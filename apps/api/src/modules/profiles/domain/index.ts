@@ -9,6 +9,7 @@ export type { AdministrativeMetadata } from './value-objects/administrative-meta
 export type { AuthSessionState } from './value-objects/auth-session-state.value-object';
 export type { BehavioralPersona } from './value-objects/behavioral-persona.value-object';
 export type { BrowserCookie } from './value-objects/browser-cookie.value-object';
+export type { ContentPreferences } from './value-objects/content-preferences.value-object';
 export type { HardwareFingerprint } from './value-objects/hardware-fingerprint.value-object';
 export type { Lifecycle } from './value-objects/lifecycle.value-object';
 export type { MacroDelayMs } from './value-objects/macro-delay-ms.value-object';

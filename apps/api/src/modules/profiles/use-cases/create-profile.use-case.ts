@@ -1,6 +1,13 @@
 import { randomBytes } from 'node:crypto';
 
-import type { BehavioralPersona, Lifecycle, NetworkIdentity, Profile, Routine } from '../domain';
+import type {
+  BehavioralPersona,
+  ContentPreferences,
+  Lifecycle,
+  NetworkIdentity,
+  Profile,
+  Routine,
+} from '../domain';
 import type { IFingerprintGenerator } from '../ports/fingerprint-generator.interface';
 import type { IProfileRepository } from '../ports/profile.repository.interface';
 
@@ -8,6 +15,7 @@ export interface CreateProfileInput {
   name: string;
   networkIdentity: NetworkIdentity;
   behavioralPersona: BehavioralPersona;
+  contentPreferences: ContentPreferences;
   routine: Routine;
   lifecycle: Lifecycle;
 }
@@ -42,6 +50,7 @@ export class CreateProfileUseCase {
         localStorageSnapshot: null,
       },
       behavioralPersona: input.behavioralPersona,
+      contentPreferences: input.contentPreferences,
       routine: input.routine,
       lifecycle: input.lifecycle,
     };

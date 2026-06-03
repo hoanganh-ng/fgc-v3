@@ -95,6 +95,7 @@ interface SerializedProfilePayload {
   hardwareFingerprint: Profile['hardwareFingerprint'];
   authSessionState: Profile['authSessionState'];
   behavioralPersona: Profile['behavioralPersona'];
+  contentPreferences: Profile['contentPreferences'];
   routine: Profile['routine'];
   lifecycle: Omit<Profile['lifecycle'], 'accountCreatedAt'> & {
     accountCreatedAt: string;
@@ -150,6 +151,7 @@ export class ProfileSqliteRepository implements IProfileRepository {
       hardwareFingerprint: profile.hardwareFingerprint,
       authSessionState: profile.authSessionState,
       behavioralPersona: profile.behavioralPersona,
+      contentPreferences: profile.contentPreferences,
       routine: profile.routine,
       lifecycle: {
         ...profile.lifecycle,
@@ -176,6 +178,7 @@ export class ProfileSqliteRepository implements IProfileRepository {
       hardwareFingerprint: payload.hardwareFingerprint,
       authSessionState: payload.authSessionState,
       behavioralPersona: payload.behavioralPersona,
+      contentPreferences: payload.contentPreferences,
       routine: payload.routine,
       lifecycle: {
         ...payload.lifecycle,

@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyPluginAsync, FastifyReply } from 'fastify'
 import type {
   AuthSessionState,
   BehavioralPersona,
+  ContentPreferences,
   Lifecycle,
   NetworkIdentity,
   Routine,
@@ -33,6 +34,7 @@ interface CreateProfileRequestBody {
   name: string;
   networkIdentity: NetworkIdentity;
   behavioralPersona: BehavioralPersona;
+  contentPreferences: ContentPreferences;
   routine: Routine;
   lifecycle: HttpLifecycle;
 }
@@ -135,6 +137,23 @@ const behavioralPersonaSchema = {
   additionalProperties: false,
 } as const;
 
+const contentPreferencesSchema = {
+  type: 'object',
+  required: ['primaryTopics', 'secondaryTopics', 'engagementProbability'],
+  properties: {
+    primaryTopics: {
+      type: 'array',
+      items: { type: 'string', minLength: 1 },
+    },
+    secondaryTopics: {
+      type: 'array',
+      items: { type: 'string', minLength: 1 },
+    },
+    engagementProbability: { type: 'number', minimum: 0, maximum: 1 },
+  },
+  additionalProperties: false,
+} as const;
+
 const activeWindowSchema = {
   type: 'object',
   required: ['start', 'end'],
@@ -187,11 +206,19 @@ const lifecycleSchema = {
 
 const createProfileBodySchema = {
   type: 'object',
-  required: ['name', 'networkIdentity', 'behavioralPersona', 'routine', 'lifecycle'],
+  required: [
+    'name',
+    'networkIdentity',
+    'behavioralPersona',
+    'contentPreferences',
+    'routine',
+    'lifecycle',
+  ],
   properties: {
     name: { type: 'string', minLength: 1 },
     networkIdentity: networkIdentitySchema,
     behavioralPersona: behavioralPersonaSchema,
+    contentPreferences: contentPreferencesSchema,
     routine: routineSchema,
     lifecycle: lifecycleSchema,
   },
@@ -357,6 +384,7 @@ function toCreateProfileInput(body: CreateProfileRequestBody): CreateProfileInpu
     name: body.name,
     networkIdentity: body.networkIdentity,
     behavioralPersona: body.behavioralPersona,
+    contentPreferences: body.contentPreferences,
     routine: body.routine,
     lifecycle: {
       ...body.lifecycle,
