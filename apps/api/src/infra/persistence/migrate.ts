@@ -1,13 +1,12 @@
 import { readdir, readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { sql } from "kysely";
 import { loadConfig } from "../../config.js";
 import { createDatabase } from "./database.js";
 
 const config = loadConfig();
 const db = createDatabase(config.DATABASE_URL);
-const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "../../../migrations");
+const migrationsDir = join(process.cwd(), "migrations");
 
 try {
   const files = (await readdir(migrationsDir))

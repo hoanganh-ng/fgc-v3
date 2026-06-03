@@ -15,11 +15,15 @@ import {
 } from "@dtpm/contracts";
 import type { z } from "zod";
 
-const baseUrl = import.meta.env["VITE_API_BASE_URL"] ?? "http://localhost:3000";
+const runtimeConfig = window.__DTPM_CONFIG__ ?? {};
+const baseUrl = runtimeConfig.API_BASE_URL ?? import.meta.env["VITE_API_BASE_URL"] ?? "http://localhost:3000";
 const apiKeyStorageKey = "dtpm.adminApiKey";
 
 export function getStoredApiKey(): string {
-  return localStorage.getItem(apiKeyStorageKey) ?? import.meta.env["VITE_ADMIN_API_KEY"] ?? "";
+  return localStorage.getItem(apiKeyStorageKey) ??
+    runtimeConfig.ADMIN_API_KEY ??
+    import.meta.env["VITE_ADMIN_API_KEY"] ??
+    "";
 }
 
 export function storeApiKey(value: string): void {

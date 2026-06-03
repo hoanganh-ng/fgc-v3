@@ -1,0 +1,10 @@
+.git/
+.codex-log/
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+*.log
+Dockerfile*
+docker-compose*.yml

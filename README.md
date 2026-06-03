@@ -20,3 +20,22 @@ Use Node.js 24 LTS and pnpm 10.
 5. Start the API and Web UI dev servers.
 
 The API listens on `http://localhost:3000` by default. The Web UI listens on `http://localhost:5173` by default.
+
+## Docker
+
+The repository includes Docker images for the API and Web UI plus Compose orchestration for Postgres, migrations, API, and web.
+
+```bash
+docker compose up --build
+```
+
+Compose exposes:
+
+- Web UI: `http://localhost:8081`
+- API proxy: `http://localhost:8081/api`
+- API docs: `http://localhost:8081/api/docs`
+- Postgres: `localhost:5432`
+
+The `api-migrate` service runs `apps/api/migrations` before the API starts. The API is private to the Compose network and is reached by the browser through the Web container's `/api` nginx proxy. The Web UI writes `/config.js` at container startup from `API_BASE_URL` and `ADMIN_API_KEY`, so the same built image can point at different API deployments.
+
+For local Compose, the default admin API key is `change-me-development-key`. Do not use that value in production.
