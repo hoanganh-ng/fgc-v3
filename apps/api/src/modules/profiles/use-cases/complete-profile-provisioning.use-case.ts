@@ -1,6 +1,6 @@
-import type { AuthSessionState, Profile } from '../domain';
-import { InvalidProfileStatusError, ProfileNotFoundError } from '../profile.errors';
-import type { IProfileRepository } from '../ports/profile.repository.interface';
+import type { AuthSessionState, Profile } from '../domain/index.js';
+import { InvalidProfileStatusError, ProfileNotFoundError } from '../profile.errors.js';
+import type { IProfileRepository } from '../ports/profile.repository.interface.js';
 
 export class CompleteProfileProvisioningUseCase {
   constructor(private readonly profileRepository: IProfileRepository) {}

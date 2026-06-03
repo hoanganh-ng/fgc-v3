@@ -1,4 +1,4 @@
-import type { ProfileStatus } from './domain';
+import type { ProfileStatus } from './domain/index.js';
 
 export class ProfileNotFoundError extends Error {
   constructor() {

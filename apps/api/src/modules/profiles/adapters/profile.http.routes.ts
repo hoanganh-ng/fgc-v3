@@ -7,14 +7,14 @@ import type {
   Lifecycle,
   NetworkIdentity,
   Routine,
-} from '../domain';
-import { InvalidProfileStatusError, ProfileNotFoundError } from '../profile.errors';
-import type { CompleteProfileProvisioningUseCase } from '../use-cases/complete-profile-provisioning.use-case';
+} from '../domain/index.js';
+import { InvalidProfileStatusError, ProfileNotFoundError } from '../profile.errors.js';
+import type { CompleteProfileProvisioningUseCase } from '../use-cases/complete-profile-provisioning.use-case.js';
 import type {
   CreateProfileInput,
   CreateProfileUseCase,
-} from '../use-cases/create-profile.use-case';
-import type { GetProfileByTokenUseCase } from '../use-cases/get-profile-by-token.use-case';
+} from '../use-cases/create-profile.use-case.js';
+import type { GetProfileByTokenUseCase } from '../use-cases/get-profile-by-token.use-case.js';
 
 export interface ProfileHttpRoutesOptions {
   createProfileUseCase: CreateProfileUseCase;

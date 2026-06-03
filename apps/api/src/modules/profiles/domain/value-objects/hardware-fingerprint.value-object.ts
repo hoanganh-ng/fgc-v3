@@ -1,4 +1,4 @@
-import type { Viewport } from './viewport.value-object';
+import type { Viewport } from './viewport.value-object.js';
 
 export interface HardwareFingerprint {
   userAgent: string;

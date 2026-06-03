@@ -1,4 +1,4 @@
-import type { ProfileStatus } from '../types/profile-status.type';
+import type { ProfileStatus } from '../types/profile-status.type.js';
 
 export interface AdministrativeMetadata {
   id: string;

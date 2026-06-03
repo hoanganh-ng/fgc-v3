@@ -7,9 +7,9 @@ import type {
   NetworkIdentity,
   Profile,
   Routine,
-} from '../domain';
-import type { IFingerprintGenerator } from '../ports/fingerprint-generator.interface';
-import type { IProfileRepository } from '../ports/profile.repository.interface';
+} from '../domain/index.js';
+import type { IFingerprintGenerator } from '../ports/fingerprint-generator.interface.js';
+import type { IProfileRepository } from '../ports/profile.repository.interface.js';
 
 export interface CreateProfileInput {
   name: string;

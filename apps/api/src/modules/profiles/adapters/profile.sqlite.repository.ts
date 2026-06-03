@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import type { Profile, ProfileStatus } from '../domain';
-import type { IProfileRepository } from '../ports/profile.repository.interface';
+import type { Profile, ProfileStatus } from '../domain/index.js';
+import type { IProfileRepository } from '../ports/profile.repository.interface.js';
 
 export const PROFILE_SQLITE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS profiles (

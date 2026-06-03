@@ -1,4 +1,4 @@
-import type { Profile } from '../domain';
+import type { Profile } from '../domain/index.js';
 
 export interface IProfileRepository {
   save(profile: Profile): Promise<void>;
