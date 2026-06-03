@@ -13,12 +13,17 @@
     "dev": "pnpm --parallel --filter @dtpm/api --filter @dtpm/web dev",
     "dev:api": "pnpm --filter @dtpm/api dev",
     "dev:web": "pnpm --filter @dtpm/web dev",
-    "lint": "pnpm -r --sort lint",
+    "lint": "pnpm -r --sort lint && eslint playwright.config.ts e2e",
+    "playwright:install": "playwright install chromium",
     "test": "pnpm -r --sort test",
-    "typecheck": "pnpm -r --sort typecheck"
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "typecheck": "pnpm -r --sort typecheck && pnpm typecheck:e2e",
+    "typecheck:e2e": "tsc -p tsconfig.e2e.json --noEmit --pretty false"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^24.0.0",
     "eslint": "^9.18.0",
     "eslint-plugin-vue": "^9.32.0",

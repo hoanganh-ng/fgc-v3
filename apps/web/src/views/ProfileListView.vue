@@ -79,7 +79,7 @@ function statusSeverity(status: string) {
 
     <Toolbar class="toolbar">
       <template #start>
-        <Button severity="secondary" outlined @click="() => profilesQuery.refetch()">
+        <Button severity="secondary" outlined aria-label="Refresh profiles" @click="() => profilesQuery.refetch()">
           <RefreshCw :size="16" />
         </Button>
       </template>
@@ -98,6 +98,7 @@ function statusSeverity(status: string) {
     <DataTable
       :value="profiles"
       data-key="id"
+      data-testid="profile-table"
       :loading="profilesQuery.isLoading.value"
       table-style="min-width: 52rem"
       class="profile-table"

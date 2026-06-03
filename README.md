@@ -39,3 +39,14 @@ Compose exposes:
 The `api-migrate` service runs `apps/api/migrations` before the API starts. The API is private to the Compose network and is reached by the browser through the Web container's `/api` nginx proxy. The Web UI writes `/config.js` at container startup from `API_BASE_URL` and `ADMIN_API_KEY`, so the same built image can point at different API deployments.
 
 For local Compose, the default admin API key is `change-me-development-key`. Do not use that value in production.
+
+## E2E Tests
+
+Playwright E2E tests run against an isolated Docker Compose project named `dtpm-e2e`. The suite exposes the Web UI on `http://127.0.0.1:18081`, uses a separate Postgres host port `15432`, and tears the stack down with volumes when tests finish.
+
+```bash
+pnpm playwright:install
+pnpm test:e2e
+```
+
+Set `E2E_KEEP_STACK=1` to keep the Compose stack running after a test failure for inspection.

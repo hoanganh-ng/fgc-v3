@@ -55,6 +55,8 @@ Run from the repository root unless scoped work makes a narrower command suffici
 - Install: `pnpm install`
 - Type check: `pnpm typecheck`
 - Test: `pnpm test`
+- Install Playwright browser: `pnpm playwright:install`
+- E2E test: `pnpm test:e2e`
 - Lint: `pnpm lint`
 - Build: `pnpm build`
 - API dev server: `pnpm dev:api`
@@ -70,6 +72,7 @@ For local Postgres, use Docker Compose from the repo root. The Compose stack inc
 - For API contract changes, update `packages/contracts` schemas and contract tests.
 - For HTTP behavior changes, update `apps/api` route tests.
 - For Web UI behavior changes, update `apps/web` tests when practical.
+- For full browser workflow changes, update `e2e` Playwright tests when practical.
 - Before handing work back, run at least `pnpm typecheck`, `pnpm test`, and `pnpm lint`; run `pnpm build` for scaffold, dependency, or frontend changes.
 
 ## Git Safety

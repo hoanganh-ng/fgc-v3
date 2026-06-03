@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:${POSTGRES_IMAGE_TAG:-17}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: dtpm
       POSTGRES_PASSWORD: dtpm
@@ -67,7 +67,7 @@ services:
     environment:
       WEB_PORT: 80
       API_BASE_URL: /api
-      ADMIN_API_KEY: ${WEB_ADMIN_API_KEY:-}
+      ADMIN_API_KEY: ${WEB_ADMIN_API_KEY:-change-me-development-key}
     depends_on:
       api:
         condition: service_healthy

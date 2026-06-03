@@ -122,7 +122,7 @@ function statusSeverity(status: string | undefined) {
 <template>
   <main class="shell">
     <header class="detail-header">
-      <Button severity="secondary" text @click="router.push('/')">
+      <Button severity="secondary" text aria-label="Back to profiles" @click="router.push('/')">
         <ArrowLeft :size="16" />
       </Button>
       <div>
@@ -132,6 +132,7 @@ function statusSeverity(status: string | undefined) {
       <Tag
         :value="profileQuery.data.value?.status ?? 'LOADING'"
         :severity="statusSeverity(profileQuery.data.value?.status)"
+        data-testid="profile-status"
       />
     </header>
 
@@ -142,7 +143,13 @@ function statusSeverity(status: string | undefined) {
 
     <section class="detail-grid">
       <Panel header="Configuration">
-        <Textarea v-model="configText" rows="24" class="json-editor" />
+        <Textarea
+          v-model="configText"
+          rows="24"
+          class="json-editor"
+          aria-label="Profile configuration JSON"
+          data-testid="profile-configuration-json"
+        />
         <div class="action-row">
           <Button :loading="configureMutation.isPending.value" @click="() => configureMutation.mutate()">
             <Save :size="16" />
@@ -185,7 +192,7 @@ function statusSeverity(status: string | undefined) {
             <span>Release lease</span>
           </Button>
         </div>
-        <div v-if="provisioningToken" class="token-box">
+        <div v-if="provisioningToken" class="token-box" data-testid="provisioning-token">
           {{ provisioningToken }}
         </div>
       </Panel>
