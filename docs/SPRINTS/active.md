@@ -1,5 +1,5 @@
 # Active Sprint
 
-Active sprint: `docs/SPRINTS/SPRINT-009-postgresql-repository-integration-verification.md`
+Active sprint: `docs/SPRINTS/SPRINT-010-composition-root-and-service-wiring.md`
 
-Only Sprint 009 should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.
+Only Sprint 010 should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.

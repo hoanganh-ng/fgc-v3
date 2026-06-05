@@ -12,11 +12,11 @@ The current focus is the Content Collector stage. The first core module is the C
 
 ## Current Sprint
 
-Sprint 009: PostgreSQL Repository Integration Verification
+Sprint 010: Composition Root and Service Wiring
 
-Active sprint file: `docs/SPRINTS/SPRINT-009-postgresql-repository-integration-verification.md`
+Active sprint file: `docs/SPRINTS/SPRINT-010-composition-root-and-service-wiring.md`
 
-Sprint 009 adds optional PostgreSQL integration verification for the Collector Profile Manager repository adapters and transaction manager while keeping the default test suite database-free. It may add `RUN_DB_TESTS=true` gated infrastructure integration tests, a `test:db` package script, local database setup documentation, and repository or mapper fixes only when a real adapter integration bug is found. No HTTP route, browser automation, worker, queue, frontend UI, Collector Runtime execution, Content Builder code, Content Publisher code, production deployment configuration, or authentication system should happen in this sprint.
+Sprint 010 adds the Collector Profile Manager composition root and production service wiring while preserving the hexagonal boundary. It may add outer-layer composition files, simple system port implementations, `DATABASE_URL` config loading, resource shutdown wiring, and database-free tests for composition and boundary safety. No HTTP route, browser automation, worker, queue, frontend UI, Collector Runtime execution, Content Builder code, Content Publisher code, production dependency injection framework, authentication system, or database schema redesign should happen in this sprint.
 
 ## Decided Items
 
@@ -41,6 +41,7 @@ Sprint 009 adds optional PostgreSQL integration verification for the Collector P
 - Sprint 007 selects PostgreSQL as the first persistence target with Drizzle for TypeScript schema and migrations and node-postgres as the driver, while deferring repository adapters.
 - Sprint 008 implements PostgreSQL repository adapters in infrastructure, keeps transaction support behind an application-owned abstraction, and uses deterministic infrastructure hashing for persisted provisioning token lookup.
 - Sprint 009 keeps default tests database-free and adds opt-in PostgreSQL integration verification for repository adapters and transaction behavior.
+- Sprint 010 introduces the composition root as the outer boundary that wires Collector Profile Manager use cases to infrastructure adapters and system port implementations.
 
 ## Not Decided Yet
 
