@@ -12,11 +12,11 @@ The current focus is the Content Collector stage. The first core module is the C
 
 ## Current Sprint
 
-Sprint 010: Composition Root and Service Wiring
+Sprint 011: HTTP API Adapter
 
-Active sprint file: `docs/SPRINTS/SPRINT-010-composition-root-and-service-wiring.md`
+Active sprint file: `docs/SPRINTS/SPRINT-011-http-api-adapter.md`
 
-Sprint 010 adds the Collector Profile Manager composition root and production service wiring while preserving the hexagonal boundary. It may add outer-layer composition files, simple system port implementations, `DATABASE_URL` config loading, resource shutdown wiring, and database-free tests for composition and boundary safety. No HTTP route, browser automation, worker, queue, frontend UI, Collector Runtime execution, Content Builder code, Content Publisher code, production dependency injection framework, authentication system, or database schema redesign should happen in this sprint.
+Sprint 011 adds the first Fastify HTTP adapter for the Collector Profile Manager while preserving the hexagonal boundary. It may add outer-layer HTTP server, route, schema, error mapping, runtime entrypoint, environment, script, documentation, and database-free HTTP adapter test code. Domain and application layers must remain independent from Fastify, HTTP, PostgreSQL, Drizzle, database clients, browser automation, queues, framework code, infrastructure, and composition dependencies. No frontend UI, browser automation, worker, queue, Collector Runtime execution, Content Builder code, Content Publisher code, authentication system, production deployment config, complex API versioning, or database schema redesign should happen in this sprint.
 
 ## Decided Items
 
@@ -42,18 +42,18 @@ Sprint 010 adds the Collector Profile Manager composition root and production se
 - Sprint 008 implements PostgreSQL repository adapters in infrastructure, keeps transaction support behind an application-owned abstraction, and uses deterministic infrastructure hashing for persisted provisioning token lookup.
 - Sprint 009 keeps default tests database-free and adds opt-in PostgreSQL integration verification for repository adapters and transaction behavior.
 - Sprint 010 introduces the composition root as the outer boundary that wires Collector Profile Manager use cases to infrastructure adapters and system port implementations.
+- Sprint 011 introduces Fastify as the first HTTP adapter at the outer interface layer, with validation and centralized error mapping while leaving authentication deferred.
 
 ## Not Decided Yet
 
-- Backend runtime and framework outside the current domain source.
 - Frontend runtime, framework, and component system.
 - Browser automation framework.
 - Queue, event bus, or scheduler technology.
 - Deployment platform and infrastructure.
 - Authentication and authorization approach for management interfaces.
 - Observability stack.
-- Concrete API contracts.
-- Backend runtime and framework outside TypeScript domain tooling.
+- API contracts beyond the initial Collector Profile Manager HTTP routes.
+- Backend runtime concerns beyond the minimal Fastify entrypoint.
 
 ## Open Questions
 

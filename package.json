@@ -5,6 +5,9 @@
   "type": "module",
   "packageManager": "pnpm@10.5.2",
   "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:db": "RUN_DB_TESTS=true vitest run src/infrastructure",
@@ -14,11 +17,13 @@
   "devDependencies": {
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.3",
     "vitest": "^3.2.6"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
+    "fastify": "^5.8.5",
     "pg": "^8.21.0",
     "zod": "^4.4.3"
   }
