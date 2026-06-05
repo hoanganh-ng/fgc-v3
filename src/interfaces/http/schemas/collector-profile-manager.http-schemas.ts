@@ -9,10 +9,14 @@ import {
   NetworkContextSchema,
   ProfileIdSchema,
   ProfileLeaseIdSchema,
+  ProfileStatusSchema,
   SafetyThresholdsSchema,
   TemporalRoutineSchema,
 } from "../../../collector-profile-manager/domain";
 import type { ValidationIssue } from "../../../collector-profile-manager/domain";
+import {
+  MAX_PROFILE_LIST_LIMIT,
+} from "../../../collector-profile-manager/application";
 
 export class HttpRequestValidationError extends Error {
   public readonly issues: readonly ValidationIssue[];
@@ -62,6 +66,19 @@ export const ProvisioningTokenHttpParamsSchema = z
 export const ProfileLeaseIdHttpParamsSchema = z
   .object({
     leaseId: ProfileLeaseIdSchema,
+  })
+  .strict();
+
+export const ListProfilesHttpQuerySchema = z
+  .object({
+    status: ProfileStatusSchema.optional(),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_PROFILE_LIST_LIMIT)
+      .optional(),
+    offset: z.coerce.number().int().min(0).optional(),
   })
   .strict();
 
@@ -118,6 +135,9 @@ export type ProvisioningTokenHttpParams = z.infer<
 export type ProfileLeaseIdHttpParams = z.infer<
   typeof ProfileLeaseIdHttpParamsSchema
 >;
+export type ListProfilesHttpQuery = z.infer<
+  typeof ListProfilesHttpQuerySchema
+>;
 export type UpdateProfileConfigurationHttpBody = z.infer<
   typeof UpdateProfileConfigurationHttpBodySchema
 >;
@@ -132,12 +152,16 @@ export type ReleaseProfileLeaseHttpBody = z.infer<
 >;
 
 const nonEmptyStringJsonSchema = { type: "string", minLength: 1 } as const;
+const stringJsonSchema = { type: "string" } as const;
 const nullableIsoDateTimeJsonSchema = {
   anyOf: [{ type: "string" }, { type: "null" }],
 } as const;
 const looseObjectJsonSchema = {
   type: "object",
   additionalProperties: true,
+} as const;
+const nullableLooseObjectJsonSchema = {
+  anyOf: [looseObjectJsonSchema, { type: "null" }],
 } as const;
 
 const errorResponseJsonSchema = {
@@ -213,6 +237,122 @@ const profileSummaryJsonSchema = {
   },
 } as const;
 
+const profileReadSummaryJsonSchema = {
+  type: "object",
+  required: [
+    "id",
+    "displayName",
+    "status",
+    "timezone",
+    "createdAt",
+    "updatedAt",
+    "lastCheckoutAt",
+    "lastReleasedAt",
+    "nextAvailableAt",
+    "dailyUsage",
+    "hasHardwareFingerprint",
+    "hasAuthenticationState",
+  ],
+  additionalProperties: false,
+  properties: {
+    id: nonEmptyStringJsonSchema,
+    displayName: nonEmptyStringJsonSchema,
+    status: {
+      type: "string",
+      enum: ["PENDING_CONFIG", "PENDING_LOGIN", "READY", "BUSY"],
+    },
+    timezone: stringJsonSchema,
+    createdAt: nonEmptyStringJsonSchema,
+    updatedAt: nonEmptyStringJsonSchema,
+    lastCheckoutAt: nullableIsoDateTimeJsonSchema,
+    lastReleasedAt: nullableIsoDateTimeJsonSchema,
+    nextAvailableAt: nullableIsoDateTimeJsonSchema,
+    dailyUsage: dailyUsageJsonSchema,
+    hasHardwareFingerprint: { type: "boolean" },
+    hasAuthenticationState: { type: "boolean" },
+    externalReference: nonEmptyStringJsonSchema,
+    labels: {
+      type: "array",
+      items: nonEmptyStringJsonSchema,
+    },
+  },
+} as const;
+
+const profileDetailJsonSchema = {
+  type: "object",
+  required: [
+    "id",
+    "displayName",
+    "status",
+    "timezone",
+    "createdAt",
+    "updatedAt",
+    "lastCheckoutAt",
+    "lastReleasedAt",
+    "nextAvailableAt",
+    "dailyUsage",
+    "hasHardwareFingerprint",
+    "hasAuthenticationState",
+    "networkContext",
+    "hardwareFingerprint",
+    "behavioralPersona",
+    "temporalRoutine",
+    "safetyThresholds",
+    "contentAffinities",
+  ],
+  additionalProperties: false,
+  properties: {
+    ...profileReadSummaryJsonSchema.properties,
+    networkContext: looseObjectJsonSchema,
+    hardwareFingerprint: nullableLooseObjectJsonSchema,
+    behavioralPersona: looseObjectJsonSchema,
+    temporalRoutine: looseObjectJsonSchema,
+    safetyThresholds: looseObjectJsonSchema,
+    contentAffinities: looseObjectJsonSchema,
+  },
+} as const;
+
+const listProfilesQueryJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    status: {
+      type: "string",
+      enum: ["PENDING_CONFIG", "PENDING_LOGIN", "READY", "BUSY"],
+    },
+    limit: {
+      type: "integer",
+      minimum: 1,
+      maximum: MAX_PROFILE_LIST_LIMIT,
+    },
+    offset: {
+      type: "integer",
+      minimum: 0,
+    },
+  },
+} as const;
+
+const listProfilesPageJsonSchema = {
+  type: "object",
+  required: ["limit", "offset"],
+  additionalProperties: false,
+  properties: {
+    limit: {
+      type: "integer",
+      minimum: 1,
+      maximum: MAX_PROFILE_LIST_LIMIT,
+    },
+    offset: {
+      type: "integer",
+      minimum: 0,
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+    },
+  },
+} as const;
+
 const profileLeaseJsonSchema = {
   type: "object",
   required: ["id", "profileId", "leasedAt", "expiresAt", "releasedAt", "status"],
@@ -254,6 +394,42 @@ const profileLeaseIdParamsJsonSchema = {
   additionalProperties: false,
   properties: {
     leaseId: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+export const listProfilesHttpRouteSchema = {
+  querystring: listProfilesQueryJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["items", "page"],
+      additionalProperties: false,
+      properties: {
+        items: {
+          type: "array",
+          items: profileReadSummaryJsonSchema,
+        },
+        page: listProfilesPageJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const getProfileHttpRouteSchema = {
+  params: profileIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["profile"],
+      additionalProperties: false,
+      properties: {
+        profile: profileDetailJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
   },
 } as const;
 

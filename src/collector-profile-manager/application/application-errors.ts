@@ -10,6 +10,7 @@ export type CollectorProfileApplicationErrorCode =
   | "PROFILE_NOT_FOUND"
   | "PROFILE_ALREADY_EXISTS"
   | "INVALID_PROFILE_CONFIGURATION"
+  | "INVALID_PROFILE_QUERY"
   | "INVALID_PROVISIONING_TOKEN"
   | "PROVISIONING_TOKEN_EXPIRED"
   | "PROVISIONING_TOKEN_CONSUMED"
@@ -65,6 +66,15 @@ export class InvalidProfileConfigurationError extends CollectorProfileApplicatio
       "INVALID_PROFILE_CONFIGURATION",
       "Collector profile configuration is invalid.",
     );
+    this.issues = issues;
+  }
+}
+
+export class InvalidProfileQueryError extends CollectorProfileApplicationError {
+  public readonly issues: readonly ValidationIssue[];
+
+  public constructor(issues: readonly ValidationIssue[]) {
+    super("INVALID_PROFILE_QUERY", "Collector profile query is invalid.");
     this.issues = issues;
   }
 }

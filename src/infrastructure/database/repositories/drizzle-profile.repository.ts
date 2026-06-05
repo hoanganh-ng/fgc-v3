@@ -10,6 +10,8 @@ import {
 } from "drizzle-orm";
 import type {
   ProfileCheckoutCandidateQuery,
+  ProfileListQuery,
+  ProfileListResult,
   ProfileRepository,
 } from "../../../collector-profile-manager/application";
 import type {
@@ -78,6 +80,40 @@ export class DrizzleProfileRepository implements ProfileRepository {
     return row === undefined ? null : toCollectorProfileDomain(row);
   }
 
+  public async listProfiles(
+    query: ProfileListQuery,
+  ): Promise<ProfileListResult> {
+    const offset = query.offset ?? 0;
+
+    if (query.status === undefined) {
+      const rows = await this.db
+        .select()
+        .from(collectorProfiles)
+        .orderBy(asc(collectorProfiles.createdAt), asc(collectorProfiles.id))
+        .limit(query.limit)
+        .offset(offset);
+      const [totalRow] = await this.db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(collectorProfiles);
+
+      return toProfileListResult(rows, totalRow?.total);
+    }
+
+    const rows = await this.db
+      .select()
+      .from(collectorProfiles)
+      .where(eq(collectorProfiles.status, query.status))
+      .orderBy(asc(collectorProfiles.createdAt), asc(collectorProfiles.id))
+      .limit(query.limit)
+      .offset(offset);
+    const [totalRow] = await this.db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(collectorProfiles)
+      .where(eq(collectorProfiles.status, query.status));
+
+    return toProfileListResult(rows, totalRow?.total);
+  }
+
   public async findCheckoutCandidates(
     query: ProfileCheckoutCandidateQuery,
   ): Promise<readonly CollectorProfile[]> {
@@ -141,4 +177,22 @@ export class DrizzleProfileRepository implements ProfileRepository {
 
     return rows.length > 0;
   }
+}
+
+function toProfileListResult(
+  rows: readonly (typeof collectorProfiles.$inferSelect)[],
+  totalValue: number | undefined,
+): ProfileListResult {
+  const items = rows.map((row) => toCollectorProfileDomain(row));
+
+  if (totalValue === undefined) {
+    return {
+      items,
+    };
+  }
+
+  return {
+    items,
+    total: Number(totalValue),
+  };
 }

@@ -3,8 +3,12 @@ import type {
   CheckoutProfileInput,
   CheckoutProfileOutput,
   CreateProfileInput,
+  GetProfileInput,
   GetProvisioningConfigurationInput,
   IngestProfileSessionInput,
+  ListProfilesInput,
+  ListProfilesOutput,
+  ProfileDetail,
   ProvisioningConfiguration,
   ReleaseProfileLeaseInput,
   ReleaseProfileLeaseOutput,
@@ -24,6 +28,7 @@ import type {
 import {
   CheckoutProfileHttpBodySchema,
   CreateProfileHttpBodySchema,
+  ListProfilesHttpQuerySchema,
   IngestProfileSessionHttpBodySchema,
   ProfileIdHttpParamsSchema,
   ProfileLeaseIdHttpParamsSchema,
@@ -33,7 +38,9 @@ import {
   checkoutProfileHttpRouteSchema,
   createProfileHttpRouteSchema,
   getProvisioningConfigurationHttpRouteSchema,
+  getProfileHttpRouteSchema,
   ingestProfileSessionHttpRouteSchema,
+  listProfilesHttpRouteSchema,
   parseHttpInput,
   releaseProfileLeaseHttpRouteSchema,
   startProfileProvisioningHttpRouteSchema,
@@ -48,6 +55,11 @@ export interface CollectorProfileManagerHttpService {
   readonly createProfile: ExecutableUseCase<
     CreateProfileInput,
     CollectorProfile
+  >;
+  readonly getProfile: ExecutableUseCase<GetProfileInput, ProfileDetail>;
+  readonly listProfiles: ExecutableUseCase<
+    ListProfilesInput,
+    ListProfilesOutput
   >;
   readonly updateProfileConfiguration: ExecutableUseCase<
     UpdateProfileConfigurationInput,
@@ -99,6 +111,42 @@ export function registerCollectorProfileManagerRoutes(
   options: RegisterCollectorProfileManagerRoutesOptions,
 ): void {
   const { collectorProfileManager } = options;
+
+  server.get(
+    "/collector/profiles",
+    { schema: listProfilesHttpRouteSchema },
+    async (request) => {
+      const query = parseHttpInput(
+        ListProfilesHttpQuerySchema,
+        request.query,
+      );
+      const input = {
+        ...(query.status !== undefined ? { status: query.status } : {}),
+        ...(query.limit !== undefined ? { limit: query.limit } : {}),
+        ...(query.offset !== undefined ? { offset: query.offset } : {}),
+      } satisfies ListProfilesInput;
+
+      return collectorProfileManager.listProfiles.execute(input);
+    },
+  );
+
+  server.get(
+    "/collector/profiles/:profileId",
+    { schema: getProfileHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileIdHttpParamsSchema,
+        request.params,
+      );
+      const profile = await collectorProfileManager.getProfile.execute({
+        profileId: params.profileId,
+      });
+
+      return {
+        profile,
+      };
+    },
+  );
 
   server.post(
     "/collector/profiles",

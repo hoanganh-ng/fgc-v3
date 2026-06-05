@@ -6,6 +6,8 @@ import type {
 } from "../../domain";
 import type {
   ProfileCheckoutCandidateQuery,
+  ProfileListQuery,
+  ProfileListResult,
   ProfileRepository,
 } from "../ports/profile-repository.port";
 import type { ProfileLeaseRepository } from "../ports/profile-lease-repository.port";
@@ -19,6 +21,25 @@ export class InMemoryProfileRepository implements ProfileRepository {
 
   public async findById(id: ProfileId): Promise<CollectorProfile | null> {
     return this.profiles.get(id) ?? null;
+  }
+
+  public async listProfiles(
+    query: ProfileListQuery,
+  ): Promise<ProfileListResult> {
+    const offset = query.offset ?? 0;
+    const matchingProfiles = [...this.profiles.values()]
+      .filter(
+        (profile) =>
+          query.status === undefined ||
+          profile.identity.status === query.status,
+      )
+      .sort(compareProfilesByCreatedAt);
+    const items = matchingProfiles.slice(offset, offset + query.limit);
+
+    return {
+      items,
+      total: matchingProfiles.length,
+    };
   }
 
   public async findCheckoutCandidates(
@@ -72,6 +93,20 @@ export class InMemoryProfileRepository implements ProfileRepository {
 
     return false;
   }
+}
+
+function compareProfilesByCreatedAt(
+  left: CollectorProfile,
+  right: CollectorProfile,
+): number {
+  const leftCreatedAt = Date.parse(left.identity.createdAt);
+  const rightCreatedAt = Date.parse(right.identity.createdAt);
+
+  if (leftCreatedAt !== rightCreatedAt) {
+    return leftCreatedAt - rightCreatedAt;
+  }
+
+  return left.identity.id.localeCompare(right.identity.id);
 }
 
 export class InMemoryProfileLeaseRepository implements ProfileLeaseRepository {

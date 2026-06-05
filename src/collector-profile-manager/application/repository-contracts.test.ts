@@ -98,6 +98,28 @@ describe("collector profile repository contract", () => {
       "ready-now",
     ]);
   });
+
+  it("lists profiles by status with limit and offset", async () => {
+    const repository = new InMemoryProfileRepository();
+    const readyOne = createProfile("ready-1", "READY");
+    const readyTwo = createProfile("ready-2", "READY");
+    const busy = createProfile("busy-1", "BUSY");
+
+    await repository.save(readyOne);
+    await repository.save(readyTwo);
+    await repository.save(busy);
+
+    const page = await repository.listProfiles({
+      status: "READY",
+      limit: 1,
+      offset: 1,
+    });
+
+    expect(page.items.map((profile) => profile.identity.id)).toEqual([
+      "ready-2",
+    ]);
+    expect(page.total).toBe(2);
+  });
 });
 
 describe("profile lease repository contract", () => {

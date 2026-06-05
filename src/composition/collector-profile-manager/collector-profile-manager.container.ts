@@ -1,8 +1,10 @@
 import {
   CheckoutProfileUseCase,
   CreateProfileUseCase,
+  GetProfileUseCase,
   GetProvisioningConfigurationUseCase,
   IngestProfileSessionUseCase,
+  ListProfilesUseCase,
   ReleaseProfileLeaseUseCase,
   StartProfileProvisioningUseCase,
   UpdateProfileConfigurationUseCase,
@@ -28,6 +30,8 @@ export interface CollectorProfileManagerDependencies {
 
 export interface CollectorProfileManagerContainer {
   readonly createProfile: CreateProfileUseCase;
+  readonly getProfile: GetProfileUseCase;
+  readonly listProfiles: ListProfilesUseCase;
   readonly updateProfileConfiguration: UpdateProfileConfigurationUseCase;
   readonly startProfileProvisioning: StartProfileProvisioningUseCase;
   readonly getProvisioningConfiguration: GetProvisioningConfigurationUseCase;
@@ -51,6 +55,8 @@ export function createCollectorProfileManager(
 
   return {
     createProfile: new CreateProfileUseCase(profiles, clock),
+    getProfile: new GetProfileUseCase(profiles),
+    listProfiles: new ListProfilesUseCase(profiles),
     updateProfileConfiguration: new UpdateProfileConfigurationUseCase(
       profiles,
       clock,

@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   CheckoutProfileUseCase,
   CreateProfileUseCase,
+  GetProfileUseCase,
   GetProvisioningConfigurationUseCase,
   IngestProfileSessionUseCase,
+  ListProfilesUseCase,
   ReleaseProfileLeaseUseCase,
   StartProfileProvisioningUseCase,
   UpdateProfileConfigurationUseCase,
@@ -32,6 +34,8 @@ describe("collector profile manager composition container", () => {
     });
 
     expect(services.createProfile).toBeInstanceOf(CreateProfileUseCase);
+    expect(services.getProfile).toBeInstanceOf(GetProfileUseCase);
+    expect(services.listProfiles).toBeInstanceOf(ListProfilesUseCase);
     expect(services.updateProfileConfiguration).toBeInstanceOf(
       UpdateProfileConfigurationUseCase,
     );

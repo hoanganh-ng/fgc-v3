@@ -36,7 +36,7 @@ Management-style profile responses return profile summaries that omit authentica
 
 Authentication is deferred. This HTTP adapter is not production-safe for public exposure until a future sprint adds access control. Fastify request logging remains disabled by default to avoid logging provisioning tokens in URLs.
 
-`GET /collector/profiles/:profileId` is deferred because the current application layer does not have a dedicated read use case.
+`GET /collector/profiles/:profileId` was deferred in Sprint 011 because the application layer did not yet have a dedicated read use case. Sprint 012 adds that read use case and exposes the route through safe read DTOs.
 
 ## Consequences
 

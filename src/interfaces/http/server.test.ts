@@ -2,13 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   InvalidApplicationOperationError,
   ProfileNotFoundError,
+  toProfileDetailDto,
+  toProfileSummaryDto,
 } from "../../collector-profile-manager/application";
 import type {
   CheckoutProfileInput,
   CheckoutProfileOutput,
   CreateProfileInput,
+  GetProfileInput,
   GetProvisioningConfigurationInput,
   IngestProfileSessionInput,
+  ListProfilesInput,
+  ListProfilesOutput,
+  ProfileDetail,
   ProvisioningConfiguration,
   ReleaseProfileLeaseInput,
   ReleaseProfileLeaseOutput,
@@ -51,6 +57,182 @@ describe("HTTP server", () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({ status: "ok" });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("lists profiles through the Collector Profile Manager service", async () => {
+    const { server, service } = createTestServer();
+
+    service.listProfiles.setOutput({
+      items: [
+        toProfileSummaryDto(
+          createProfile({
+            status: "READY",
+            authenticationState: createAuthenticationState(),
+            provisioningTokenStatus: "CONSUMED",
+          }),
+        ),
+      ],
+      page: {
+        limit: 10,
+        offset: 0,
+        total: 1,
+      },
+    });
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles?status=READY&limit=10&offset=0",
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(service.listProfiles.calls).toEqual([
+        {
+          status: "READY",
+          limit: 10,
+          offset: 0,
+        },
+      ]);
+      expect(body).toMatchObject({
+        items: [
+          {
+            id: "profile-1",
+            displayName: "Profile 1",
+            status: "READY",
+            timezone: "America/Los_Angeles",
+            hasAuthenticationState: true,
+          },
+        ],
+        page: {
+          limit: 10,
+          offset: 0,
+          total: 1,
+        },
+      });
+      expect(body.items[0]).not.toHaveProperty("authenticationState");
+      expect(body.items[0]).not.toHaveProperty("provisioningToken");
+      expect(body.items[0]).not.toHaveProperty("provisioningTokenStatus");
+      expect(JSON.stringify(body)).not.toContain("session-cookie-value");
+      expect(JSON.stringify(body)).not.toContain("local-storage-value");
+      expect(JSON.stringify(body)).not.toContain("provisioning-token-1");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 for invalid profile list status query", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles?status=UNKNOWN",
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "VALIDATION_ERROR",
+        },
+      });
+      expect(service.listProfiles.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 for invalid profile list limit query", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles?limit=0",
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "VALIDATION_ERROR",
+        },
+      });
+      expect(service.listProfiles.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("gets a profile detail through the Collector Profile Manager service", async () => {
+    const { server, service } = createTestServer();
+
+    service.getProfile.setOutput(
+      toProfileDetailDto(
+        createProfile({
+          status: "PENDING_LOGIN",
+          authenticationState: createAuthenticationState(),
+          provisioningTokenStatus: "ISSUED",
+        }),
+      ),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles/profile-1",
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(service.getProfile.calls).toEqual([
+        {
+          profileId: "profile-1",
+        },
+      ]);
+      expect(body).toMatchObject({
+        profile: {
+          id: "profile-1",
+          displayName: "Profile 1",
+          status: "PENDING_LOGIN",
+          timezone: "America/Los_Angeles",
+          hasAuthenticationState: true,
+        },
+      });
+      expect(body.profile.networkContext.proxy).not.toHaveProperty(
+        "credentials",
+      );
+      expect(body.profile).not.toHaveProperty("authenticationState");
+      expect(body.profile).not.toHaveProperty("provisioningToken");
+      expect(body.profile).not.toHaveProperty("provisioningTokenStatus");
+      expect(JSON.stringify(body)).not.toContain("session-cookie-value");
+      expect(JSON.stringify(body)).not.toContain("local-storage-value");
+      expect(JSON.stringify(body)).not.toContain("provisioning-token-1");
+      expect(JSON.stringify(body)).not.toContain("secret");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps missing profile details to 404", async () => {
+    const { server, service } = createTestServer();
+
+    service.getProfile.setError(new ProfileNotFoundError("missing-profile"));
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles/missing-profile",
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "PROFILE_NOT_FOUND",
+        },
+      });
     } finally {
       await server.close();
     }
@@ -414,6 +596,8 @@ class StubUseCase<Input, Output> {
 
 interface FakeCollectorProfileManager extends CollectorProfileManagerHttpService {
   readonly createProfile: StubUseCase<CreateProfileInput, CollectorProfile>;
+  readonly getProfile: StubUseCase<GetProfileInput, ProfileDetail>;
+  readonly listProfiles: StubUseCase<ListProfilesInput, ListProfilesOutput>;
   readonly updateProfileConfiguration: StubUseCase<
     UpdateProfileConfigurationInput,
     CollectorProfile
@@ -447,6 +631,15 @@ function createTestServer(): {
   const profile = createProfile();
   const service: FakeCollectorProfileManager = {
     createProfile: new StubUseCase(profile),
+    getProfile: new StubUseCase(toProfileDetailDto(profile)),
+    listProfiles: new StubUseCase({
+      items: [toProfileSummaryDto(profile)],
+      page: {
+        limit: 25,
+        offset: 0,
+        total: 1,
+      },
+    }),
     updateProfileConfiguration: new StubUseCase(profile),
     startProfileProvisioning: new StubUseCase({
       profile: createProfile({

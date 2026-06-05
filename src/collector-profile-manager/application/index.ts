@@ -1,4 +1,5 @@
 export * from "./application-errors";
+export * from "./profile-read-dtos";
 export * from "./ports/clock.port";
 export * from "./ports/lease-id-generator.port";
 export * from "./ports/profile-lease-repository.port";
@@ -7,8 +8,10 @@ export * from "./ports/token-generator.port";
 export * from "./ports/transaction-manager.port";
 export * from "./use-cases/checkout-profile.use-case";
 export * from "./use-cases/create-profile.use-case";
+export * from "./use-cases/get-profile.use-case";
 export * from "./use-cases/get-provisioning-configuration.use-case";
 export * from "./use-cases/ingest-profile-session.use-case";
+export * from "./use-cases/list-profiles.use-case";
 export * from "./use-cases/release-profile-lease.use-case";
 export * from "./use-cases/start-profile-provisioning.use-case";
 export * from "./use-cases/update-profile-configuration.use-case";

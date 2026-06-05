@@ -3,6 +3,7 @@ import {
   CollectorProfileApplicationError,
   type CollectorProfileApplicationErrorCode,
   InvalidProfileConfigurationError,
+  InvalidProfileQueryError,
   NoEligibleProfileAvailableError,
   ProfileNotCheckoutEligibleError,
 } from "../../../collector-profile-manager/application";
@@ -84,6 +85,19 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
     };
   }
 
+  if (error instanceof InvalidProfileQueryError) {
+    return {
+      statusCode: 400,
+      body: {
+        error: {
+          code: error.code,
+          message: error.message,
+          issues: error.issues,
+        },
+      },
+    };
+  }
+
   if (error instanceof ProfileNotCheckoutEligibleError) {
     return {
       statusCode: 409,
@@ -141,6 +155,7 @@ const applicationErrorStatus: Record<CollectorProfileApplicationErrorCode, numbe
   PROFILE_NOT_FOUND: 404,
   PROFILE_ALREADY_EXISTS: 409,
   INVALID_PROFILE_CONFIGURATION: 400,
+  INVALID_PROFILE_QUERY: 400,
   INVALID_PROVISIONING_TOKEN: 401,
   PROVISIONING_TOKEN_EXPIRED: 401,
   PROVISIONING_TOKEN_CONSUMED: 401,

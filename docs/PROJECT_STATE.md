@@ -12,11 +12,11 @@ The current focus is the Content Collector stage. The first core module is the C
 
 ## Current Sprint
 
-Sprint 011: HTTP API Adapter
+Sprint 012: Profile Query Use Cases and Read API
 
-Active sprint file: `docs/SPRINTS/SPRINT-011-http-api-adapter.md`
+Active sprint file: `docs/SPRINTS/SPRINT-012-profile-query-use-cases-and-read-api.md`
 
-Sprint 011 adds the first Fastify HTTP adapter for the Collector Profile Manager while preserving the hexagonal boundary. It may add outer-layer HTTP server, route, schema, error mapping, runtime entrypoint, environment, script, documentation, and database-free HTTP adapter test code. Domain and application layers must remain independent from Fastify, HTTP, PostgreSQL, Drizzle, database clients, browser automation, queues, framework code, infrastructure, and composition dependencies. No frontend UI, browser automation, worker, queue, Collector Runtime execution, Content Builder code, Content Publisher code, authentication system, production deployment config, complex API versioning, or database schema redesign should happen in this sprint.
+Sprint 012 adds application-owned query use cases and safe HTTP read routes for the Collector Profile Manager. It may add read DTOs, repository query contracts, in-memory and PostgreSQL list implementations, composition wiring, `GET /collector/profiles`, `GET /collector/profiles/:profileId`, validation, error mapping, documentation, and database-free read API tests. Domain and application layers must remain independent from Fastify, HTTP, PostgreSQL, Drizzle, database clients, browser automation, queues, framework code, infrastructure, and composition dependencies. No frontend UI, browser automation, worker, queue, Collector Runtime execution, Content Builder code, Content Publisher code, authentication system, complex search, full-text search, generic query builder, production audit log, or API versioning should happen in this sprint.
 
 ## Decided Items
 
@@ -43,6 +43,7 @@ Sprint 011 adds the first Fastify HTTP adapter for the Collector Profile Manager
 - Sprint 009 keeps default tests database-free and adds opt-in PostgreSQL integration verification for repository adapters and transaction behavior.
 - Sprint 010 introduces the composition root as the outer boundary that wires Collector Profile Manager use cases to infrastructure adapters and system port implementations.
 - Sprint 011 introduces Fastify as the first HTTP adapter at the outer interface layer, with validation and centralized error mapping while leaving authentication deferred.
+- Sprint 012 introduces application-owned profile query use cases and HTTP read routes with explicit DTOs that omit authentication state, provisioning token internals, and proxy credentials.
 
 ## Not Decided Yet
 
@@ -52,7 +53,7 @@ Sprint 011 adds the first Fastify HTTP adapter for the Collector Profile Manager
 - Deployment platform and infrastructure.
 - Authentication and authorization approach for management interfaces.
 - Observability stack.
-- API contracts beyond the initial Collector Profile Manager HTTP routes.
+- API contracts beyond the current Collector Profile Manager command and read routes.
 - Backend runtime concerns beyond the minimal Fastify entrypoint.
 
 ## Open Questions

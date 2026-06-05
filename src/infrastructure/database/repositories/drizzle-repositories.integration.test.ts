@@ -224,6 +224,35 @@ if (!shouldRunDbTests) {
       ]);
     });
 
+    it("lists profiles by status with limit and offset", async () => {
+      const readyOne = trackProfile(
+        createReadyProfile(nextTestId("list-ready-one"), {
+          createdAt: "2026-01-05T18:00:00.000Z",
+        }),
+      );
+      const readyTwo = trackProfile(
+        createReadyProfile(nextTestId("list-ready-two"), {
+          createdAt: "2026-01-05T18:01:00.000Z",
+        }),
+      );
+      const busy = trackProfile(createBusyProfile(nextTestId("list-busy")));
+
+      await profiles.save(readyOne);
+      await profiles.save(readyTwo);
+      await profiles.save(busy);
+
+      const page = await profiles.listProfiles({
+        status: "READY",
+        limit: 1,
+        offset: 1,
+      });
+
+      expect(page.items.map((profile) => profile.identity.id)).toEqual([
+        readyTwo.identity.id,
+      ]);
+      expect(page.total).toBe(2);
+    });
+
     it("rejects invalid persisted JSONB profile data on read", async () => {
       const profile = trackProfile(
         createPersistableProfile(nextTestId("profile-invalid-jsonb")),
