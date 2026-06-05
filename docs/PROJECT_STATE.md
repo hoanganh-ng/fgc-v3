@@ -8,15 +8,15 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. The first core module is the Collector Profile Manager, responsible for profile lifecycle, profile properties, provisioning, session ingestion, and checkout eligibility.
+The current focus is the Content Collector stage. The first core module is the Collector Profile Manager, responsible for profile lifecycle, profile properties, provisioning, session ingestion, checkout eligibility, and leasing contracts.
 
 ## Current Sprint
 
-Sprint 005: Checkout Eligibility and Leasing
+Sprint 008: PostgreSQL Repository Adapters
 
-Active sprint file: `docs/SPRINTS/SPRINT-005-checkout-eligibility-and-leasing.md`
+Active sprint file: `docs/SPRINTS/SPRINT-008-postgresql-repository-adapters.md`
 
-Sprint 005 adds Collector Profile Manager checkout eligibility and leasing behavior for READY profiles. It may add domain checkout logic, profile lease models, application-owned lease ports, checkout and release use cases, minimal operational metadata, and in-memory fakes only in tests. No HTTP routes, database repository implementations, browser automation, workers, queues, frontend UI, Collector Runtime execution, Content Builder code, Content Publisher code, production lease id generator adapters, or production clock adapters should happen in this sprint.
+Sprint 008 implements PostgreSQL/Drizzle repository adapters for the Collector Profile Manager application ports while preserving the hexagonal boundary. It may add a database client factory, infrastructure mappers, repository adapters, an application-owned transaction boundary with a Drizzle transaction manager, deterministic persisted-token hashing, non-database mapper tests, and an ADR for adapter and transaction decisions. No HTTP route, browser automation, worker, queue, frontend UI, Collector Runtime execution, Content Builder code, Content Publisher code, production deployment configuration, or authentication system should happen in this sprint.
 
 ## Decided Items
 
@@ -37,12 +37,14 @@ Sprint 005 adds Collector Profile Manager checkout eligibility and leasing behav
 - Sprint 003 uses Zod for Collector Profile Manager runtime validation schemas in the domain layer.
 - Sprint 004 introduces the Collector Profile Manager application layer as use cases coordinated through application-owned ports, with in-memory fakes only in tests.
 - Sprint 005 introduces checkout eligibility and leasing in the Collector Profile Manager core, with profile leases and application-owned lease ports.
+- Sprint 006 uses database-agnostic repository contracts and documents a likely PostgreSQL storage shape with root-level operational columns and JSONB-style complex property groups.
+- Sprint 007 selects PostgreSQL as the first persistence target with Drizzle for TypeScript schema and migrations and node-postgres as the driver, while deferring repository adapters.
+- Sprint 008 implements PostgreSQL repository adapters in infrastructure, keeps transaction support behind an application-owned abstraction, and uses deterministic infrastructure hashing for persisted provisioning token lookup.
 
 ## Not Decided Yet
 
 - Backend runtime and framework outside the current domain source.
 - Frontend runtime, framework, and component system.
-- Database engine, schema strategy, and migration tooling.
 - Browser automation framework.
 - Queue, event bus, or scheduler technology.
 - Deployment platform and infrastructure.
@@ -53,7 +55,7 @@ Sprint 005 adds Collector Profile Manager checkout eligibility and leasing behav
 
 ## Open Questions
 
-- What profile storage model best supports lifecycle state, serialized session data, and indexed checkout eligibility?
+- What retry or error-translation policy should future runtime composition use for active lease unique-conflict failures?
 - What actor or system is authorized to create, provision, modify, and check out profiles?
 - How will provisioning tokens be delivered to trusted consumers?
 - What audit trail is required for profile lifecycle changes and session ingestion?

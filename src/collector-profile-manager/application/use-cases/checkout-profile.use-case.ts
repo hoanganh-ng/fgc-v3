@@ -8,6 +8,7 @@ import type { Clock } from "../ports/clock.port";
 import type { LeaseIdGenerator } from "../ports/lease-id-generator.port";
 import type { ProfileLeaseRepository } from "../ports/profile-lease-repository.port";
 import type { ProfileRepository } from "../ports/profile-repository.port";
+import type { TransactionManager } from "../ports/transaction-manager.port";
 import { toIsoDateTime } from "../provisioning-token-policy";
 import {
   loadValidatedProfileById,
@@ -59,13 +60,32 @@ export class CheckoutProfileUseCase {
     private readonly leases: ProfileLeaseRepository,
     private readonly leaseIds: LeaseIdGenerator,
     private readonly clock: Clock,
+    private readonly transactionManager?: TransactionManager,
   ) {}
 
   public async execute(
     input: CheckoutProfileInput = {},
   ): Promise<CheckoutProfileOutput> {
+    if (this.transactionManager !== undefined) {
+      return this.transactionManager.runInTransaction((repositories) =>
+        this.executeWithRepositories(
+          input,
+          repositories.profiles,
+          repositories.leases,
+        ),
+      );
+    }
+
+    return this.executeWithRepositories(input, this.profiles, this.leases);
+  }
+
+  private async executeWithRepositories(
+    input: CheckoutProfileInput,
+    profiles: ProfileRepository,
+    leases: ProfileLeaseRepository,
+  ): Promise<CheckoutProfileOutput> {
     const now = this.clock.now();
-    const candidates = await this.loadCandidates(input);
+    const candidates = await this.loadCandidates(profiles, input, now);
     const rejectedReasons: CheckoutIneligibilityReason[] = [];
 
     for (const candidate of candidates) {
@@ -84,7 +104,7 @@ export class CheckoutProfileUseCase {
         continue;
       }
 
-      const activeLease = await this.leases.findActiveByProfileId(
+      const activeLease = await leases.findActiveByProfileId(
         candidate.identity.id,
       );
 
@@ -104,8 +124,8 @@ export class CheckoutProfileUseCase {
         markProfileCheckedOut(candidate, now, eligibility.localDate),
       );
 
-      await this.profiles.save(checkedOutProfile);
-      await this.leases.save(lease);
+      await profiles.save(checkedOutProfile);
+      await leases.save(lease);
 
       return {
         lease,
@@ -117,13 +137,18 @@ export class CheckoutProfileUseCase {
   }
 
   private async loadCandidates(
+    profiles: ProfileRepository,
     input: CheckoutProfileInput,
+    now: Date,
   ): Promise<readonly CollectorProfile[]> {
     if (input.profileId !== undefined) {
-      return [await loadValidatedProfileById(this.profiles, input.profileId)];
+      return [await loadValidatedProfileById(profiles, input.profileId)];
     }
 
-    const candidates = await this.profiles.findReadyProfiles();
+    const candidates = await profiles.findCheckoutCandidates({
+      status: "READY",
+      availableAt: toIsoDateTime(now),
+    });
 
     return candidates.map((profile) => validateProfileForApplication(profile));
   }

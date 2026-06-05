@@ -12,10 +12,12 @@ import {
 import type {
   Clock,
   LeaseIdGenerator,
-  ProfileLeaseRepository,
-  ProfileRepository,
   TokenGenerator,
 } from "./index";
+import {
+  InMemoryProfileLeaseRepository,
+  InMemoryProfileRepository,
+} from "./test-support/in-memory-repositories";
 import type {
   BehavioralPersona,
   BrowserCookie,
@@ -322,79 +324,6 @@ async function expectCheckoutRejection(
         ]),
       );
     }
-  }
-}
-
-class InMemoryProfileRepository implements ProfileRepository {
-  private readonly profiles = new Map<ProfileId, CollectorProfile>();
-
-  public async save(profile: CollectorProfile): Promise<void> {
-    this.profiles.set(profile.identity.id, profile);
-  }
-
-  public async findById(id: ProfileId): Promise<CollectorProfile | null> {
-    return this.profiles.get(id) ?? null;
-  }
-
-  public async findReadyProfiles(): Promise<readonly CollectorProfile[]> {
-    return [...this.profiles.values()].filter(
-      (profile) => profile.identity.status === "READY",
-    );
-  }
-
-  public async findByProvisioningToken(
-    token: string,
-  ): Promise<CollectorProfile | null> {
-    for (const profile of this.profiles.values()) {
-      if (
-        profile.provisioningToken.status === "ISSUED" &&
-        profile.provisioningToken.tokenHash === token
-      ) {
-        return profile;
-      }
-    }
-
-    return null;
-  }
-
-  public async existsByDisplayName(
-    displayName: string,
-    excludeProfileId?: ProfileId,
-  ): Promise<boolean> {
-    for (const profile of this.profiles.values()) {
-      if (
-        profile.identity.displayName === displayName &&
-        profile.identity.id !== excludeProfileId
-      ) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-}
-
-class InMemoryProfileLeaseRepository implements ProfileLeaseRepository {
-  private readonly leases = new Map<ProfileLeaseId, ProfileLease>();
-
-  public async save(lease: ProfileLease): Promise<void> {
-    this.leases.set(lease.id, lease);
-  }
-
-  public async findById(id: ProfileLeaseId): Promise<ProfileLease | null> {
-    return this.leases.get(id) ?? null;
-  }
-
-  public async findActiveByProfileId(
-    profileId: ProfileId,
-  ): Promise<ProfileLease | null> {
-    for (const lease of this.leases.values()) {
-      if (lease.profileId === profileId && lease.status === "ACTIVE") {
-        return lease;
-      }
-    }
-
-    return null;
   }
 }
 

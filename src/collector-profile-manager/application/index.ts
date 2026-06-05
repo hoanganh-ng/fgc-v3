@@ -4,6 +4,7 @@ export * from "./ports/lease-id-generator.port";
 export * from "./ports/profile-lease-repository.port";
 export * from "./ports/profile-repository.port";
 export * from "./ports/token-generator.port";
+export * from "./ports/transaction-manager.port";
 export * from "./use-cases/checkout-profile.use-case";
 export * from "./use-cases/create-profile.use-case";
 export * from "./use-cases/get-provisioning-configuration.use-case";

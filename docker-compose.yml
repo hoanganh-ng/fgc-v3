@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: content_pipeline_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: content_pipeline
+      POSTGRES_PASSWORD: content_pipeline
+      POSTGRES_DB: content_pipeline
+    ports:
+      - "5432:5432"
+    volumes:
+      - content_pipeline_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  content_pipeline_postgres_data:

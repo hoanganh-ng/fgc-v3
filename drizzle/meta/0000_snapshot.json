@@ -1,0 +1,413 @@
+{
+  "id": "b3ef4fbf-9069-4210-94b1-170b7cf91263",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.collector_profile_leases": {
+      "name": "collector_profile_leases",
+      "schema": "",
+      "columns": {
+        "lease_id": {
+          "name": "lease_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "collector_profile_lease_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ACTIVE'"
+        },
+        "leased_at": {
+          "name": "leased_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "released_at": {
+          "name": "released_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "collector_profile_leases_profile_id_idx": {
+          "name": "collector_profile_leases_profile_id_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "collector_profile_leases_profile_status_idx": {
+          "name": "collector_profile_leases_profile_status_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "collector_profile_leases_active_profile_uidx": {
+          "name": "collector_profile_leases_active_profile_uidx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"collector_profile_leases\".\"status\" = 'ACTIVE'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "collector_profile_leases_profile_id_collector_profiles_profile_id_fk": {
+          "name": "collector_profile_leases_profile_id_collector_profiles_profile_id_fk",
+          "tableFrom": "collector_profile_leases",
+          "tableTo": "collector_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "profile_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.collector_profiles": {
+      "name": "collector_profiles",
+      "schema": "",
+      "columns": {
+        "profile_id": {
+          "name": "profile_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "collector_profile_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING_CONFIG'"
+        },
+        "provisioning_token_status": {
+          "name": "provisioning_token_status",
+          "type": "provisioning_token_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'NOT_ISSUED'"
+        },
+        "provisioning_token_hash": {
+          "name": "provisioning_token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provisioning_token_issued_at": {
+          "name": "provisioning_token_issued_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provisioning_token_expires_at": {
+          "name": "provisioning_token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provisioning_token_consumed_at": {
+          "name": "provisioning_token_consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_checkout_at": {
+          "name": "last_checkout_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_released_at": {
+          "name": "last_released_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "next_available_at": {
+          "name": "next_available_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "daily_usage_local_date": {
+          "name": "daily_usage_local_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "daily_sessions_started": {
+          "name": "daily_sessions_started",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "daily_active_duration_minutes": {
+          "name": "daily_active_duration_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "daily_macro_actions": {
+          "name": "daily_macro_actions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "identity_metadata": {
+          "name": "identity_metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "network_context": {
+          "name": "network_context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hardware_fingerprint": {
+          "name": "hardware_fingerprint",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "authentication_state": {
+          "name": "authentication_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "behavioral_persona": {
+          "name": "behavioral_persona",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "temporal_routine": {
+          "name": "temporal_routine",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "safety_thresholds": {
+          "name": "safety_thresholds",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_affinities": {
+          "name": "content_affinities",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "collector_profiles_status_idx": {
+          "name": "collector_profiles_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "collector_profiles_issued_token_hash_uidx": {
+          "name": "collector_profiles_issued_token_hash_uidx",
+          "columns": [
+            {
+              "expression": "provisioning_token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"collector_profiles\".\"provisioning_token_status\" = 'ISSUED' and \"collector_profiles\".\"provisioning_token_hash\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "collector_profiles_checkout_availability_idx": {
+          "name": "collector_profiles_checkout_availability_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_available_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.collector_profile_lease_status": {
+      "name": "collector_profile_lease_status",
+      "schema": "public",
+      "values": [
+        "ACTIVE",
+        "RELEASED",
+        "EXPIRED"
+      ]
+    },
+    "public.collector_profile_status": {
+      "name": "collector_profile_status",
+      "schema": "public",
+      "values": [
+        "PENDING_CONFIG",
+        "PENDING_LOGIN",
+        "READY",
+        "BUSY"
+      ]
+    },
+    "public.provisioning_token_status": {
+      "name": "provisioning_token_status",
+      "schema": "public",
+      "values": [
+        "NOT_ISSUED",
+        "ISSUED",
+        "CONSUMED",
+        "EXPIRED"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

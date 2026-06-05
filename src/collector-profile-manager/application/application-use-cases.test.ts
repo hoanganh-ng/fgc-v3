@@ -11,9 +11,9 @@ import {
 } from "./index";
 import type {
   Clock,
-  ProfileRepository,
   TokenGenerator,
 } from "./index";
+import { InMemoryProfileRepository } from "./test-support/in-memory-repositories";
 import type {
   BehavioralPersona,
   BrowserCookie,
@@ -303,55 +303,6 @@ async function ingestSession(
     localStorage: createLocalStorage(),
     sessionExpiresAt: "2026-01-02T10:00:00.000Z",
   });
-}
-
-class InMemoryProfileRepository implements ProfileRepository {
-  private readonly profiles = new Map<ProfileId, CollectorProfile>();
-
-  public async save(profile: CollectorProfile): Promise<void> {
-    this.profiles.set(profile.identity.id, profile);
-  }
-
-  public async findById(id: ProfileId): Promise<CollectorProfile | null> {
-    return this.profiles.get(id) ?? null;
-  }
-
-  public async findReadyProfiles(): Promise<readonly CollectorProfile[]> {
-    return [...this.profiles.values()].filter(
-      (profile) => profile.identity.status === "READY",
-    );
-  }
-
-  public async findByProvisioningToken(
-    token: string,
-  ): Promise<CollectorProfile | null> {
-    for (const profile of this.profiles.values()) {
-      if (
-        profile.provisioningToken.status === "ISSUED" &&
-        profile.provisioningToken.tokenHash === token
-      ) {
-        return profile;
-      }
-    }
-
-    return null;
-  }
-
-  public async existsByDisplayName(
-    displayName: string,
-    excludeProfileId?: ProfileId,
-  ): Promise<boolean> {
-    for (const profile of this.profiles.values()) {
-      if (
-        profile.identity.displayName === displayName &&
-        profile.identity.id !== excludeProfileId
-      ) {
-        return true;
-      }
-    }
-
-    return false;
-  }
 }
 
 class FakeTokenGenerator implements TokenGenerator {

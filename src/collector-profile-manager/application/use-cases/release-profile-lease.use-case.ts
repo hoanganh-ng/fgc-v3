@@ -7,6 +7,7 @@ import {
 import type { Clock } from "../ports/clock.port";
 import type { ProfileLeaseRepository } from "../ports/profile-lease-repository.port";
 import type { ProfileRepository } from "../ports/profile-repository.port";
+import type { TransactionManager } from "../ports/transaction-manager.port";
 import { toIsoDateTime } from "../provisioning-token-policy";
 import {
   loadValidatedProfileById,
@@ -35,12 +36,31 @@ export class ReleaseProfileLeaseUseCase {
     private readonly profiles: ProfileRepository,
     private readonly leases: ProfileLeaseRepository,
     private readonly clock: Clock,
+    private readonly transactionManager?: TransactionManager,
   ) {}
 
   public async execute(
     input: ReleaseProfileLeaseInput,
   ): Promise<ReleaseProfileLeaseOutput> {
-    const lease = await this.leases.findById(input.leaseId);
+    if (this.transactionManager !== undefined) {
+      return this.transactionManager.runInTransaction((repositories) =>
+        this.executeWithRepositories(
+          input,
+          repositories.profiles,
+          repositories.leases,
+        ),
+      );
+    }
+
+    return this.executeWithRepositories(input, this.profiles, this.leases);
+  }
+
+  private async executeWithRepositories(
+    input: ReleaseProfileLeaseInput,
+    profiles: ProfileRepository,
+    leases: ProfileLeaseRepository,
+  ): Promise<ReleaseProfileLeaseOutput> {
+    const lease = await leases.findById(input.leaseId);
 
     if (lease === null) {
       throw new ProfileLeaseNotFoundError(input.leaseId);
@@ -67,10 +87,7 @@ export class ReleaseProfileLeaseUseCase {
       );
     }
 
-    const profile = await loadValidatedProfileById(
-      this.profiles,
-      lease.profileId,
-    );
+    const profile = await loadValidatedProfileById(profiles, lease.profileId);
 
     if (profile.identity.status !== "BUSY") {
       throw new ProfileLeaseStateConflictError(
@@ -91,8 +108,8 @@ export class ReleaseProfileLeaseUseCase {
     );
     const releasedLease = releaseProfileLease(lease, releasedAt);
 
-    await this.profiles.save(releasedProfile);
-    await this.leases.save(releasedLease);
+    await profiles.save(releasedProfile);
+    await leases.updateStatus(releasedLease);
 
     return {
       lease: releasedLease,
