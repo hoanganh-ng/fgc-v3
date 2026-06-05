@@ -12,11 +12,11 @@ The current focus is the Content Collector stage. The first core module is the C
 
 ## Current Sprint
 
-Sprint 008: PostgreSQL Repository Adapters
+Sprint 009: PostgreSQL Repository Integration Verification
 
-Active sprint file: `docs/SPRINTS/SPRINT-008-postgresql-repository-adapters.md`
+Active sprint file: `docs/SPRINTS/SPRINT-009-postgresql-repository-integration-verification.md`
 
-Sprint 008 implements PostgreSQL/Drizzle repository adapters for the Collector Profile Manager application ports while preserving the hexagonal boundary. It may add a database client factory, infrastructure mappers, repository adapters, an application-owned transaction boundary with a Drizzle transaction manager, deterministic persisted-token hashing, non-database mapper tests, and an ADR for adapter and transaction decisions. No HTTP route, browser automation, worker, queue, frontend UI, Collector Runtime execution, Content Builder code, Content Publisher code, production deployment configuration, or authentication system should happen in this sprint.
+Sprint 009 adds optional PostgreSQL integration verification for the Collector Profile Manager repository adapters and transaction manager while keeping the default test suite database-free. It may add `RUN_DB_TESTS=true` gated infrastructure integration tests, a `test:db` package script, local database setup documentation, and repository or mapper fixes only when a real adapter integration bug is found. No HTTP route, browser automation, worker, queue, frontend UI, Collector Runtime execution, Content Builder code, Content Publisher code, production deployment configuration, or authentication system should happen in this sprint.
 
 ## Decided Items
 
@@ -40,6 +40,7 @@ Sprint 008 implements PostgreSQL/Drizzle repository adapters for the Collector P
 - Sprint 006 uses database-agnostic repository contracts and documents a likely PostgreSQL storage shape with root-level operational columns and JSONB-style complex property groups.
 - Sprint 007 selects PostgreSQL as the first persistence target with Drizzle for TypeScript schema and migrations and node-postgres as the driver, while deferring repository adapters.
 - Sprint 008 implements PostgreSQL repository adapters in infrastructure, keeps transaction support behind an application-owned abstraction, and uses deterministic infrastructure hashing for persisted provisioning token lookup.
+- Sprint 009 keeps default tests database-free and adds opt-in PostgreSQL integration verification for repository adapters and transaction behavior.
 
 ## Not Decided Yet
 

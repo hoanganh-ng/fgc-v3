@@ -1,5 +1,5 @@
 # Active Sprint
 
-Active sprint: `docs/SPRINTS/SPRINT-008-postgresql-repository-adapters.md`
+Active sprint: `docs/SPRINTS/SPRINT-009-postgresql-repository-integration-verification.md`
 
-Only Sprint 008 should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.
+Only Sprint 009 should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.

@@ -107,3 +107,20 @@ A future database adapter will likely need one transaction for checkout:
 5. Insert the active lease.
 
 This sprint only documents that boundary and strengthens port contracts. It does not introduce transactions, database clients, migrations, or production persistence adapters.
+
+## Optional Integration Verification
+
+Sprint 009 adds opt-in PostgreSQL integration tests for the repository adapters and transaction manager. Default tests remain database-free; database tests run only when explicitly enabled with `RUN_DB_TESTS=true` and read their connection from `DATABASE_URL`.
+
+Use a local or disposable PostgreSQL database for these tests. They create unique profile and lease IDs and clean those rows up where practical, but `DATABASE_URL` should not point at production or shared operational data.
+
+Preferred local flow:
+
+```bash
+docker compose up -d postgres
+cp .env.example .env
+pnpm run db:migrate
+pnpm run test:db
+```
+
+The integration tests do not start Docker and do not run migrations themselves.
