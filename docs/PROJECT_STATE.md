@@ -8,17 +8,17 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Web UI remains intentionally deferred.
+The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager domain model is complete through Sprint 015. Web UI remains intentionally deferred.
 
 The next module is Content Manager because content is the central business object of the pipeline. Content Manager will own collected content, source groups, managed group categories, content lifecycle status, content deduplication/upsert behavior, engagement counts, top high-engagement comments as normalized metadata, safe read contracts, and the future handoff shape for Content Builder.
 
 ## Current Sprint
 
-Sprint 015: Content Manager Domain Model
+Sprint 016: Content Manager Application Use Cases
 
-Active sprint file: `docs/SPRINTS/SPRINT-015-content-manager-domain-model.md`
+Active sprint file: `docs/SPRINTS/SPRINT-016-content-manager-application-use-cases.md`
 
-Sprint 015 implements the Content Manager domain model and domain tests only. It covers normalized ingestion input, content categories, source groups, content items, top comments, lifecycle statuses, status transitions, top comment normalization, and duplicate collected content merge behavior. No application use cases, repository ports, PostgreSQL schema, Drizzle migrations, repository adapters, HTTP routes, Fastify schemas, composition root wiring, Facebook GraphQL parser, Collector Runtime, real GraphQL fixtures, Web UI, or Collector Profile Manager behavior changes should happen in this sprint.
+Sprint 016 implements the Content Manager application layer and application tests only. It covers application-owned repository ports, supporting clock and id ports, application errors, application validation, category and source group use cases, normalized content ingestion, content status updates, and read/list use cases. No PostgreSQL schema, Drizzle migrations, repository adapters, HTTP routes, Fastify schemas, composition root wiring, Facebook GraphQL parser, Collector Runtime, real GraphQL fixtures, Web UI, or Collector Profile Manager behavior changes should happen in this sprint.
 
 ## Decided Items
 
@@ -49,6 +49,7 @@ Sprint 015 implements the Content Manager domain model and domain tests only. It
 - Sprint 013 introduces opt-in DB-backed HTTP integration verification for the full Collector Profile Manager backend slice while keeping default tests database-free.
 - Collector Profile Manager is complete through Sprint 013 and accepted.
 - Sprint 014 introduces Content Manager as the next Content Collector module before Web UI and Collector Runtime.
+- Sprint 015 introduces the Content Manager domain model and domain tests for normalized collected content.
 - Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
 - Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.
 - The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.
