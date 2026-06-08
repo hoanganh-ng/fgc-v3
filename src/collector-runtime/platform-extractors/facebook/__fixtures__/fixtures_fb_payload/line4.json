@@ -1,0 +1,10 @@
+{
+  "label": "GroupsCometFeedRegularStories_pageInfo",
+  "path": ["node", "group_feed", "page_info"],
+  "data": {
+    "page_info": {
+      "has_next_page": false,
+      "end_cursor": "SANITIZED_CURSOR"
+    }
+  }
+}

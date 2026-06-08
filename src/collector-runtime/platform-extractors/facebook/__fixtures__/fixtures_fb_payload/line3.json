@@ -1,0 +1,53 @@
+{
+  "label": "CometFeedStoryFeedbackQuery",
+  "path": ["data", "feed_units", "edges", 0, "node"],
+  "data": {
+    "feed_units": {
+      "edges": [
+        {
+          "node": {
+            "__typename": "CometFeedStory",
+            "story_fbid": "sanitized-real-post-003",
+            "url": "https://www.facebook.com/groups/sanitized-source/posts/sanitized-real-post-003/",
+            "message": {
+              "fragments": [
+                {
+                  "text": "Sanitized fixture post three uses fragment text"
+                },
+                {
+                  "text": "and comment nodes."
+                }
+              ]
+            },
+            "from": {
+              "id": "sanitized-author-003",
+              "displayName": "Sanitized Author Three"
+            },
+            "timestamp": "2026-02-03T12:15:00.000Z",
+            "feedback": {
+              "reaction_count": 31,
+              "comment_count": 1,
+              "share_count": 0
+            },
+            "comments": {
+              "nodes": [
+                {
+                  "__typename": "Comment",
+                  "id": "sanitized-comment-003-a",
+                  "bodyText": "Sanitized id-only comment keeps path-based comment id extraction covered.",
+                  "author": {
+                    "id": "sanitized-comment-author-003-a",
+                    "name": "Sanitized Commenter Three A"
+                  },
+                  "reaction_count": 6,
+                  "reply_count": 0,
+                  "created_time": "2026-02-03T12:20:00.000Z"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

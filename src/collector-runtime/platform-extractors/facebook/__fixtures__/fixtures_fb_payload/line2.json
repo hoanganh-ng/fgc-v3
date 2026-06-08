@@ -1,0 +1,72 @@
+{
+  "label": "GroupsCometFeedRegularStories_group_group_feed",
+  "path": ["data", "group", "group_feed", "edges", 0, "node"],
+  "data": {
+    "group": {
+      "group_feed": {
+        "edges": [
+          {
+            "node": {
+              "__typename": "GroupPostStory",
+              "post_id": "sanitized-real-post-002",
+              "wwwURL": "https://www.facebook.com/groups/sanitized-source/permalink/sanitized-real-post-002/",
+              "comet_sections": {
+                "content": {
+                  "story": {
+                    "message": {
+                      "text": "Sanitized fixture post two keeps nested comet_sections text extraction covered."
+                    }
+                  }
+                }
+              },
+              "owner": {
+                "__typename": "User",
+                "id": "sanitized-author-002",
+                "name": "Sanitized Author Two"
+              },
+              "creation_time": {
+                "timestamp": 1770117300
+              },
+              "feedback": {
+                "reactors": {
+                  "count": "23"
+                },
+                "comments_count": {
+                  "total_count": "3"
+                },
+                "display_comments": {
+                  "nodes": [
+                    {
+                      "__typename": "Comment",
+                      "legacy_fbid": "sanitized-comment-002-a",
+                      "body": {
+                        "text": "Sanitized legacy id comment body."
+                      },
+                      "author": {
+                        "id": "sanitized-comment-author-002-a",
+                        "name": "Sanitized Commenter Two A"
+                      },
+                      "feedback": {
+                        "reaction_count": {
+                          "count": 11
+                        }
+                      },
+                      "reply_count": 2,
+                      "created_time": {
+                        "timestamp": 1770117600
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "page_info": {
+          "has_next_page": false,
+          "end_cursor": "SANITIZED_CURSOR"
+        }
+      }
+    }
+  }
+}
