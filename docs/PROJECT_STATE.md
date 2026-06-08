@@ -14,11 +14,11 @@ The next module is Content Manager because content is the central business objec
 
 ## Current Sprint
 
-Sprint 016: Content Manager Application Use Cases
+Sprint 016A: Content Manager Application Layer File Organization Cleanup
 
-Active sprint file: `docs/SPRINTS/SPRINT-016-content-manager-application-use-cases.md`
+Active sprint file: `docs/SPRINTS/SPRINT-016A-content-manager-application-file-organization-cleanup.md`
 
-Sprint 016 implements the Content Manager application layer and application tests only. It covers application-owned repository ports, supporting clock and id ports, application errors, application validation, category and source group use cases, normalized content ingestion, content status updates, and read/list use cases. No PostgreSQL schema, Drizzle migrations, repository adapters, HTTP routes, Fastify schemas, composition root wiring, Facebook GraphQL parser, Collector Runtime, real GraphQL fixtures, Web UI, or Collector Profile Manager behavior changes should happen in this sprint.
+Sprint 016A is a refactor-only follow-up to Sprint 016. It verifies that the Content Manager application layer keeps implementation details in focused files and keeps `src/content-manager/application/index.ts` as a barrel export. If the application index is already only a barrel export, no application code changes should be made. No PostgreSQL schema, Drizzle migrations, repository adapters, HTTP routes, Fastify schemas, composition root wiring, Facebook GraphQL parser, Collector Runtime, real GraphQL fixtures, Web UI, or Collector Profile Manager behavior changes should happen in this sprint.
 
 ## Decided Items
 
