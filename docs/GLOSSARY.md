@@ -16,11 +16,23 @@ Naming note: `Collector Profile Manager` is the canonical module name. `Profile 
 
 ## Collector Runtime
 
-The future runtime module that will use eligible profiles to perform collection work. It will check out profiles, visit Facebook groups and posts, extract post data and top comments, submit collected content to Content Manager, and release profile leases. It must consume Collector Profile Manager and Content Manager capabilities through explicit application interfaces.
+The future runtime module that will use eligible profiles to perform collection work. It will check out profiles, visit Facebook groups and posts, capture platform artifacts, use Platform Extractors to produce normalized Content Manager ingestion input, submit normalized collected content to Content Manager, and release profile leases. It must consume Collector Profile Manager and Content Manager capabilities through explicit application interfaces.
+
+## Platform Extractor
+
+A collection-side component that converts raw platform-specific artifacts, such as captured Facebook GraphQL payloads, into normalized Content Manager ingestion input. Platform Extractors belong to the Collector Runtime side, not Content Manager core.
+
+## Facebook GraphQL Payload Extractor
+
+The first planned Platform Extractor. It will interpret captured Facebook GraphQL payloads, map Facebook-specific fields, extract posts, high-engagement comments, and engagement counts, handle missing fields on a best-effort basis, and produce normalized Content Manager ingestion input.
+
+## Normalized Content Manager Ingestion Input
+
+Clean collected content input accepted by Content Manager after platform extraction. It contains normalized source, post, engagement, and top-comment fields rather than raw platform response structure.
 
 ## Content Manager
 
-The Content Collector module that owns collected content as the central business object of the pipeline. It owns source groups, managed group categories, content items, engagement counts, top high-engagement comments, lifecycle status, deduplication/upsert behavior, safe reads, and future Content Builder handoff shape.
+The Content Collector module that owns collected content as the central business object of the pipeline. It owns source groups, managed group categories, content items, engagement counts, top high-engagement comments as normalized metadata, lifecycle status, deduplication/upsert behavior, safe reads, and future Content Builder handoff shape.
 
 ## Source Group
 
@@ -36,7 +48,7 @@ A collected source record owned by Content Manager. The first content item type 
 
 ## High-Engagement Comment
 
-A top comment selected by reaction count for a content item. V1 stores only the top N comments, defaulting to 10, rather than full comment history.
+A normalized top comment selected by reaction count for a content item. V1 stores only the top N comments, defaulting to 10, rather than full comment history.
 
 ## Content Status
 

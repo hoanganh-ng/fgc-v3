@@ -8,9 +8,11 @@ The Content Collector is responsible for gathering source material, managing the
 
 The first module, Collector Profile Manager, manages profile lifecycle, profile properties, provisioning, session ingestion, checkout eligibility, and leasing.
 
-The next module, Content Manager, owns collected content as the central business object of the pipeline. It will define Facebook source groups, managed group categories, content items, engagement counts, top high-engagement comments, content lifecycle status, deduplication/upsert behavior, safe read contracts, and the future handoff shape for Content Builder.
+The next module, Content Manager, owns collected content as the central business object of the pipeline. It will define Facebook source groups, managed group categories, content items, engagement counts, top high-engagement comments as normalized metadata, content lifecycle status, deduplication/upsert behavior, safe read contracts, and the future handoff shape for Content Builder.
 
-Collector Runtime is a future module that will check out profiles, visit Facebook groups and posts, extract post data and top comments, submit collected content to Content Manager, and release profile leases.
+Collector Runtime is a future module that will check out profiles, visit Facebook groups and posts, capture platform artifacts, use Platform Extractors to convert those artifacts into normalized Content Manager ingestion input, submit normalized collected content to Content Manager, and release profile leases.
+
+The first planned Platform Extractor is the Facebook GraphQL Payload Extractor. Raw Facebook GraphQL parsing belongs to this Collector Runtime-side boundary, not Content Manager core.
 
 ## Stage 2: Content Builder
 
@@ -22,4 +24,4 @@ The Content Publisher will distribute completed videos to target publishing dest
 
 ## Current Product Priority
 
-Only the Content Collector stage is in current focus. Collector Profile Manager is complete through Sprint 013. Sprint 014 defines Content Manager requirements and boundaries before implementation begins. Web UI, Collector Runtime execution, Content Builder, and Content Publisher remain deferred.
+Only the Content Collector stage is in current focus. Collector Profile Manager is complete through Sprint 013. Sprint 014A amends the Content Manager boundary by defining the Collector Runtime-side Platform Extractor boundary. Web UI, Collector Runtime execution, Content Builder, and Content Publisher remain deferred.

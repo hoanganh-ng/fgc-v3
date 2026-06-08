@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Content Manager is the Content Collector module that owns collected content as the central business object of the pipeline. It records source groups, managed group categories, content items, engagement counts, selected high-engagement comments, content lifecycle status, deduplication behavior, safe read contracts, and the future handoff shape for Content Builder.
+Content Manager is the Content Collector module that owns collected content as the central business object of the pipeline. It records source groups, managed group categories, content items, engagement counts, selected high-engagement comments as normalized metadata, content lifecycle status, deduplication behavior, safe read contracts, and the future handoff shape for Content Builder.
 
 Content Manager is introduced before Collector Runtime and Web UI so the project can define the content model and application boundary before adding scraping behavior or human-facing screens.
 
@@ -14,19 +14,20 @@ The Content Collector is separated into three core modules:
 
 - `collector-profile-manager`: owns profile lifecycle, profile properties, provisioning, session ingestion, checkout eligibility, and leasing.
 - `content-manager`: owns collected content, source groups, content categories, deduplication/upsert behavior, content lifecycle status, safe reads, and future builder handoff contracts.
-- `collector-runtime`: will check out profiles, visit sources, extract source data, submit collected content to Content Manager, and release profile leases.
+- `collector-runtime`: will check out profiles, visit sources, capture platform artifacts, use Platform Extractors to produce normalized Content Manager ingestion input, submit normalized collected content to Content Manager, and release profile leases.
 
 ## Ownership
 
 Content Manager owns:
 
+- Validation of normalized content ingestion input.
 - Content item storage.
 - Content deduplication and upsert rules.
 - Content lifecycle status.
-- Facebook source group records.
+- Source group records.
 - Group categories as managed entities.
 - Engagement counts.
-- Top N high-engagement comments for each content item.
+- Top comments as normalized metadata for each content item.
 - Safe read APIs for future interfaces.
 - Future handoff shape for Content Builder.
 
@@ -34,10 +35,59 @@ Content Manager does not own:
 
 - Profile or session management.
 - Browser automation.
-- Actual scraping behavior.
+- Network payload capture.
+- Raw Facebook GraphQL parsing.
+- Scraping strategy.
+- Platform-specific extraction rules.
 - Comment crawling strategy.
 - Video generation.
 - Publishing workflows.
+
+## Platform Extraction Boundary
+
+A Platform Extractor is a collection-side component that converts raw platform-specific artifacts, such as captured Facebook GraphQL payloads, into normalized Content Manager ingestion input.
+
+The first planned extractor is the Facebook GraphQL Payload Extractor.
+
+Collector Runtime / Platform Extractor owns:
+
+- Raw Facebook GraphQL payload interpretation.
+- Facebook-specific field mapping.
+- Post extraction.
+- High-engagement comment extraction.
+- Engagement count extraction.
+- Best-effort handling of missing fields.
+- Future extractor fixtures and parser tests.
+
+Content Manager owns validation, deduplication, upsert, lifecycle state, managed records, and safe reads after extraction has produced normalized input.
+
+Canonical ingestion flow:
+
+```text
+raw GraphQL payload
+-> Facebook GraphQL Payload Extractor
+-> normalized Content Manager ingestion input
+-> Content Manager validation/upsert/storage
+```
+
+Content Manager should not accept raw Facebook GraphQL payloads as its primary ingestion contract. A future implementation may optionally store sanitized raw payload data or a raw payload reference for trusted diagnostics or reprocessing, but that storage is optional and is not the canonical content model.
+
+## Normalized Content Manager Ingestion Input
+
+The Content Manager ingestion contract should describe clean collected content, not platform response structure.
+
+Expected normalized ingestion input includes:
+
+- Platform and source group identity.
+- External post identity and source URL.
+- Rich text post body and optional title.
+- Optional author display fields that are safe to retain.
+- Optional posted timestamp.
+- Engagement counts.
+- Top comments as normalized metadata.
+- Collection timestamp.
+
+Facebook GraphQL field paths, nested response fragments, missing-field heuristics, and response-shape fallbacks belong to the Facebook GraphQL Payload Extractor, not this contract.
 
 ## First Platform And Source Type
 
@@ -107,9 +157,15 @@ Initial content item fields:
 - `shareCount` optional
 - `topComments`
 - `status`
-- `rawPayload` optional
 - `createdAt`
 - `updatedAt`
+
+Optional future diagnostics fields, if explicitly introduced by a later sprint:
+
+- `sanitizedRawPayload`
+- `rawPayloadRef`
+
+Diagnostics fields must not become the primary ingestion contract or canonical content model.
 
 Content statuses:
 
@@ -120,11 +176,12 @@ Content statuses:
 
 ## High-Engagement Comments
 
-Content Manager stores only the top N high-engagement comments for a content item in v1.
+Content Manager stores only the top N high-engagement comments for a content item in v1. These comments arrive as normalized metadata in the ingestion input after platform extraction.
 
 Rules:
 
-- Top comments are selected by reaction count.
+- The Facebook GraphQL Payload Extractor extracts high-engagement comments from raw payloads.
+- Top comments are selected by reaction count before ingestion.
 - Default N is 10.
 - A future ingestion request may make N configurable.
 - Full comment history is out of scope for v1.
@@ -168,7 +225,7 @@ Status preservation means an item marked `SELECTED`, `REJECTED`, or `USED` does 
 
 ## Safe Reads
 
-Future Content Manager read APIs should expose operational and review-friendly content data without leaking unnecessary raw source payloads.
+Future Content Manager read APIs should expose operational and review-friendly content data without leaking unnecessary raw source payloads or platform extraction internals.
 
 Safe read contracts may include:
 
@@ -177,7 +234,7 @@ Safe read contracts may include:
 - Content item summaries for filtering and review.
 - Content item details with body text, source context, engagement counts, lifecycle status, and top comments.
 
-Safe read contracts should not expose `rawPayload` by default. If a future trusted diagnostics workflow needs raw source payload data, it should use a dedicated contract.
+Safe read contracts should not expose `sanitizedRawPayload`, `rawPayloadRef`, or any future raw source diagnostics by default. If a future trusted diagnostics workflow needs sanitized raw payload data or a raw payload reference, it should use a dedicated contract.
 
 ## Future Content Builder Handoff
 
@@ -197,4 +254,3 @@ A future handoff contract should likely include:
 - Lifecycle status or explicit handoff state.
 
 The first handoff candidates are likely content items in `SELECTED` status.
-

@@ -12,6 +12,10 @@ Define and implement the core Collector Profile Manager backend slice for lifecy
 
 Define Content Manager as the next Content Collector module. Record boundaries, requirements, first platform, first source type, initial content model, top comment rules, deduplication/upsert behavior, storage direction, and module separation. This sprint is documentation/design only.
 
+## Sprint 014A: Collector Extraction Boundary Amendment
+
+Define the Platform Extractor boundary on the Collector Runtime side. Record that Facebook GraphQL payload parsing belongs to the future Facebook GraphQL Payload Extractor, not Content Manager core. This sprint is documentation/design only.
+
 ## Sprint 015: Content Manager Domain Model
 
 Implement the Content Manager domain model for source groups, group categories, content items, top comments, lifecycle statuses, and deduplication/upsert rules.
@@ -28,13 +32,21 @@ Add PostgreSQL schema, migrations, repository adapters, and opt-in persistence v
 
 Add HTTP adapter routes for Content Manager use cases and safe read APIs, with route handlers kept free of business logic.
 
-## Sprint 019: Profile + Content Manager Web UI Foundation
+## Sprint 019: Facebook GraphQL Payload Extractor
+
+Implement the collection-side extractor that converts captured Facebook GraphQL payloads into normalized Content Manager ingestion input, with parser fixtures and extractor tests owned by the Collector Runtime side.
+
+## Sprint 020: Collector Runtime Submission Flow
+
+Implement the Collector Runtime flow that checks out profiles, visits configured Facebook sources, captures payloads, invokes the Facebook GraphQL Payload Extractor, submits normalized ingestion input to Content Manager, and releases profile leases through explicit application contracts.
+
+## Sprint 021: Profile + Content Manager Web UI Foundation
 
 Start the deferred Web UI foundation for profile and content management, consuming application/API contracts instead of owning domain rules or persistence logic.
 
 ## Future: Collector Runtime
 
-Define and implement runtime behavior that checks out eligible profiles, visits Facebook groups and posts, extracts post data and top comments, submits collected content to Content Manager, and releases profile leases through explicit application contracts.
+Define and implement additional runtime behavior that checks out eligible profiles, visits Facebook groups and posts, captures platform artifacts, invokes Platform Extractors, submits normalized content to Content Manager, and releases profile leases through explicit application contracts.
 
 ## Future: Content Builder
 

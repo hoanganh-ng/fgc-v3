@@ -10,15 +10,15 @@ The project is a Content Video Pipeline with three stages:
 
 The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Web UI remains intentionally deferred.
 
-The next module is Content Manager because content is the central business object of the pipeline. Content Manager will own collected content, source groups, managed group categories, content lifecycle status, content deduplication/upsert behavior, engagement counts, top high-engagement comments, safe read contracts, and the future handoff shape for Content Builder.
+The next module is Content Manager because content is the central business object of the pipeline. Content Manager will own collected content, source groups, managed group categories, content lifecycle status, content deduplication/upsert behavior, engagement counts, top high-engagement comments as normalized metadata, safe read contracts, and the future handoff shape for Content Builder.
 
 ## Current Sprint
 
-Sprint 014: Content Manager Requirement Amendment and Boundary Definition
+Sprint 014A: Collector Extraction Boundary Amendment
 
-Active sprint file: `docs/SPRINTS/SPRINT-014-content-manager-requirement-amendment.md`
+Active sprint file: `docs/SPRINTS/SPRINT-014A-collector-extraction-boundary-amendment.md`
 
-Sprint 014 is documentation and design only. It introduces Content Manager to the project brain, defines its ownership boundaries, records first-platform and first-source decisions, defines initial content/source/category/comment models, documents v1 deduplication and upsert behavior, adds storage planning notes, and updates the roadmap. No source implementation files, migrations, repositories, HTTP routes, tests, Facebook integration, Collector Runtime execution, Web UI, or Collector Profile Manager behavior changes should happen in this sprint.
+Sprint 014A is documentation and design only. It amends the Content Manager boundary by defining Platform Extractors on the Collector Runtime side and recording that raw Facebook GraphQL payload parsing belongs to the future Facebook GraphQL Payload Extractor, not Content Manager core. No source implementation files, parser code, test fixtures, migrations, repositories, HTTP routes, Collector Runtime implementation, Content Manager domain implementation, Web UI, or Collector Profile Manager behavior changes should happen in this sprint.
 
 ## Decided Items
 
@@ -49,17 +49,23 @@ Sprint 014 is documentation and design only. It introduces Content Manager to th
 - Sprint 013 introduces opt-in DB-backed HTTP integration verification for the full Collector Profile Manager backend slice while keeping default tests database-free.
 - Collector Profile Manager is complete through Sprint 013 and accepted.
 - Sprint 014 introduces Content Manager as the next Content Collector module before Web UI and Collector Runtime.
-- Content Manager owns content item storage, content deduplication/upsert behavior, content lifecycle status, Facebook source group records, managed group categories, engagement counts, top N high-engagement comments, safe read contracts, and future Content Builder handoff shape.
-- Content Manager does not own profile/session management, browser automation, scraping behavior, comment crawling strategy, video generation, or publishing workflows.
+- Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
+- Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.
 - The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.
-- Collector Runtime will later own checking out profiles, visiting Facebook groups and posts, extracting post data and top comments, submitting collected content to Content Manager, and releasing leases.
+- Collector Runtime will later own checking out profiles, visiting Facebook groups and posts, capturing platform artifacts, using Platform Extractors, submitting normalized collected content to Content Manager, and releasing leases.
 - Facebook is the first Content Manager platform.
 - Facebook knowledge groups are the first Content Manager source type.
 - Facebook rich text posts are the first Content Manager content type.
 - Group categories are managed entities, not free text.
 - V1 content deduplication uses `platform + externalPostId`.
 - V1 duplicate content preserves `id`, `firstCollectedAt`, `createdAt`, and manual status while updating body text, engagement counts, top comments, `lastCollectedAt`, and `updatedAt`.
-- V1 top comments store the top N comments by reaction count, with default N = 10 and no full comment history.
+- V1 top comments store normalized top N comments selected by reaction count during extraction, with default N = 10 and no full comment history.
+- A Platform Extractor is a collection-side component that converts raw platform-specific artifacts into normalized Content Manager ingestion input.
+- Facebook GraphQL Payload Extractor is the first planned Platform Extractor.
+- Collector Runtime / Platform Extractor owns raw Facebook GraphQL payload interpretation, Facebook-specific field mapping, post extraction, high-engagement comment extraction, engagement count extraction, best-effort missing-field handling, and future extractor fixtures and parser tests.
+- The canonical content collection flow is raw GraphQL payload -> Facebook GraphQL Payload Extractor -> normalized Content Manager ingestion input -> Content Manager validation/upsert/storage.
+- Content Manager should not accept raw Facebook GraphQL payloads as its primary ingestion contract.
+- Optional future `sanitizedRawPayload` or `rawPayloadRef` storage is diagnostic and not the canonical content model.
 
 ## Not Decided Yet
 
@@ -69,11 +75,12 @@ Sprint 014 is documentation and design only. It introduces Content Manager to th
 - Deployment platform and infrastructure.
 - Authentication and authorization approach for management interfaces.
 - Observability stack.
-- API contracts beyond the current Collector Profile Manager routes and future Content Manager safe read/write contracts.
+- API contracts beyond the current Collector Profile Manager routes and future Content Manager safe read/normalized write contracts.
 - Backend runtime concerns beyond the minimal Fastify entrypoint.
 - Exact Content Manager database schema and repository adapter details.
 - Whether top comments remain JSONB long term or move into a dedicated comment table.
-- Exact Collector Runtime crawling strategy and comment extraction strategy.
+- Exact Collector Runtime crawling strategy.
+- Exact Facebook GraphQL response-shape mapping and parser fixture set.
 - Exact Content Builder handoff use cases and status transitions beyond the initial `SELECTED` direction.
 
 ## Open Questions
@@ -87,5 +94,5 @@ Sprint 014 is documentation and design only. It introduces Content Manager to th
 - How will Content Collector outputs be handed off to Content Builder?
 - What actor or system is authorized to manage source groups, categories, content status, and future builder handoff?
 - Which Facebook source and author fields can be safely displayed in future management interfaces?
-- What retention policy should apply to optional raw source payloads?
+- What retention policy should apply to optional sanitized raw payload diagnostics or raw payload references?
 - When will top comments need dedicated querying instead of JSONB storage?

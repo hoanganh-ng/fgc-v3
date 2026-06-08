@@ -25,13 +25,14 @@ Does not own:
 
 Owns:
 
+- Validation of normalized content ingestion input.
 - Content item storage.
 - Content deduplication and upsert rules.
 - Content lifecycle status.
-- Facebook source group records.
+- Source group records.
 - Group categories as managed entities.
 - Engagement counts.
-- Top N high-engagement comments for each content item.
+- Top comments as normalized metadata for each content item.
 - Safe read APIs.
 - Future handoff shape for Content Builder.
 
@@ -39,10 +40,15 @@ Does not own:
 
 - Profile or session management.
 - Browser automation.
-- Actual scraping behavior.
+- Network payload capture.
+- Raw Facebook GraphQL parsing.
+- Scraping strategy.
+- Platform-specific extraction rules.
 - Comment crawling strategy.
 - Video generation.
 - Publishing workflows.
+
+Content Manager should not accept raw Facebook GraphQL payloads as its primary ingestion contract. Its canonical write contract is normalized Content Manager ingestion input. A future implementation may optionally store sanitized raw payload data or a raw payload reference for trusted diagnostics or reprocessing, but that storage is not the canonical content model.
 
 ## Collector Runtime
 
@@ -51,9 +57,16 @@ Owns:
 - Future execution of collection workflows.
 - Checking out eligible profiles from Collector Profile Manager.
 - Visiting Facebook groups and posts.
-- Extracting post data.
-- Extracting top comments.
-- Submitting collected content to Content Manager.
+- Browser automation and network payload capture.
+- Platform Extractors that convert raw platform artifacts into normalized Content Manager ingestion input.
+- Raw Facebook GraphQL payload interpretation.
+- Facebook-specific field mapping.
+- Post extraction.
+- High-engagement comment extraction.
+- Engagement count extraction.
+- Best-effort handling of missing fields in captured platform payloads.
+- Future extractor fixtures and parser tests.
+- Submitting normalized collected content to Content Manager.
 - Releasing profile leases.
 - Returning profile usage outcomes and runtime metrics.
 
@@ -67,6 +80,23 @@ Does not own:
 - Group category management.
 - Content building.
 - Content publishing.
+
+## Platform Extractor Boundary
+
+A Platform Extractor is a collection-side component that converts raw platform-specific artifacts, such as captured Facebook GraphQL payloads, into normalized Content Manager ingestion input.
+
+The first planned extractor is the Facebook GraphQL Payload Extractor.
+
+Canonical collection ingestion flow:
+
+```text
+raw GraphQL payload
+-> Facebook GraphQL Payload Extractor
+-> normalized Content Manager ingestion input
+-> Content Manager validation/upsert/storage
+```
+
+Platform Extractors belong to the Collector Runtime side of the Content Collector. They do not belong in the Content Manager domain core.
 
 ## Profile Manager Web UI
 

@@ -21,6 +21,8 @@ The domain core contains business concepts and invariants. For Collector Profile
 
 For Content Manager, this includes source group rules, managed group category rules, content item lifecycle status, content deduplication/upsert rules, high-engagement top comment rules, engagement count invariants, and future builder handoff eligibility.
 
+Content Manager domain core must work from normalized content ingestion input. It must not parse raw Facebook GraphQL payloads or own platform-specific extraction rules.
+
 Domain code should be deterministic where possible and should express business errors in domain terms.
 
 ## Application Layer
@@ -55,7 +57,24 @@ Adapters implement ports using concrete technologies. Expected future adapter ca
 - Queue or scheduler integration.
 - Web UI integration.
 
-Collector Runtime will be a future operational module that consumes Collector Profile Manager and Content Manager application contracts. Browser automation and scraping details must remain outside the Content Manager domain and application rules.
+Collector Runtime will be a future operational module that consumes Collector Profile Manager and Content Manager application contracts. Browser automation, network payload capture, scraping strategy, and raw platform payload parsing must remain outside the Content Manager domain and application rules.
+
+## Platform Extractors
+
+A Platform Extractor is a collection-side component that converts raw platform-specific artifacts, such as captured Facebook GraphQL payloads, into normalized Content Manager ingestion input.
+
+The first planned extractor is the Facebook GraphQL Payload Extractor. It belongs to the Collector Runtime side and owns raw Facebook GraphQL payload interpretation, Facebook-specific field mapping, post extraction, high-engagement comment extraction, engagement count extraction, best-effort missing-field handling, and future extractor fixtures and parser tests.
+
+The canonical flow is:
+
+```text
+raw GraphQL payload
+-> Facebook GraphQL Payload Extractor
+-> normalized Content Manager ingestion input
+-> Content Manager validation/upsert/storage
+```
+
+Content Manager should not accept raw Facebook GraphQL payloads as its primary ingestion contract. Optional future storage of sanitized raw payload data or a raw payload reference must be diagnostic, must not become the canonical content model, and must not leak through safe reads by default.
 
 Adapter selection is out of scope for Sprint 000.
 
@@ -63,7 +82,7 @@ Adapter selection is out of scope for Sprint 000.
 
 Runtime validation should protect data entering through public APIs and data leaving persistence before it reaches business use cases. The NFRs call for schemas that mirror compile-time TypeScript interfaces, but the exact tooling is not selected in Sprint 000.
 
-Content Manager safe read contracts should avoid exposing optional raw source payloads by default. If trusted diagnostics need raw payloads later, they should use a dedicated application contract.
+Content Manager validation should validate normalized content ingestion input after platform extraction. Content Manager safe read contracts should avoid exposing optional sanitized raw payload diagnostics or raw payload references by default. If trusted diagnostics need sanitized raw payload data or raw payload references later, they should use a dedicated application contract.
 
 ## Sprint 000 Scope
 

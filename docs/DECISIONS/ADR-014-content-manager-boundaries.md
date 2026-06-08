@@ -4,6 +4,8 @@
 
 Accepted
 
+Amended by ADR-015: Platform Extractor Boundary.
+
 ## Context
 
 The project is a Content Video Pipeline with three stages: Content Collector, Content Builder, and Content Publisher. The current product focus remains the Content Collector stage.
@@ -22,7 +24,7 @@ The first platform is Facebook. The first source type is Facebook knowledge grou
 
 Content Manager does not own profile/session management, browser automation, scraping behavior, comment crawling strategy, video generation, or publishing.
 
-Collector Runtime will later own operational collection flow: check out a profile, visit Facebook groups and posts, extract post data, extract top comments, submit collected content to Content Manager, and release the profile lease.
+Collector Runtime will later own operational collection flow: check out a profile, visit Facebook groups and posts, extract post data and top comments through collection-side extraction components, submit normalized collected content to Content Manager, and release the profile lease.
 
 Content Manager must follow the existing hexagonal architecture:
 
@@ -39,6 +41,5 @@ Content Manager must follow the existing hexagonal architecture:
 - Collector Runtime can later depend on Content Manager application contracts instead of inventing content rules inside automation code.
 - Future Web UI work can read from stable Content Manager contracts instead of raw storage structures.
 - Content Builder can later receive selected content through an intentional handoff shape.
-- Facebook-specific fields are allowed in the first Content Manager model, but platform ownership remains inside Content Manager instead of leaking into unrelated modules.
+- Facebook-specific source identity and content fields are allowed in the first Content Manager model, but raw Facebook GraphQL payload parsing is owned by the Collector Runtime / Platform Extractor boundary defined in ADR-015.
 - Storage work, repositories, HTTP routes, and tests are deferred to later sprints.
-
