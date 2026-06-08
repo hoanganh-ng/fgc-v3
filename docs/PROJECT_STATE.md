@@ -14,11 +14,11 @@ The next module is Content Manager because content is the central business objec
 
 ## Current Sprint
 
-Sprint 014A: Collector Extraction Boundary Amendment
+Sprint 015: Content Manager Domain Model
 
-Active sprint file: `docs/SPRINTS/SPRINT-014A-collector-extraction-boundary-amendment.md`
+Active sprint file: `docs/SPRINTS/SPRINT-015-content-manager-domain-model.md`
 
-Sprint 014A is documentation and design only. It amends the Content Manager boundary by defining Platform Extractors on the Collector Runtime side and recording that raw Facebook GraphQL payload parsing belongs to the future Facebook GraphQL Payload Extractor, not Content Manager core. No source implementation files, parser code, test fixtures, migrations, repositories, HTTP routes, Collector Runtime implementation, Content Manager domain implementation, Web UI, or Collector Profile Manager behavior changes should happen in this sprint.
+Sprint 015 implements the Content Manager domain model and domain tests only. It covers normalized ingestion input, content categories, source groups, content items, top comments, lifecycle statuses, status transitions, top comment normalization, and duplicate collected content merge behavior. No application use cases, repository ports, PostgreSQL schema, Drizzle migrations, repository adapters, HTTP routes, Fastify schemas, composition root wiring, Facebook GraphQL parser, Collector Runtime, real GraphQL fixtures, Web UI, or Collector Profile Manager behavior changes should happen in this sprint.
 
 ## Decided Items
 
