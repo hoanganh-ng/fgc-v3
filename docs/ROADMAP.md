@@ -42,9 +42,13 @@ Implement the collection-side extractor that converts captured Facebook GraphQL 
 
 ## Sprint 021: Collector Runtime Submission Flow
 
-Implement the Collector Runtime flow that checks out profiles, visits configured Facebook sources, captures payloads, invokes the Facebook GraphQL Payload Extractor, submits normalized ingestion input to Content Manager, and releases profile leases through explicit application contracts.
+Implement the Collector Runtime submission flow for already-captured Facebook GraphQL payloads. This sprint invokes the Facebook GraphQL Payload Extractor and submits normalized ingestion input to the Content Manager HTTP API, without browser automation, network interception, profile checkout, lease release, scheduling, queues, or database access from Collector Runtime.
 
-## Sprint 022: Profile + Content Manager Web UI Foundation
+## Sprint 022: Collector Runtime Profile-Orchestrated Capture Flow
+
+Add the next runtime layer that can orchestrate profile checkout, captured payload collection, submission, and lease release through explicit application contracts.
+
+## Sprint 023: Profile + Content Manager Web UI Foundation
 
 Start the deferred Web UI foundation for profile and content management, consuming application/API contracts instead of owning domain rules or persistence logic.
 

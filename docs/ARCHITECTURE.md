@@ -63,7 +63,9 @@ Collector Runtime will be a future operational module that consumes Collector Pr
 
 A Platform Extractor is a collection-side component that converts raw platform-specific artifacts, such as captured Facebook GraphQL payloads, into normalized Content Manager ingestion input.
 
-The first planned extractor is the Facebook GraphQL Payload Extractor. It belongs to the Collector Runtime side and owns raw Facebook GraphQL payload interpretation, Facebook-specific field mapping, post extraction, high-engagement comment extraction, engagement count extraction, best-effort missing-field handling, and future extractor fixtures and parser tests.
+The first extractor is the Facebook GraphQL Payload Extractor. It belongs to the Collector Runtime side and owns raw Facebook GraphQL payload interpretation, Facebook-specific field mapping, post extraction, high-engagement comment extraction, engagement count extraction, best-effort missing-field handling, and extractor fixtures and parser tests.
+
+The extractor produces normalized Content Manager ingestion input candidates only. It does not submit to Content Manager, perform browser automation, intercept network traffic, check out profiles, or access storage.
 
 The canonical flow is:
 
