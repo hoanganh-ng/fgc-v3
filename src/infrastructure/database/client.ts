@@ -2,16 +2,17 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import type { PoolConfig } from "pg";
-import * as schema from "./schema/collector-profile-manager.schema";
+import * as schema from "./schema";
 
 export type DatabaseSchema = typeof schema;
-export type CollectorProfileDatabase = NodePgDatabase<DatabaseSchema>;
-export type CollectorProfileTransaction = Parameters<
-  Parameters<CollectorProfileDatabase["transaction"]>[0]
+export type Database = NodePgDatabase<DatabaseSchema>;
+export type DatabaseTransaction = Parameters<
+  Parameters<Database["transaction"]>[0]
 >[0];
-export type CollectorProfileDatabaseSession =
-  | CollectorProfileDatabase
-  | CollectorProfileTransaction;
+export type DatabaseSession = Database | DatabaseTransaction;
+export type CollectorProfileDatabase = Database;
+export type CollectorProfileTransaction = DatabaseTransaction;
+export type CollectorProfileDatabaseSession = DatabaseSession;
 
 export interface CreateDatabaseClientOptions {
   readonly databaseUrl?: string;
@@ -20,7 +21,7 @@ export interface CreateDatabaseClientOptions {
 
 export interface DatabaseClient {
   readonly pool: Pool;
-  readonly db: CollectorProfileDatabase;
+  readonly db: Database;
   close(): Promise<void>;
 }
 

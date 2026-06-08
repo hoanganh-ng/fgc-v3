@@ -2,34 +2,33 @@
 
 ## Purpose
 
-This document records likely future storage direction for Content Manager. It is planning material only. Sprint 014A does not add migrations, repositories, schemas, adapters, parser code, fixtures, or implementation code.
+This document records Content Manager storage direction. Sprint 017 implements the first PostgreSQL/Drizzle storage shape for Content Manager tables, repositories, mappers, migrations, and gated database integration tests.
 
-Content Manager domain and application code must continue to depend only on domain objects and application-owned ports when implementation begins.
+Content Manager domain and application code must continue to depend only on domain objects and application-owned ports as implementation continues.
 
 Content Manager storage must be designed around normalized Content Manager ingestion input. Raw Facebook GraphQL payload interpretation belongs to the Collector Runtime / Platform Extractor boundary, not Content Manager persistence or domain logic.
 
-## Likely Tables
+## Implemented Tables
 
-Future PostgreSQL storage will likely include:
+PostgreSQL storage includes:
 
 - `source_groups`
 - `content_categories`
 - `content_items`
-- `content_item_top_comments` or JSONB `top_comments`
 
 ## V1 Storage Direction
 
-Recommended v1 direction:
+Implemented v1 direction:
 
 - Keep operational and query fields as PostgreSQL root columns.
 - Store top comments as JSONB at first unless individual comment querying becomes necessary.
-- Store sanitized raw payload diagnostics or raw payload references only if a later sprint explicitly introduces them.
+- Store `raw_payload_ref` as an optional reference field only. Do not store raw Facebook GraphQL payloads as canonical content data.
 - Keep deduplication enforced by a unique constraint on platform plus external post id.
 - Reconstruct and validate domain/application data before it reaches use cases.
 
 ## Source Groups
 
-Suggested table: `source_groups`
+Table: `source_groups`
 
 Root-level columns:
 
@@ -47,7 +46,7 @@ Root-level columns:
 
 ## Content Categories
 
-Suggested table: `content_categories`
+Table: `content_categories`
 
 Root-level columns:
 
@@ -60,7 +59,7 @@ Root-level columns:
 
 ## Content Items
 
-Suggested table: `content_items`
+Table: `content_items`
 
 Root-level columns:
 
@@ -79,6 +78,7 @@ Root-level columns:
 - `reaction_count`: latest reaction count.
 - `comment_count`: latest comment count.
 - `share_count`: nullable latest share count.
+- `raw_payload_ref`: nullable external reference to raw payload storage.
 - `status`: `COLLECTED`, `SELECTED`, `REJECTED`, or `USED`.
 - `created_at`: creation timestamp.
 - `updated_at`: update timestamp.
@@ -90,9 +90,8 @@ JSONB columns:
 Optional future diagnostics columns, if explicitly introduced by a later sprint:
 
 - `sanitized_raw_payload`: sanitized source payload data for trusted diagnostics or future reprocessing.
-- `raw_payload_ref`: reference to raw payload data stored outside the canonical content model.
 
-Diagnostics columns are optional. They must not be required by Content Manager domain rules and must not become the primary ingestion contract.
+Diagnostics columns are optional. They must not be required by Content Manager domain rules and must not become the primary ingestion contract. `raw_payload_ref` is currently available only as an optional external reference, not as embedded raw payload storage.
 
 ## Top Comments
 
@@ -117,7 +116,7 @@ If a future table is introduced, likely root-level fields are:
 - `posted_at`
 - `collected_at`
 
-## Future Indexes To Consider
+## Implemented Indexes
 
 - Unique index on `content_items(platform, external_post_id)`.
 - Index on `content_items(source_group_id)`.
@@ -131,4 +130,4 @@ If a future table is introduced, likely root-level fields are:
 
 ## Notes
 
-The recommended shape keeps frequently filtered operational fields in columns while allowing nested top comment payloads to begin as JSONB. This matches the current project direction of using PostgreSQL root columns for query-critical fields and JSONB for complex structures that are usually loaded as a whole. Raw platform payload parsing remains outside Content Manager.
+The implemented shape keeps frequently filtered operational fields in columns while allowing nested top comment payloads to begin as JSONB. This matches the current project direction of using PostgreSQL root columns for query-critical fields and JSONB for complex structures that are usually loaded as a whole. Raw platform payload parsing remains outside Content Manager.

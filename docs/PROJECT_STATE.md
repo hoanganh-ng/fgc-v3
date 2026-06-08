@@ -14,11 +14,11 @@ The next module is Content Manager because content is the central business objec
 
 ## Current Sprint
 
-Sprint 016A: Content Manager Application Layer File Organization Cleanup
+Sprint 017: Content Manager PostgreSQL Schema and Repository Adapters
 
-Active sprint file: `docs/SPRINTS/SPRINT-016A-content-manager-application-file-organization-cleanup.md`
+Active sprint file: `docs/SPRINTS/SPRINT-017-content-manager-postgres-schema-and-repositories.md`
 
-Sprint 016A is a refactor-only follow-up to Sprint 016. It verifies that the Content Manager application layer keeps implementation details in focused files and keeps `src/content-manager/application/index.ts` as a barrel export. If the application index is already only a barrel export, no application code changes should be made. No PostgreSQL schema, Drizzle migrations, repository adapters, HTTP routes, Fastify schemas, composition root wiring, Facebook GraphQL parser, Collector Runtime, real GraphQL fixtures, Web UI, or Collector Profile Manager behavior changes should happen in this sprint.
+Sprint 017 adds PostgreSQL/Drizzle persistence for Content Manager and implements infrastructure repository adapters for the existing Content Manager application ports. It covers Content Manager tables, indexes, foreign keys, migration, mappers, repository adapters, and gated database integration tests. No HTTP routes, Fastify schemas, Content Manager HTTP API, composition root wiring, Facebook GraphQL parser, Collector Runtime, real GraphQL fixtures, Web UI, Content Builder, Publisher, or Collector Profile Manager behavior changes should happen in this sprint.
 
 ## Decided Items
 
@@ -50,6 +50,9 @@ Sprint 016A is a refactor-only follow-up to Sprint 016. It verifies that the Con
 - Collector Profile Manager is complete through Sprint 013 and accepted.
 - Sprint 014 introduces Content Manager as the next Content Collector module before Web UI and Collector Runtime.
 - Sprint 015 introduces the Content Manager domain model and domain tests for normalized collected content.
+- Sprint 016 introduces the Content Manager application layer and application-owned ports for normalized collected content use cases.
+- Sprint 016A verified that the Content Manager application layer is already organized into focused files and that `src/content-manager/application/index.ts` is a barrel export only.
+- Sprint 017 introduces PostgreSQL/Drizzle storage for Content Manager through infrastructure adapters that implement application-owned repository ports.
 - Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
 - Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.
 - The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.
@@ -61,12 +64,13 @@ Sprint 016A is a refactor-only follow-up to Sprint 016. It verifies that the Con
 - V1 content deduplication uses `platform + externalPostId`.
 - V1 duplicate content preserves `id`, `firstCollectedAt`, `createdAt`, and manual status while updating body text, engagement counts, top comments, `lastCollectedAt`, and `updatedAt`.
 - V1 top comments store normalized top N comments selected by reaction count during extraction, with default N = 10 and no full comment history.
+- V1 Content Manager PostgreSQL storage keeps top comments as JSONB on `content_items`.
 - A Platform Extractor is a collection-side component that converts raw platform-specific artifacts into normalized Content Manager ingestion input.
 - Facebook GraphQL Payload Extractor is the first planned Platform Extractor.
 - Collector Runtime / Platform Extractor owns raw Facebook GraphQL payload interpretation, Facebook-specific field mapping, post extraction, high-engagement comment extraction, engagement count extraction, best-effort missing-field handling, and future extractor fixtures and parser tests.
 - The canonical content collection flow is raw GraphQL payload -> Facebook GraphQL Payload Extractor -> normalized Content Manager ingestion input -> Content Manager validation/upsert/storage.
 - Content Manager should not accept raw Facebook GraphQL payloads as its primary ingestion contract.
-- Optional future `sanitizedRawPayload` or `rawPayloadRef` storage is diagnostic and not the canonical content model.
+- Optional future `sanitizedRawPayload` storage is diagnostic and not the canonical content model. `rawPayloadRef` is an optional external reference, not embedded raw payload storage.
 
 ## Not Decided Yet
 
@@ -78,7 +82,6 @@ Sprint 016A is a refactor-only follow-up to Sprint 016. It verifies that the Con
 - Observability stack.
 - API contracts beyond the current Collector Profile Manager routes and future Content Manager safe read/normalized write contracts.
 - Backend runtime concerns beyond the minimal Fastify entrypoint.
-- Exact Content Manager database schema and repository adapter details.
 - Whether top comments remain JSONB long term or move into a dedicated comment table.
 - Exact Collector Runtime crawling strategy.
 - Exact Facebook GraphQL response-shape mapping and parser fixture set.
