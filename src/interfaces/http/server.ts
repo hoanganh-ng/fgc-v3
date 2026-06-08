@@ -5,10 +5,15 @@ import {
   registerCollectorProfileManagerRoutes,
   type CollectorProfileManagerHttpService,
 } from "./routes/collector-profile-manager.routes";
+import {
+  registerContentManagerRoutes,
+  type ContentManagerHttpService,
+} from "./routes/content-manager.routes";
 import { registerHealthRoutes } from "./routes/health.routes";
 
 export interface CreateHttpServerOptions {
   readonly collectorProfileManager: CollectorProfileManagerHttpService;
+  readonly contentManager: ContentManagerHttpService;
   readonly logger?: FastifyServerOptions["logger"];
 }
 
@@ -16,6 +21,11 @@ export function createHttpServer(
   options: CreateHttpServerOptions,
 ): FastifyInstance {
   const server = fastify({
+    ajv: {
+      customOptions: {
+        removeAdditional: false,
+      },
+    },
     logger: options.logger ?? false,
   });
 
@@ -28,6 +38,9 @@ export function createHttpServer(
   registerHealthRoutes(server);
   registerCollectorProfileManagerRoutes(server, {
     collectorProfileManager: options.collectorProfileManager,
+  });
+  registerContentManagerRoutes(server, {
+    contentManager: options.contentManager,
   });
 
   return server;

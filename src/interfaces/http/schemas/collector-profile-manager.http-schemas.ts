@@ -13,36 +13,10 @@ import {
   SafetyThresholdsSchema,
   TemporalRoutineSchema,
 } from "../../../collector-profile-manager/domain";
-import type { ValidationIssue } from "../../../collector-profile-manager/domain";
 import {
   MAX_PROFILE_LIST_LIMIT,
 } from "../../../collector-profile-manager/application";
-
-export class HttpRequestValidationError extends Error {
-  public readonly issues: readonly ValidationIssue[];
-
-  public constructor(issues: readonly ValidationIssue[]) {
-    super("HTTP request validation failed.");
-    this.name = "HttpRequestValidationError";
-    this.issues = issues;
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
-
-export function parseHttpInput<T>(schema: z.ZodType<T>, value: unknown): T {
-  const result = schema.safeParse(value);
-
-  if (!result.success) {
-    throw new HttpRequestValidationError(
-      result.error.issues.map((issue) => ({
-        path: issue.path.map(String).join("."),
-        message: issue.message,
-      })),
-    );
-  }
-
-  return result.data;
-}
+export { HttpRequestValidationError, parseHttpInput } from "./http-validation";
 
 export const CreateProfileHttpBodySchema = z
   .object({

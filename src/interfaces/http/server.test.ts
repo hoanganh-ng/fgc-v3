@@ -42,6 +42,9 @@ import { createHttpServer } from "./server";
 import type {
   CollectorProfileManagerHttpService,
 } from "./routes/collector-profile-manager.routes";
+import {
+  createFakeContentManagerHttpService,
+} from "./test-support/content-manager-http-service";
 
 const now = "2026-01-05T18:00:00.000Z";
 
@@ -677,6 +680,7 @@ function createTestServer(): {
   return {
     server: createHttpServer({
       collectorProfileManager: service,
+      contentManager: createFakeContentManagerHttpService(),
     }),
     service,
   };

@@ -14,6 +14,9 @@ import {
 } from "../../infrastructure/database";
 import type { DatabaseClient } from "../../infrastructure/database";
 import { createHttpServer } from "./server";
+import {
+  createFakeContentManagerHttpService,
+} from "./test-support/content-manager-http-service";
 
 const shouldRunHttpDbTests = process.env.RUN_HTTP_DB_TESTS === "true";
 const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -50,6 +53,7 @@ if (!shouldRunHttpDbTests) {
       service = createCollectorProfileManagerFromDatabaseClient(databaseClient);
       server = createHttpServer({
         collectorProfileManager: service,
+        contentManager: createFakeContentManagerHttpService(),
       });
     });
 

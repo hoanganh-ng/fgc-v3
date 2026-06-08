@@ -11,7 +11,16 @@ import {
   CollectorProfileDomainError,
   type CollectorProfileDomainErrorCode,
 } from "../../../collector-profile-manager/domain";
-import { HttpRequestValidationError } from "../schemas/collector-profile-manager.http-schemas";
+import {
+  ContentManagerApplicationError,
+  ContentValidationError,
+  type ContentManagerApplicationErrorCode,
+} from "../../../content-manager/application";
+import {
+  ContentManagerDomainError,
+  type ContentManagerDomainErrorCode,
+} from "../../../content-manager/domain";
+import { HttpRequestValidationError } from "../schemas/http-validation";
 
 export interface HttpErrorBody {
   readonly error: {
@@ -124,6 +133,19 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
     };
   }
 
+  if (error instanceof ContentValidationError) {
+    return {
+      statusCode: 400,
+      body: {
+        error: {
+          code: error.code,
+          message: error.message,
+          issues: error.issues,
+        },
+      },
+    };
+  }
+
   if (error instanceof CollectorProfileApplicationError) {
     return mapKnownError(
       error.code,
@@ -132,10 +154,26 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
     );
   }
 
+  if (error instanceof ContentManagerApplicationError) {
+    return mapKnownError(
+      error.code,
+      contentApplicationErrorStatus[error.code],
+      error.message,
+    );
+  }
+
   if (error instanceof CollectorProfileDomainError) {
     return mapKnownError(
       error.code,
       domainErrorStatus[error.code],
+      error.message,
+    );
+  }
+
+  if (error instanceof ContentManagerDomainError) {
+    return mapKnownError(
+      error.code,
+      contentDomainErrorStatus[error.code],
       error.message,
     );
   }
@@ -172,6 +210,23 @@ const domainErrorStatus: Record<CollectorProfileDomainErrorCode, number> = {
   MISSING_REQUIRED_PROFILE_CONFIGURATION: 400,
   INVALID_PROVISIONING_TOKEN_STATE: 400,
   IMMUTABLE_FINGERPRINT_VIOLATION: 409,
+};
+
+const contentApplicationErrorStatus: Record<
+  ContentManagerApplicationErrorCode,
+  number
+> = {
+  CONTENT_CATEGORY_ALREADY_EXISTS: 409,
+  CONTENT_CATEGORY_NOT_FOUND: 404,
+  SOURCE_GROUP_ALREADY_EXISTS: 409,
+  SOURCE_GROUP_NOT_FOUND: 404,
+  CONTENT_ITEM_NOT_FOUND: 404,
+  INVALID_CONTENT_STATUS_TRANSITION: 409,
+  CONTENT_VALIDATION_ERROR: 400,
+};
+
+const contentDomainErrorStatus: Record<ContentManagerDomainErrorCode, number> = {
+  INVALID_CONTENT_STATUS_TRANSITION: 409,
 };
 
 function mapKnownError(
