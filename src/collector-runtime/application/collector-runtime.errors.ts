@@ -1,5 +1,30 @@
 import type { ContentSubmissionResult } from "./collector-runtime.types";
 
+export type CollectorRuntimeErrorCode =
+  | "CONTENT_SUBMISSION_FAILED"
+  | "FACEBOOK_PAYLOAD_CAPTURE_FAILED"
+  | "FACEBOOK_PAYLOAD_EXTRACTION_FAILED"
+  | "PROFILE_CHECKOUT_FAILED"
+  | "PROFILE_LEASE_RELEASE_FAILED";
+
+export interface CollectorRuntimeError {
+  readonly code: CollectorRuntimeErrorCode;
+  readonly message: string;
+  readonly causeCode?: string;
+  readonly payloadIndex?: number;
+  readonly externalPostId?: string;
+  readonly statusCode?: number;
+  readonly path?: string;
+}
+
+export interface CollectorRuntimeErrorContext {
+  readonly causeCode?: string;
+  readonly payloadIndex?: number;
+  readonly externalPostId?: string;
+  readonly statusCode?: number;
+  readonly path?: string;
+}
+
 export function createSubmissionPortErrorResult(
   error: unknown,
 ): ContentSubmissionResult {
@@ -22,3 +47,26 @@ export function errorToMessage(error: unknown): string {
   return "Content submission failed for an unknown reason.";
 }
 
+export function createCollectorRuntimeError(
+  code: CollectorRuntimeErrorCode,
+  message: string,
+  context: CollectorRuntimeErrorContext = {},
+): CollectorRuntimeError {
+  return {
+    code,
+    message,
+    ...(context.causeCode !== undefined
+      ? { causeCode: context.causeCode }
+      : {}),
+    ...(context.payloadIndex !== undefined
+      ? { payloadIndex: context.payloadIndex }
+      : {}),
+    ...(context.externalPostId !== undefined
+      ? { externalPostId: context.externalPostId }
+      : {}),
+    ...(context.statusCode !== undefined
+      ? { statusCode: context.statusCode }
+      : {}),
+    ...(context.path !== undefined ? { path: context.path } : {}),
+  };
+}

@@ -10,15 +10,15 @@ The project is a Content Video Pipeline with three stages:
 
 The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI remains intentionally deferred.
 
-The next active module work is the Collector Runtime Submission Flow. It takes already-captured Facebook GraphQL response bodies, invokes the Facebook GraphQL Payload Extractor, and submits normalized content candidates to the Content Manager HTTP API while keeping browser automation, network interception, profile checkout, lease release, scheduling, queues, and database access deferred.
+The next active module work is the Collector Runtime Profile-Orchestrated Collection Flow. It coordinates profile checkout, captured Facebook GraphQL payload collection through a placeholder port, content submission through the Sprint 021 submission use case, and profile lease release while keeping browser automation, real network interception, scheduling, queues, direct database access, Web UI, Content Builder, and Publisher work deferred.
 
 ## Current Sprint
 
-Sprint 021: Collector Runtime Submission Flow
+Sprint 022: Collector Runtime Profile-Orchestrated Collection Flow
 
-Active sprint file: `docs/SPRINTS/SPRINT-021-collector-runtime-submission-flow.md`
+Active sprint file: `docs/SPRINTS/SPRINT-022-collector-runtime-profile-orchestrated-collection-flow.md`
 
-Sprint 021 implements the Collector Runtime submission flow for already-captured Facebook GraphQL response bodies. It connects the Sprint 020 Facebook GraphQL Payload Extractor to the existing Content Manager normalized ingestion HTTP API through a Collector Runtime-owned submission port and HTTP client adapter. No browser automation, network interception, profile checkout, lease release, scheduling, queues, database access, Content Manager business-rule changes, Web UI, Content Builder, or Publisher work should happen in this sprint.
+Sprint 022 implements Collector Runtime orchestration with ports and fakes. It checks out a profile through a runtime-owned Profile Manager port, captures already-available Facebook GraphQL payloads through a placeholder capture port, submits each payload through the Sprint 021 submission flow, and releases the profile lease. No browser automation, real network interception, scheduler, queue, direct database access, repository imports, Content Manager business-rule changes, Profile Manager business-rule changes, Web UI, Content Builder, or Publisher work should happen in this sprint.
 
 ## Decided Items
 
@@ -57,14 +57,17 @@ Sprint 021 implements the Collector Runtime submission flow for already-captured
 - Sprint 019 introduces Content Manager HTTP routes through the existing Fastify adapter while keeping parser/runtime/UI work deferred.
 - Sprint 020 introduces the Facebook GraphQL Payload Extractor under the Collector Runtime / Platform Extractor boundary while keeping browser automation, network interception, profile checkout, HTTP submission, and database access deferred.
 - Sprint 021 introduces the Collector Runtime submission flow that sends extracted normalized candidates to the Content Manager HTTP API while keeping browser automation, network interception, profile checkout, lease release, scheduling, queues, and database access deferred.
+- Sprint 022 introduces the Collector Runtime profile-orchestrated collection flow that coordinates profile checkout, placeholder captured-payload collection, Sprint 021 submission, and lease release through runtime-owned ports while keeping real browser automation, network interception, scheduling, queues, direct database access, and Web UI work deferred.
 - Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
 - Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.
 - The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.
 - Collector Runtime will later own checking out profiles, visiting Facebook groups and posts, capturing platform artifacts, using Platform Extractors, submitting normalized collected content to Content Manager, and releasing leases.
+- Sprint 022 Collector Runtime orchestration owns the coordination of profile checkout, payload capture port invocation, submission flow invocation, and profile lease release, but not the business rules behind profile eligibility/leasing or content deduplication/upsert.
 - The Sprint 020 Facebook GraphQL Payload Extractor owns conversion from captured Facebook GraphQL response bodies to normalized Content Manager ingestion input candidates only.
 - Sprint 020 extractor fixtures include synthetic fixtures and sanitized real Facebook payload fixtures.
 - The Sprint 020 extractor outputs normalized ISO datetime strings so candidates structurally match Content Manager ingestion input.
 - The Sprint 021 Collector Runtime submission flow accepts already-captured payloads only and submits normalized candidates to Content Manager through the HTTP API.
+- The Sprint 022 Collector Runtime orchestration flow uses a capture port as a placeholder for future browser/network capture; it does not implement real Facebook login, navigation, or network interception.
 - Content Manager remains responsible for validation, persistent deduplication, upsert behavior, lifecycle status, and storage after runtime submission.
 - Facebook is the first Content Manager platform.
 - Facebook knowledge groups are the first Content Manager source type.
@@ -93,7 +96,7 @@ Sprint 021 implements the Collector Runtime submission flow for already-captured
 - Backend runtime concerns beyond the minimal Fastify entrypoint.
 - Whether top comments remain JSONB long term or move into a dedicated comment table.
 - Exact Collector Runtime crawling strategy.
-- Exact Collector Runtime profile-orchestrated capture strategy.
+- Exact Collector Runtime browser-backed capture strategy.
 - Exact Content Builder handoff use cases and status transitions beyond the initial `SELECTED` direction.
 
 ## Open Questions
