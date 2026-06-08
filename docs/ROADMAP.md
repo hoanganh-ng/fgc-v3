@@ -28,19 +28,23 @@ Add application use cases and application-owned ports for managing categories, m
 
 Add PostgreSQL schema, migrations, repository adapters, and opt-in persistence verification for Content Manager while keeping domain and application layers database-free.
 
-## Sprint 018: Content Manager HTTP API
+## Sprint 018: Content Manager Composition Root And Service Wiring
+
+Wire Content Manager use cases to real infrastructure through the composition root, expose service types for future adapters, and verify construction without adding HTTP routes.
+
+## Sprint 019: Content Manager HTTP API
 
 Add HTTP adapter routes for Content Manager use cases and safe read APIs, with route handlers kept free of business logic.
 
-## Sprint 019: Facebook GraphQL Payload Extractor
+## Sprint 020: Facebook GraphQL Payload Extractor
 
 Implement the collection-side extractor that converts captured Facebook GraphQL payloads into normalized Content Manager ingestion input, with parser fixtures and extractor tests owned by the Collector Runtime side.
 
-## Sprint 020: Collector Runtime Submission Flow
+## Sprint 021: Collector Runtime Submission Flow
 
 Implement the Collector Runtime flow that checks out profiles, visits configured Facebook sources, captures payloads, invokes the Facebook GraphQL Payload Extractor, submits normalized ingestion input to Content Manager, and releases profile leases through explicit application contracts.
 
-## Sprint 021: Profile + Content Manager Web UI Foundation
+## Sprint 022: Profile + Content Manager Web UI Foundation
 
 Start the deferred Web UI foundation for profile and content management, consuming application/API contracts instead of owning domain rules or persistence logic.
 

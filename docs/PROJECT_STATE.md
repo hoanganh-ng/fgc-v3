@@ -8,17 +8,17 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager domain model is complete through Sprint 015. Web UI remains intentionally deferred.
+The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager persistence is complete through Sprint 017. Web UI remains intentionally deferred.
 
 The next module is Content Manager because content is the central business object of the pipeline. Content Manager will own collected content, source groups, managed group categories, content lifecycle status, content deduplication/upsert behavior, engagement counts, top high-engagement comments as normalized metadata, safe read contracts, and the future handoff shape for Content Builder.
 
 ## Current Sprint
 
-Sprint 017: Content Manager PostgreSQL Schema and Repository Adapters
+Sprint 018: Content Manager Composition Root and Service Wiring
 
-Active sprint file: `docs/SPRINTS/SPRINT-017-content-manager-postgres-schema-and-repositories.md`
+Active sprint file: `docs/SPRINTS/SPRINT-018-content-manager-composition-root-and-service-wiring.md`
 
-Sprint 017 adds PostgreSQL/Drizzle persistence for Content Manager and implements infrastructure repository adapters for the existing Content Manager application ports. It covers Content Manager tables, indexes, foreign keys, migration, mappers, repository adapters, and gated database integration tests. No HTTP routes, Fastify schemas, Content Manager HTTP API, composition root wiring, Facebook GraphQL parser, Collector Runtime, real GraphQL fixtures, Web UI, Content Builder, Publisher, or Collector Profile Manager behavior changes should happen in this sprint.
+Sprint 018 wires Content Manager application use cases to real infrastructure through the composition root. It covers Content Manager service construction, PostgreSQL repository adapter wiring, shared clock and ID generator support, composition exports, focused composition tests, and a small optional DB-backed application integration test if it fits existing conventions. No HTTP routes, Fastify schemas, Content Manager HTTP API, Facebook GraphQL parser, Collector Runtime, real GraphQL fixtures, Web UI, Content Builder, Publisher, new database tables, new Content Manager use cases, repository business behavior changes, or Collector Profile Manager behavior changes should happen in this sprint.
 
 ## Decided Items
 
@@ -53,6 +53,7 @@ Sprint 017 adds PostgreSQL/Drizzle persistence for Content Manager and implement
 - Sprint 016 introduces the Content Manager application layer and application-owned ports for normalized collected content use cases.
 - Sprint 016A verified that the Content Manager application layer is already organized into focused files and that `src/content-manager/application/index.ts` is a barrel export only.
 - Sprint 017 introduces PostgreSQL/Drizzle storage for Content Manager through infrastructure adapters that implement application-owned repository ports.
+- Sprint 018 introduces Content Manager composition root wiring through real infrastructure adapters while keeping HTTP routes and parser/runtime code deferred.
 - Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
 - Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.
 - The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CryptoIdGenerator,
   CryptoLeaseIdGenerator,
   CryptoTokenGenerator,
   SystemClock,
@@ -38,5 +39,15 @@ describe("system infrastructure adapters", () => {
       true,
     );
     expect(new Set(leaseIds).size).toBe(leaseIds.length);
+  });
+
+  it("generates non-empty unique ids", async () => {
+    const generator = new CryptoIdGenerator("content");
+    const ids = await Promise.all(
+      Array.from({ length: 10 }, () => generator.generateId()),
+    );
+
+    expect(ids.every((id) => id.startsWith("content-"))).toBe(true);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
