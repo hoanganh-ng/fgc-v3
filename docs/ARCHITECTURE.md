@@ -19,6 +19,8 @@ The domain must not import or depend on HTTP, database, browser automation, queu
 
 The domain core contains business concepts and invariants. For Collector Profile Manager, this includes profile state transitions, property invariants, provisioning token rules, session ingestion rules, and checkout eligibility rules.
 
+For Content Manager, this includes source group rules, managed group category rules, content item lifecycle status, content deduplication/upsert rules, high-engagement top comment rules, engagement count invariants, and future builder handoff eligibility.
+
 Domain code should be deterministic where possible and should express business errors in domain terms.
 
 ## Application Layer
@@ -32,6 +34,9 @@ Application code should not know concrete adapter details.
 Ports are abstract contracts owned by the core. Expected future port categories include:
 
 - Profile repository.
+- Content repository.
+- Source group repository.
+- Content category repository.
 - Token generator.
 - Clock.
 - Fingerprint provider.
@@ -50,11 +55,15 @@ Adapters implement ports using concrete technologies. Expected future adapter ca
 - Queue or scheduler integration.
 - Web UI integration.
 
+Collector Runtime will be a future operational module that consumes Collector Profile Manager and Content Manager application contracts. Browser automation and scraping details must remain outside the Content Manager domain and application rules.
+
 Adapter selection is out of scope for Sprint 000.
 
 ## Validation
 
 Runtime validation should protect data entering through public APIs and data leaving persistence before it reaches business use cases. The NFRs call for schemas that mirror compile-time TypeScript interfaces, but the exact tooling is not selected in Sprint 000.
+
+Content Manager safe read contracts should avoid exposing optional raw source payloads by default. If trusted diagnostics need raw payloads later, they should use a dedicated application contract.
 
 ## Sprint 000 Scope
 

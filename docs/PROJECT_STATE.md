@@ -8,15 +8,17 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. The first core module is the Collector Profile Manager, responsible for profile lifecycle, profile properties, provisioning, session ingestion, checkout eligibility, and leasing contracts.
+The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Web UI remains intentionally deferred.
+
+The next module is Content Manager because content is the central business object of the pipeline. Content Manager will own collected content, source groups, managed group categories, content lifecycle status, content deduplication/upsert behavior, engagement counts, top high-engagement comments, safe read contracts, and the future handoff shape for Content Builder.
 
 ## Current Sprint
 
-Sprint 013: DB-backed HTTP Integration Verification
+Sprint 014: Content Manager Requirement Amendment and Boundary Definition
 
-Active sprint file: `docs/SPRINTS/SPRINT-013-db-backed-http-integration-verification.md`
+Active sprint file: `docs/SPRINTS/SPRINT-014-content-manager-requirement-amendment.md`
 
-Sprint 013 adds opt-in DB-backed HTTP integration verification for the Collector Profile Manager backend slice: HTTP route -> composition root -> use case -> repository -> PostgreSQL. It may add gated tests under the HTTP interface, a `test:http:db` package script, safe HTTP response mapping fixes, and documentation for local database/API verification. Default tests must remain database-free. Domain and application layers must remain independent from Fastify, HTTP, PostgreSQL, Drizzle, database clients, browser automation, queues, framework code, infrastructure, and composition dependencies. No frontend UI, browser automation, worker, queue, Collector Runtime execution, Content Builder code, Content Publisher code, authentication system, API versioning, deployment config, performance/load testing, complex seed framework, or broad repository/domain/storage redesign should happen in this sprint.
+Sprint 014 is documentation and design only. It introduces Content Manager to the project brain, defines its ownership boundaries, records first-platform and first-source decisions, defines initial content/source/category/comment models, documents v1 deduplication and upsert behavior, adds storage planning notes, and updates the roadmap. No source implementation files, migrations, repositories, HTTP routes, tests, Facebook integration, Collector Runtime execution, Web UI, or Collector Profile Manager behavior changes should happen in this sprint.
 
 ## Decided Items
 
@@ -45,6 +47,19 @@ Sprint 013 adds opt-in DB-backed HTTP integration verification for the Collector
 - Sprint 011 introduces Fastify as the first HTTP adapter at the outer interface layer, with validation and centralized error mapping while leaving authentication deferred.
 - Sprint 012 introduces application-owned profile query use cases and HTTP read routes with explicit DTOs that omit authentication state, provisioning token internals, and proxy credentials.
 - Sprint 013 introduces opt-in DB-backed HTTP integration verification for the full Collector Profile Manager backend slice while keeping default tests database-free.
+- Collector Profile Manager is complete through Sprint 013 and accepted.
+- Sprint 014 introduces Content Manager as the next Content Collector module before Web UI and Collector Runtime.
+- Content Manager owns content item storage, content deduplication/upsert behavior, content lifecycle status, Facebook source group records, managed group categories, engagement counts, top N high-engagement comments, safe read contracts, and future Content Builder handoff shape.
+- Content Manager does not own profile/session management, browser automation, scraping behavior, comment crawling strategy, video generation, or publishing workflows.
+- The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.
+- Collector Runtime will later own checking out profiles, visiting Facebook groups and posts, extracting post data and top comments, submitting collected content to Content Manager, and releasing leases.
+- Facebook is the first Content Manager platform.
+- Facebook knowledge groups are the first Content Manager source type.
+- Facebook rich text posts are the first Content Manager content type.
+- Group categories are managed entities, not free text.
+- V1 content deduplication uses `platform + externalPostId`.
+- V1 duplicate content preserves `id`, `firstCollectedAt`, `createdAt`, and manual status while updating body text, engagement counts, top comments, `lastCollectedAt`, and `updatedAt`.
+- V1 top comments store the top N comments by reaction count, with default N = 10 and no full comment history.
 
 ## Not Decided Yet
 
@@ -54,8 +69,12 @@ Sprint 013 adds opt-in DB-backed HTTP integration verification for the Collector
 - Deployment platform and infrastructure.
 - Authentication and authorization approach for management interfaces.
 - Observability stack.
-- API contracts beyond the current Collector Profile Manager command and read routes.
+- API contracts beyond the current Collector Profile Manager routes and future Content Manager safe read/write contracts.
 - Backend runtime concerns beyond the minimal Fastify entrypoint.
+- Exact Content Manager database schema and repository adapter details.
+- Whether top comments remain JSONB long term or move into a dedicated comment table.
+- Exact Collector Runtime crawling strategy and comment extraction strategy.
+- Exact Content Builder handoff use cases and status transitions beyond the initial `SELECTED` direction.
 
 ## Open Questions
 
@@ -66,3 +85,7 @@ Sprint 013 adds opt-in DB-backed HTTP integration verification for the Collector
 - Which target platforms or collector behaviors impose additional safety constraints?
 - What is the expected scale for profile count and checkout frequency?
 - How will Content Collector outputs be handed off to Content Builder?
+- What actor or system is authorized to manage source groups, categories, content status, and future builder handoff?
+- Which Facebook source and author fields can be safely displayed in future management interfaces?
+- What retention policy should apply to optional raw source payloads?
+- When will top comments need dedicated querying instead of JSONB storage?

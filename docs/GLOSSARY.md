@@ -16,7 +16,35 @@ Naming note: `Collector Profile Manager` is the canonical module name. `Profile 
 
 ## Collector Runtime
 
-The future runtime module that will use eligible profiles to perform collection work. It must consume Collector Profile Manager capabilities through explicit application interfaces.
+The future runtime module that will use eligible profiles to perform collection work. It will check out profiles, visit Facebook groups and posts, extract post data and top comments, submit collected content to Content Manager, and release profile leases. It must consume Collector Profile Manager and Content Manager capabilities through explicit application interfaces.
+
+## Content Manager
+
+The Content Collector module that owns collected content as the central business object of the pipeline. It owns source groups, managed group categories, content items, engagement counts, top high-engagement comments, lifecycle status, deduplication/upsert behavior, safe reads, and future Content Builder handoff shape.
+
+## Source Group
+
+A configured external group that Collector Runtime may visit in the future. The first source groups are Facebook knowledge groups.
+
+## Group Category
+
+A managed Content Manager entity used to classify source groups. Categories are not free text.
+
+## Content Item
+
+A collected source record owned by Content Manager. The first content item type is a Facebook rich text post.
+
+## High-Engagement Comment
+
+A top comment selected by reaction count for a content item. V1 stores only the top N comments, defaulting to 10, rather than full comment history.
+
+## Content Status
+
+The lifecycle state of a content item. Initial statuses are `COLLECTED`, `SELECTED`, `REJECTED`, and `USED`.
+
+## Content Deduplication
+
+The Content Manager rule that duplicate collected posts update an existing content item instead of creating another item. V1 deduplicates by `platform + externalPostId`.
 
 ## Profile Manager Web UI
 

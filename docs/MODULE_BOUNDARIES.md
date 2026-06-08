@@ -21,13 +21,40 @@ Does not own:
 - Content building.
 - Content publishing.
 
+## Content Manager
+
+Owns:
+
+- Content item storage.
+- Content deduplication and upsert rules.
+- Content lifecycle status.
+- Facebook source group records.
+- Group categories as managed entities.
+- Engagement counts.
+- Top N high-engagement comments for each content item.
+- Safe read APIs.
+- Future handoff shape for Content Builder.
+
+Does not own:
+
+- Profile or session management.
+- Browser automation.
+- Actual scraping behavior.
+- Comment crawling strategy.
+- Video generation.
+- Publishing workflows.
+
 ## Collector Runtime
 
 Owns:
 
 - Future execution of collection workflows.
-- Requesting eligible profile leases from Collector Profile Manager.
-- Using automation adapters to perform collection tasks.
+- Checking out eligible profiles from Collector Profile Manager.
+- Visiting Facebook groups and posts.
+- Extracting post data.
+- Extracting top comments.
+- Submitting collected content to Content Manager.
+- Releasing profile leases.
 - Returning profile usage outcomes and runtime metrics.
 
 Does not own:
@@ -35,6 +62,9 @@ Does not own:
 - Profile property invariants.
 - Provisioning token rules.
 - Authentication session ingestion rules.
+- Content item lifecycle rules.
+- Content deduplication or upsert rules.
+- Group category management.
 - Content building.
 - Content publishing.
 
