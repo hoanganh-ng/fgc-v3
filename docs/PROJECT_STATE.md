@@ -12,11 +12,11 @@ The current focus is the Content Collector stage. The first core module is the C
 
 ## Current Sprint
 
-Sprint 012: Profile Query Use Cases and Read API
+Sprint 013: DB-backed HTTP Integration Verification
 
-Active sprint file: `docs/SPRINTS/SPRINT-012-profile-query-use-cases-and-read-api.md`
+Active sprint file: `docs/SPRINTS/SPRINT-013-db-backed-http-integration-verification.md`
 
-Sprint 012 adds application-owned query use cases and safe HTTP read routes for the Collector Profile Manager. It may add read DTOs, repository query contracts, in-memory and PostgreSQL list implementations, composition wiring, `GET /collector/profiles`, `GET /collector/profiles/:profileId`, validation, error mapping, documentation, and database-free read API tests. Domain and application layers must remain independent from Fastify, HTTP, PostgreSQL, Drizzle, database clients, browser automation, queues, framework code, infrastructure, and composition dependencies. No frontend UI, browser automation, worker, queue, Collector Runtime execution, Content Builder code, Content Publisher code, authentication system, complex search, full-text search, generic query builder, production audit log, or API versioning should happen in this sprint.
+Sprint 013 adds opt-in DB-backed HTTP integration verification for the Collector Profile Manager backend slice: HTTP route -> composition root -> use case -> repository -> PostgreSQL. It may add gated tests under the HTTP interface, a `test:http:db` package script, safe HTTP response mapping fixes, and documentation for local database/API verification. Default tests must remain database-free. Domain and application layers must remain independent from Fastify, HTTP, PostgreSQL, Drizzle, database clients, browser automation, queues, framework code, infrastructure, and composition dependencies. No frontend UI, browser automation, worker, queue, Collector Runtime execution, Content Builder code, Content Publisher code, authentication system, API versioning, deployment config, performance/load testing, complex seed framework, or broad repository/domain/storage redesign should happen in this sprint.
 
 ## Decided Items
 
@@ -44,6 +44,7 @@ Sprint 012 adds application-owned query use cases and safe HTTP read routes for 
 - Sprint 010 introduces the composition root as the outer boundary that wires Collector Profile Manager use cases to infrastructure adapters and system port implementations.
 - Sprint 011 introduces Fastify as the first HTTP adapter at the outer interface layer, with validation and centralized error mapping while leaving authentication deferred.
 - Sprint 012 introduces application-owned profile query use cases and HTTP read routes with explicit DTOs that omit authentication state, provisioning token internals, and proxy credentials.
+- Sprint 013 introduces opt-in DB-backed HTTP integration verification for the full Collector Profile Manager backend slice while keeping default tests database-free.
 
 ## Not Decided Yet
 

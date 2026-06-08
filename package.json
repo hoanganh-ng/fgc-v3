@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:db": "RUN_DB_TESTS=true vitest run src/infrastructure",
+    "test:http:db": "RUN_HTTP_DB_TESTS=true vitest run src/interfaces/http",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },

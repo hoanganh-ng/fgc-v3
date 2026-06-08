@@ -362,13 +362,15 @@ describe("HTTP server", () => {
       ]);
       expect(body).toMatchObject({
         profileId: "profile-1",
-        networkContext: createNetworkContext(),
+        networkContext: createSafeNetworkContext(),
         hardwareFingerprint: createHardwareFingerprint(),
       });
+      expect(body.networkContext.proxy).not.toHaveProperty("credentials");
       expect(body).not.toHaveProperty("authenticationState");
       expect(body).not.toHaveProperty("provisioningToken");
       expect(JSON.stringify(body)).not.toContain("session-cookie-value");
       expect(JSON.stringify(body)).not.toContain("local-storage-value");
+      expect(JSON.stringify(body)).not.toContain("secret");
     } finally {
       await server.close();
     }
@@ -784,6 +786,21 @@ function createNetworkContext(): NetworkContext {
       enabled: true,
       failClosed: true,
     },
+  };
+}
+
+function createSafeNetworkContext() {
+  const networkContext = createNetworkContext();
+
+  if (networkContext.proxy === null) {
+    return networkContext;
+  }
+
+  const { credentials: _credentials, ...proxy } = networkContext.proxy;
+
+  return {
+    proxy,
+    killswitch: networkContext.killswitch,
   };
 }
 

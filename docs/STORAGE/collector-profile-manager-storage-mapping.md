@@ -112,6 +112,8 @@ This sprint only documents that boundary and strengthens port contracts. It does
 
 Sprint 009 adds opt-in PostgreSQL integration tests for the repository adapters and transaction manager. Default tests remain database-free; database tests run only when explicitly enabled with `RUN_DB_TESTS=true` and read their connection from `DATABASE_URL`.
 
+Sprint 013 adds opt-in DB-backed HTTP integration tests for the full backend slice from Fastify routes through the composition root and PostgreSQL repositories. These tests run only when explicitly enabled with `RUN_HTTP_DB_TESTS=true` and also read their connection from `DATABASE_URL`.
+
 Use a local or disposable PostgreSQL database for these tests. They create unique profile and lease IDs and clean those rows up where practical, but `DATABASE_URL` should not point at production or shared operational data.
 
 Preferred local flow:
@@ -119,8 +121,9 @@ Preferred local flow:
 ```bash
 docker compose up -d postgres
 cp .env.example .env
-pnpm run db:migrate
-pnpm run test:db
+DATABASE_URL=postgres://content_pipeline:content_pipeline@localhost:5432/content_pipeline pnpm run db:migrate
+DATABASE_URL=postgres://content_pipeline:content_pipeline@localhost:5432/content_pipeline pnpm run test:db
+DATABASE_URL=postgres://content_pipeline:content_pipeline@localhost:5432/content_pipeline pnpm run test:http:db
 ```
 
-The integration tests do not start Docker and do not run migrations themselves.
+The integration tests do not start Docker and do not run migrations themselves. The current package scripts do not load `.env` automatically, so pass `DATABASE_URL` explicitly when running migrations or opt-in DB tests.

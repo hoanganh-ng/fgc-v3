@@ -8,6 +8,7 @@ import type {
   IngestProfileSessionInput,
   ListProfilesInput,
   ListProfilesOutput,
+  ProfileReadNetworkContext,
   ProfileDetail,
   ProvisioningConfiguration,
   ReleaseProfileLeaseInput,
@@ -20,8 +21,8 @@ import type {
   CollectorProfile,
   DailySafetyUsage,
   IsoDateTime,
+  NetworkContext,
   ProfileId,
-  ProfileLease,
   ProfileStatus,
   ProvisioningTokenStatus,
 } from "../../../collector-profile-manager/domain";
@@ -236,9 +237,17 @@ export function registerCollectorProfileManagerRoutes(
         request.params,
       );
 
-      return collectorProfileManager.getProvisioningConfiguration.execute({
-        provisioningToken: params.token,
-      });
+      const configuration =
+        await collectorProfileManager.getProvisioningConfiguration.execute({
+          provisioningToken: params.token,
+        });
+
+      return {
+        ...configuration,
+        networkContext: toProfileReadNetworkContext(
+          configuration.networkContext,
+        ),
+      };
     },
   );
 
@@ -336,5 +345,23 @@ function toProfileSummary(profile: CollectorProfile): ProfileSummary {
       profile.authenticationState.cookies.length > 0 ||
       profile.authenticationState.localStorage.length > 0,
     provisioningTokenStatus: profile.provisioningToken.status,
+  };
+}
+
+function toProfileReadNetworkContext(
+  networkContext: NetworkContext,
+): ProfileReadNetworkContext {
+  if (networkContext.proxy === null) {
+    return {
+      proxy: null,
+      killswitch: networkContext.killswitch,
+    };
+  }
+
+  const { credentials: _credentials, ...proxy } = networkContext.proxy;
+
+  return {
+    proxy,
+    killswitch: networkContext.killswitch,
   };
 }
