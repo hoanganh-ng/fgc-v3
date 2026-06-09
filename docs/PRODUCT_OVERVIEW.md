@@ -24,4 +24,4 @@ The Content Publisher will distribute completed videos to target publishing dest
 
 ## Current Product Priority
 
-Only the Content Collector stage is in current focus. Collector Profile Manager is complete through Sprint 013. Sprint 014A amends the Content Manager boundary by defining the Collector Runtime-side Platform Extractor boundary. Web UI, Collector Runtime execution, Content Builder, and Content Publisher remain deferred.
+Only the Content Collector stage is in current focus. Collector Profile Manager is complete through Sprint 013, Content Manager backend is complete through Sprint 019, and Collector Runtime has foundation contracts through Sprint 024. Sprint 025 starts the Web UI foundation as an internal dashboard shell. Full profile workflows, browser-backed capture, Content Builder, and Content Publisher remain deferred.

@@ -1,0 +1,62 @@
+name: fgc-v3-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: content_pipeline
+      POSTGRES_PASSWORD: content_pipeline
+      POSTGRES_DB: content_pipeline
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - fgc_dev_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      target: app-deps
+    command: sh -lc "pnpm db:migrate && pnpm dev"
+    environment:
+      DATABASE_URL: postgres://content_pipeline:content_pipeline@postgres:5432/content_pipeline
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/workspace/src
+      - ./drizzle:/workspace/drizzle
+      - ./drizzle.config.ts:/workspace/drizzle.config.ts
+      - ./tsconfig.json:/workspace/tsconfig.json
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web-dev:
+    build:
+      context: .
+      target: app-deps
+    command: pnpm --filter @fgc/web dev --host 0.0.0.0
+    environment:
+      API_PROXY_TARGET: http://api:3000
+      VITE_API_BASE_URL: ""
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "${WEB_DEV_PORT:-5173}:5173"
+    volumes:
+      - ./apps/web/index.html:/workspace/apps/web/index.html
+      - ./apps/web/postcss.config.js:/workspace/apps/web/postcss.config.js
+      - ./apps/web/tailwind.config.js:/workspace/apps/web/tailwind.config.js
+      - ./apps/web/tsconfig.json:/workspace/apps/web/tsconfig.json
+      - ./apps/web/vite.config.ts:/workspace/apps/web/vite.config.ts
+      - ./apps/web/src:/workspace/apps/web/src
+    depends_on:
+      - api
+
+volumes:
+  fgc_dev_postgres_data:

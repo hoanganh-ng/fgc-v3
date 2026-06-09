@@ -8,17 +8,17 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI remains intentionally deferred.
+The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work has started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, and Dockerized full-stack runtime support was added in Sprint 027.
 
-The next active work is the Trusted Runtime Profile Configuration Contract. It lets Collector Runtime fetch browser launch configuration from Collector Profile Manager through a lease-scoped trusted contract after checkout while browser automation, real network interception, scheduling, queues, direct database access, Web UI, Content Builder, and Publisher work remain deferred.
+The next active work is Profile Create + Configure Forms. It adds structured Web UI forms for creating profiles and updating profile configuration through existing Profile Manager APIs while provisioning actions, session ingestion, browser login capture, Facebook content capture, scheduling, queues, authentication, authorization, Content Builder, and Publisher work remain deferred.
 
 ## Current Sprint
 
-Sprint 024: Trusted Runtime Profile Configuration Contract
+Sprint 028: Profile Create + Configure Forms
 
-Active sprint file: `docs/SPRINTS/SPRINT-024-trusted-runtime-profile-configuration-contract.md`
+Active sprint file: `docs/SPRINTS/SPRINT-028-profile-create-configure-forms.md`
 
-Sprint 024 implements a trusted, lease-scoped runtime profile configuration contract. Profile Manager owns validation that a lease is active and still associated with a BUSY profile, and Collector Runtime may fetch runtime configuration by `leaseId` through the Profile Manager HTTP API. No browser automation, real network interception, scheduler, queue, direct Collector Runtime database access, repository imports, Profile Manager checkout/leasing business-rule changes, Content Manager business-rule changes, public read DTO expansion for sensitive runtime config, Web UI, Content Builder, or Publisher work should happen in this sprint.
+Sprint 028 implements structured Web UI forms for creating profiles and updating profile configuration through the existing Profile Manager APIs. No provisioning action, session ingestion, browser login capture, Facebook content capture, scheduler, queue, authentication, authorization, source group management, content item review, collection run, Content Builder, or Publisher work should happen in this sprint.
 
 ## Decided Items
 
@@ -61,6 +61,10 @@ Sprint 024 implements a trusted, lease-scoped runtime profile configuration cont
 - Sprint 022A resolves release-readiness tracking for sanitized Facebook extractor fixtures and keeps raw/sensitive Facebook payload data out of the repository before browser/network capture work begins.
 - Sprint 023 introduces a Collector Runtime HTTP adapter for Profile Manager checkout/release through the runtime-owned profile lease port, without importing Profile Manager repositories, database adapters, or composition roots.
 - Sprint 024 introduces a trusted lease-scoped runtime profile configuration contract and HTTP route for Collector Runtime, without changing public profile read DTOs or adding browser automation.
+- Sprint 025 starts the Web UI foundation as a React/Vite TypeScript app under `apps/web`, with dashboard routing, layout shell, Tailwind CSS, TanStack Query, local UI primitives, and API client foundation only.
+- Sprint 026 replaces the Profiles placeholder with read-only safe Collector Profile Manager list and detail integration, using `/collector/profiles` and `/collector/profiles/:profileId` without exposing cookies, local storage, proxy credentials, raw session state, token hashes, provisioning token hashes, or trusted runtime secrets.
+- Sprint 027 adds Docker Compose development and production-like preview runtimes, using Vite for development hot reload and Nginx to serve the built Web UI and proxy `/collector/*` to the Fastify API in preview mode.
+- Sprint 028 adds structured Web UI create and configure forms for Collector Profile Manager profiles, using existing backend contracts and keeping sensitive session, token, provisioning, proxy password, and trusted runtime data out of the UI.
 - Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
 - Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.
 - The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.
@@ -92,7 +96,6 @@ Sprint 024 implements a trusted, lease-scoped runtime profile configuration cont
 
 ## Not Decided Yet
 
-- Frontend runtime, framework, and component system.
 - Browser automation framework.
 - Queue, event bus, or scheduler technology.
 - Deployment platform and infrastructure.

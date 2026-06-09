@@ -1,5 +1,5 @@
 # Active Sprint
 
-Active sprint: `docs/SPRINTS/SPRINT-024-trusted-runtime-profile-configuration-contract.md`
+Active sprint: `docs/SPRINTS/SPRINT-028-profile-create-configure-forms.md`
 
-Only Sprint 024 should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.
+Only Sprint 028 should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.

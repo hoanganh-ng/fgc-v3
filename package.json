@@ -6,14 +6,23 @@
   "packageManager": "pnpm@10.5.2",
   "scripts": {
     "dev": "tsx watch src/main.ts",
+    "dev:web": "pnpm --filter @fgc/web dev",
     "start": "tsx src/main.ts",
     "build": "tsc --noEmit",
+    "build:web": "pnpm --filter @fgc/web build",
     "typecheck": "tsc --noEmit",
+    "typecheck:web": "pnpm --filter @fgc/web typecheck",
     "test": "vitest run",
     "test:db": "RUN_DB_TESTS=true vitest run src/infrastructure",
     "test:http:db": "RUN_HTTP_DB_TESTS=true vitest run src/interfaces/http",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "stack:dev:start": "docker compose -f docker-compose.dev.yml up --build -d",
+    "stack:dev:stop": "docker compose -f docker-compose.dev.yml down --remove-orphans",
+    "stack:dev:reset": "docker compose -f docker-compose.dev.yml down --volumes --remove-orphans",
+    "stack:preview:start": "docker compose -f docker-compose.preview.yml up --build -d",
+    "stack:preview:stop": "docker compose -f docker-compose.preview.yml down --remove-orphans",
+    "stack:preview:reset": "docker compose -f docker-compose.preview.yml down --volumes --remove-orphans"
   },
   "devDependencies": {
     "@types/pg": "^8.20.0",

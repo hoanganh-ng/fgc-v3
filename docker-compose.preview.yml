@@ -1,0 +1,41 @@
+name: fgc-v3-preview
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: content_pipeline
+      POSTGRES_PASSWORD: content_pipeline
+      POSTGRES_DB: content_pipeline
+    volumes:
+      - fgc_preview_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      target: api-runtime
+    command: sh -lc "pnpm db:migrate && pnpm start"
+    environment:
+      DATABASE_URL: postgres://content_pipeline:content_pipeline@postgres:5432/content_pipeline
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web-gateway:
+    build:
+      context: .
+      target: web-gateway
+    ports:
+      - "${WEB_GATEWAY_PORT:-8081}:80"
+    depends_on:
+      - api
+
+volumes:
+  fgc_preview_postgres_data:

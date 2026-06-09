@@ -56,13 +56,13 @@ Add the concrete Collector Runtime HTTP adapter for Profile Manager checkout/rel
 
 Add a trusted, lease-scoped runtime profile configuration contract so Collector Runtime can fetch browser launch configuration from Profile Manager after checkout while public read DTOs remain safe.
 
-## Sprint 025: Facebook Browser Payload Capture Adapter
+## Sprint 025: Web UI Foundation
+
+Start the Web UI foundation for profile and content management, consuming application/API contracts instead of owning domain rules or persistence logic.
+
+## Sprint 026: Facebook Browser Payload Capture Adapter
 
 Add the first real Facebook browser payload capture adapter for Collector Runtime, behind the Sprint 022 capture port.
-
-## Sprint 026: Profile + Content Manager Web UI Foundation
-
-Start the deferred Web UI foundation for profile and content management, consuming application/API contracts instead of owning domain rules or persistence logic.
 
 ## Future: Collector Runtime
 
