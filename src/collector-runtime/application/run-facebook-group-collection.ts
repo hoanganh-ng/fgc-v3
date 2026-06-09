@@ -285,7 +285,12 @@ export class RunFacebookGroupCollectionUseCase {
     const leaseReleaseError = createCollectorRuntimeError(
       "PROFILE_LEASE_RELEASE_FAILED",
       releaseResult.errorMessage,
-      { causeCode: releaseResult.errorCode },
+      {
+        causeCode: releaseResult.errorCode,
+        ...(releaseResult.statusCode !== undefined
+          ? { statusCode: releaseResult.statusCode }
+          : {}),
+      },
     );
 
     accumulator.leaseReleaseError = leaseReleaseError;
@@ -325,7 +330,12 @@ function createCheckoutFailureResult(
       createCollectorRuntimeError(
         "PROFILE_CHECKOUT_FAILED",
         checkoutResult.errorMessage,
-        { causeCode: checkoutResult.errorCode },
+        {
+          causeCode: checkoutResult.errorCode,
+          ...(checkoutResult.statusCode !== undefined
+            ? { statusCode: checkoutResult.statusCode }
+            : {}),
+        },
       ),
     ],
     payloadResults: [],

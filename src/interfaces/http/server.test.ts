@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   InvalidApplicationOperationError,
+  ProfileLeaseAlreadyClosedError,
   ProfileNotFoundError,
   toProfileDetailDto,
   toProfileSummaryDto,
@@ -11,6 +12,7 @@ import type {
   CreateProfileInput,
   GetProfileInput,
   GetProvisioningConfigurationInput,
+  GetRuntimeProfileConfigurationInput,
   IngestProfileSessionInput,
   ListProfilesInput,
   ListProfilesOutput,
@@ -18,6 +20,7 @@ import type {
   ProvisioningConfiguration,
   ReleaseProfileLeaseInput,
   ReleaseProfileLeaseOutput,
+  RuntimeProfileConfiguration,
   StartProfileProvisioningInput,
   StartProfileProvisioningOutput,
   UpdateProfileConfigurationInput,
@@ -493,6 +496,72 @@ describe("HTTP server", () => {
     }
   });
 
+  it("returns trusted runtime configuration for an active profile lease", async () => {
+    const { server, service } = createTestServer();
+
+    service.getRuntimeProfileConfiguration.setOutput(
+      createRuntimeProfileConfiguration(),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profile-leases/lease-1/runtime-configuration",
+      });
+      const body = response.json();
+      const bodyText = JSON.stringify(body);
+
+      expect(response.statusCode).toBe(200);
+      expect(service.getRuntimeProfileConfiguration.calls).toEqual([
+        {
+          leaseId: "lease-1",
+        },
+      ]);
+      expect(body).toMatchObject({
+        profileId: "profile-1",
+        leaseId: "lease-1",
+        leaseExpiresAt: "2026-01-05T18:45:00.000Z",
+        hardwareFingerprint: createHardwareFingerprint(),
+        networkContext: createNetworkContext(),
+        authenticationState: createAuthenticationState(),
+      });
+      expect(body.networkContext.proxy.credentials.password).toBe("secret");
+      expect(body.authenticationState.cookies[0].value).toBe(
+        "session-cookie-value",
+      );
+      expect(body).not.toHaveProperty("provisioningToken");
+      expect(body).not.toHaveProperty("provisioningTokenStatus");
+      expect(bodyText).not.toContain("provisioning-token-1");
+      expect(bodyText).not.toContain("tokenHash");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps inactive runtime configuration leases to 409", async () => {
+    const { server, service } = createTestServer();
+
+    service.getRuntimeProfileConfiguration.setError(
+      new ProfileLeaseAlreadyClosedError("lease-1", "RELEASED"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profile-leases/lease-1/runtime-configuration",
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "PROFILE_LEASE_ALREADY_CLOSED",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("maps profile not found errors to 404", async () => {
     const { server, service } = createTestServer();
 
@@ -615,6 +684,10 @@ interface FakeCollectorProfileManager extends CollectorProfileManagerHttpService
     GetProvisioningConfigurationInput,
     ProvisioningConfiguration
   >;
+  readonly getRuntimeProfileConfiguration: StubUseCase<
+    GetRuntimeProfileConfigurationInput,
+    RuntimeProfileConfiguration
+  >;
   readonly ingestProfileSession: StubUseCase<
     IngestProfileSessionInput,
     CollectorProfile
@@ -659,6 +732,9 @@ function createTestServer(): {
       networkContext: createNetworkContext(),
       hardwareFingerprint: createHardwareFingerprint(),
     }),
+    getRuntimeProfileConfiguration: new StubUseCase(
+      createRuntimeProfileConfiguration(),
+    ),
     ingestProfileSession: new StubUseCase(
       createProfile({
         status: "READY",
@@ -751,6 +827,20 @@ function createCheckoutOutput(): CheckoutProfileOutput {
       safetyThresholds: createSafetyThresholds(),
       contentAffinities: createContentAffinities(),
     },
+  };
+}
+
+function createRuntimeProfileConfiguration(): RuntimeProfileConfiguration {
+  return {
+    profileId: "profile-1",
+    leaseId: "lease-1",
+    leaseExpiresAt: "2026-01-05T18:45:00.000Z",
+    hardwareFingerprint: createHardwareFingerprint(),
+    networkContext: createNetworkContext(),
+    authenticationState: createAuthenticationState(),
+    temporalRoutine: createTemporalRoutine(),
+    safetyThresholds: createSafetyThresholds(),
+    contentAffinities: createContentAffinities(),
   };
 }
 

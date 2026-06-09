@@ -2,12 +2,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const forbiddenRepositoryOrDatabaseImportPattern =
-  /\b(?:from|import)\s*(?:\(\s*)?["'][^"']*(?:infrastructure\/database|drizzle|postgres|repositories\/|profile-repository|profile-lease-repository|content-item-repository|source-group-repository|content-category-repository)[^"']*["']/i;
+  /\b(?:from|import)\s*(?:\(\s*)?["'][^"']*(?:composition|infrastructure\/database|drizzle|postgres|repositories\/|profile-repository|profile-lease-repository|content-item-repository|source-group-repository|content-category-repository)[^"']*["']/i;
 const forbiddenBrowserAutomationImportPattern =
   /\b(?:from|import)\s*(?:\(\s*)?["'][^"']*(?:playwright|puppeteer|selenium|browserless)[^"']*["']/i;
 
 describe("collector runtime architecture boundary", () => {
-  it("keeps collector runtime free of direct database and repository imports", () => {
+  it("keeps collector runtime free of direct database, repository, and composition imports", () => {
     const offendingFiles = collectTypeScriptFiles(
       new URL("./", import.meta.url),
     ).filter((file) =>

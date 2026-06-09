@@ -17,6 +17,7 @@ export type ProfileCheckoutResult =
     }
   | {
       readonly ok: false;
+      readonly statusCode?: number;
       readonly errorCode: string;
       readonly errorMessage: string;
     };
@@ -34,6 +35,31 @@ export type ProfileLeaseReleaseResult =
     }
   | {
       readonly ok: false;
+      readonly statusCode?: number;
+      readonly errorCode: string;
+      readonly errorMessage: string;
+    };
+
+export interface RuntimeProfileConfiguration {
+  readonly profileId: string;
+  readonly leaseId: string;
+  readonly leaseExpiresAt?: string;
+  readonly hardwareFingerprint: unknown;
+  readonly networkContext: unknown;
+  readonly authenticationState: unknown;
+  readonly temporalRoutine?: unknown;
+  readonly safetyThresholds?: unknown;
+  readonly contentAffinities?: unknown;
+}
+
+export type RuntimeProfileConfigurationResult =
+  | {
+      readonly ok: true;
+      readonly configuration: RuntimeProfileConfiguration;
+    }
+  | {
+      readonly ok: false;
+      readonly statusCode?: number;
       readonly errorCode: string;
       readonly errorMessage: string;
     };
@@ -43,6 +69,12 @@ export interface ProfileLeasePort {
   releaseProfileLease(
     input: ProfileLeaseReleaseInput,
   ): Promise<ProfileLeaseReleaseResult>;
+}
+
+export interface RuntimeProfileConfigurationPort {
+  getRuntimeProfileConfiguration(
+    leaseId: string,
+  ): Promise<RuntimeProfileConfigurationResult>;
 }
 
 export interface CollectorRuntimeWarning {

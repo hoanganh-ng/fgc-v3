@@ -10,6 +10,7 @@ export * from "./use-cases/checkout-profile.use-case";
 export * from "./use-cases/create-profile.use-case";
 export * from "./use-cases/get-profile.use-case";
 export * from "./use-cases/get-provisioning-configuration.use-case";
+export * from "./use-cases/get-runtime-profile-configuration.use-case";
 export * from "./use-cases/ingest-profile-session.use-case";
 export * from "./use-cases/list-profiles.use-case";
 export * from "./use-cases/release-profile-lease.use-case";

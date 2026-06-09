@@ -5,6 +5,7 @@ import type {
   CreateProfileInput,
   GetProfileInput,
   GetProvisioningConfigurationInput,
+  GetRuntimeProfileConfigurationInput,
   IngestProfileSessionInput,
   ListProfilesInput,
   ListProfilesOutput,
@@ -13,6 +14,7 @@ import type {
   ProvisioningConfiguration,
   ReleaseProfileLeaseInput,
   ReleaseProfileLeaseOutput,
+  RuntimeProfileConfiguration,
   StartProfileProvisioningInput,
   StartProfileProvisioningOutput,
   UpdateProfileConfigurationInput,
@@ -40,6 +42,7 @@ import {
   createProfileHttpRouteSchema,
   getProvisioningConfigurationHttpRouteSchema,
   getProfileHttpRouteSchema,
+  getRuntimeProfileConfigurationHttpRouteSchema,
   ingestProfileSessionHttpRouteSchema,
   listProfilesHttpRouteSchema,
   parseHttpInput,
@@ -73,6 +76,10 @@ export interface CollectorProfileManagerHttpService {
   readonly getProvisioningConfiguration: ExecutableUseCase<
     GetProvisioningConfigurationInput,
     ProvisioningConfiguration
+  >;
+  readonly getRuntimeProfileConfiguration: ExecutableUseCase<
+    GetRuntimeProfileConfigurationInput,
+    RuntimeProfileConfiguration
   >;
   readonly ingestProfileSession: ExecutableUseCase<
     IngestProfileSessionInput,
@@ -324,6 +331,21 @@ export function registerCollectorProfileManagerRoutes(
         lease: output.lease,
         profile: toProfileSummary(output.profile),
       };
+    },
+  );
+
+  server.get(
+    "/collector/profile-leases/:leaseId/runtime-configuration",
+    { schema: getRuntimeProfileConfigurationHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileLeaseIdHttpParamsSchema,
+        request.params,
+      );
+
+      return collectorProfileManager.getRuntimeProfileConfiguration.execute({
+        leaseId: params.leaseId,
+      });
     },
   );
 }

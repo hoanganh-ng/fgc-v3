@@ -4,6 +4,7 @@ import {
   CreateProfileUseCase,
   GetProfileUseCase,
   GetProvisioningConfigurationUseCase,
+  GetRuntimeProfileConfigurationUseCase,
   IngestProfileSessionUseCase,
   ListProfilesUseCase,
   ReleaseProfileLeaseUseCase,
@@ -44,6 +45,9 @@ describe("collector profile manager composition container", () => {
     );
     expect(services.getProvisioningConfiguration).toBeInstanceOf(
       GetProvisioningConfigurationUseCase,
+    );
+    expect(services.getRuntimeProfileConfiguration).toBeInstanceOf(
+      GetRuntimeProfileConfigurationUseCase,
     );
     expect(services.ingestProfileSession).toBeInstanceOf(
       IngestProfileSessionUseCase,

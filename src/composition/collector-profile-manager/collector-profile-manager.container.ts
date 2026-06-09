@@ -3,6 +3,7 @@ import {
   CreateProfileUseCase,
   GetProfileUseCase,
   GetProvisioningConfigurationUseCase,
+  GetRuntimeProfileConfigurationUseCase,
   IngestProfileSessionUseCase,
   ListProfilesUseCase,
   ReleaseProfileLeaseUseCase,
@@ -35,6 +36,7 @@ export interface CollectorProfileManagerContainer {
   readonly updateProfileConfiguration: UpdateProfileConfigurationUseCase;
   readonly startProfileProvisioning: StartProfileProvisioningUseCase;
   readonly getProvisioningConfiguration: GetProvisioningConfigurationUseCase;
+  readonly getRuntimeProfileConfiguration: GetRuntimeProfileConfigurationUseCase;
   readonly ingestProfileSession: IngestProfileSessionUseCase;
   readonly checkoutProfile: CheckoutProfileUseCase;
   readonly releaseProfileLease: ReleaseProfileLeaseUseCase;
@@ -68,6 +70,11 @@ export function createCollectorProfileManager(
     ),
     getProvisioningConfiguration: new GetProvisioningConfigurationUseCase(
       profiles,
+      clock,
+    ),
+    getRuntimeProfileConfiguration: new GetRuntimeProfileConfigurationUseCase(
+      profiles,
+      leases,
       clock,
     ),
     ingestProfileSession: new IngestProfileSessionUseCase(profiles, clock),

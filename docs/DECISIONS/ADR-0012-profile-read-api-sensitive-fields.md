@@ -26,3 +26,4 @@ HTTP routes return these read DTOs directly instead of serializing raw `Collecto
 - The application layer owns the read model shape, so non-HTTP callers get the same sensitive-field boundary.
 - Future authentication and authorization can build on these DTOs without changing the domain model.
 - If a future trusted operational caller needs raw authentication state, it must use a dedicated use case with a separate contract.
+- Sprint 024 adds that separate trusted contract for Collector Runtime: runtime profile configuration is fetched by `leaseId` through a dedicated internal route and application use case. This does not change the public list/detail/provisioning read DTOs. The runtime configuration contract may include browser-required authentication state and proxy credentials, but it must omit provisioning token material and must validate an active lease before returning configuration.

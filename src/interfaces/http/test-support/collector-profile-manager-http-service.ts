@@ -16,6 +16,7 @@ export function createUnusedCollectorProfileManagerHttpService(): CollectorProfi
     updateProfileConfiguration: useCase,
     startProfileProvisioning: useCase,
     getProvisioningConfiguration: useCase,
+    getRuntimeProfileConfiguration: useCase,
     ingestProfileSession: useCase,
     checkoutProfile: useCase,
     releaseProfileLease: useCase,

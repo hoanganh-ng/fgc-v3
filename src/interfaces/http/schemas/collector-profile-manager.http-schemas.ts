@@ -600,3 +600,37 @@ export const releaseProfileLeaseHttpRouteSchema = {
     "5xx": errorResponseJsonSchema,
   },
 } as const;
+
+export const getRuntimeProfileConfigurationHttpRouteSchema = {
+  params: profileLeaseIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: [
+        "profileId",
+        "leaseId",
+        "leaseExpiresAt",
+        "hardwareFingerprint",
+        "networkContext",
+        "authenticationState",
+        "temporalRoutine",
+        "safetyThresholds",
+        "contentAffinities",
+      ],
+      additionalProperties: false,
+      properties: {
+        profileId: nonEmptyStringJsonSchema,
+        leaseId: nonEmptyStringJsonSchema,
+        leaseExpiresAt: nonEmptyStringJsonSchema,
+        hardwareFingerprint: looseObjectJsonSchema,
+        networkContext: looseObjectJsonSchema,
+        authenticationState: looseObjectJsonSchema,
+        temporalRoutine: looseObjectJsonSchema,
+        safetyThresholds: looseObjectJsonSchema,
+        contentAffinities: looseObjectJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;

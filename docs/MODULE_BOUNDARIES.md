@@ -68,7 +68,9 @@ Owns:
 - Best-effort handling of missing fields in captured platform payloads.
 - Future extractor fixtures and parser tests.
 - Submitting normalized collected content to Content Manager through the Content Manager HTTP API.
-- Future profile lease release.
+- Calling Collector Profile Manager checkout/release through runtime-owned ports and HTTP adapters.
+- Requesting lease-scoped runtime profile configuration from Collector Profile Manager through trusted application/API contracts after checkout.
+- Profile lease release orchestration.
 - Returning profile usage outcomes and runtime metrics.
 
 The Sprint 022 orchestration flow coordinates Profile Manager checkout/release behavior, captured payload collection, and Content Manager submission through Collector Runtime-owned ports and use cases. Payload capture is represented by a port only in Sprint 022; real browser automation, network interception, login, navigation, scheduling, queues, and database access remain out of scope.
@@ -83,6 +85,10 @@ Does not own:
 - Group category management.
 - Direct database access.
 - Direct Content Manager repository access.
+- Collector Profile Manager repository access.
+- Collector Profile Manager composition root wiring.
+- Collector Profile Manager checkout eligibility or leasing business rules.
+- Public Profile Manager read DTO expansion for sensitive runtime material.
 - Content building.
 - Content publishing.
 
@@ -97,6 +103,8 @@ The Sprint 020 extractor is extractor-only. It does not perform browser automati
 The Sprint 021 submission flow accepts already-captured payloads only. It invokes the Facebook GraphQL Payload Extractor, submits normalized candidates to the Content Manager HTTP API, and reports per-candidate submission outcomes. It does not perform browser automation, network interception, profile checkout, lease release, scheduling, queueing, database access, or Content Manager business logic.
 
 The Sprint 022 profile-orchestrated collection flow invokes the Sprint 021 submission flow for each captured payload. It does not move extractor rules, Content Manager deduplication/upsert behavior, or Profile Manager checkout eligibility/leasing rules into Collector Runtime.
+
+The Sprint 024 trusted runtime profile configuration contract remains owned by Collector Profile Manager and is guarded by `leaseId`. Collector Runtime may consume that contract after checkout, but public profile read DTOs must continue to omit authentication state, local storage, proxy credentials, provisioning tokens, and token hashes.
 
 Extractor fixtures must be sanitized. They must not include cookies, tokens, authorization headers, viewer IDs, private user data, raw request headers, or sensitive account/session details. Synthetic fixtures should be clearly named as synthetic. Real payload fixtures must be sanitized before they are used in tests.
 

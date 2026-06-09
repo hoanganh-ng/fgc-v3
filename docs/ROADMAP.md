@@ -48,11 +48,19 @@ Implement the Collector Runtime submission flow for already-captured Facebook Gr
 
 Add the next runtime layer that orchestrates profile checkout, captured payload collection through a placeholder port, content submission, and lease release through explicit application contracts.
 
-## Sprint 023: Facebook Browser Payload Capture Adapter
+## Sprint 023: Collector Runtime Profile Manager HTTP Adapter
+
+Add the concrete Collector Runtime HTTP adapter for Profile Manager checkout/release through the runtime-owned profile lease port.
+
+## Sprint 024: Trusted Runtime Profile Configuration Contract
+
+Add a trusted, lease-scoped runtime profile configuration contract so Collector Runtime can fetch browser launch configuration from Profile Manager after checkout while public read DTOs remain safe.
+
+## Sprint 025: Facebook Browser Payload Capture Adapter
 
 Add the first real Facebook browser payload capture adapter for Collector Runtime, behind the Sprint 022 capture port.
 
-## Sprint 024: Profile + Content Manager Web UI Foundation
+## Sprint 026: Profile + Content Manager Web UI Foundation
 
 Start the deferred Web UI foundation for profile and content management, consuming application/API contracts instead of owning domain rules or persistence logic.
 
