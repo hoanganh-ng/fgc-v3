@@ -282,6 +282,14 @@ export const ProfileMutationResponseSchema = z
   })
   .strict();
 
+export const StartProfileProvisioningResponseSchema = z
+  .object({
+    profile: ProfileMutationSummarySchema,
+    provisioningToken: NonEmptyStringSchema.optional(),
+    expiresAt: NonEmptyStringSchema.optional(),
+  })
+  .strict();
+
 export type ProvisioningTokenStatus = z.infer<
   typeof ProvisioningTokenStatusSchema
 >;
@@ -314,6 +322,9 @@ export type UpdateProfileConfigurationRequest = z.infer<
 export type ProfileMutationResponse = z.infer<
   typeof ProfileMutationResponseSchema
 >;
+export type StartProfileProvisioningResponse = z.infer<
+  typeof StartProfileProvisioningResponseSchema
+>;
 
 export interface ListProfilesQuery {
   readonly status?: KnownProfileStatus;
@@ -335,6 +346,9 @@ export interface ProfileManagerClient {
     profileId: string,
     request: UpdateProfileConfigurationRequest,
   ) => Promise<ApiResult<ProfileMutationResponse>>;
+  readonly startProfileProvisioning: (
+    profileId: string,
+  ) => Promise<ApiResult<StartProfileProvisioningResponse>>;
 }
 
 export function createProfileManagerClient(
@@ -368,6 +382,13 @@ export function createProfileManagerClient(
         method: "PATCH",
         body: request,
         responseSchema: ProfileMutationResponseSchema,
+      });
+    },
+    startProfileProvisioning(profileId) {
+      return httpClient.request({
+        path: `/collector/profiles/${encodeURIComponent(profileId)}/provisioning/start`,
+        method: "POST",
+        responseSchema: StartProfileProvisioningResponseSchema,
       });
     },
   };

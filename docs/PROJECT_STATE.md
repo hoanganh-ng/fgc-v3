@@ -8,17 +8,17 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work has started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, and Dockerized full-stack runtime support was added in Sprint 027.
+The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, and Start Provisioning UI was added in Sprint 029.
 
-The next active work is Profile Create + Configure Forms. It adds structured Web UI forms for creating profiles and updating profile configuration through existing Profile Manager APIs while provisioning actions, session ingestion, browser login capture, Facebook content capture, scheduling, queues, authentication, authorization, Content Builder, and Publisher work remain deferred.
+The next active work is Profile Provisioning Browser CLI. It adds a TypeScript operator CLI that consumes a one-time provisioning token, opens a headed browser for manual Facebook login, captures cookies/localStorage, and submits the captured session through the existing Profile Manager ingestion flow while runtime collection, Facebook content capture, scheduling, queues, authentication, authorization, Content Builder, and Publisher work remain deferred.
 
 ## Current Sprint
 
-Sprint 028: Profile Create + Configure Forms
+Sprint 030: Profile Provisioning Browser CLI
 
-Active sprint file: `docs/SPRINTS/SPRINT-028-profile-create-configure-forms.md`
+Active sprint file: `docs/SPRINTS/SPRINT-030-profile-provisioning-browser-cli.md`
 
-Sprint 028 implements structured Web UI forms for creating profiles and updating profile configuration through the existing Profile Manager APIs. No provisioning action, session ingestion, browser login capture, Facebook content capture, scheduler, queue, authentication, authorization, source group management, content item review, collection run, Content Builder, or Publisher work should happen in this sprint.
+Sprint 030 implements an operator-only Playwright provisioning CLI that uses a one-time provisioning token to fetch provisioning configuration, opens headed Chromium for manual Facebook login, captures cookies/localStorage after explicit operator confirmation, and submits the session through the existing Profile Manager token ingestion API. No credential automation, CAPTCHA solving, stealth tooling, Facebook content capture, GraphQL capture, runtime collection, scheduler, queue, authentication, authorization, Content Builder, or Publisher work should happen in this sprint.
 
 ## Decided Items
 
@@ -65,6 +65,8 @@ Sprint 028 implements structured Web UI forms for creating profiles and updating
 - Sprint 026 replaces the Profiles placeholder with read-only safe Collector Profile Manager list and detail integration, using `/collector/profiles` and `/collector/profiles/:profileId` without exposing cookies, local storage, proxy credentials, raw session state, token hashes, provisioning token hashes, or trusted runtime secrets.
 - Sprint 027 adds Docker Compose development and production-like preview runtimes, using Vite for development hot reload and Nginx to serve the built Web UI and proxy `/collector/*` to the Fastify API in preview mode.
 - Sprint 028 adds structured Web UI create and configure forms for Collector Profile Manager profiles, using existing backend contracts and keeping sensitive session, token, provisioning, proxy password, and trusted runtime data out of the UI.
+- Sprint 029 adds a safe Web UI Start Provisioning action on profile detail, using the existing backend contract and keeping one-time provisioning tokens confined to the immediate success UI when returned.
+- Sprint 030 adds an operator-only Profile Provisioning Browser CLI that consumes one-time provisioning tokens and submits manually captured Facebook session state through existing Profile Manager HTTP contracts without printing or storing raw session material.
 - Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
 - Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.
 - The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.
@@ -96,7 +98,7 @@ Sprint 028 implements structured Web UI forms for creating profiles and updating
 
 ## Not Decided Yet
 
-- Browser automation framework.
+- Browser automation framework for runtime collection.
 - Queue, event bus, or scheduler technology.
 - Deployment platform and infrastructure.
 - Authentication and authorization approach for management interfaces.

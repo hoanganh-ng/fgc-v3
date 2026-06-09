@@ -84,6 +84,49 @@ pnpm stack:preview:reset
 
 In preview, `apps/web` is built into static files and served by Nginx. The browser uses the Nginx entrypoint at `http://localhost:8081`. Nginx proxies `/collector/*` to `http://api:3000` before applying the React SPA fallback, so refreshing `http://localhost:8081/profiles` returns the React app.
 
+## Profile Provisioning CLI
+
+Sprint 030 adds an operator-only CLI for finishing Collector Profile Manager provisioning after the Web UI starts it.
+
+Create and start provisioning:
+
+1. Start the dev or preview stack.
+2. Open the Web UI profile detail page.
+3. Create a profile if needed.
+4. Configure the required profile fields through the structured forms.
+5. Use the Start Provisioning action on the profile detail page.
+6. Copy the one-time provisioning token from the immediate success UI.
+
+The token is shown only at the moment provisioning starts. It is one-time-use and should be treated as a secret. After successful session ingestion, reusing the same token should fail through the backend token validation rules.
+
+Run the CLI against the preview gateway:
+
+```bash
+pnpm profile:provision -- --token <provisioning-token> --base-url http://localhost:8081
+```
+
+Run the CLI against the direct local API:
+
+```bash
+pnpm profile:provision -- --token <provisioning-token> --base-url http://localhost:3000
+```
+
+If `--base-url` is omitted, the CLI uses `PROFILE_PROVISIONING_BASE_URL`, then `PROFILE_MANAGER_BASE_URL`, then `http://localhost:3000`.
+
+Expected operator flow:
+
+1. The CLI fetches provisioning configuration from `GET /collector/provisioning/:token/configuration`.
+2. A headed Chromium browser opens at `https://www.facebook.com/login`.
+3. The operator logs in manually in the browser.
+4. The operator returns to the terminal and presses Enter.
+5. The CLI captures context cookies and localStorage snapshots for Facebook origins.
+6. The CLI submits the captured session to `POST /collector/provisioning/:token/session`.
+7. Profile Manager consumes the token and returns the profile in `READY` status.
+
+The CLI does not automate credentials, store passwords, solve CAPTCHAs, add stealth tooling, capture Facebook content, capture GraphQL responses, implement collection runtime behavior, or write cookies/localStorage to disk.
+
+The CLI prints only operational progress and counts. It must not print cookies, localStorage values, proxy passwords, token hashes, raw session material, or trusted runtime secrets. The current provisioning configuration HTTP response redacts proxy credentials; the CLI applies proxy host/port settings and will apply credentials only if a future trusted DTO explicitly supplies them.
+
 ## Migrations
 
 The existing migration system is Drizzle:

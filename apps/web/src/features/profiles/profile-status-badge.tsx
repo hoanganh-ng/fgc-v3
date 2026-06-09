@@ -6,19 +6,19 @@ import type {
 
 const statusMeta = {
   PENDING_CONFIG: {
-    label: "Pending config",
+    label: "PENDING_CONFIG",
     tone: "warning",
   },
   PENDING_LOGIN: {
-    label: "Pending login",
+    label: "PENDING_LOGIN",
     tone: "info",
   },
   READY: {
-    label: "Ready",
+    label: "READY",
     tone: "success",
   },
   BUSY: {
-    label: "Busy",
+    label: "BUSY",
     tone: "neutral",
   },
 } satisfies Record<

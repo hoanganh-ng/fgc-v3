@@ -1,7 +1,12 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  AlertTriangle,
   CalendarClock,
+  CheckCircle2,
+  Clipboard,
+  KeyRound,
   RefreshCw,
   Settings2,
   ShieldCheck,
@@ -16,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useStartProfileProvisioningMutation } from "@/features/profiles/profile-mutations";
 import { ProfileStatusBadge } from "@/features/profiles/profile-status-badge";
 import { useProfileQuery } from "@/features/profiles/profile-queries";
 import { isApiResultError } from "@/lib/api/http-client";
@@ -95,6 +101,7 @@ function ProfileDetailView({
       </div>
       <div className="grid content-start gap-5">
         <StatusSummaryCard profile={profile} />
+        <StartProvisioningCard key={profile.id} profile={profile} />
         <TimestampSummaryCard profile={profile} />
       </div>
     </div>
@@ -179,6 +186,200 @@ function StatusSummaryCard({
       </CardContent>
     </Card>
   );
+}
+
+function StartProvisioningCard({
+  profile,
+}: {
+  readonly profile: ProfileDetail;
+}): JSX.Element {
+  const startProvisioning = useStartProfileProvisioningMutation();
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
+  const [provisioningSuccess, setProvisioningSuccess] =
+    useState<ImmediateProvisioningSuccess | null>(null);
+  const canStartProvisioning = profile.status === "PENDING_CONFIG";
+  const provisioningToken = provisioningSuccess?.provisioningToken;
+  const expiresAt = provisioningSuccess?.expiresAt;
+
+  function start(): void {
+    const confirmed = window.confirm(
+      `Start provisioning for ${profile.displayName} (${profile.id})?\n\nThe backend may issue a one-time provisioning token. Save it immediately if it is returned.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCopyState("idle");
+    setProvisioningSuccess(null);
+    startProvisioning.reset();
+    void (async () => {
+      try {
+        const response = await startProvisioning.mutateAsync({
+          profileId: profile.id,
+        });
+
+        setProvisioningSuccess({
+          ...(response.provisioningToken !== undefined
+            ? { provisioningToken: response.provisioningToken }
+            : {}),
+          ...(response.expiresAt !== undefined
+            ? { expiresAt: response.expiresAt }
+            : {}),
+        });
+        startProvisioning.reset();
+      } catch {
+        return;
+      }
+    })();
+  }
+
+  async function copyProvisioningToken(): Promise<void> {
+    if (provisioningToken === undefined) {
+      return;
+    }
+
+    if (
+      typeof navigator === "undefined" ||
+      navigator.clipboard === undefined
+    ) {
+      setCopyState("failed");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(provisioningToken);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <CardTitle>Provisioning</CardTitle>
+          <CardDescription>Start login provisioning through the backend API.</CardDescription>
+        </div>
+        <div className="grid size-11 place-items-center rounded border border-border bg-muted text-primary">
+          <KeyRound aria-hidden="true" className="size-5" />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm text-muted-foreground">Current Status</span>
+          <ProfileStatusBadge status={profile.status} />
+        </div>
+
+        <p className="text-sm leading-6 text-muted-foreground">
+          {getProvisioningStatusText(profile.status)}
+        </p>
+
+        {canStartProvisioning ? (
+          <Button
+            className="w-full"
+            disabled={startProvisioning.isPending}
+            onClick={start}
+          >
+            <KeyRound aria-hidden="true" className="size-4" />
+            {startProvisioning.isPending
+              ? "Starting Provisioning"
+              : "Start Provisioning"}
+          </Button>
+        ) : null}
+
+        {startProvisioning.isError ? (
+          <div
+            className="rounded border border-[#e4a0a0] bg-[#fff5f5] px-3 py-3 text-sm text-[#7f1d1d]"
+            role="alert"
+          >
+            <div className="flex gap-2">
+              <AlertTriangle
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0"
+              />
+              <div className="min-w-0">
+                <p className="font-semibold">Provisioning could not start.</p>
+                <p className="mt-1 break-words">
+                  {formatApiError(startProvisioning.error)}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {provisioningSuccess !== null ? (
+          <div
+            className="rounded border border-[#8ac6a7] bg-[#f1fbf5] px-3 py-3 text-sm text-[#23563b]"
+            role="status"
+          >
+            <div className="flex gap-2">
+              <CheckCircle2
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0"
+              />
+              <div className="min-w-0">
+                <p className="font-semibold">Provisioning started.</p>
+                <p className="mt-1 leading-6">
+                  The profile list and detail are refreshing from the backend.
+                </p>
+              </div>
+            </div>
+
+            {provisioningToken !== undefined ? (
+              <div className="mt-3 rounded border border-[#8ac6a7] bg-white p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#36724f]">
+                  One-Time Provisioning Token
+                </p>
+                <code className="mt-2 block max-h-28 overflow-auto break-all rounded border border-border bg-muted/60 p-2 text-xs text-foreground">
+                  {provisioningToken}
+                </code>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      void copyProvisioningToken();
+                    }}
+                  >
+                    <Clipboard aria-hidden="true" className="size-4" />
+                    {copyState === "copied" ? "Copied" : "Copy"}
+                  </Button>
+                  {expiresAt !== undefined ? (
+                    <span className="text-xs text-[#36724f]">
+                      Expires {formatDateTime(expiresAt)}
+                    </span>
+                  ) : null}
+                </div>
+                {copyState === "failed" ? (
+                  <p className="mt-2 text-xs font-medium text-[#7f1d1d]">
+                    Clipboard copy is unavailable in this browser.
+                  </p>
+                ) : null}
+                <p className="mt-3 text-xs font-medium leading-5 text-[#7f1d1d]">
+                  Save this token now. It may not be visible again, and it
+                  disappears after a page refresh.
+                </p>
+              </div>
+            ) : (
+              <p className="mt-3 leading-6">
+                No raw token was returned. Continue with the trusted
+                provisioning workflow outside this UI.
+              </p>
+            )}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface ImmediateProvisioningSuccess {
+  readonly provisioningToken?: string;
+  readonly expiresAt?: string;
 }
 
 function ConfigurationSummaryCard({
@@ -448,4 +649,24 @@ function formatDateTime(value: string): string {
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function getProvisioningStatusText(status: string): string {
+  if (status === "PENDING_CONFIG") {
+    return "PENDING_CONFIG can start provisioning after the backend accepts the required configuration.";
+  }
+
+  if (status === "PENDING_LOGIN") {
+    return "PENDING_LOGIN means provisioning has started and login is the next lifecycle step.";
+  }
+
+  if (status === "READY") {
+    return "READY means authentication state is already captured for backend checkout.";
+  }
+
+  if (status === "BUSY") {
+    return "BUSY means the profile is currently checked out by runtime work.";
+  }
+
+  return `${status} is reported by the backend.`;
 }
