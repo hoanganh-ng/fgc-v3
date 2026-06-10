@@ -45,6 +45,7 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }

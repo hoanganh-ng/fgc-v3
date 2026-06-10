@@ -17,6 +17,9 @@ export const ContentPlatformSchema = z.enum(["FACEBOOK"]);
 
 export type SourceGroupStatus = z.infer<typeof SourceGroupStatusSchema>;
 export type ContentStatus = z.infer<typeof ContentStatusSchema>;
+export type ContentPlatform = z.infer<typeof ContentPlatformSchema>;
+
+const NonEmptyStringSchema = z.string().min(1);
 
 const PageSchema = z
   .object({
@@ -26,56 +29,118 @@ const PageSchema = z
   })
   .strict();
 
+export const ContentCategorySchema = z
+  .object({
+    id: NonEmptyStringSchema,
+    name: NonEmptyStringSchema,
+    slug: NonEmptyStringSchema,
+    description: NonEmptyStringSchema.optional(),
+    createdAt: NonEmptyStringSchema,
+    updatedAt: NonEmptyStringSchema,
+  })
+  .strict();
+
 export const SourceGroupSchema = z
   .object({
-    id: z.string().min(1),
+    id: NonEmptyStringSchema,
     platform: ContentPlatformSchema,
-    externalGroupId: z.string().min(1),
-    name: z.string().min(1),
-    url: z.string().min(1),
-    categoryId: z.string().min(1),
+    externalGroupId: NonEmptyStringSchema,
+    name: NonEmptyStringSchema,
+    url: NonEmptyStringSchema,
+    categoryId: NonEmptyStringSchema,
     status: SourceGroupStatusSchema,
-    collectionPriority: z.number(),
-    notes: z.string().min(1).optional(),
-    createdAt: z.string().min(1),
-    updatedAt: z.string().min(1),
+    collectionPriority: z.number().int().min(0).max(100),
+    notes: NonEmptyStringSchema.optional(),
+    createdAt: NonEmptyStringSchema,
+    updatedAt: NonEmptyStringSchema,
   })
   .strict();
 
 const TopCommentSchema = z
   .object({
-    externalCommentId: z.string().min(1),
-    bodyText: z.string().min(1),
-    authorDisplayName: z.string().min(1).optional(),
-    authorExternalId: z.string().min(1).optional(),
+    externalCommentId: NonEmptyStringSchema,
+    bodyText: NonEmptyStringSchema,
+    authorDisplayName: NonEmptyStringSchema.optional(),
+    authorExternalId: NonEmptyStringSchema.optional(),
     reactionCount: z.number(),
     replyCount: z.number().optional(),
-    postedAt: z.string().min(1).optional(),
-    collectedAt: z.string().min(1),
+    postedAt: NonEmptyStringSchema.optional(),
+    collectedAt: NonEmptyStringSchema,
   })
   .strict();
 
 export const ContentItemSchema = z
   .object({
-    id: z.string().min(1),
+    id: NonEmptyStringSchema,
     platform: ContentPlatformSchema,
-    sourceGroupId: z.string().min(1),
-    externalPostId: z.string().min(1),
-    sourceUrl: z.string().min(1),
-    title: z.string().min(1).optional(),
-    bodyText: z.string().min(1),
-    authorDisplayName: z.string().min(1).optional(),
-    authorExternalId: z.string().min(1).optional(),
-    postedAt: z.string().min(1).optional(),
-    firstCollectedAt: z.string().min(1),
-    lastCollectedAt: z.string().min(1),
+    sourceGroupId: NonEmptyStringSchema,
+    externalPostId: NonEmptyStringSchema,
+    sourceUrl: NonEmptyStringSchema,
+    title: NonEmptyStringSchema.optional(),
+    bodyText: NonEmptyStringSchema,
+    authorDisplayName: NonEmptyStringSchema.optional(),
+    authorExternalId: NonEmptyStringSchema.optional(),
+    postedAt: NonEmptyStringSchema.optional(),
+    firstCollectedAt: NonEmptyStringSchema,
+    lastCollectedAt: NonEmptyStringSchema,
     reactionCount: z.number(),
     commentCount: z.number(),
     shareCount: z.number().optional(),
     topComments: z.array(TopCommentSchema),
     status: ContentStatusSchema,
-    createdAt: z.string().min(1),
-    updatedAt: z.string().min(1),
+    createdAt: NonEmptyStringSchema,
+    updatedAt: NonEmptyStringSchema,
+  })
+  .strict();
+
+export const ContentCategoriesListResponseSchema = z
+  .object({
+    items: z.array(ContentCategorySchema),
+  })
+  .strict();
+
+export const CreateContentCategoryRequestSchema = z
+  .object({
+    name: NonEmptyStringSchema,
+    slug: NonEmptyStringSchema,
+    description: NonEmptyStringSchema.optional(),
+  })
+  .strict();
+
+export const CreateContentCategoryResponseSchema = z
+  .object({
+    category: ContentCategorySchema,
+  })
+  .strict();
+
+export const CreateSourceGroupRequestSchema = z
+  .object({
+    platform: ContentPlatformSchema,
+    externalGroupId: NonEmptyStringSchema,
+    name: NonEmptyStringSchema,
+    url: NonEmptyStringSchema,
+    categoryId: NonEmptyStringSchema,
+    status: SourceGroupStatusSchema.optional(),
+    collectionPriority: z.number().int().min(0).max(100),
+    notes: NonEmptyStringSchema.optional(),
+  })
+  .strict();
+
+export const CreateSourceGroupResponseSchema = z
+  .object({
+    sourceGroup: SourceGroupSchema,
+  })
+  .strict();
+
+export const UpdateSourceGroupStatusRequestSchema = z
+  .object({
+    status: SourceGroupStatusSchema,
+  })
+  .strict();
+
+export const UpdateSourceGroupStatusResponseSchema = z
+  .object({
+    sourceGroup: SourceGroupSchema,
   })
   .strict();
 
@@ -93,8 +158,30 @@ export const ContentItemsListResponseSchema = z
   })
   .strict();
 
+export type ContentCategory = z.infer<typeof ContentCategorySchema>;
 export type SourceGroup = z.infer<typeof SourceGroupSchema>;
 export type ContentItem = z.infer<typeof ContentItemSchema>;
+export type ContentCategoriesListResponse = z.infer<
+  typeof ContentCategoriesListResponseSchema
+>;
+export type CreateContentCategoryRequest = z.infer<
+  typeof CreateContentCategoryRequestSchema
+>;
+export type CreateContentCategoryResponse = z.infer<
+  typeof CreateContentCategoryResponseSchema
+>;
+export type CreateSourceGroupRequest = z.infer<
+  typeof CreateSourceGroupRequestSchema
+>;
+export type CreateSourceGroupResponse = z.infer<
+  typeof CreateSourceGroupResponseSchema
+>;
+export type UpdateSourceGroupStatusRequest = z.infer<
+  typeof UpdateSourceGroupStatusRequestSchema
+>;
+export type UpdateSourceGroupStatusResponse = z.infer<
+  typeof UpdateSourceGroupStatusResponseSchema
+>;
 export type SourceGroupsListResponse = z.infer<
   typeof SourceGroupsListResponseSchema
 >;
@@ -117,9 +204,22 @@ export interface ListContentItemsQuery {
 }
 
 export interface ContentManagerClient {
+  readonly listContentCategories: () => Promise<
+    ApiResult<ContentCategoriesListResponse>
+  >;
+  readonly createContentCategory: (
+    request: CreateContentCategoryRequest,
+  ) => Promise<ApiResult<CreateContentCategoryResponse>>;
   readonly listSourceGroups: (
     query?: ListSourceGroupsQuery,
   ) => Promise<ApiResult<SourceGroupsListResponse>>;
+  readonly createSourceGroup: (
+    request: CreateSourceGroupRequest,
+  ) => Promise<ApiResult<CreateSourceGroupResponse>>;
+  readonly updateSourceGroupStatus: (
+    sourceGroupId: string,
+    status: SourceGroupStatus,
+  ) => Promise<ApiResult<UpdateSourceGroupStatusResponse>>;
   readonly listContentItems: (
     query?: ListContentItemsQuery,
   ) => Promise<ApiResult<ContentItemsListResponse>>;
@@ -129,11 +229,41 @@ export function createContentManagerClient(
   httpClient: HttpClient = createHttpClient({ baseUrl: env.VITE_API_BASE_URL }),
 ): ContentManagerClient {
   return {
+    listContentCategories() {
+      return httpClient.request({
+        path: "/collector/content-categories",
+        responseSchema: ContentCategoriesListResponseSchema,
+      });
+    },
+    createContentCategory(request) {
+      return httpClient.request({
+        path: "/collector/content-categories",
+        method: "POST",
+        body: request,
+        responseSchema: CreateContentCategoryResponseSchema,
+      });
+    },
     listSourceGroups(query) {
       return httpClient.request({
         path: "/collector/source-groups",
         query: toListSourceGroupsQueryParams(query),
         responseSchema: SourceGroupsListResponseSchema,
+      });
+    },
+    createSourceGroup(request) {
+      return httpClient.request({
+        path: "/collector/source-groups",
+        method: "POST",
+        body: request,
+        responseSchema: CreateSourceGroupResponseSchema,
+      });
+    },
+    updateSourceGroupStatus(sourceGroupId, status) {
+      return httpClient.request({
+        path: `/collector/source-groups/${encodeURIComponent(sourceGroupId)}/status`,
+        method: "PATCH",
+        body: { status } satisfies UpdateSourceGroupStatusRequest,
+        responseSchema: UpdateSourceGroupStatusResponseSchema,
       });
     },
     listContentItems(query) {
