@@ -12,6 +12,7 @@ import type {
   CollectorRuntimeWarning,
   FacebookGroupPayloadCaptureInput,
   FacebookGroupPayloadCapturePort,
+  FacebookPayloadCaptureDiagnostics,
   FacebookPayloadCaptureResult,
   RuntimeProfileConfiguration,
   RuntimeProfileConfigurationPort,
@@ -22,6 +23,10 @@ const DEFAULT_MAX_DURATION_MS = 30_000;
 const POST_NAVIGATION_SETTLE_MS = 1_500;
 const BETWEEN_SCROLL_SETTLE_MS = 1_200;
 const MIN_SCROLL_DISTANCE_PX = 800;
+const PAGE_CONTEXT_CAPTURE_BINDING_NAME = "__fgcFacebookPayloadCaptured";
+const PAGE_CONTEXT_PARSE_FAILURE_BINDING_NAME =
+  "__fgcFacebookPayloadParseFailed";
+const FACEBOOK_JSON_PREFIX = "for (;;);";
 
 interface PlaywrightProxySettings {
   readonly server: string;
@@ -66,6 +71,21 @@ export interface FacebookGraphQLResponseMetadata {
   readonly headers?: Record<string, string | undefined>;
 }
 
+export type FacebookPageContextCaptureTransport = "fetch" | "xhr";
+
+export interface FacebookPageContextPayloadCaptureMessage {
+  readonly url: string;
+  readonly pageUrl: string;
+  readonly body: unknown;
+  readonly capturedAt: string;
+  readonly transport: FacebookPageContextCaptureTransport;
+}
+
+export interface FacebookJsonParseResult {
+  readonly bodies: readonly unknown[];
+  readonly parseFailed: boolean;
+}
+
 export class PlaywrightFacebookBrowserPayloadCaptureAdapter
   implements FacebookGroupPayloadCapturePort {
   private readonly runtimeProfileConfigurationPort: RuntimeProfileConfigurationPort;
@@ -93,8 +113,8 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
     input: FacebookGroupPayloadCaptureInput,
   ): Promise<FacebookPayloadCaptureResult> {
     const warnings: CollectorRuntimeWarning[] = [];
-    const capturedPayloads: CapturedFacebookPayload[] = [];
     const sensitiveValues = new Set<string>();
+    let captureBuffer: FacebookPayloadCaptureBuffer | undefined;
     let browser: Browser | undefined;
     let context: BrowserContext | undefined;
     let abortCloseListener: (() => void) | undefined;
@@ -143,6 +163,9 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
       );
 
       const page = await context.newPage();
+      const pageCaptureBuffer = new FacebookPayloadCaptureBuffer(this.now);
+      captureBuffer = pageCaptureBuffer;
+      await installFacebookPageContextCapture(page, pageCaptureBuffer);
       const pendingCaptures: Promise<void>[] = [];
       const deadlineAt = Date.now() + this.maxDurationMs;
       const pageFailureWatcher = createPageFailureWatcher(
@@ -151,10 +174,10 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
       );
 
       page.on("response", (response) => {
-        const capture = captureGraphQLResponse(
+        const capture = captureNetworkResponse(
           response,
-          capturedPayloads,
-          this.now,
+          pageCaptureBuffer,
+          () => page.url(),
         );
 
         if (capture !== undefined) {
@@ -174,21 +197,25 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
         throwIfAborted(this.abortSignal);
 
         if (navigationResponse !== null && navigationResponse.status() >= 400) {
+          pageCaptureBuffer.recordFinalPageUrl(page.url());
           return {
             ok: false,
             errorCode: "FACEBOOK_GROUP_NAVIGATION_FAILED",
             errorMessage: `Facebook group navigation returned HTTP ${navigationResponse.status()}.`,
             warnings,
+            diagnostics: pageCaptureBuffer.toDiagnostics(),
           };
         }
 
         if (isFacebookLoginOrCheckpointUrl(page.url())) {
+          pageCaptureBuffer.recordFinalPageUrl(page.url());
           return {
             ok: false,
             errorCode: "FACEBOOK_LOGIN_REQUIRED",
             errorMessage:
               "Facebook redirected to login or checkpoint. Re-provision the profile session before retrying.",
             warnings,
+            diagnostics: pageCaptureBuffer.toDiagnostics(),
           };
         }
 
@@ -203,19 +230,24 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
         ]);
 
         if (isFacebookLoginOrCheckpointUrl(page.url())) {
+          pageCaptureBuffer.recordFinalPageUrl(page.url());
           return {
             ok: false,
             errorCode: "FACEBOOK_LOGIN_REQUIRED",
             errorMessage:
               "Facebook redirected to login or checkpoint. Re-provision the profile session before retrying.",
             warnings,
+            diagnostics: pageCaptureBuffer.toDiagnostics(),
           };
         }
 
         await settlePendingCaptures(pendingCaptures);
+        pageCaptureBuffer.recordFinalPageUrl(page.url());
       } finally {
         pageFailureWatcher.dispose();
       }
+
+      const capturedPayloads = pageCaptureBuffer.getCapturedPayloads();
 
       if (capturedPayloads.length === 0) {
         warnings.push({
@@ -229,6 +261,7 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
         ok: true,
         capturedPayloads,
         warnings,
+        diagnostics: pageCaptureBuffer.toDiagnostics(),
       };
     } catch (error) {
       if (isAbortLikeError(error, this.abortSignal)) {
@@ -238,6 +271,9 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
           errorMessage:
             "Facebook browser payload capture was interrupted before completion.",
           warnings,
+          ...(captureBuffer !== undefined
+            ? { diagnostics: captureBuffer.toDiagnostics() }
+            : {}),
         };
       }
 
@@ -249,6 +285,9 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
           sensitiveValues,
         ),
         warnings,
+        ...(captureBuffer !== undefined
+          ? { diagnostics: captureBuffer.toDiagnostics() }
+          : {}),
       };
     } finally {
       abortCloseListener?.();
@@ -260,45 +299,592 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
 export function shouldCaptureFacebookGraphQLResponse(
   response: FacebookGraphQLResponseMetadata,
 ): boolean {
-  if (!response.url.includes("/api/graphql")) {
-    return false;
-  }
-
-  const contentType = readHeader(response.headers, "content-type");
-
-  if (contentType === undefined) {
-    return true;
-  }
-
-  return contentType.toLowerCase().includes("application/json");
+  return shouldCaptureFacebookPayload(
+    response.url,
+    readHeader(response.headers, "content-type"),
+  );
 }
 
-function captureGraphQLResponse(
+export function shouldCaptureFacebookPayload(
+  url: string,
+  contentType: string | undefined,
+): boolean {
+  return (
+    url.includes("/api/graphql") ||
+    url.includes("/graphql") ||
+    url.includes("/ajax/") ||
+    contentType?.toLowerCase().includes("application/json") === true
+  );
+}
+
+export function parseFacebookJson(value: string): FacebookJsonParseResult {
+  const normalizedValue = value.trim();
+
+  if (normalizedValue.length === 0) {
+    return {
+      bodies: [],
+      parseFailed: true,
+    };
+  }
+
+  const wholePayload = parseSingleFacebookJson(normalizedValue);
+
+  if (wholePayload.ok) {
+    return {
+      bodies: [wholePayload.value],
+      parseFailed: false,
+    };
+  }
+
+  const bodies: unknown[] = [];
+
+  for (const part of value.split(/\r?\n/)) {
+    const normalizedPart = part.trim();
+
+    if (normalizedPart.length === 0) {
+      continue;
+    }
+
+    const parsedPart = parseSingleFacebookJson(normalizedPart);
+
+    if (parsedPart.ok) {
+      bodies.push(parsedPart.value);
+    }
+  }
+
+  return {
+    bodies,
+    parseFailed: bodies.length === 0,
+  };
+}
+
+export function sanitizeFacebookDiagnosticUrl(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return `${url.origin}${url.pathname}`;
+    }
+
+    if (url.protocol === "about:") {
+      return `${url.protocol}${url.pathname}`;
+    }
+
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+class FacebookPayloadCaptureBuffer {
+  private readonly now: () => Date;
+  private readonly capturedPayloads: CapturedFacebookPayload[] = [];
+  private readonly dedupeKeys = new Set<string>();
+  private pageContextFetchCaptureCount = 0;
+  private pageContextXhrCaptureCount = 0;
+  private networkListenerCaptureCount = 0;
+  private parseFailureCount = 0;
+  private finalPageUrl: string | undefined;
+  private loginRedirectSuspected = false;
+
+  public constructor(now: () => Date) {
+    this.now = now;
+  }
+
+  public recordPageContextCapture(message: unknown): void {
+    const captureMessage = toPageContextPayloadCaptureMessage(message);
+
+    if (captureMessage === undefined) {
+      return;
+    }
+
+    if (captureMessage.transport === "fetch") {
+      this.pageContextFetchCaptureCount += 1;
+    } else {
+      this.pageContextXhrCaptureCount += 1;
+    }
+
+    this.recordParsedPayload({
+      url: captureMessage.url,
+      pageUrl: captureMessage.pageUrl,
+      body: captureMessage.body,
+      capturedAt: toCapturedAt(captureMessage.capturedAt, this.now),
+    });
+  }
+
+  public recordPageContextParseFailure(message: unknown): void {
+    if (isPageContextParseFailureMessage(message)) {
+      this.parseFailureCount += 1;
+    }
+  }
+
+  public recordNetworkResponseText(input: {
+    readonly url: string;
+    readonly pageUrl: string;
+    readonly bodyText: string;
+  }): void {
+    const parseResult = parseFacebookJson(input.bodyText);
+
+    if (parseResult.parseFailed) {
+      this.parseFailureCount += 1;
+      return;
+    }
+
+    const capturedAt = this.now();
+
+    for (const body of parseResult.bodies) {
+      this.networkListenerCaptureCount += 1;
+      this.recordParsedPayload({
+        url: input.url,
+        pageUrl: input.pageUrl,
+        body,
+        capturedAt,
+      });
+    }
+  }
+
+  public recordParseFailure(): void {
+    this.parseFailureCount += 1;
+  }
+
+  public recordFinalPageUrl(url: string): void {
+    this.finalPageUrl = sanitizeFacebookDiagnosticUrl(url);
+    this.loginRedirectSuspected = isFacebookLoginOrCheckpointUrl(url);
+  }
+
+  public getCapturedPayloads(): readonly CapturedFacebookPayload[] {
+    return [...this.capturedPayloads];
+  }
+
+  public toDiagnostics(): FacebookPayloadCaptureDiagnostics {
+    return {
+      pageContextFetchCaptureCount: this.pageContextFetchCaptureCount,
+      pageContextXhrCaptureCount: this.pageContextXhrCaptureCount,
+      networkListenerCaptureCount: this.networkListenerCaptureCount,
+      parseFailureCount: this.parseFailureCount,
+      totalPayloadsPassedToExtractor: this.capturedPayloads.length,
+      ...(this.finalPageUrl !== undefined
+        ? { finalPageUrl: this.finalPageUrl }
+        : {}),
+      loginRedirectSuspected: this.loginRedirectSuspected,
+    };
+  }
+
+  private recordParsedPayload(input: {
+    readonly url: string;
+    readonly pageUrl: string;
+    readonly body: unknown;
+    readonly capturedAt: Date;
+  }): void {
+    const dedupeKey = createPayloadDedupeKey(input.url, input.body);
+
+    if (this.dedupeKeys.has(dedupeKey)) {
+      return;
+    }
+
+    this.dedupeKeys.add(dedupeKey);
+
+    const sourceUrlHint =
+      sanitizeFacebookDiagnosticUrl(input.pageUrl) ??
+      sanitizeFacebookDiagnosticUrl(input.url);
+
+    this.capturedPayloads.push({
+      payload: input.body,
+      capturedAt: input.capturedAt,
+      ...(sourceUrlHint !== undefined ? { sourceUrlHint } : {}),
+    });
+  }
+}
+
+async function installFacebookPageContextCapture(
+  page: Page,
+  captureBuffer: FacebookPayloadCaptureBuffer,
+): Promise<void> {
+  await page.exposeBinding(
+    PAGE_CONTEXT_CAPTURE_BINDING_NAME,
+    (_source, message: unknown) => {
+      captureBuffer.recordPageContextCapture(message);
+    },
+  );
+  await page.exposeBinding(
+    PAGE_CONTEXT_PARSE_FAILURE_BINDING_NAME,
+    (_source, message: unknown) => {
+      captureBuffer.recordPageContextParseFailure(message);
+    },
+  );
+  await page.addInitScript({
+    content: createFacebookPageContextCaptureInitScript(),
+  });
+}
+
+function captureNetworkResponse(
   response: Response,
-  capturedPayloads: CapturedFacebookPayload[],
-  now: () => Date,
+  captureBuffer: FacebookPayloadCaptureBuffer,
+  readCurrentPageUrl: () => string,
 ): Promise<void> | undefined {
-  if (
-    !shouldCaptureFacebookGraphQLResponse({
-      url: response.url(),
-      headers: response.headers(),
-    })
-  ) {
+  const url = response.url();
+
+  if (!shouldCaptureFacebookPayload(url, readHeader(response.headers(), "content-type"))) {
     return undefined;
   }
 
   return response
-    .json()
-    .then((payload: unknown) => {
-      capturedPayloads.push({
-        payload,
-        capturedAt: now(),
-        sourceUrlHint: response.url(),
+    .text()
+    .then((bodyText) => {
+      captureBuffer.recordNetworkResponseText({
+        url,
+        pageUrl: readCurrentPageUrl(),
+        bodyText,
       });
     })
     .catch(() => {
-      // Ignore unparsable or non-JSON GraphQL-looking responses.
+      captureBuffer.recordParseFailure();
     });
+}
+
+function parseSingleFacebookJson(
+  value: string,
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+  try {
+    return {
+      ok: true,
+      value: JSON.parse(stripFacebookJsonPrefix(value)),
+    };
+  } catch {
+    return {
+      ok: false,
+    };
+  }
+}
+
+function stripFacebookJsonPrefix(value: string): string {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue.startsWith(FACEBOOK_JSON_PREFIX)) {
+    return normalizedValue;
+  }
+
+  return normalizedValue.slice(FACEBOOK_JSON_PREFIX.length).trimStart();
+}
+
+function toPageContextPayloadCaptureMessage(
+  value: unknown,
+): FacebookPageContextPayloadCaptureMessage | undefined {
+  const record = toRecord(value);
+  const url = readString(record, "url");
+  const pageUrl = readString(record, "pageUrl");
+  const capturedAt = readString(record, "capturedAt");
+  const transport = readString(record, "transport");
+
+  if (
+    url === undefined ||
+    pageUrl === undefined ||
+    capturedAt === undefined ||
+    (transport !== "fetch" && transport !== "xhr")
+  ) {
+    return undefined;
+  }
+
+  return {
+    url,
+    pageUrl,
+    body: record?.body,
+    capturedAt,
+    transport,
+  };
+}
+
+function isPageContextParseFailureMessage(value: unknown): boolean {
+  const record = toRecord(value);
+  const transport = readString(record, "transport");
+
+  return transport === "fetch" || transport === "xhr";
+}
+
+function toCapturedAt(value: string, now: () => Date): Date {
+  const capturedAtMs = Date.parse(value);
+
+  return Number.isFinite(capturedAtMs) ? new Date(capturedAtMs) : now();
+}
+
+function createPayloadDedupeKey(url: string, body: unknown): string {
+  try {
+    return `${url}\n${JSON.stringify(body)}`;
+  } catch {
+    return `${url}\n${String(body)}`;
+  }
+}
+
+function createFacebookPageContextCaptureInitScript(): string {
+  return `
+(() => {
+  const captureBindingName = ${JSON.stringify(PAGE_CONTEXT_CAPTURE_BINDING_NAME)};
+  const parseFailureBindingName = ${JSON.stringify(PAGE_CONTEXT_PARSE_FAILURE_BINDING_NAME)};
+  const facebookJsonPrefix = ${JSON.stringify(FACEBOOK_JSON_PREFIX)};
+
+  if (window.__fgcFacebookPayloadCaptureInstalled === true) {
+    return;
+  }
+
+  window.__fgcFacebookPayloadCaptureInstalled = true;
+
+  function shouldCapture(url, contentType) {
+    const normalizedUrl = typeof url === "string" ? url : "";
+    const normalizedContentType =
+      typeof contentType === "string" ? contentType.toLowerCase() : "";
+
+    return (
+      normalizedUrl.includes("/api/graphql") ||
+      normalizedUrl.includes("/graphql") ||
+      normalizedUrl.includes("/ajax/") ||
+      normalizedContentType.includes("application/json")
+    );
+  }
+
+  function stripFacebookJsonPrefix(value) {
+    const normalizedValue = String(value).trim();
+
+    if (!normalizedValue.startsWith(facebookJsonPrefix)) {
+      return normalizedValue;
+    }
+
+    return normalizedValue.slice(facebookJsonPrefix.length).trimStart();
+  }
+
+  function parseSingleFacebookJson(value) {
+    try {
+      return {
+        ok: true,
+        value: JSON.parse(stripFacebookJsonPrefix(value)),
+      };
+    } catch {
+      return {
+        ok: false,
+      };
+    }
+  }
+
+  function parseFacebookJson(value) {
+    const normalizedValue = String(value).trim();
+
+    if (normalizedValue.length === 0) {
+      return [];
+    }
+
+    const wholePayload = parseSingleFacebookJson(normalizedValue);
+
+    if (wholePayload.ok) {
+      return [wholePayload.value];
+    }
+
+    const bodies = [];
+    const parts = String(value).split(/\\r?\\n/);
+
+    for (const part of parts) {
+      const normalizedPart = part.trim();
+
+      if (normalizedPart.length === 0) {
+        continue;
+      }
+
+      const parsedPart = parseSingleFacebookJson(normalizedPart);
+
+      if (parsedPart.ok) {
+        bodies.push(parsedPart.value);
+      }
+    }
+
+    return bodies;
+  }
+
+  function readBridge(name) {
+    const bridge = window[name];
+
+    return typeof bridge === "function" ? bridge : undefined;
+  }
+
+  function sendBridgeMessage(name, message) {
+    try {
+      const bridge = readBridge(name);
+
+      if (bridge === undefined) {
+        return;
+      }
+
+      Promise.resolve(bridge(message)).catch(() => {});
+    } catch {}
+  }
+
+  function reportParseFailure(transport, url, pageUrl) {
+    sendBridgeMessage(parseFailureBindingName, {
+      url,
+      pageUrl,
+      capturedAt: new Date().toISOString(),
+      transport,
+    });
+  }
+
+  function normalizeUrl(value, fallbackUrl) {
+    const rawUrl = typeof value === "string" ? value : "";
+
+    if (rawUrl.length === 0) {
+      return fallbackUrl;
+    }
+
+    try {
+      return new URL(rawUrl, window.location.href).href;
+    } catch {
+      return fallbackUrl;
+    }
+  }
+
+  function inspectResponse(transport, url, pageUrl, contentType, readText) {
+    if (!shouldCapture(url, contentType)) {
+      return;
+    }
+
+    Promise.resolve()
+      .then(readText)
+      .then((bodyText) => {
+        if (typeof bodyText !== "string") {
+          reportParseFailure(transport, url, pageUrl);
+          return;
+        }
+
+        const bodies = parseFacebookJson(bodyText);
+
+        if (bodies.length === 0) {
+          reportParseFailure(transport, url, pageUrl);
+          return;
+        }
+
+        const capturedAt = new Date().toISOString();
+
+        for (const body of bodies) {
+          sendBridgeMessage(captureBindingName, {
+            url,
+            pageUrl,
+            body,
+            capturedAt,
+            transport,
+          });
+        }
+      })
+      .catch(() => {
+        reportParseFailure(transport, url, pageUrl);
+      });
+  }
+
+  function readFetchUrl(input, fallbackUrl) {
+    if (typeof input === "string") {
+      return normalizeUrl(input, fallbackUrl);
+    }
+
+    if (input !== undefined && input !== null && typeof input.url === "string") {
+      return normalizeUrl(input.url, fallbackUrl);
+    }
+
+    return fallbackUrl;
+  }
+
+  if (typeof window.fetch === "function") {
+    const originalFetch = window.fetch;
+
+    window.fetch = function fgcFacebookPayloadCaptureFetch(input, init) {
+      return originalFetch.apply(this, arguments).then((response) => {
+        try {
+          const responseUrl =
+            response !== undefined && typeof response.url === "string"
+              ? response.url
+              : window.location.href;
+          const url = readFetchUrl(input, responseUrl);
+          const contentType =
+            response !== undefined &&
+            response.headers !== undefined &&
+            typeof response.headers.get === "function"
+              ? response.headers.get("content-type") ?? ""
+              : "";
+
+          if (response !== undefined && typeof response.clone === "function") {
+            inspectResponse("fetch", url, window.location.href, contentType, () =>
+              response.clone().text(),
+            );
+          }
+        } catch {}
+
+        return response;
+      });
+    };
+  }
+
+  if (
+    typeof XMLHttpRequest !== "undefined" &&
+    XMLHttpRequest.prototype !== undefined
+  ) {
+    const originalOpen = XMLHttpRequest.prototype.open;
+    const originalSend = XMLHttpRequest.prototype.send;
+
+    XMLHttpRequest.prototype.open = function fgcFacebookPayloadCaptureOpen(
+      method,
+      url,
+    ) {
+      try {
+        this.__fgcFacebookPayloadCaptureUrl = normalizeUrl(
+          typeof url === "string" ? url : String(url),
+          window.location.href,
+        );
+      } catch {}
+
+      return originalOpen.apply(this, arguments);
+    };
+
+    XMLHttpRequest.prototype.send = function fgcFacebookPayloadCaptureSend() {
+      try {
+        this.addEventListener(
+          "load",
+          () => {
+            const storedUrl =
+              typeof this.__fgcFacebookPayloadCaptureUrl === "string"
+                ? this.__fgcFacebookPayloadCaptureUrl
+                : window.location.href;
+            const url = normalizeUrl(
+              typeof this.responseURL === "string" && this.responseURL.length > 0
+                ? this.responseURL
+                : storedUrl,
+              storedUrl,
+            );
+            const contentType =
+              typeof this.getResponseHeader === "function"
+                ? this.getResponseHeader("content-type") ?? ""
+                : "";
+
+            if (!shouldCapture(url, contentType)) {
+              return;
+            }
+
+            let responseText = "";
+
+            try {
+              responseText =
+                typeof this.responseText === "string" ? this.responseText : "";
+            } catch {
+              reportParseFailure("xhr", url, window.location.href);
+              return;
+            }
+
+            inspectResponse("xhr", url, window.location.href, contentType, () =>
+              responseText,
+            );
+          },
+          { once: true },
+        );
+      } catch {}
+
+      return originalSend.apply(this, arguments);
+    };
+  }
+})();
+`;
 }
 
 async function scrollFacebookGroupPage(

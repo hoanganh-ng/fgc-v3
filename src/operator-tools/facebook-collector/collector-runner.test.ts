@@ -79,6 +79,15 @@ describe("runFacebookCollectorCommand", () => {
     const output = logger.messages.join("\n");
 
     expect(output).toContain("GraphQL responses captured: 1");
+    expect(output).toContain("Page-context fetch captures: 1");
+    expect(output).toContain("Page-context XHR captures: 1");
+    expect(output).toContain("Network listener captures: 1");
+    expect(output).toContain("Capture parse failures: 1");
+    expect(output).toContain("Payloads passed to extractor: 1");
+    expect(output).toContain(
+      "Final page URL: https://www.facebook.com/groups/group-1",
+    );
+    expect(output).toContain("Login redirect suspected: no");
     expect(output).toContain("Extractor candidates produced: 2");
     expect(output).toContain("Content items submitted: 2");
     expect(output).not.toContain("rawGraphQLPayload");
@@ -394,6 +403,15 @@ class FakeCapturePort implements FacebookGroupPayloadCapturePort {
           message: "Capture settled before timeout.",
         },
       ],
+      diagnostics: {
+        pageContextFetchCaptureCount: 1,
+        pageContextXhrCaptureCount: 1,
+        networkListenerCaptureCount: 1,
+        parseFailureCount: 1,
+        totalPayloadsPassedToExtractor: 1,
+        finalPageUrl: "https://www.facebook.com/groups/group-1",
+        loginRedirectSuspected: false,
+      },
     };
   }
 }

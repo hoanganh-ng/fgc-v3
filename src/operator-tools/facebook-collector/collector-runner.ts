@@ -57,6 +57,13 @@ export interface FacebookCollectorCommandResult {
   readonly sourceGroupId: string;
   readonly leaseReleased: boolean;
   readonly capturedGraphQLResponseCount: number;
+  readonly pageContextFetchCaptureCount: number;
+  readonly pageContextXhrCaptureCount: number;
+  readonly networkListenerCaptureCount: number;
+  readonly captureParseFailureCount: number;
+  readonly totalPayloadsPassedToExtractor: number;
+  readonly finalPageUrl?: string;
+  readonly loginRedirectSuspected: boolean;
   readonly extractedCandidateCount: number;
   readonly submittedContentItemCount: number;
   readonly failedSubmissionCount: number;
@@ -334,11 +341,27 @@ function toCommandResult(
   result: RunFacebookGroupCollectionResult,
   durationMs: number,
 ): FacebookCollectorCommandResult {
+  const captureDiagnostics = result.captureDiagnostics;
+
   return {
     ok: result.ok,
     sourceGroupId,
     leaseReleased: result.leaseReleased,
     capturedGraphQLResponseCount: result.capturedPayloadCount,
+    pageContextFetchCaptureCount:
+      captureDiagnostics?.pageContextFetchCaptureCount ?? 0,
+    pageContextXhrCaptureCount:
+      captureDiagnostics?.pageContextXhrCaptureCount ?? 0,
+    networkListenerCaptureCount:
+      captureDiagnostics?.networkListenerCaptureCount ?? 0,
+    captureParseFailureCount: captureDiagnostics?.parseFailureCount ?? 0,
+    totalPayloadsPassedToExtractor:
+      captureDiagnostics?.totalPayloadsPassedToExtractor ??
+      result.capturedPayloadCount,
+    ...(captureDiagnostics?.finalPageUrl !== undefined
+      ? { finalPageUrl: captureDiagnostics.finalPageUrl }
+      : {}),
+    loginRedirectSuspected: captureDiagnostics?.loginRedirectSuspected ?? false,
     extractedCandidateCount: result.extractedCandidateCount,
     submittedContentItemCount: result.submittedCount,
     failedSubmissionCount: result.failedSubmissionCount,
@@ -363,6 +386,12 @@ function createFailureCommandResult(
     sourceGroupId,
     leaseReleased: false,
     capturedGraphQLResponseCount: 0,
+    pageContextFetchCaptureCount: 0,
+    pageContextXhrCaptureCount: 0,
+    networkListenerCaptureCount: 0,
+    captureParseFailureCount: 0,
+    totalPayloadsPassedToExtractor: 0,
+    loginRedirectSuspected: false,
     extractedCandidateCount: 0,
     submittedContentItemCount: 0,
     failedSubmissionCount: 0,
@@ -454,6 +483,21 @@ function logSafeSummary(
   logger.info(`- Lease released: ${result.leaseReleased ? "yes" : "no"}`);
   logger.info(
     `- GraphQL responses captured: ${result.capturedGraphQLResponseCount}`,
+  );
+  logger.info(
+    `- Page-context fetch captures: ${result.pageContextFetchCaptureCount}`,
+  );
+  logger.info(`- Page-context XHR captures: ${result.pageContextXhrCaptureCount}`);
+  logger.info(`- Network listener captures: ${result.networkListenerCaptureCount}`);
+  logger.info(`- Capture parse failures: ${result.captureParseFailureCount}`);
+  logger.info(
+    `- Payloads passed to extractor: ${result.totalPayloadsPassedToExtractor}`,
+  );
+  logger.info(`- Final page URL: ${result.finalPageUrl ?? "unavailable"}`);
+  logger.info(
+    `- Login redirect suspected: ${
+      result.loginRedirectSuspected ? "yes" : "no"
+    }`,
   );
   logger.info(`- Extractor candidates produced: ${result.extractedCandidateCount}`);
   logger.info(`- Content items submitted: ${result.submittedContentItemCount}`);

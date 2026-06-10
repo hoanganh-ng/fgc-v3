@@ -89,6 +89,16 @@ export interface CapturedFacebookPayload {
   readonly sourceUrlHint?: string;
 }
 
+export interface FacebookPayloadCaptureDiagnostics {
+  readonly pageContextFetchCaptureCount: number;
+  readonly pageContextXhrCaptureCount: number;
+  readonly networkListenerCaptureCount: number;
+  readonly parseFailureCount: number;
+  readonly totalPayloadsPassedToExtractor: number;
+  readonly finalPageUrl?: string;
+  readonly loginRedirectSuspected: boolean;
+}
+
 export interface FacebookGroupPayloadCaptureInput {
   readonly sourceGroupId: string;
   readonly sourceGroupUrl: string;
@@ -101,12 +111,14 @@ export type FacebookPayloadCaptureResult =
       readonly ok: true;
       readonly capturedPayloads: readonly CapturedFacebookPayload[];
       readonly warnings: readonly CollectorRuntimeWarning[];
+      readonly diagnostics?: FacebookPayloadCaptureDiagnostics;
     }
   | {
       readonly ok: false;
       readonly errorCode: string;
       readonly errorMessage: string;
       readonly warnings: readonly CollectorRuntimeWarning[];
+      readonly diagnostics?: FacebookPayloadCaptureDiagnostics;
     };
 
 export interface FacebookGroupPayloadCapturePort {

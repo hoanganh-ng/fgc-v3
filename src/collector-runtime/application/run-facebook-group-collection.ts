@@ -10,6 +10,7 @@ import type {
   CapturedFacebookPayloadSubmissionUseCase,
   CollectorRuntimeWarning,
   FacebookGroupPayloadCapturePort,
+  FacebookPayloadCaptureDiagnostics,
   FacebookPayloadCaptureResult,
   ProfileCheckoutResult,
   ProfileLeasePort,
@@ -59,6 +60,7 @@ export interface RunFacebookGroupCollectionResult {
   readonly profileId?: string;
   readonly leaseId?: string;
   readonly capturedPayloadCount: number;
+  readonly captureDiagnostics?: FacebookPayloadCaptureDiagnostics;
   readonly extractedCandidateCount: number;
   readonly submittedCount: number;
   readonly failedSubmissionCount: number;
@@ -79,6 +81,7 @@ interface CollectionAccumulator {
   readonly profileId: string;
   readonly leaseId: string;
   capturedPayloadCount: number;
+  captureDiagnostics?: FacebookPayloadCaptureDiagnostics;
   extractedCandidateCount: number;
   submittedCount: number;
   failedSubmissionCount: number;
@@ -133,6 +136,9 @@ export class RunFacebookGroupCollectionUseCase {
     const captureResult = await this.capturePayloads(input, checkoutResult);
 
     if (!captureResult.ok) {
+      if (captureResult.diagnostics !== undefined) {
+        accumulator.captureDiagnostics = captureResult.diagnostics;
+      }
       accumulator.warnings.push(
         ...captureResult.warnings.map((warning) =>
           toCollectionWarning("PAYLOAD_CAPTURE", warning),
@@ -152,6 +158,9 @@ export class RunFacebookGroupCollectionUseCase {
     }
 
     accumulator.capturedPayloadCount = captureResult.capturedPayloads.length;
+    if (captureResult.diagnostics !== undefined) {
+      accumulator.captureDiagnostics = captureResult.diagnostics;
+    }
     accumulator.warnings.push(
       ...captureResult.warnings.map((warning) =>
         toCollectionWarning("PAYLOAD_CAPTURE", warning),
@@ -453,6 +462,9 @@ function toCollectionResult(
     profileId: accumulator.profileId,
     leaseId: accumulator.leaseId,
     capturedPayloadCount: accumulator.capturedPayloadCount,
+    ...(accumulator.captureDiagnostics !== undefined
+      ? { captureDiagnostics: accumulator.captureDiagnostics }
+      : {}),
     extractedCandidateCount: accumulator.extractedCandidateCount,
     submittedCount: accumulator.submittedCount,
     failedSubmissionCount: accumulator.failedSubmissionCount,

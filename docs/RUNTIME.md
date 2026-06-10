@@ -129,7 +129,7 @@ The CLI prints only operational progress and counts. It must not print cookies, 
 
 ## Manual Facebook Collector Command
 
-Sprint 032 added a manual/dev operator command for one Facebook group run using one existing `READY` profile. Sprint 034A makes `sourceGroupId` the normal source of truth for the group URL.
+Sprint 032 added a manual/dev operator command for one Facebook group run using one existing `READY` profile. Sprint 034A makes `sourceGroupId` the normal source of truth for the group URL. Sprint 034B adds page-context `fetch`/XHR capture while keeping the Playwright network listener as secondary diagnostics.
 
 Prerequisites:
 
@@ -141,7 +141,7 @@ Prerequisites:
 Run against the preview gateway:
 
 ```bash
-pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081 --max-scrolls 3 --max-duration-ms 30000
+pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081 --max-scrolls 8 --max-duration-ms 60000
 ```
 
 Use the preview gateway (`http://localhost:8081`) when running against the preview stack. This matches the Web UI entrypoint and lets Nginx proxy `/collector/*` to the API.
@@ -174,15 +174,23 @@ Expected operator flow:
 4. It fetches trusted runtime configuration from `GET /collector/profile-leases/:leaseId/runtime-configuration`.
 5. A headed Chromium browser opens with the profile cookies, localStorage, browser fingerprint, locale/language, timezone, viewport, and proxy settings where Playwright supports them.
 6. The browser visits the stored Facebook group URL, unless `--group-url` was provided as a development override.
-7. The adapter captures in-memory JSON responses whose URL contains `/api/graphql`.
-8. Captured payloads are passed to the existing Facebook GraphQL extractor.
-9. Normalized candidates are submitted to Content Manager through `POST /collector/content-items` using the same `sourceGroupId`.
-10. The profile lease is released even when capture, extraction, or submission fails.
+7. Before navigation, the adapter injects page-context instrumentation that patches `window.fetch` and XHR to capture parsed JSON response bodies from `/api/graphql`, `/graphql`, `/ajax/`, and JSON content-type responses.
+8. The existing Playwright network response listener remains enabled as secondary capture and diagnostics.
+9. Captured page-context and network-listener payloads are deduplicated in memory and passed to the existing Facebook GraphQL extractor.
+10. Normalized candidates are submitted to Content Manager through `POST /collector/content-items` using the same `sourceGroupId`.
+11. The profile lease is released even when capture, extraction, or submission fails.
 
 The safe summary prints counts only:
 
 - Lease released yes/no.
 - GraphQL responses captured.
+- Page-context fetch captures.
+- Page-context XHR captures.
+- Network listener captures.
+- Capture parse failures.
+- Payloads passed to extractor.
+- Final page URL with query string and fragment removed.
+- Login redirect suspected yes/no.
 - Extractor candidates produced.
 - Content items submitted.
 - Failed submissions.
@@ -195,14 +203,16 @@ Current limitations:
 - One Facebook group URL.
 - One browser session.
 - No scheduler, queue, `collection_runs` table, multi-group run, multi-profile run, Web UI trigger, source group selection UI, or automatic group discovery.
-- Zero captured GraphQL responses or zero extracted candidates can happen if Facebook changes response shapes, the group is inaccessible, the page redirects to login, or no supported post payloads load during the stop window.
+- Zero page-context and network captures can happen if Facebook does not return matching JSON responses during the stop window, the group is inaccessible, the profile is redirected to login or checkpoint, the page has not loaded enough feed content, or Facebook changes response shapes.
+- Non-zero captures with zero extracted candidates means the collector saw JSON payloads, but the current extractor did not find supported post candidates in those payloads.
 - A profile shown as `READY` is not always checkout-eligible. Checkout can still be blocked by temporal routine windows, cooldowns, daily safety thresholds, or an existing lease/BUSY state.
 - `NO_ELIGIBLE_PROFILE_AVAILABLE` can also happen when the CLI `--base-url` points to a different API/database than the Web UI. For preview stack testing, prefer `--base-url http://localhost:8081`; use `--base-url http://localhost:3000` only for the direct API stack.
 
 Safety boundaries:
 
 - The command does not automate credentials, solve CAPTCHAs, use stealth plugins, bypass access controls, bypass rate limits, post, comment, like, or persist raw payloads.
-- Captured GraphQL responses stay in memory and are not written to disk.
+- Captured page-context and network-listener payloads stay in memory and are not written to disk.
+- Raw response bodies are parsed inside the browser page context or in memory for the network listener; raw payload text is not logged or persisted.
 - CLI output must not include cookies, localStorage, proxy credentials, raw GraphQL payloads, request or response headers, authorization/session headers, viewer/account identifiers, trusted runtime config, token material, or hashes.
 
 ## Migrations

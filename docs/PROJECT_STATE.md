@@ -8,17 +8,17 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, Start Provisioning UI was added in Sprint 029, the Profile Provisioning Browser CLI was added in Sprint 030, provisioning E2E verification and hardening was completed in Sprint 031, the Facebook Browser Payload Capture Adapter was added in Sprint 032, and Web UI content category/source group management was added in Sprint 033.
+The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, Start Provisioning UI was added in Sprint 029, the Profile Provisioning Browser CLI was added in Sprint 030, provisioning E2E verification and hardening was completed in Sprint 031, the Facebook Browser Payload Capture Adapter was added in Sprint 032, Web UI content category/source group management was added in Sprint 033, and Collector CLI source group resolution and checkout diagnostics were added in Sprint 034A.
 
-The next active work is Collector CLI source group resolution and checkout diagnostics. It makes `sourceGroupId` the primary manual Facebook collector input, resolves the stored Facebook source URL from Content Manager, and improves safe checkout troubleshooting output.
+The next active work is page-context Facebook fetch/XHR capture. It adapts the proven page-context `fetch` and `XMLHttpRequest` capture strategy into the Playwright collector while keeping the existing network listener as secondary diagnostics.
 
 ## Current Sprint
 
-Sprint 034A: Collector CLI Source Group Resolution + Checkout Diagnostics
+Sprint 034B: Page-Context Facebook Fetch/XHR Capture
 
-Active sprint file: `docs/SPRINTS/SPRINT-034A-collector-cli-source-group-resolution-checkout-diagnostics.md`
+Active sprint file: `docs/SPRINTS/SPRINT-034B-page-context-facebook-fetch-xhr-capture.md`
 
-Sprint 034A updates the manual Facebook collector CLI so `--source-group-id` is the normal required input and the group URL is resolved from Content Manager before browser launch. It may add a safe source group read endpoint or an adapter-level list-and-find fallback, validation for platform/status/source URL, safe checkout failure hints for `NO_ELIGIBLE_PROFILE_AVAILABLE`, optional safe checkout diagnostics, and operator documentation. No scheduler, worker process, collection run storage, Web UI Run Now button, advanced eligibility API, retries, multi-group or multi-profile collection, stealth plugins, CAPTCHA solving, rate-limit bypass, access-control bypass, or raw payload persistence should happen in this sprint.
+Sprint 034B updates the Playwright Facebook browser payload capture adapter to inject page-context `fetch` and XHR instrumentation before navigation, parse safe JSON response bodies in memory, combine page-context payloads with the existing network listener using local deduplication, and report safe diagnostic counts. No scheduler, worker process, collection run storage, Web UI Run Now button, multi-source collection, advanced feed heuristics, comment expansion, stealth plugins, CAPTCHA solving, credential automation, rate-limit bypass, access-control bypass, posting/commenting/liking, or raw payload persistence should happen in this sprint.
 
 ## Decided Items
 
@@ -71,6 +71,7 @@ Sprint 034A updates the manual Facebook collector CLI so `--source-group-id` is 
 - Sprint 032 adds the first manual/dev Facebook browser payload capture adapter under Collector Runtime infrastructure/adapters or operator tooling, reusing existing runtime orchestration, extractor, and HTTP clients.
 - Sprint 033 adds Web UI management for Content Manager content categories and Facebook source groups, including creation, listing, source group ID copy support, and source group status updates.
 - Sprint 034A makes `sourceGroupId` the primary manual Facebook collector CLI input, resolves the source URL from Content Manager, and improves safe checkout diagnostics.
+- Sprint 034B adapts page-context Facebook `fetch` and XHR capture into the Playwright collector, keeps network response capture as secondary diagnostics, and reports safe capture counters without logging or persisting raw payloads.
 - Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
 - Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.
 - The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.
