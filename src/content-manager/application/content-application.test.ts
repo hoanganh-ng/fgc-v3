@@ -6,6 +6,7 @@ import {
   CreateContentCategoryUseCase,
   CreateSourceGroupUseCase,
   GetContentItemUseCase,
+  GetSourceGroupUseCase,
   IngestCollectedContentUseCase,
   InvalidContentStatusTransitionError,
   ListContentCategoriesUseCase,
@@ -182,6 +183,29 @@ describe("content manager application use cases", () => {
     await expect(context.sourceGroups.findById("source-group-1")).resolves.toEqual(
       sourceGroup,
     );
+  });
+
+  it("gets a source group by id", async () => {
+    const context = createTestContext();
+
+    const seededSourceGroup = await seedSourceGroup(context);
+    const sourceGroup = await new GetSourceGroupUseCase(
+      context.sourceGroups,
+    ).execute({
+      sourceGroupId: "source-group-1",
+    });
+
+    expect(sourceGroup).toEqual(seededSourceGroup);
+  });
+
+  it("rejects missing source group reads", async () => {
+    const context = createTestContext();
+
+    await expect(
+      new GetSourceGroupUseCase(context.sourceGroups).execute({
+        sourceGroupId: "source-group-missing",
+      }),
+    ).rejects.toThrow(SourceGroupNotFoundError);
   });
 
   it("creates a new COLLECTED content item from normalized input", async () => {

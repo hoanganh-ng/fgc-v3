@@ -355,6 +355,60 @@ describe("ProfileManagerHttpClient", () => {
       ok: false,
       errorCode: "PROFILE_MANAGER_NETWORK_ERROR",
       errorMessage: "runtime config fetch failed",
+      });
+  });
+
+  it("gets safe aggregate profile status counts for checkout diagnostics", async () => {
+    const fetch = new FakeFetch(
+      createProfileListResponse(7),
+      createProfileListResponse(2),
+      createProfileListResponse(1),
+      createProfileListResponse(3),
+      createProfileListResponse(1),
+    );
+    const client = createClient(fetch.fetch);
+
+    await expect(client.getSafeProfileStatusCounts()).resolves.toEqual({
+      ok: true,
+      counts: {
+        total: 7,
+        READY: 2,
+        BUSY: 1,
+        PENDING_LOGIN: 3,
+        PENDING_CONFIG: 1,
+      },
+    });
+    expect(fetch.calls.map((call) => call.input)).toEqual([
+      "https://profile-manager.test/collector/profiles?limit=1&offset=0",
+      "https://profile-manager.test/collector/profiles?status=READY&limit=1&offset=0",
+      "https://profile-manager.test/collector/profiles?status=BUSY&limit=1&offset=0",
+      "https://profile-manager.test/collector/profiles?status=PENDING_LOGIN&limit=1&offset=0",
+      "https://profile-manager.test/collector/profiles?status=PENDING_CONFIG&limit=1&offset=0",
+    ]);
+    expect(fetch.calls[0]?.init).toMatchObject({
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+    });
+  });
+
+  it("maps safe checkout diagnostic failures without exposing profile details", async () => {
+    const fetch = new FakeFetch(
+      createErrorResponse(
+        503,
+        "INTERNAL_SERVER_ERROR",
+        "Profile Manager is unavailable.",
+      ),
+    );
+    const client = createClient(fetch.fetch);
+
+    await expect(client.getSafeProfileStatusCounts()).resolves.toEqual({
+      ok: false,
+      statusCode: 503,
+      errorCode: "INTERNAL_SERVER_ERROR",
+      errorMessage: "Profile Manager is unavailable.",
     });
   });
 
@@ -663,6 +717,40 @@ function createRuntimeConfigurationResponse(): FetchLikeResponse {
     },
     contentAffinities: {
       primaryTopics: ["travel"],
+    },
+  });
+}
+
+function createProfileListResponse(total: number): FetchLikeResponse {
+  return createResponse(200, {
+    items:
+      total > 0
+        ? [
+            {
+              id: "profile-summary",
+              displayName: "Profile Summary",
+              status: "READY",
+              timezone: "America/Los_Angeles",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+              lastCheckoutAt: null,
+              lastReleasedAt: null,
+              nextAvailableAt: null,
+              dailyUsage: {
+                localDate: null,
+                sessionsStarted: 0,
+                activeDurationMinutes: 0,
+                macroActions: 0,
+              },
+              hasHardwareFingerprint: true,
+              hasAuthenticationState: true,
+            },
+          ]
+        : [],
+    page: {
+      limit: 1,
+      offset: 0,
+      total,
     },
   });
 }

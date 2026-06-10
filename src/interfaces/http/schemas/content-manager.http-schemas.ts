@@ -565,6 +565,22 @@ export const listSourceGroupsHttpRouteSchema = {
   },
 } as const;
 
+export const getSourceGroupHttpRouteSchema = {
+  params: sourceGroupIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["sourceGroup"],
+      additionalProperties: false,
+      properties: {
+        sourceGroup: sourceGroupJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
 export const updateSourceGroupStatusHttpRouteSchema = {
   params: sourceGroupIdParamsJsonSchema,
   body: sourceGroupStatusBodyJsonSchema,

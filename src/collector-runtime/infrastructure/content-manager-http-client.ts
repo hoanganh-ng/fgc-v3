@@ -7,6 +7,10 @@ import type {
 } from "../application";
 
 const CONTENT_ITEMS_PATH = "collector/content-items";
+const SOURCE_GROUPS_PATH = "collector/source-groups";
+const CONTENT_MANAGER_HTTP_ERROR = "CONTENT_MANAGER_HTTP_ERROR";
+const CONTENT_MANAGER_NETWORK_ERROR = "CONTENT_MANAGER_NETWORK_ERROR";
+const CONTENT_MANAGER_RESPONSE_ERROR = "CONTENT_MANAGER_RESPONSE_ERROR";
 
 export interface ContentManagerHttpClientEnvironment {
   readonly CONTENT_MANAGER_BASE_URL?: string;
@@ -61,6 +65,32 @@ export interface ContentManagerHttpClientOptions {
   readonly fetchImplementation?: FetchLike;
 }
 
+export interface ContentManagerSourceGroup {
+  readonly id: string;
+  readonly platform: string;
+  readonly status: string;
+  readonly url: string;
+}
+
+export type ContentManagerSourceGroupLookupResult =
+  | {
+      readonly ok: true;
+      readonly statusCode: number;
+      readonly sourceGroup: ContentManagerSourceGroup;
+    }
+  | {
+      readonly ok: false;
+      readonly statusCode?: number;
+      readonly errorCode: string;
+      readonly errorMessage: string;
+    };
+
+interface ContentManagerHttpFailure {
+  readonly statusCode: number;
+  readonly errorCode: string;
+  readonly errorMessage: string;
+}
+
 export class ContentManagerHttpClient
   implements ContentManagerContentSubmissionPort {
   private readonly baseUrl: string;
@@ -110,7 +140,50 @@ export class ContentManagerHttpClient
     } catch (error) {
       return {
         ok: false,
-        errorCode: "CONTENT_MANAGER_NETWORK_ERROR",
+        errorCode: CONTENT_MANAGER_NETWORK_ERROR,
+        errorMessage: errorToMessage(error),
+      };
+    }
+  }
+
+  public async getSourceGroup(
+    sourceGroupId: string,
+  ): Promise<ContentManagerSourceGroupLookupResult> {
+    try {
+      const response = await this.fetchImplementation(
+        buildSourceGroupUrl(this.baseUrl, sourceGroupId),
+        {
+          method: "GET",
+          headers: jsonHeaders(),
+        },
+      );
+
+      if (!isSuccessStatusCode(response.status)) {
+        return toSourceGroupLookupFailure(await readHttpFailure(response));
+      }
+
+      const sourceGroup = toSourceGroupLookupResult(
+        await readJsonBody(response),
+      );
+
+      if (sourceGroup !== undefined) {
+        return {
+          ok: true,
+          statusCode: response.status,
+          sourceGroup,
+        };
+      }
+
+      return {
+        ok: false,
+        statusCode: response.status,
+        errorCode: CONTENT_MANAGER_RESPONSE_ERROR,
+        errorMessage: "Content Manager source group response is invalid.",
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        errorCode: CONTENT_MANAGER_NETWORK_ERROR,
         errorMessage: errorToMessage(error),
       };
     }
@@ -139,10 +212,28 @@ function createGlobalFetchAdapter(): FetchLike {
   };
 }
 
+function jsonHeaders(): Record<string, string> {
+  return {
+    accept: "application/json",
+    "content-type": "application/json",
+  };
+}
+
 function buildContentItemsUrl(baseUrl: string): string {
+  return buildUrl(baseUrl, CONTENT_ITEMS_PATH);
+}
+
+function buildSourceGroupUrl(baseUrl: string, sourceGroupId: string): string {
+  return buildUrl(
+    baseUrl,
+    `${SOURCE_GROUPS_PATH}/${encodeURIComponent(sourceGroupId)}`,
+  );
+}
+
+function buildUrl(baseUrl: string, path: string): string {
   const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
 
-  return new URL(CONTENT_ITEMS_PATH, normalizedBaseUrl).toString();
+  return new URL(path, normalizedBaseUrl).toString();
 }
 
 function isSuccessStatusCode(statusCode: number): boolean {
@@ -199,23 +290,15 @@ function toContentManagerTopCommentRequestBody(
 async function readContentItemId(
   response: FetchLikeResponse,
 ): Promise<string | undefined> {
-  if (response.json === undefined) {
+  const body = await readJsonBody(response);
+
+  if (!isRecord(body) || !isRecord(body.contentItem)) {
     return undefined;
   }
 
-  try {
-    const body = await response.json();
+  const id = body.contentItem.id;
 
-    if (!isRecord(body) || !isRecord(body.contentItem)) {
-      return undefined;
-    }
-
-    const id = body.contentItem.id;
-
-    return typeof id === "string" && id.trim().length > 0 ? id : undefined;
-  } catch {
-    return undefined;
-  }
+  return typeof id === "string" && id.trim().length > 0 ? id : undefined;
 }
 
 async function readFailureMessage(response: FetchLikeResponse): Promise<string> {
@@ -243,6 +326,115 @@ async function readFailureMessage(response: FetchLikeResponse): Promise<string> 
   } catch {
     return fallbackMessage;
   }
+}
+
+async function readHttpFailure(
+  response: FetchLikeResponse,
+): Promise<ContentManagerHttpFailure> {
+  const fallbackMessage = `Content Manager responded with HTTP ${response.status}.`;
+
+  try {
+    const responseText = (await response.text()).trim();
+
+    if (responseText.length === 0) {
+      return {
+        statusCode: response.status,
+        errorCode: CONTENT_MANAGER_HTTP_ERROR,
+        errorMessage: fallbackMessage,
+      };
+    }
+
+    const parsedBody: unknown = JSON.parse(responseText);
+
+    if (isRecord(parsedBody) && isRecord(parsedBody.error)) {
+      const errorCode = parsedBody.error.code;
+      const errorMessage = parsedBody.error.message;
+
+      return {
+        statusCode: response.status,
+        errorCode:
+          typeof errorCode === "string" && errorCode.trim().length > 0
+            ? errorCode
+            : CONTENT_MANAGER_HTTP_ERROR,
+        errorMessage:
+          typeof errorMessage === "string" && errorMessage.trim().length > 0
+            ? errorMessage
+            : fallbackMessage,
+      };
+    }
+
+    return {
+      statusCode: response.status,
+      errorCode: CONTENT_MANAGER_HTTP_ERROR,
+      errorMessage: responseText,
+    };
+  } catch {
+    return {
+      statusCode: response.status,
+      errorCode: CONTENT_MANAGER_HTTP_ERROR,
+      errorMessage: fallbackMessage,
+    };
+  }
+}
+
+async function readJsonBody(response: FetchLikeResponse): Promise<unknown> {
+  if (response.json !== undefined) {
+    try {
+      return await response.json();
+    } catch {
+      return undefined;
+    }
+  }
+
+  try {
+    return JSON.parse(await response.text());
+  } catch {
+    return undefined;
+  }
+}
+
+function toSourceGroupLookupResult(
+  body: unknown,
+): ContentManagerSourceGroup | undefined {
+  if (!isRecord(body) || !isRecord(body.sourceGroup)) {
+    return undefined;
+  }
+
+  const id = body.sourceGroup.id;
+  const platform = body.sourceGroup.platform;
+  const status = body.sourceGroup.status;
+  const url = body.sourceGroup.url;
+
+  if (
+    typeof id !== "string" ||
+    id.trim().length === 0 ||
+    typeof platform !== "string" ||
+    platform.trim().length === 0 ||
+    typeof status !== "string" ||
+    status.trim().length === 0 ||
+    typeof url !== "string" ||
+    url.trim().length === 0
+  ) {
+    return undefined;
+  }
+
+  return {
+    id,
+    platform,
+    status,
+    url,
+  };
+}
+
+function toSourceGroupLookupFailure(
+  failure: ContentManagerHttpFailure,
+): Extract<ContentManagerSourceGroupLookupResult, { readonly ok: false }> {
+  return {
+    ok: false,
+    statusCode: failure.statusCode,
+    errorCode: failure.errorCode,
+    errorMessage: failure.errorMessage,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

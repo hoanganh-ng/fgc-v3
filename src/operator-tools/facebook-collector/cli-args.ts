@@ -1,9 +1,10 @@
 export interface FacebookCollectorCliArgs {
-  readonly groupUrl: string;
+  readonly groupUrl?: string;
   readonly sourceGroupId: string;
   readonly baseUrl: string;
   readonly maxScrolls: number;
   readonly maxDurationMs: number;
+  readonly diagnoseCheckout: boolean;
 }
 
 export interface FacebookCollectorCliEnvironment {
@@ -41,6 +42,7 @@ export function parseFacebookCollectorCliArgs(
   let baseUrl: string | undefined;
   let maxScrolls: string | undefined;
   let maxDurationMs: string | undefined;
+  let diagnoseCheckout = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const rawArg = argv[index];
@@ -122,6 +124,17 @@ export function parseFacebookCollectorCliArgs(
       continue;
     }
 
+    if (rawArg === "--diagnose-checkout") {
+      if (diagnoseCheckout) {
+        throw new FacebookCollectorCliArgumentError(
+          "--diagnose-checkout can only be provided once.",
+        );
+      }
+
+      diagnoseCheckout = true;
+      continue;
+    }
+
     if (rawArg.startsWith("-")) {
       throw new FacebookCollectorCliArgumentError(`Unknown option ${rawArg}.`);
     }
@@ -131,13 +144,14 @@ export function parseFacebookCollectorCliArgs(
     );
   }
 
-  const normalizedGroupUrl = normalizeFacebookGroupUrl(groupUrl);
+  const normalizedGroupUrl =
+    groupUrl === undefined
+      ? undefined
+      : normalizeFacebookGroupUrl(groupUrl, "--group-url");
 
   return {
-    groupUrl: normalizedGroupUrl,
-    sourceGroupId: normalizeSourceGroupId(
-      sourceGroupId ?? deriveSourceGroupIdFromFacebookGroupUrl(normalizedGroupUrl),
-    ),
+    ...(normalizedGroupUrl !== undefined ? { groupUrl: normalizedGroupUrl } : {}),
+    sourceGroupId: normalizeSourceGroupId(sourceGroupId),
     baseUrl: normalizeBaseUrl(
       baseUrl ??
         environment.COLLECTOR_FACEBOOK_BASE_URL ??
@@ -155,25 +169,27 @@ export function parseFacebookCollectorCliArgs(
       "--max-duration-ms",
       DEFAULT_FACEBOOK_COLLECTOR_MAX_DURATION_MS,
     ),
+    diagnoseCheckout,
   };
 }
 
 export function getFacebookCollectorCliUsage(): string {
   return [
     "Usage:",
-    '  pnpm collector:facebook:run -- --group-url "https://www.facebook.com/groups/<group>" [--source-group-id <id>] [--base-url <url>] [--max-scrolls 3] [--max-duration-ms 30000]',
+    "  pnpm collector:facebook:run -- --source-group-id <source-group-id> [--base-url <url>] [--max-scrolls 3] [--max-duration-ms 30000] [--diagnose-checkout]",
     "",
     "Options:",
-    "  --group-url          Required Facebook group URL to open in the browser.",
-    "  --source-group-id    Content Manager source group id. If omitted, a dev-friendly id is derived from the group URL.",
+    "  --source-group-id    Required Content Manager source group id. The command resolves the stored Facebook group URL before launch.",
+    "  --group-url          Optional development override for the stored source group URL.",
     "  --base-url           API or gateway base URL for Profile Manager and Content Manager.",
     "  --max-scrolls        Maximum page scrolls before capture stops. Default: 3.",
     "  --max-duration-ms    Maximum browser capture duration in milliseconds. Default: 30000.",
+    "  --diagnose-checkout  Print safe aggregate profile status counts before checkout.",
     "",
     "Defaults:",
     "  --base-url uses COLLECTOR_FACEBOOK_BASE_URL, then PROFILE_MANAGER_BASE_URL, then CONTENT_MANAGER_BASE_URL, then http://localhost:3000.",
     "",
-    "The command checks out one READY profile, captures Facebook GraphQL JSON responses in memory, submits normalized candidates, releases the lease, and prints only safe counts.",
+    "The command resolves an ACTIVE Facebook source group, checks out one eligible READY profile, captures Facebook GraphQL JSON responses in memory, submits normalized candidates, releases the lease, and prints only safe counts.",
   ].join("\n");
 }
 
@@ -217,11 +233,14 @@ function assertOptionNotProvided(
   }
 }
 
-function normalizeFacebookGroupUrl(value: string | undefined): string {
+export function normalizeFacebookGroupUrl(
+  value: string | undefined,
+  valueName = "--group-url",
+): string {
   const normalizedValue = value?.trim();
 
   if (normalizedValue === undefined || normalizedValue.length === 0) {
-    throw new FacebookCollectorCliArgumentError("--group-url is required.");
+    throw new FacebookCollectorCliArgumentError(`${valueName} is required.`);
   }
 
   let parsedUrl: URL;
@@ -230,38 +249,44 @@ function normalizeFacebookGroupUrl(value: string | undefined): string {
     parsedUrl = new URL(normalizedValue);
   } catch {
     throw new FacebookCollectorCliArgumentError(
-      "--group-url must be a valid Facebook group URL.",
+      `${valueName} must be a valid Facebook group URL.`,
     );
   }
 
   if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
     throw new FacebookCollectorCliArgumentError(
-      "--group-url must use http or https.",
+      `${valueName} must use http or https.`,
     );
   }
 
   if (parsedUrl.username.length > 0 || parsedUrl.password.length > 0) {
     throw new FacebookCollectorCliArgumentError(
-      "--group-url must not contain embedded credentials.",
+      `${valueName} must not contain embedded credentials.`,
     );
   }
 
   if (!isFacebookHost(parsedUrl.hostname)) {
     throw new FacebookCollectorCliArgumentError(
-      "--group-url must point to facebook.com.",
+      `${valueName} must point to facebook.com.`,
     );
   }
 
   if (!parsedUrl.pathname.toLowerCase().includes("/groups/")) {
     throw new FacebookCollectorCliArgumentError(
-      "--group-url must point to a Facebook group.",
+      `${valueName} must point to a Facebook group.`,
     );
   }
 
   return normalizedValue;
 }
 
-function normalizeSourceGroupId(value: string): string {
+function normalizeSourceGroupId(value: string | undefined): string {
+  if (value === undefined) {
+    throw new FacebookCollectorCliArgumentError(
+      "--source-group-id is required.",
+    );
+  }
+
   const normalizedValue = value.trim();
 
   if (normalizedValue.length === 0) {
@@ -345,28 +370,6 @@ function normalizePositiveIntegerOption(
   }
 
   return parsedValue;
-}
-
-function deriveSourceGroupIdFromFacebookGroupUrl(groupUrl: string): string {
-  const parsedUrl = new URL(groupUrl);
-  const groupSegmentIndex = parsedUrl.pathname
-    .toLowerCase()
-    .split("/")
-    .findIndex((segment) => segment === "groups");
-  const rawGroupSegment =
-    groupSegmentIndex >= 0
-      ? parsedUrl.pathname.split("/")[groupSegmentIndex + 1]
-      : undefined;
-  const decodedGroupSegment =
-    rawGroupSegment !== undefined && rawGroupSegment.length > 0
-      ? decodeURIComponent(rawGroupSegment)
-      : "group";
-  const slug = decodedGroupSegment
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return `facebook-group-${slug.length > 0 ? slug : "group"}`;
 }
 
 function isFacebookHost(hostname: string): boolean {

@@ -8,6 +8,7 @@ export * from "./ports/source-group-repository.port";
 export * from "./use-cases/create-content-category.use-case";
 export * from "./use-cases/create-source-group.use-case";
 export * from "./use-cases/get-content-item.use-case";
+export * from "./use-cases/get-source-group.use-case";
 export * from "./use-cases/ingest-collected-content.use-case";
 export * from "./use-cases/list-content-categories.use-case";
 export * from "./use-cases/list-content-items.use-case";

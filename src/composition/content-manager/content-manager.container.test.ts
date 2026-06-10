@@ -3,6 +3,7 @@ import {
   CreateContentCategoryUseCase,
   CreateSourceGroupUseCase,
   GetContentItemUseCase,
+  GetSourceGroupUseCase,
   IngestCollectedContentUseCase,
   ListContentCategoriesUseCase,
   ListContentItemsUseCase,
@@ -67,6 +68,7 @@ function expectContentManagerServices(services: {
   readonly createContentCategory: unknown;
   readonly listContentCategories: unknown;
   readonly createSourceGroup: unknown;
+  readonly getSourceGroup: unknown;
   readonly updateSourceGroupStatus: unknown;
   readonly listSourceGroups: unknown;
   readonly ingestCollectedContent: unknown;
@@ -81,6 +83,7 @@ function expectContentManagerServices(services: {
     ListContentCategoriesUseCase,
   );
   expect(services.createSourceGroup).toBeInstanceOf(CreateSourceGroupUseCase);
+  expect(services.getSourceGroup).toBeInstanceOf(GetSourceGroupUseCase);
   expect(services.updateSourceGroupStatus).toBeInstanceOf(
     UpdateSourceGroupStatusUseCase,
   );

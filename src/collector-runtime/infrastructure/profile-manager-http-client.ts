@@ -13,9 +13,16 @@ import type {
 } from "./content-manager-http-client";
 
 const CHECKOUT_PROFILE_PATH = "collector/profiles/checkout";
+const PROFILES_PATH = "collector/profiles";
 const PROFILE_MANAGER_HTTP_ERROR = "PROFILE_MANAGER_HTTP_ERROR";
 const PROFILE_MANAGER_NETWORK_ERROR = "PROFILE_MANAGER_NETWORK_ERROR";
 const PROFILE_MANAGER_RESPONSE_ERROR = "PROFILE_MANAGER_RESPONSE_ERROR";
+const DIAGNOSTIC_PROFILE_STATUSES = [
+  "READY",
+  "BUSY",
+  "PENDING_LOGIN",
+  "PENDING_CONFIG",
+] as const;
 
 export interface ProfileManagerHttpClientEnvironment {
   readonly PROFILE_MANAGER_BASE_URL?: string;
@@ -52,6 +59,26 @@ export function loadProfileManagerHttpClientConfig(
 export interface ProfileManagerHttpClientOptions {
   readonly fetchImplementation?: FetchLike;
 }
+
+export interface SafeProfileStatusCounts {
+  readonly total: number;
+  readonly READY: number;
+  readonly BUSY: number;
+  readonly PENDING_LOGIN: number;
+  readonly PENDING_CONFIG: number;
+}
+
+export type SafeProfileStatusCountsResult =
+  | {
+      readonly ok: true;
+      readonly counts: SafeProfileStatusCounts;
+    }
+  | {
+      readonly ok: false;
+      readonly statusCode?: number;
+      readonly errorCode: string;
+      readonly errorMessage: string;
+    };
 
 interface HttpFailure {
   readonly statusCode: number;
@@ -191,6 +218,91 @@ export class ProfileManagerHttpClient
       };
     }
   }
+
+  public async getSafeProfileStatusCounts(): Promise<SafeProfileStatusCountsResult> {
+    const totalResult = await this.readSafeProfileCount();
+
+    if (!totalResult.ok) {
+      return totalResult;
+    }
+
+    const statusCounts: Partial<Record<
+      (typeof DIAGNOSTIC_PROFILE_STATUSES)[number],
+      number
+    >> = {};
+
+    for (const status of DIAGNOSTIC_PROFILE_STATUSES) {
+      const statusCountResult = await this.readSafeProfileCount(status);
+
+      if (!statusCountResult.ok) {
+        return statusCountResult;
+      }
+
+      statusCounts[status] = statusCountResult.count;
+    }
+
+    return {
+      ok: true,
+      counts: {
+        total: totalResult.count,
+        READY: statusCounts.READY ?? 0,
+        BUSY: statusCounts.BUSY ?? 0,
+        PENDING_LOGIN: statusCounts.PENDING_LOGIN ?? 0,
+        PENDING_CONFIG: statusCounts.PENDING_CONFIG ?? 0,
+      },
+    };
+  }
+
+  private async readSafeProfileCount(
+    status?: (typeof DIAGNOSTIC_PROFILE_STATUSES)[number],
+  ): Promise<
+    | {
+        readonly ok: true;
+        readonly count: number;
+      }
+    | {
+        readonly ok: false;
+        readonly statusCode?: number;
+        readonly errorCode: string;
+        readonly errorMessage: string;
+      }
+  > {
+    try {
+      const response = await this.fetchImplementation(
+        buildProfilesUrl(this.baseUrl, status),
+        {
+          method: "GET",
+          headers: jsonHeaders(),
+        },
+      );
+
+      if (!isSuccessStatusCode(response.status)) {
+        return toSafeProfileStatusCountsFailure(await readHttpFailure(response));
+      }
+
+      const count = toProfileListCount(await readJsonBody(response));
+
+      if (count !== undefined) {
+        return {
+          ok: true,
+          count,
+        };
+      }
+
+      return {
+        ok: false,
+        statusCode: response.status,
+        errorCode: PROFILE_MANAGER_RESPONSE_ERROR,
+        errorMessage: "Profile Manager profile list response is invalid.",
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        errorCode: PROFILE_MANAGER_NETWORK_ERROR,
+        errorMessage: errorToProfileManagerMessage(error),
+      };
+    }
+  }
 }
 
 export function createProfileManagerHttpClientFromEnv(
@@ -224,6 +336,22 @@ function jsonHeaders(): Record<string, string> {
 
 function buildCheckoutProfileUrl(baseUrl: string): string {
   return buildUrl(baseUrl, CHECKOUT_PROFILE_PATH);
+}
+
+function buildProfilesUrl(
+  baseUrl: string,
+  status?: (typeof DIAGNOSTIC_PROFILE_STATUSES)[number],
+): string {
+  const url = new URL(buildUrl(baseUrl, PROFILES_PATH));
+
+  if (status !== undefined) {
+    url.searchParams.set("status", status);
+  }
+
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("offset", "0");
+
+  return url.toString();
 }
 
 function buildReleaseProfileLeaseUrl(baseUrl: string, leaseId: string): string {
@@ -361,6 +489,31 @@ function toRuntimeProfileConfigurationSuccessResult(
         ? { contentAffinities: body.contentAffinities }
         : {}),
     },
+  };
+}
+
+function toProfileListCount(body: unknown): number | undefined {
+  if (!isRecord(body) || !Array.isArray(body.items) || !isRecord(body.page)) {
+    return undefined;
+  }
+
+  const total = body.page.total;
+
+  if (typeof total === "number" && Number.isInteger(total) && total >= 0) {
+    return total;
+  }
+
+  return body.items.length;
+}
+
+function toSafeProfileStatusCountsFailure(
+  failure: HttpFailure,
+): Extract<SafeProfileStatusCountsResult, { readonly ok: false }> {
+  return {
+    ok: false,
+    statusCode: failure.statusCode,
+    errorCode: failure.errorCode,
+    errorMessage: failure.errorMessage,
   };
 }
 

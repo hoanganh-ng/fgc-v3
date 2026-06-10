@@ -3,6 +3,7 @@ import type {
   CreateContentCategoryInput,
   CreateSourceGroupInput,
   GetContentItemInput,
+  GetSourceGroupInput,
   ListContentItemsInput,
   ListContentItemsOutput,
   ListSourceGroupsInput,
@@ -36,6 +37,7 @@ import {
   createContentCategoryHttpRouteSchema,
   createSourceGroupHttpRouteSchema,
   getContentItemHttpRouteSchema,
+  getSourceGroupHttpRouteSchema,
   ingestCollectedContentHttpRouteSchema,
   listContentCategoriesHttpRouteSchema,
   listContentItemsHttpRouteSchema,
@@ -65,6 +67,7 @@ export interface ContentManagerHttpService {
     CreateSourceGroupInput,
     SourceGroup
   >;
+  readonly getSourceGroup: ExecutableUseCase<GetSourceGroupInput, SourceGroup>;
   readonly updateSourceGroupStatus: ExecutableUseCase<
     UpdateSourceGroupStatusInput,
     SourceGroup
@@ -238,6 +241,24 @@ export function registerContentManagerRoutes(
       return {
         items: output.items.map(toSourceGroupDto),
         page: output.page,
+      };
+    },
+  );
+
+  server.get(
+    "/collector/source-groups/:sourceGroupId",
+    { schema: getSourceGroupHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        SourceGroupIdHttpParamsSchema,
+        request.params,
+      );
+      const sourceGroup = await contentManager.getSourceGroup.execute({
+        sourceGroupId: params.sourceGroupId,
+      });
+
+      return {
+        sourceGroup: toSourceGroupDto(sourceGroup),
       };
     },
   );

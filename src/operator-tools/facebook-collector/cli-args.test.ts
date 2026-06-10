@@ -13,8 +13,6 @@ describe("parseFacebookCollectorCliArgs", () => {
   it("parses explicit operator options", () => {
     expect(
       parseFacebookCollectorCliArgs([
-        "--group-url",
-        " https://www.facebook.com/groups/my-group ",
         "--source-group-id",
         " source-group-1 ",
         "--base-url",
@@ -23,36 +21,39 @@ describe("parseFacebookCollectorCliArgs", () => {
         "5",
         "--max-duration-ms",
         "45000",
+        "--diagnose-checkout",
       ]),
     ).toEqual({
-      groupUrl: "https://www.facebook.com/groups/my-group",
       sourceGroupId: "source-group-1",
       baseUrl: "http://localhost:8081",
       maxScrolls: 5,
       maxDurationMs: 45_000,
+      diagnoseCheckout: true,
     });
   });
 
-  it("supports inline options and the pnpm separator", () => {
+  it("supports inline options, the pnpm separator, and the dev group URL override", () => {
     expect(
       parseFacebookCollectorCliArgs([
         "--",
+        "--source-group-id=source-group-1",
         "--group-url=https://m.facebook.com/groups/12345/",
         "--base-url=https://gateway.example.test",
       ]),
     ).toEqual({
       groupUrl: "https://m.facebook.com/groups/12345/",
-      sourceGroupId: "facebook-group-12345",
+      sourceGroupId: "source-group-1",
       baseUrl: "https://gateway.example.test",
       maxScrolls: DEFAULT_FACEBOOK_COLLECTOR_MAX_SCROLLS,
       maxDurationMs: DEFAULT_FACEBOOK_COLLECTOR_MAX_DURATION_MS,
+      diagnoseCheckout: false,
     });
   });
 
   it("uses environment base URL defaults before the local API default", () => {
     expect(
       parseFacebookCollectorCliArgs(
-        ["--group-url", "https://www.facebook.com/groups/group-1"],
+        ["--source-group-id", "source-group-1"],
         {
           COLLECTOR_FACEBOOK_BASE_URL: " http://localhost:8081 ",
           PROFILE_MANAGER_BASE_URL: "http://localhost:3000",
@@ -64,7 +65,7 @@ describe("parseFacebookCollectorCliArgs", () => {
 
     expect(
       parseFacebookCollectorCliArgs(
-        ["--group-url", "https://www.facebook.com/groups/group-1"],
+        ["--source-group-id", "source-group-1"],
         {
           PROFILE_MANAGER_BASE_URL: " http://localhost:3000 ",
           CONTENT_MANAGER_BASE_URL: "http://localhost:3001",
@@ -75,10 +76,7 @@ describe("parseFacebookCollectorCliArgs", () => {
     });
 
     expect(
-      parseFacebookCollectorCliArgs([
-        "--group-url",
-        "https://www.facebook.com/groups/group-1",
-      ]),
+      parseFacebookCollectorCliArgs(["--source-group-id", "source-group-1"]),
     ).toMatchObject({
       baseUrl: DEFAULT_FACEBOOK_COLLECTOR_BASE_URL,
     });
@@ -86,22 +84,25 @@ describe("parseFacebookCollectorCliArgs", () => {
 
   it("fails safely for missing required values and unexpected options", () => {
     expect(() => parseFacebookCollectorCliArgs([])).toThrow(
-      new FacebookCollectorCliArgumentError("--group-url is required."),
+      new FacebookCollectorCliArgumentError("--source-group-id is required."),
     );
     expect(() =>
-      parseFacebookCollectorCliArgs(["--group-url", "--base-url"]),
-    ).toThrow("--group-url requires a value.");
+      parseFacebookCollectorCliArgs(["--source-group-id", " "]),
+    ).toThrow("--source-group-id must be a non-empty id.");
+    expect(() =>
+      parseFacebookCollectorCliArgs(["--source-group-id", "--base-url"]),
+    ).toThrow("--source-group-id requires a value.");
     expect(() =>
       parseFacebookCollectorCliArgs([
-        "--group-url",
-        "https://www.facebook.com/groups/group-1",
+        "--source-group-id",
+        "source-group-1",
         "unexpected",
       ]),
     ).toThrow("Unexpected positional argument.");
     expect(() =>
       parseFacebookCollectorCliArgs([
-        "--group-url",
-        "https://www.facebook.com/groups/group-1",
+        "--source-group-id",
+        "source-group-1",
         "--wat",
       ]),
     ).toThrow("Unknown option --wat.");
@@ -110,24 +111,32 @@ describe("parseFacebookCollectorCliArgs", () => {
   it("rejects invalid URLs, embedded credentials, and non-group URLs", () => {
     expect(() =>
       parseFacebookCollectorCliArgs([
+        "--source-group-id",
+        "source-group-1",
         "--group-url",
         "https://example.com/groups/group-1",
       ]),
     ).toThrow("--group-url must point to facebook.com.");
     expect(() =>
       parseFacebookCollectorCliArgs([
+        "--source-group-id",
+        "source-group-1",
         "--group-url",
         "https://user:secret@www.facebook.com/groups/group-1",
       ]),
     ).toThrow("--group-url must not contain embedded credentials.");
     expect(() =>
       parseFacebookCollectorCliArgs([
+        "--source-group-id",
+        "source-group-1",
         "--group-url",
         "https://www.facebook.com/profile.php?id=1",
       ]),
     ).toThrow("--group-url must point to a Facebook group.");
     expect(() =>
       parseFacebookCollectorCliArgs([
+        "--source-group-id",
+        "source-group-1",
         "--group-url",
         "https://www.facebook.com/groups/group-1",
         "--base-url",
@@ -139,16 +148,16 @@ describe("parseFacebookCollectorCliArgs", () => {
   it("validates stop condition options", () => {
     expect(() =>
       parseFacebookCollectorCliArgs([
-        "--group-url",
-        "https://www.facebook.com/groups/group-1",
+        "--source-group-id",
+        "source-group-1",
         "--max-scrolls",
         "-1",
       ]),
     ).toThrow("--max-scrolls must be a non-negative integer.");
     expect(() =>
       parseFacebookCollectorCliArgs([
-        "--group-url",
-        "https://www.facebook.com/groups/group-1",
+        "--source-group-id",
+        "source-group-1",
         "--max-duration-ms",
         "0",
       ]),
@@ -160,8 +169,9 @@ describe("parseFacebookCollectorCliArgs", () => {
       FacebookCollectorCliHelpRequested,
     );
     expect(getFacebookCollectorCliUsage()).toContain(
-      "pnpm collector:facebook:run",
+      "pnpm collector:facebook:run -- --source-group-id",
     );
+    expect(getFacebookCollectorCliUsage()).toContain("--diagnose-checkout");
     expect(getFacebookCollectorCliUsage()).not.toContain("password");
   });
 });

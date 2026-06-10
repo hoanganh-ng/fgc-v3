@@ -2,6 +2,7 @@ import type {
   CreateContentCategoryInput,
   CreateSourceGroupInput,
   GetContentItemInput,
+  GetSourceGroupInput,
   ListContentItemsInput,
   ListContentItemsOutput,
   ListSourceGroupsInput,
@@ -85,6 +86,7 @@ export interface FakeContentManagerHttpService
     CreateSourceGroupInput,
     SourceGroup
   >;
+  readonly getSourceGroup: StubUseCase<GetSourceGroupInput, SourceGroup>;
   readonly updateSourceGroupStatus: StubUseCase<
     UpdateSourceGroupStatusInput,
     SourceGroup
@@ -117,6 +119,7 @@ export function createFakeContentManagerHttpService(): FakeContentManagerHttpSer
     createContentCategory: new StubUseCase(category),
     listContentCategories: new StubNoInputUseCase([category]),
     createSourceGroup: new StubUseCase(sourceGroup),
+    getSourceGroup: new StubUseCase(sourceGroup),
     updateSourceGroupStatus: new StubUseCase(
       createSourceGroup({ status: "PAUSED" }),
     ),

@@ -230,6 +230,68 @@ describe("Content Manager HTTP routes", () => {
     }
   });
 
+  it("gets one source group", async () => {
+    const { server, service } = createTestServer();
+
+    service.getSourceGroup.setOutput(
+      createSourceGroup({
+        notes: "Operator-visible note.",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/source-groups/source-group-1",
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(service.getSourceGroup.calls).toEqual([
+        {
+          sourceGroupId: "source-group-1",
+        },
+      ]);
+      expect(body).toMatchObject({
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          url: "https://facebook.test/groups/fb-group-1",
+          status: "ACTIVE",
+        },
+      });
+      expect(body.sourceGroup).not.toHaveProperty("rawPayloadRef");
+      expect(body.sourceGroup).not.toHaveProperty("cookies");
+      expect(body.sourceGroup).not.toHaveProperty("localStorage");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps missing source group reads to 404", async () => {
+    const { server, service } = createTestServer();
+
+    service.getSourceGroup.setError(
+      new SourceGroupNotFoundError("source-group-missing"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/source-groups/source-group-missing",
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "SOURCE_GROUP_NOT_FOUND",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("updates source group status", async () => {
     const { server, service } = createTestServer();
 

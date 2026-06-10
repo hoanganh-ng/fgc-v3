@@ -129,38 +129,55 @@ The CLI prints only operational progress and counts. It must not print cookies, 
 
 ## Manual Facebook Collector Command
 
-Sprint 032 adds a manual/dev operator command for one Facebook group run using one existing `READY` profile.
+Sprint 032 added a manual/dev operator command for one Facebook group run using one existing `READY` profile. Sprint 034A makes `sourceGroupId` the normal source of truth for the group URL.
 
 Prerequisites:
 
 1. Start the dev or preview stack.
 2. Complete profile provisioning so at least one profile is `READY`.
-3. Ensure Content Manager has a source group record for the target Facebook group. The command can derive a dev-friendly source group id from the group URL, but real submissions require that id to match an existing Content Manager source group.
+3. Ensure Content Manager has an `ACTIVE` Facebook source group record for the target Facebook group.
+4. Copy the `sourceGroupId` from the Web UI Source Groups page.
 
 Run against the preview gateway:
 
 ```bash
-pnpm collector:facebook:run -- --group-url "https://www.facebook.com/groups/<group>" --source-group-id <source-group-id> --base-url http://localhost:8081 --max-scrolls 3 --max-duration-ms 30000
+pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081 --max-scrolls 3 --max-duration-ms 30000
 ```
+
+Use the preview gateway (`http://localhost:8081`) when running against the preview stack. This matches the Web UI entrypoint and lets Nginx proxy `/collector/*` to the API.
 
 Run against the direct local API:
 
 ```bash
-pnpm collector:facebook:run -- --group-url "https://www.facebook.com/groups/<group>" --source-group-id <source-group-id> --base-url http://localhost:3000
+pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:3000
 ```
 
-If `--source-group-id` is omitted, the command derives an id such as `facebook-group-<group>` from the URL. If `--base-url` is omitted, the command uses `COLLECTOR_FACEBOOK_BASE_URL`, then `PROFILE_MANAGER_BASE_URL`, then `CONTENT_MANAGER_BASE_URL`, then `http://localhost:3000`.
+Use the direct API URL (`http://localhost:3000`) when you are running the API directly or intentionally bypassing the preview gateway. A base URL mismatch can make the CLI talk to a different API/database than the Web UI.
+
+If `--base-url` is omitted, the command uses `COLLECTOR_FACEBOOK_BASE_URL`, then `PROFILE_MANAGER_BASE_URL`, then `CONTENT_MANAGER_BASE_URL`, then `http://localhost:3000`.
+
+`--group-url` is only a development override. When it is provided, the CLI still requires `--source-group-id`, resolves and validates the stored source group first, then prints a warning before opening the override URL instead of the stored source URL.
+
+Optional checkout diagnostics:
+
+```bash
+pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081 --diagnose-checkout
+```
+
+Diagnostic mode prints only safe aggregate profile status counts: total profiles, `READY`, `BUSY`, `PENDING_LOGIN`, and `PENDING_CONFIG`.
 
 Expected operator flow:
 
-1. The command checks out one eligible `READY` profile through `POST /collector/profiles/checkout`.
-2. It fetches trusted runtime configuration from `GET /collector/profile-leases/:leaseId/runtime-configuration`.
-3. A headed Chromium browser opens with the profile cookies, localStorage, browser fingerprint, locale/language, timezone, viewport, and proxy settings where Playwright supports them.
-4. The browser visits the provided Facebook group URL.
-5. The adapter captures in-memory JSON responses whose URL contains `/api/graphql`.
-6. Captured payloads are passed to the existing Facebook GraphQL extractor.
-7. Normalized candidates are submitted to Content Manager through `POST /collector/content-items`.
-8. The profile lease is released even when capture, extraction, or submission fails.
+1. The command resolves the source group through `GET /collector/source-groups/:sourceGroupId`.
+2. It verifies the source group exists, uses platform `FACEBOOK`, is `ACTIVE`, and has a Facebook group URL before browser launch.
+3. The command checks out one eligible `READY` profile through `POST /collector/profiles/checkout`.
+4. It fetches trusted runtime configuration from `GET /collector/profile-leases/:leaseId/runtime-configuration`.
+5. A headed Chromium browser opens with the profile cookies, localStorage, browser fingerprint, locale/language, timezone, viewport, and proxy settings where Playwright supports them.
+6. The browser visits the stored Facebook group URL, unless `--group-url` was provided as a development override.
+7. The adapter captures in-memory JSON responses whose URL contains `/api/graphql`.
+8. Captured payloads are passed to the existing Facebook GraphQL extractor.
+9. Normalized candidates are submitted to Content Manager through `POST /collector/content-items` using the same `sourceGroupId`.
+10. The profile lease is released even when capture, extraction, or submission fails.
 
 The safe summary prints counts only:
 
@@ -179,6 +196,8 @@ Current limitations:
 - One browser session.
 - No scheduler, queue, `collection_runs` table, multi-group run, multi-profile run, Web UI trigger, source group selection UI, or automatic group discovery.
 - Zero captured GraphQL responses or zero extracted candidates can happen if Facebook changes response shapes, the group is inaccessible, the page redirects to login, or no supported post payloads load during the stop window.
+- A profile shown as `READY` is not always checkout-eligible. Checkout can still be blocked by temporal routine windows, cooldowns, daily safety thresholds, or an existing lease/BUSY state.
+- `NO_ELIGIBLE_PROFILE_AVAILABLE` can also happen when the CLI `--base-url` points to a different API/database than the Web UI. For preview stack testing, prefer `--base-url http://localhost:8081`; use `--base-url http://localhost:3000` only for the direct API stack.
 
 Safety boundaries:
 

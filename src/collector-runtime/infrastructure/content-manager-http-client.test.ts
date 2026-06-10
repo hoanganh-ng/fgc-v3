@@ -130,6 +130,69 @@ describe("ContentManagerHttpClient", () => {
       });
   });
 
+  it("gets source groups by id using the safe read endpoint", async () => {
+    const fetch = new FakeFetch(
+      createResponse(200, {
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          externalGroupId: "fb-group-1",
+          name: "Knowledge Group",
+          url: "https://www.facebook.com/groups/fb-group-1",
+          categoryId: "category-1",
+          status: "ACTIVE",
+          collectionPriority: 80,
+          createdAt: "2026-02-01T10:00:00.000Z",
+          updatedAt: "2026-02-01T10:00:00.000Z",
+        },
+      }),
+    );
+    const client = createClient(fetch.fetch);
+
+    await expect(client.getSourceGroup("source/group 1")).resolves.toEqual({
+      ok: true,
+      statusCode: 200,
+      sourceGroup: {
+        id: "source-group-1",
+        platform: "FACEBOOK",
+        status: "ACTIVE",
+        url: "https://www.facebook.com/groups/fb-group-1",
+      },
+    });
+    expect(fetch.calls).toEqual([
+      {
+        input:
+          "https://content-manager.test/collector/source-groups/source%2Fgroup%201",
+        init: {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+          },
+        },
+      },
+    ]);
+  });
+
+  it("maps missing source group reads to structured failures", async () => {
+    const fetch = new FakeFetch(
+      createResponse(404, {
+        error: {
+          code: "SOURCE_GROUP_NOT_FOUND",
+          message: "Source group not found: missing.",
+        },
+      }),
+    );
+    const client = createClient(fetch.fetch);
+
+    await expect(client.getSourceGroup("missing")).resolves.toEqual({
+      ok: false,
+      statusCode: 404,
+      errorCode: "SOURCE_GROUP_NOT_FOUND",
+      errorMessage: "Source group not found: missing.",
+    });
+  });
+
   it("does not include raw GraphQL payload fields in the request body", async () => {
     const fetch = new FakeFetch(createResponse(200, {}));
     const client = createClient(fetch.fetch);
