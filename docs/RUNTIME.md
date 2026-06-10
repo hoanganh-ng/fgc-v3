@@ -125,7 +125,7 @@ Expected operator flow:
 
 The CLI does not automate credentials, store passwords, solve CAPTCHAs, add stealth tooling, capture Facebook content, capture GraphQL responses, implement collection runtime behavior, or write cookies/localStorage to disk.
 
-The CLI prints only operational progress and counts. It must not print cookies, localStorage values, proxy passwords, token hashes, raw session material, or trusted runtime secrets. The current provisioning configuration HTTP response redacts proxy credentials; the CLI applies proxy host/port settings and will apply credentials only if a future trusted DTO explicitly supplies them.
+The CLI prints only operational progress and counts. It must not print cookies, localStorage values, proxy passwords, token hashes, raw session material, or trusted runtime secrets. The one-time provisioning configuration route may include proxy credentials so Playwright can use the configured proxy, but public profile list/detail reads continue to omit proxy credentials and captured session state.
 
 ## Migrations
 

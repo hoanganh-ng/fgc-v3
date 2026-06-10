@@ -344,7 +344,7 @@ describe("HTTP server", () => {
     }
   });
 
-  it("returns provisioning configuration without authentication state", async () => {
+  it("returns provisioning configuration with runtime network context and without authentication state", async () => {
     const { server, service } = createTestServer();
 
     service.getProvisioningConfiguration.setOutput({
@@ -368,15 +368,16 @@ describe("HTTP server", () => {
       ]);
       expect(body).toMatchObject({
         profileId: "profile-1",
-        networkContext: createSafeNetworkContext(),
+        networkContext: createNetworkContext(),
         hardwareFingerprint: createHardwareFingerprint(),
       });
-      expect(body.networkContext.proxy).not.toHaveProperty("credentials");
+      expect(body.networkContext.proxy.credentials.password).toBe("secret");
       expect(body).not.toHaveProperty("authenticationState");
       expect(body).not.toHaveProperty("provisioningToken");
+      expect(JSON.stringify(body)).not.toContain("provisioning-token-1");
+      expect(JSON.stringify(body)).not.toContain("tokenHash");
       expect(JSON.stringify(body)).not.toContain("session-cookie-value");
       expect(JSON.stringify(body)).not.toContain("local-storage-value");
-      expect(JSON.stringify(body)).not.toContain("secret");
     } finally {
       await server.close();
     }

@@ -249,12 +249,7 @@ export function registerCollectorProfileManagerRoutes(
           provisioningToken: params.token,
         });
 
-      return {
-        ...configuration,
-        networkContext: toProfileReadNetworkContext(
-          configuration.networkContext,
-        ),
-      };
+      return configuration;
     },
   );
 

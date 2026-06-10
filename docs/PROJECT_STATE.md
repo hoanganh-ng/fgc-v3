@@ -8,17 +8,17 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, and Start Provisioning UI was added in Sprint 029.
+The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, Start Provisioning UI was added in Sprint 029, and the Profile Provisioning Browser CLI was added in Sprint 030.
 
-The next active work is Profile Provisioning Browser CLI. It adds a TypeScript operator CLI that consumes a one-time provisioning token, opens a headed browser for manual Facebook login, captures cookies/localStorage, and submits the captured session through the existing Profile Manager ingestion flow while runtime collection, Facebook content capture, scheduling, queues, authentication, authorization, Content Builder, and Publisher work remain deferred.
+The next active work is Provisioning E2E Verification & Hardening. It verifies the complete create -> configure -> start provisioning -> CLI manual login -> session ingestion -> READY flow through the Dockerized stack and fixes only small integration, cleanup, safe-output, or operator documentation issues found during verification.
 
 ## Current Sprint
 
-Sprint 030: Profile Provisioning Browser CLI
+Sprint 031: Provisioning E2E Verification & Hardening
 
-Active sprint file: `docs/SPRINTS/SPRINT-030-profile-provisioning-browser-cli.md`
+Active sprint file: `docs/SPRINTS/SPRINT-031-provisioning-e2e-verification-and-hardening.md`
 
-Sprint 030 implements an operator-only Playwright provisioning CLI that uses a one-time provisioning token to fetch provisioning configuration, opens headed Chromium for manual Facebook login, captures cookies/localStorage after explicit operator confirmation, and submits the session through the existing Profile Manager token ingestion API. No credential automation, CAPTCHA solving, stealth tooling, Facebook content capture, GraphQL capture, runtime collection, scheduler, queue, authentication, authorization, Content Builder, or Publisher work should happen in this sprint.
+Sprint 031 runs and hardens the full provisioning path through the Dockerized stack, Web UI, backend, and operator CLI. No credential automation, CAPTCHA solving, stealth tooling, Facebook content capture, GraphQL capture, runtime collection, scheduler, queue, authentication, authorization, Content Builder, or Publisher work should happen in this sprint.
 
 ## Decided Items
 

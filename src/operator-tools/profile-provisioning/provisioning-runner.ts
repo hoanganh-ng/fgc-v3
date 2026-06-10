@@ -72,6 +72,7 @@ export async function runProfileProvisioning(
   input: RunProfileProvisioningInput,
 ): Promise<ProfileProvisioningRunResult> {
   const logger = input.logger ?? NOOP_LOGGER;
+  const sensitiveValues = new Set<string>([input.token]);
   let browserSession: ProvisioningBrowserSession | undefined;
   let result: ProfileProvisioningRunResult | undefined;
 
@@ -84,11 +85,15 @@ export async function runProfileProvisioning(
     );
 
     if (!configurationResult.ok) {
-      result = toRunFailure(configurationResult);
+      result = toRunFailure(configurationResult, sensitiveValues);
 
       return result;
     }
 
+    addConfigurationSensitiveValues(
+      sensitiveValues,
+      configurationResult.configuration,
+    );
     throwIfAborted(input.abortSignal);
     logger.info(
       `Provisioning configuration loaded for profile ${configurationResult.configuration.profileId}.`,
@@ -109,6 +114,7 @@ export async function runProfileProvisioning(
 
     logger.info("Capturing browser session state.");
     const sessionState = await browserSession.captureSessionState();
+    addSessionSensitiveValues(sensitiveValues, sessionState);
 
     logger.info(
       `Captured ${sessionState.cookies.length} cookies and ${sessionState.localStorage.length} localStorage entries.`,
@@ -127,7 +133,7 @@ export async function runProfileProvisioning(
     );
 
     if (!ingestionResult.ok) {
-      result = toRunFailure(ingestionResult);
+      result = toRunFailure(ingestionResult, sensitiveValues);
 
       return result;
     }
@@ -155,7 +161,7 @@ export async function runProfileProvisioning(
       : {
           ok: false,
           errorCode: "PROFILE_PROVISIONING_BROWSER_FLOW_FAILED",
-          errorMessage: errorToSafeMessage(error),
+          errorMessage: errorToSafeMessage(error, sensitiveValues),
         };
 
     return result;
@@ -168,15 +174,23 @@ export async function runProfileProvisioning(
 
 function toRunFailure(
   failure: ProvisioningHttpFailure,
+  sensitiveValues: ReadonlySet<string>,
 ): Extract<ProfileProvisioningRunResult, { readonly ok: false }> {
   return {
     ok: false,
     errorCode: failure.errorCode,
-    errorMessage: failure.errorMessage,
+    errorMessage: redactSensitiveText(failure.errorMessage, sensitiveValues),
     ...(failure.statusCode !== undefined
       ? { statusCode: failure.statusCode }
       : {}),
-    ...(failure.issues !== undefined ? { issues: failure.issues } : {}),
+    ...(failure.issues !== undefined
+      ? {
+          issues: failure.issues.map((issue) => ({
+            path: redactSensitiveText(issue.path, sensitiveValues),
+            message: redactSensitiveText(issue.message, sensitiveValues),
+          })),
+        }
+      : {}),
   };
 }
 
@@ -218,14 +232,70 @@ function isAbortLikeError(
   );
 }
 
-function errorToSafeMessage(error: unknown): string {
+function errorToSafeMessage(
+  error: unknown,
+  sensitiveValues: ReadonlySet<string>,
+): string {
   if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
+    return redactSensitiveText(error.message, sensitiveValues);
   }
 
   if (typeof error === "string" && error.trim().length > 0) {
-    return error;
+    return redactSensitiveText(error, sensitiveValues);
   }
 
   return "Profile provisioning failed for an unknown reason.";
+}
+
+function addConfigurationSensitiveValues(
+  sensitiveValues: Set<string>,
+  configuration: ProvisioningConfiguration,
+): void {
+  const credentials = configuration.networkContext.proxy?.credentials;
+
+  if (credentials === undefined || credentials === null) {
+    return;
+  }
+
+  addSensitiveValue(sensitiveValues, credentials.username);
+  addSensitiveValue(sensitiveValues, credentials.password);
+}
+
+function addSessionSensitiveValues(
+  sensitiveValues: Set<string>,
+  sessionState: ProvisioningCapturedSessionState,
+): void {
+  for (const cookie of sessionState.cookies) {
+    addSensitiveValue(sensitiveValues, cookie.name);
+    addSensitiveValue(sensitiveValues, cookie.value);
+  }
+
+  for (const localStorageEntry of sessionState.localStorage) {
+    addSensitiveValue(sensitiveValues, localStorageEntry.key);
+    addSensitiveValue(sensitiveValues, localStorageEntry.value);
+  }
+}
+
+function addSensitiveValue(
+  sensitiveValues: Set<string>,
+  value: string,
+): void {
+  const normalizedValue = value.trim();
+
+  if (normalizedValue.length >= 3) {
+    sensitiveValues.add(normalizedValue);
+  }
+}
+
+function redactSensitiveText(
+  text: string,
+  sensitiveValues: ReadonlySet<string>,
+): string {
+  let redactedText = text;
+
+  for (const sensitiveValue of sensitiveValues) {
+    redactedText = redactedText.split(sensitiveValue).join("[redacted]");
+  }
+
+  return redactedText;
 }

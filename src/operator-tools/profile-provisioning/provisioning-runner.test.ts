@@ -112,6 +112,76 @@ describe("runProfileProvisioning", () => {
     expect(browserLauncher.sessions[0]?.closeCalls).toBe(1);
   });
 
+  it("redacts known sensitive values from ingestion failures", async () => {
+    const client = new FakeProfileProvisioningClient();
+    const browserLauncher = new FakeProvisioningBrowserLauncher();
+
+    client.ingestionResult = {
+      ok: false,
+      statusCode: 400,
+      errorCode: "VALIDATION_ERROR",
+      errorMessage:
+        "Rejected provisioning-token-1 session-cookie-value local-storage-value proxy-password.",
+      issues: [
+        {
+          path: "cookies.c_user",
+          message:
+            "Invalid c_user from session-cookie-value and local-storage-value.",
+        },
+      ],
+    };
+
+    const result = await runProfileProvisioning({
+      token: "provisioning-token-1",
+      client,
+      browserLauncher,
+      waitForOperatorConfirmation: async () => {},
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      statusCode: 400,
+      errorCode: "VALIDATION_ERROR",
+      errorMessage: "Rejected [redacted] [redacted] [redacted] [redacted].",
+      issues: [
+        {
+          path: "cookies.[redacted]",
+          message: "Invalid [redacted] from [redacted] and [redacted].",
+        },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toContain("provisioning-token-1");
+    expect(JSON.stringify(result)).not.toContain("session-cookie-value");
+    expect(JSON.stringify(result)).not.toContain("local-storage-value");
+    expect(JSON.stringify(result)).not.toContain("proxy-password");
+  });
+
+  it("redacts token and proxy credentials from browser-flow failures", async () => {
+    const client = new FakeProfileProvisioningClient();
+    const browserLauncher = new FakeProvisioningBrowserLauncher();
+
+    browserLauncher.launchError = new Error(
+      "Could not launch for provisioning-token-1 through proxy-user:proxy-password.",
+    );
+
+    const result = await runProfileProvisioning({
+      token: "provisioning-token-1",
+      client,
+      browserLauncher,
+      waitForOperatorConfirmation: async () => {},
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errorCode: "PROFILE_PROVISIONING_BROWSER_FLOW_FAILED",
+      errorMessage:
+        "Could not launch for [redacted] through [redacted]:[redacted].",
+    });
+    expect(JSON.stringify(result)).not.toContain("provisioning-token-1");
+    expect(JSON.stringify(result)).not.toContain("proxy-user");
+    expect(JSON.stringify(result)).not.toContain("proxy-password");
+  });
+
   it("closes the browser when the operator interrupts before capture", async () => {
     const client = new FakeProfileProvisioningClient();
     const browserLauncher = new FakeProvisioningBrowserLauncher();
@@ -206,11 +276,17 @@ class FakeProvisioningBrowserLauncher implements ProvisioningBrowserLauncher {
   public readonly launchCalls: ProvisioningConfiguration[] = [];
   public readonly sessions: FakeProvisioningBrowserSession[] = [];
   public nextSession = new FakeProvisioningBrowserSession();
+  public launchError: unknown;
 
   public async launch(
     configuration: ProvisioningConfiguration,
   ): Promise<ProvisioningBrowserSession> {
     this.launchCalls.push(configuration);
+
+    if (this.launchError !== undefined) {
+      throw this.launchError;
+    }
+
     this.sessions.push(this.nextSession);
 
     return this.nextSession;

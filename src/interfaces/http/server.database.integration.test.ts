@@ -230,16 +230,17 @@ if (!shouldRunHttpDbTests) {
             host: "proxy.integration.test",
             port: 443,
             protocol: "HTTPS",
+            credentials: {
+              username: "collector",
+              password: "proxy-password-secret",
+            },
           },
         },
         hardwareFingerprint: {
           timezone: "Etc/UTC",
         },
       });
-      expect(
-        provisioningConfigurationBody.networkContext.proxy,
-      ).not.toHaveProperty("credentials");
-      expectReadPayloadIsSafe(
+      expectProvisioningConfigurationPayloadIsSafe(
         provisioningConfigurationBody,
         provisioningToken,
       );
@@ -542,4 +543,19 @@ function expectReadPayloadIsSafe(
   if (provisioningToken !== undefined) {
     expect(serialized).not.toContain(provisioningToken);
   }
+}
+
+function expectProvisioningConfigurationPayloadIsSafe(
+  payload: unknown,
+  provisioningToken: string,
+): void {
+  const serialized = JSON.stringify(payload);
+
+  expect(serialized).not.toContain("cookies");
+  expect(serialized).not.toContain("session-cookie-secret");
+  expect(serialized).not.toContain("localStorage");
+  expect(serialized).not.toContain("local-storage-secret");
+  expect(serialized).not.toContain("provisioningToken");
+  expect(serialized).not.toContain("tokenHash");
+  expect(serialized).not.toContain(provisioningToken);
 }
