@@ -8,17 +8,17 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, Start Provisioning UI was added in Sprint 029, and the Profile Provisioning Browser CLI was added in Sprint 030.
+The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, Start Provisioning UI was added in Sprint 029, the Profile Provisioning Browser CLI was added in Sprint 030, and provisioning E2E verification and hardening was completed in Sprint 031.
 
-The next active work is Provisioning E2E Verification & Hardening. It verifies the complete create -> configure -> start provisioning -> CLI manual login -> session ingestion -> READY flow through the Dockerized stack and fixes only small integration, cleanup, safe-output, or operator documentation issues found during verification.
+The next active work is the Facebook Browser Payload Capture Adapter. It adds the first manual/dev single-group Collector Runtime browser capture adapter that uses an existing READY profile session, captures Facebook GraphQL JSON responses in memory, runs the existing extractor, submits normalized candidates to Content Manager, releases the profile lease, and prints only safe operator summaries.
 
 ## Current Sprint
 
-Sprint 031: Provisioning E2E Verification & Hardening
+Sprint 032: Facebook Browser Payload Capture Adapter
 
-Active sprint file: `docs/SPRINTS/SPRINT-031-provisioning-e2e-verification-and-hardening.md`
+Active sprint file: `docs/SPRINTS/SPRINT-032-facebook-browser-payload-capture-adapter.md`
 
-Sprint 031 runs and hardens the full provisioning path through the Dockerized stack, Web UI, backend, and operator CLI. No credential automation, CAPTCHA solving, stealth tooling, Facebook content capture, GraphQL capture, runtime collection, scheduler, queue, authentication, authorization, Content Builder, or Publisher work should happen in this sprint.
+Sprint 032 adds the first real Facebook browser payload capture adapter for a manual/dev single-group run. It may add Playwright browser capture under Collector Runtime infrastructure/adapters or operator tooling and an operator command that checks out a READY profile, fetches trusted runtime configuration, captures `/api/graphql` JSON responses in memory, runs the existing extractor, submits normalized candidates, releases the lease, and prints safe counts. No scheduler, queue, `collection_runs` table, multi-group runs, multi-profile runs, Web UI trigger, credential automation, CAPTCHA solving, stealth tooling, anti-detection tricks, rate-limit bypass, access-control bypass, posting/commenting/liking, raw payload persistence, Content Builder, or Publisher work should happen in this sprint.
 
 ## Decided Items
 
@@ -67,6 +67,8 @@ Sprint 031 runs and hardens the full provisioning path through the Dockerized st
 - Sprint 028 adds structured Web UI create and configure forms for Collector Profile Manager profiles, using existing backend contracts and keeping sensitive session, token, provisioning, proxy password, and trusted runtime data out of the UI.
 - Sprint 029 adds a safe Web UI Start Provisioning action on profile detail, using the existing backend contract and keeping one-time provisioning tokens confined to the immediate success UI when returned.
 - Sprint 030 adds an operator-only Profile Provisioning Browser CLI that consumes one-time provisioning tokens and submits manually captured Facebook session state through existing Profile Manager HTTP contracts without printing or storing raw session material.
+- Sprint 031 verifies and hardens the complete manual provisioning flow from Web UI profile creation through CLI manual login and READY profile state.
+- Sprint 032 adds the first manual/dev Facebook browser payload capture adapter under Collector Runtime infrastructure/adapters or operator tooling, reusing existing runtime orchestration, extractor, and HTTP clients.
 - Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
 - Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.
 - The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.

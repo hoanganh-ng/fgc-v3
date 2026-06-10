@@ -127,6 +127,65 @@ The CLI does not automate credentials, store passwords, solve CAPTCHAs, add stea
 
 The CLI prints only operational progress and counts. It must not print cookies, localStorage values, proxy passwords, token hashes, raw session material, or trusted runtime secrets. The one-time provisioning configuration route may include proxy credentials so Playwright can use the configured proxy, but public profile list/detail reads continue to omit proxy credentials and captured session state.
 
+## Manual Facebook Collector Command
+
+Sprint 032 adds a manual/dev operator command for one Facebook group run using one existing `READY` profile.
+
+Prerequisites:
+
+1. Start the dev or preview stack.
+2. Complete profile provisioning so at least one profile is `READY`.
+3. Ensure Content Manager has a source group record for the target Facebook group. The command can derive a dev-friendly source group id from the group URL, but real submissions require that id to match an existing Content Manager source group.
+
+Run against the preview gateway:
+
+```bash
+pnpm collector:facebook:run -- --group-url "https://www.facebook.com/groups/<group>" --source-group-id <source-group-id> --base-url http://localhost:8081 --max-scrolls 3 --max-duration-ms 30000
+```
+
+Run against the direct local API:
+
+```bash
+pnpm collector:facebook:run -- --group-url "https://www.facebook.com/groups/<group>" --source-group-id <source-group-id> --base-url http://localhost:3000
+```
+
+If `--source-group-id` is omitted, the command derives an id such as `facebook-group-<group>` from the URL. If `--base-url` is omitted, the command uses `COLLECTOR_FACEBOOK_BASE_URL`, then `PROFILE_MANAGER_BASE_URL`, then `CONTENT_MANAGER_BASE_URL`, then `http://localhost:3000`.
+
+Expected operator flow:
+
+1. The command checks out one eligible `READY` profile through `POST /collector/profiles/checkout`.
+2. It fetches trusted runtime configuration from `GET /collector/profile-leases/:leaseId/runtime-configuration`.
+3. A headed Chromium browser opens with the profile cookies, localStorage, browser fingerprint, locale/language, timezone, viewport, and proxy settings where Playwright supports them.
+4. The browser visits the provided Facebook group URL.
+5. The adapter captures in-memory JSON responses whose URL contains `/api/graphql`.
+6. Captured payloads are passed to the existing Facebook GraphQL extractor.
+7. Normalized candidates are submitted to Content Manager through `POST /collector/content-items`.
+8. The profile lease is released even when capture, extraction, or submission fails.
+
+The safe summary prints counts only:
+
+- Lease released yes/no.
+- GraphQL responses captured.
+- Extractor candidates produced.
+- Content items submitted.
+- Failed submissions.
+- Warning count.
+- Duration in milliseconds.
+
+Current limitations:
+
+- One profile.
+- One Facebook group URL.
+- One browser session.
+- No scheduler, queue, `collection_runs` table, multi-group run, multi-profile run, Web UI trigger, source group selection UI, or automatic group discovery.
+- Zero captured GraphQL responses or zero extracted candidates can happen if Facebook changes response shapes, the group is inaccessible, the page redirects to login, or no supported post payloads load during the stop window.
+
+Safety boundaries:
+
+- The command does not automate credentials, solve CAPTCHAs, use stealth plugins, bypass access controls, bypass rate limits, post, comment, like, or persist raw payloads.
+- Captured GraphQL responses stay in memory and are not written to disk.
+- CLI output must not include cookies, localStorage, proxy credentials, raw GraphQL payloads, request or response headers, authorization/session headers, viewer/account identifiers, trusted runtime config, token material, or hashes.
+
 ## Migrations
 
 The existing migration system is Drizzle:

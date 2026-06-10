@@ -17,10 +17,13 @@ describe("collector runtime architecture boundary", () => {
     expect(offendingFiles.map((file) => file.pathname)).toEqual([]);
   });
 
-  it("keeps collector runtime free of browser automation imports", () => {
-    const offendingFiles = collectTypeScriptFiles(
-      new URL("./", import.meta.url),
-    ).filter((file) =>
+  it("keeps collector runtime core and extractors free of browser automation imports", () => {
+    const offendingFiles = [
+      ...collectTypeScriptFiles(new URL("./application/", import.meta.url)),
+      ...collectTypeScriptFiles(
+        new URL("./platform-extractors/", import.meta.url),
+      ),
+    ].filter((file) =>
       forbiddenBrowserAutomationImportPattern.test(readFileSync(file, "utf8")),
     );
 
