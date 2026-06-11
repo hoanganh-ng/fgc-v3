@@ -158,6 +158,18 @@ export const ContentItemsListResponseSchema = z
   })
   .strict();
 
+export const ContentItemResponseSchema = z
+  .object({
+    contentItem: ContentItemSchema,
+  })
+  .strict();
+
+export const UpdateContentItemStatusRequestSchema = z
+  .object({
+    status: ContentStatusSchema,
+  })
+  .strict();
+
 export type ContentCategory = z.infer<typeof ContentCategorySchema>;
 export type SourceGroup = z.infer<typeof SourceGroupSchema>;
 export type ContentItem = z.infer<typeof ContentItemSchema>;
@@ -188,6 +200,11 @@ export type SourceGroupsListResponse = z.infer<
 export type ContentItemsListResponse = z.infer<
   typeof ContentItemsListResponseSchema
 >;
+export type ContentItemResponse = z.infer<typeof ContentItemResponseSchema>;
+export type UpdateContentItemStatusRequest = z.infer<
+  typeof UpdateContentItemStatusRequestSchema
+>;
+export type UpdateContentItemStatusResponse = ContentItemResponse;
 
 export interface ListSourceGroupsQuery {
   readonly status?: SourceGroupStatus;
@@ -223,6 +240,13 @@ export interface ContentManagerClient {
   readonly listContentItems: (
     query?: ListContentItemsQuery,
   ) => Promise<ApiResult<ContentItemsListResponse>>;
+  readonly getContentItem: (
+    contentItemId: string,
+  ) => Promise<ApiResult<ContentItemResponse>>;
+  readonly updateContentItemStatus: (
+    contentItemId: string,
+    status: ContentStatus,
+  ) => Promise<ApiResult<UpdateContentItemStatusResponse>>;
 }
 
 export function createContentManagerClient(
@@ -271,6 +295,20 @@ export function createContentManagerClient(
         path: "/collector/content-items",
         query: toListContentItemsQueryParams(query),
         responseSchema: ContentItemsListResponseSchema,
+      });
+    },
+    getContentItem(contentItemId) {
+      return httpClient.request({
+        path: `/collector/content-items/${encodeURIComponent(contentItemId)}`,
+        responseSchema: ContentItemResponseSchema,
+      });
+    },
+    updateContentItemStatus(contentItemId, status) {
+      return httpClient.request({
+        path: `/collector/content-items/${encodeURIComponent(contentItemId)}/status`,
+        method: "PATCH",
+        body: { status } satisfies UpdateContentItemStatusRequest,
+        responseSchema: ContentItemResponseSchema,
       });
     },
   };

@@ -1,5 +1,5 @@
 # Active Sprint
 
-Active sprint: `docs/SPRINTS/SPRINT-034B-page-context-facebook-fetch-xhr-capture.md`
+Active sprint: `docs/SPRINTS/SPRINT-035A-content-items-review-layout-polish.md`
 
-Only Sprint 034B should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.
+Only Sprint 035A should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.

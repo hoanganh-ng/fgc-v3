@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 import { DashboardLayout } from "@/app/layout/dashboard-layout";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { CollectionRunsPage } from "@/pages/collection-runs-page";
+import { ContentItemDetailPage } from "@/pages/content-item-detail-page";
 import { ContentItemsPage } from "@/pages/content-items-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { ProfileConfigurePage } from "@/pages/profile-configure-page";
@@ -44,6 +45,10 @@ export const router = createBrowserRouter([
       {
         path: "content-items",
         element: <ContentItemsPage />,
+      },
+      {
+        path: "content-items/:contentItemId",
+        element: <ContentItemDetailPage />,
       },
       {
         path: "collection-runs",

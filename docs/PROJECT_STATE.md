@@ -8,17 +8,17 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, Start Provisioning UI was added in Sprint 029, the Profile Provisioning Browser CLI was added in Sprint 030, provisioning E2E verification and hardening was completed in Sprint 031, the Facebook Browser Payload Capture Adapter was added in Sprint 032, Web UI content category/source group management was added in Sprint 033, and Collector CLI source group resolution and checkout diagnostics were added in Sprint 034A.
+The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, Start Provisioning UI was added in Sprint 029, the Profile Provisioning Browser CLI was added in Sprint 030, provisioning E2E verification and hardening was completed in Sprint 031, the Facebook Browser Payload Capture Adapter was added in Sprint 032, Web UI content category/source group management was added in Sprint 033, Collector CLI source group resolution and checkout diagnostics were added in Sprint 034A, page-context Facebook fetch/XHR capture was added in Sprint 034B, Content Items review UI screens were added in Sprint 035, and Content Items review layout polish is active in Sprint 035A.
 
-The next active work is page-context Facebook fetch/XHR capture. It adapts the proven page-context `fetch` and `XMLHttpRequest` capture strategy into the Playwright collector while keeping the existing network listener as secondary diagnostics.
+The next active work is Content Items review layout polish. It reorganizes the existing Content Items list and detail review screens into an operator-friendly review queue backed by the existing Content Manager safe read and status transition APIs.
 
 ## Current Sprint
 
-Sprint 034B: Page-Context Facebook Fetch/XHR Capture
+Sprint 035A: Content Items Review Layout Polish
 
-Active sprint file: `docs/SPRINTS/SPRINT-034B-page-context-facebook-fetch-xhr-capture.md`
+Active sprint file: `docs/SPRINTS/SPRINT-035A-content-items-review-layout-polish.md`
 
-Sprint 034B updates the Playwright Facebook browser payload capture adapter to inject page-context `fetch` and XHR instrumentation before navigation, parse safe JSON response bodies in memory, combine page-context payloads with the existing network listener using local deduplication, and report safe diagnostic counts. No scheduler, worker process, collection run storage, Web UI Run Now button, multi-source collection, advanced feed heuristics, comment expansion, stealth plugins, CAPTCHA solving, credential automation, rate-limit bypass, access-control bypass, posting/commenting/liking, or raw payload persistence should happen in this sprint.
+Sprint 035A polishes the existing Web UI Content Items review screens into a card/list review queue that prioritizes post body preview, engagement counts, collected time, compact source group/category metadata, detail navigation, and valid lifecycle quick actions. It preserves the existing backend contracts and safe text/link rendering. No backend changes, collection run records, API-triggered runs, worker process, scheduler, Run Now button, display-name joins, bulk actions, advanced search/filtering, content editing, raw payload viewer, video generation, publishing workflow, auth/permissions, or audit log should happen in this sprint.
 
 ## Decided Items
 
@@ -72,6 +72,8 @@ Sprint 034B updates the Playwright Facebook browser payload capture adapter to i
 - Sprint 033 adds Web UI management for Content Manager content categories and Facebook source groups, including creation, listing, source group ID copy support, and source group status updates.
 - Sprint 034A makes `sourceGroupId` the primary manual Facebook collector CLI input, resolves the source URL from Content Manager, and improves safe checkout diagnostics.
 - Sprint 034B adapts page-context Facebook `fetch` and XHR capture into the Playwright collector, keeps network response capture as secondary diagnostics, and reports safe capture counters without logging or persisting raw payloads.
+- Sprint 035 adds Web UI Content Items list/detail review screens and status actions backed by existing Content Manager safe read and lifecycle APIs.
+- Sprint 035A polishes Web UI Content Items list/detail review layouts without changing backend behavior or exposing sensitive/raw collector data.
 - Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
 - Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.
 - The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.

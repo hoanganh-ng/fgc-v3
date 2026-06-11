@@ -5,11 +5,13 @@ import {
 } from "@tanstack/react-query";
 import {
   contentManagerClient,
+  type ContentStatus,
   type CreateContentCategoryRequest,
   type CreateContentCategoryResponse,
   type CreateSourceGroupRequest,
   type CreateSourceGroupResponse,
   type SourceGroupStatus,
+  type UpdateContentItemStatusResponse,
   type UpdateSourceGroupStatusResponse,
 } from "@/lib/api/content-manager-client";
 import {
@@ -21,6 +23,11 @@ import { contentManagerQueryKeys } from "@/features/content-manager/content-mana
 export interface UpdateSourceGroupStatusVariables {
   readonly sourceGroupId: string;
   readonly status: SourceGroupStatus;
+}
+
+export interface UpdateContentItemStatusVariables {
+  readonly contentItemId: string;
+  readonly status: ContentStatus;
 }
 
 export function useCreateContentCategoryMutation(): UseMutationResult<
@@ -95,6 +102,38 @@ export function useUpdateSourceGroupStatusMutation(): UseMutationResult<
       await queryClient.invalidateQueries({
         queryKey: contentManagerQueryKeys.all,
       });
+    },
+  });
+}
+
+export function useUpdateContentItemStatusMutation(): UseMutationResult<
+  UpdateContentItemStatusResponse,
+  ApiResultError,
+  UpdateContentItemStatusVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    UpdateContentItemStatusResponse,
+    ApiResultError,
+    UpdateContentItemStatusVariables
+  >({
+    mutationFn: async ({ contentItemId, status }) =>
+      unwrapApiResult(
+        await contentManagerClient.updateContentItemStatus(
+          contentItemId,
+          status,
+        ),
+      ),
+    onSuccess: async (_response, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: contentManagerQueryKeys.contentItems(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: contentManagerQueryKeys.contentItem(variables.contentItemId),
+        }),
+      ]);
     },
   });
 }
