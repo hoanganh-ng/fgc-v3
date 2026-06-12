@@ -1,7 +1,8 @@
 import {
   ContentManagerHttpClient,
-  PlaywrightFacebookBrowserPayloadCaptureAdapter,
+  FacebookBrowserPayloadCaptureAdapter,
   ProfileManagerHttpClient,
+  resolveBrowserProvider,
 } from "../../collector-runtime/infrastructure";
 import type {
   ContentManagerSourceGroup,
@@ -186,10 +187,19 @@ function buildDependencies(
     new SubmitCapturedFacebookPayloadUseCase({
       contentSubmissionPort: defaultContentManagerClient,
     });
+  const browserProviderResolution = resolveBrowserProvider({
+    browserProvider: input.args.browserProvider,
+  });
+
+  if (!browserProviderResolution.ok) {
+    throw new Error(browserProviderResolution.message);
+  }
+
   const payloadCapturePort =
     input.dependencies?.payloadCapturePort ??
-    new PlaywrightFacebookBrowserPayloadCaptureAdapter({
+    new FacebookBrowserPayloadCaptureAdapter({
       runtimeProfileConfigurationPort: defaultProfileManagerClient,
+      browserProvider: browserProviderResolution.provider,
       maxScrolls: input.args.maxScrolls,
       maxDurationMs: input.args.maxDurationMs,
       ...(input.abortSignal !== undefined

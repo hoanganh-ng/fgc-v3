@@ -1,10 +1,15 @@
+import type { BrowserProviderCliValue } from "../../collector-runtime/infrastructure";
+import { normalizeBrowserProviderValue } from "../../collector-runtime/infrastructure";
+
 export interface CollectorWorkerCliArgs {
   readonly baseUrl: string;
   readonly once: boolean;
   readonly pollIntervalMs: number;
+  readonly browserProvider: BrowserProviderCliValue;
 }
 
 export interface CollectorWorkerCliEnvironment {
+  readonly BROWSER_PROVIDER?: string;
   readonly COLLECTOR_WORKER_BASE_URL?: string;
   readonly COLLECTOR_FACEBOOK_BASE_URL?: string;
   readonly PROFILE_MANAGER_BASE_URL?: string;
@@ -36,6 +41,7 @@ export function parseCollectorWorkerCliArgs(
 ): CollectorWorkerCliArgs {
   let baseUrl: string | undefined;
   let pollIntervalMs: string | undefined;
+  let browserProvider: string | undefined;
   let once = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -90,6 +96,23 @@ export function parseCollectorWorkerCliArgs(
       continue;
     }
 
+    if (rawArg === "--browser-provider") {
+      assertOptionNotProvided(browserProvider, "--browser-provider");
+      browserProvider = readSeparatedOptionValue(
+        argv,
+        index,
+        "--browser-provider",
+      );
+      index += 1;
+      continue;
+    }
+
+    if (rawArg.startsWith("--browser-provider=")) {
+      assertOptionNotProvided(browserProvider, "--browser-provider");
+      browserProvider = readInlineOptionValue(rawArg, "--browser-provider");
+      continue;
+    }
+
     if (rawArg.startsWith("-")) {
       throw new CollectorWorkerCliArgumentError(`Unknown option ${rawArg}.`);
     }
@@ -112,6 +135,9 @@ export function parseCollectorWorkerCliArgs(
       "--poll-interval-ms",
       DEFAULT_COLLECTOR_WORKER_POLL_INTERVAL_MS,
     ),
+    browserProvider: normalizeBrowserProviderOption(
+      browserProvider ?? environment.BROWSER_PROVIDER,
+    ),
   };
 }
 
@@ -125,9 +151,11 @@ export function getCollectorWorkerCliUsage(): string {
     "  --base-url           API or gateway base URL for Profile Manager and Content Manager.",
     "  --once               Claim and execute at most one queued collection run, then exit.",
     "  --poll-interval-ms   Delay between polling attempts when --once is not provided. Default: 5000.",
+    "  --browser-provider   Browser provider: playwright or cloakbrowser. Default: playwright.",
     "",
     "Defaults:",
     "  --base-url uses COLLECTOR_WORKER_BASE_URL, then COLLECTOR_FACEBOOK_BASE_URL, then PROFILE_MANAGER_BASE_URL, then CONTENT_MANAGER_BASE_URL, then http://localhost:3000.",
+    "  --browser-provider uses BROWSER_PROVIDER, then playwright.",
     "",
     "The worker claims queued collection runs from the database, executes existing Facebook collector orchestration, and persists only safe summary counts or sanitized failure reasons.",
   ].join("\n");
@@ -221,4 +249,16 @@ function normalizePositiveIntegerOption(
   }
 
   return parsedValue;
+}
+
+function normalizeBrowserProviderOption(
+  value: string | undefined,
+): BrowserProviderCliValue {
+  const result = normalizeBrowserProviderValue(value);
+
+  if (!result.ok) {
+    throw new CollectorWorkerCliArgumentError(result.message);
+  }
+
+  return result.value;
 }

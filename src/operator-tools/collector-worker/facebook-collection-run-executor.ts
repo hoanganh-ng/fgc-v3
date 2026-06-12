@@ -3,6 +3,7 @@ import type {
   CollectionRunExecutorPort,
   CollectionRunExecutorResult,
 } from "../../collector-runtime/application";
+import type { BrowserProviderCliValue } from "../../collector-runtime/infrastructure";
 import {
   DEFAULT_FACEBOOK_COLLECTOR_MAX_DURATION_MS,
   DEFAULT_FACEBOOK_COLLECTOR_MAX_SCROLLS,
@@ -17,6 +18,7 @@ import {
 
 export interface FacebookCollectionRunExecutorOptions {
   readonly baseUrl: string;
+  readonly browserProvider: BrowserProviderCliValue;
   readonly logger?: FacebookCollectorLogger;
   readonly abortSignal?: AbortSignal;
   readonly runCommand?: (
@@ -38,6 +40,7 @@ export class FacebookCollectionRunExecutor implements CollectionRunExecutorPort 
       args: {
         sourceGroupId: input.sourceGroupId,
         baseUrl: this.options.baseUrl,
+        browserProvider: this.options.browserProvider,
         maxScrolls:
           input.parameters.maxScrolls ?? DEFAULT_FACEBOOK_COLLECTOR_MAX_SCROLLS,
         maxDurationMs:

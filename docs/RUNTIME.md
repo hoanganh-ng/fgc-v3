@@ -141,7 +141,7 @@ Prerequisites:
 Run against the preview gateway:
 
 ```bash
-pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081 --max-scrolls 8 --max-duration-ms 60000
+pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081 --max-scrolls 8 --max-duration-ms 60000 --browser-provider playwright
 ```
 
 Use the preview gateway (`http://localhost:8081`) when running against the preview stack. This matches the Web UI entrypoint and lets Nginx proxy `/collector/*` to the API.
@@ -155,6 +155,8 @@ pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url ht
 Use the direct API URL (`http://localhost:3000`) when you are running the API directly or intentionally bypassing the preview gateway. A base URL mismatch can make the CLI talk to a different API/database than the Web UI.
 
 If `--base-url` is omitted, the command uses `COLLECTOR_FACEBOOK_BASE_URL`, then `PROFILE_MANAGER_BASE_URL`, then `CONTENT_MANAGER_BASE_URL`, then `http://localhost:3000`.
+
+If `--browser-provider` is omitted, the command uses `BROWSER_PROVIDER`, then `playwright`. Supported operator values are `playwright` and `cloakbrowser`. `playwright` maps to provider name `PLAYWRIGHT_CHROMIUM` and remains the default behavior. `cloakbrowser` maps to provider name `CLOAK_BROWSER` and is experimental.
 
 `--group-url` is only a development override. When it is provided, the CLI still requires `--source-group-id`, resolves and validates the stored source group first, then prints a warning before opening the override URL instead of the stored source URL.
 
@@ -172,7 +174,7 @@ Expected operator flow:
 2. It verifies the source group exists, uses platform `FACEBOOK`, is `ACTIVE`, and has a Facebook group URL before browser launch.
 3. The command checks out one eligible `READY` profile through `POST /collector/profiles/checkout`.
 4. It fetches trusted runtime configuration from `GET /collector/profile-leases/:leaseId/runtime-configuration`.
-5. A headed Chromium browser opens with the profile cookies, localStorage, browser fingerprint, locale/language, timezone, viewport, and proxy settings where Playwright supports them.
+5. The selected browser provider opens a headed browser with the profile cookies, localStorage, browser fingerprint, locale/language, timezone, viewport, and proxy settings it can honor from Profile Manager runtime configuration.
 6. The browser visits the stored Facebook group URL, unless `--group-url` was provided as a development override.
 7. Before navigation, the adapter injects page-context instrumentation that patches `window.fetch` and XHR to capture parsed JSON response bodies from `/api/graphql`, `/graphql`, `/ajax/`, and JSON content-type responses.
 8. The existing Playwright network response listener remains enabled as secondary capture and diagnostics.
@@ -196,6 +198,49 @@ The safe summary prints counts only:
 - Failed submissions.
 - Warning count.
 - Duration in milliseconds.
+
+## Browser Provider Selection And Probe
+
+Sprint 037A adds a Collector Runtime browser provider boundary. Browser-provider hardening is allowed only inside Collector Runtime infrastructure. Profile Manager remains the authority for profile identity, session state, proxy configuration, and fingerprint configuration.
+
+Default provider:
+
+```bash
+BROWSER_PROVIDER=playwright
+pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081
+```
+
+Experimental CloakBrowser provider:
+
+```bash
+BROWSER_PROVIDER=cloakbrowser
+pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081
+```
+
+Probe the default provider without Facebook login:
+
+```bash
+pnpm collector:browser:probe -- --browser-provider playwright
+```
+
+Probe CloakBrowser setup:
+
+```bash
+pnpm collector:browser:probe -- --browser-provider cloakbrowser
+```
+
+The probe builds a synthetic safe runtime profile configuration, launches the selected provider, creates one page, and verifies init-script plus binding instrumentation. It does not check out a profile, visit Facebook, automate credentials, or persist session material.
+
+CloakBrowser is optional. If it is not installed or does not expose a supported launch/context/page API locally, the probe should fail with sanitized setup guidance and the collector should continue to use Playwright by default.
+
+Provider safety boundaries:
+
+- Browser providers consume Profile Manager trusted runtime configuration after checkout.
+- Browser providers must not randomize or mutate profile identity outside Profile Manager.
+- Browser providers must not regenerate fingerprints outside Profile Manager; provider fingerprint seed/config must come from Profile Manager runtime config or a stable profile-id mapping.
+- Browser providers must not solve CAPTCHAs, automate credentials, bypass checkpoints, bypass rate limits or access controls, post, comment, or like.
+- Login, checkpoint, and session-expired states must be surfaced as profile/session health issues such as `LOGIN_REQUIRED`, `CHECKPOINT_REQUIRED`, or `SESSION_EXPIRED`.
+- Browser-provider output must not include cookies, localStorage, raw Facebook payloads, proxy credentials, session headers, trusted runtime configuration, checkpoint HTML, or fingerprint secrets.
 
 ## Collection Run API Trigger
 
@@ -251,7 +296,7 @@ Sprint 037 adds an operator worker command that claims queued collection runs an
 Run one queued collection run through the preview gateway:
 
 ```bash
-pnpm collector:worker:run -- --base-url http://localhost:8081 --once
+pnpm collector:worker:run -- --base-url http://localhost:8081 --once --browser-provider playwright
 ```
 
 Use the preview gateway (`http://localhost:8081`) when running against the preview stack.
@@ -267,14 +312,14 @@ Use the direct API URL (`http://localhost:3000`) only when you are running the A
 Run the worker in polling mode:
 
 ```bash
-pnpm collector:worker:run -- --base-url http://localhost:8081 --poll-interval-ms 5000
+pnpm collector:worker:run -- --base-url http://localhost:8081 --poll-interval-ms 5000 --browser-provider playwright
 ```
 
 The worker:
 
 - Claims only `QUEUED` runs.
 - Atomically transitions the oldest queued run to `RUNNING`.
-- Executes the existing Facebook collector runner.
+- Executes the existing Facebook collector runner and browser provider boundary.
 - Passes `maxScrolls` and `maxDurationMs` from the run record.
 - Marks successful runs `SUCCEEDED` with safe summary counts.
 - Marks failed runs `FAILED` with a sanitized failure code and message.
@@ -295,7 +340,7 @@ Current limitations:
 
 Safety boundaries:
 
-- The command does not automate credentials, solve CAPTCHAs, use stealth plugins, bypass access controls, bypass rate limits, post, comment, like, or persist raw payloads.
+- The command does not automate credentials, solve CAPTCHAs, bypass access controls, bypass rate limits, post, comment, like, or persist raw payloads.
 - Captured page-context and network-listener payloads stay in memory and are not written to disk.
 - Raw response bodies are parsed inside the browser page context or in memory for the network listener; raw payload text is not logged or persisted.
 - CLI output must not include cookies, localStorage, proxy credentials, raw GraphQL payloads, request or response headers, authorization/session headers, viewer/account identifiers, trusted runtime config, token material, or hashes.

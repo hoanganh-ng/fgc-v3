@@ -59,6 +59,10 @@ Adapters implement ports using concrete technologies. Expected future adapter ca
 
 Collector Runtime will be a future operational module that consumes Collector Profile Manager and Content Manager application contracts. Browser automation, network payload capture, scraping strategy, and raw platform payload parsing must remain outside the Content Manager domain and application rules.
 
+Browser-provider hardening is allowed only behind Collector Runtime infrastructure adapters. Browser provider ports are owned by the Collector Runtime application layer; concrete browser providers consume Profile Manager runtime configuration after checkout and must not randomize or mutate profile identity, session, proxy, or fingerprint settings outside Profile Manager.
+
+Browser providers must not solve CAPTCHAs, automate credentials, bypass checkpoints, bypass rate limits or access controls, post, comment, or like. Login, checkpoint, and session-expired states are profile/session health issues to surface safely, not states to bypass automatically. Browser-provider logs and persisted records must not include cookies, localStorage, raw platform payloads, proxy credentials, session headers, trusted runtime configuration, or fingerprint secrets.
+
 ## Platform Extractors
 
 A Platform Extractor is a collection-side component that converts raw platform-specific artifacts, such as captured Facebook GraphQL payloads, into normalized Content Manager ingestion input.

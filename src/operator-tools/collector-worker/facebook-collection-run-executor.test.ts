@@ -10,6 +10,7 @@ describe("FacebookCollectionRunExecutor", () => {
     const calls: RunFacebookCollectorCommandInput[] = [];
     const executor = new FacebookCollectionRunExecutor({
       baseUrl: "http://localhost:8081",
+      browserProvider: "cloakbrowser",
       runCommand: async (input) => {
         calls.push(input);
 
@@ -46,6 +47,7 @@ describe("FacebookCollectionRunExecutor", () => {
     expect(calls[0]?.args).toMatchObject({
       sourceGroupId: "source-group-1",
       baseUrl: "http://localhost:8081",
+      browserProvider: "cloakbrowser",
       maxScrolls: 7,
       maxDurationMs: 45_000,
       diagnoseCheckout: false,
@@ -55,6 +57,7 @@ describe("FacebookCollectionRunExecutor", () => {
   it("returns sanitized failure reasons from failed collector results", async () => {
     const executor = new FacebookCollectionRunExecutor({
       baseUrl: "http://localhost:8081",
+      browserProvider: "playwright",
       runCommand: async () =>
         createCommandResult({
           ok: false,

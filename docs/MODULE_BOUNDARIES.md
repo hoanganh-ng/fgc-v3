@@ -58,6 +58,7 @@ Owns:
 - Checking out eligible profiles from Collector Profile Manager.
 - Visiting Facebook groups and posts.
 - Browser automation and network payload capture.
+- Browser provider orchestration and provider adapters inside infrastructure.
 - Platform Extractors that convert raw platform artifacts into normalized Content Manager ingestion input.
 - The Facebook GraphQL Payload Extractor that converts captured Facebook GraphQL response bodies into normalized Content Manager ingestion input candidates.
 - Raw Facebook GraphQL payload interpretation.
@@ -75,6 +76,8 @@ Owns:
 
 The Sprint 022 orchestration flow coordinates Profile Manager checkout/release behavior, captured payload collection, and Content Manager submission through Collector Runtime-owned ports and use cases. Payload capture is represented by a port only in Sprint 022; real browser automation, network interception, login, navigation, scheduling, queues, and database access remain out of scope.
 
+Browser-provider hardening must stay inside Collector Runtime infrastructure. Providers consume Profile Manager trusted runtime configuration after checkout; they must not become a profile manager, randomly mutate profile identity, regenerate fingerprints outside Profile Manager, solve CAPTCHAs, automate credentials, bypass checkpoints, bypass rate limits/access controls, post, comment, or like.
+
 Does not own:
 
 - Profile property invariants.
@@ -89,6 +92,7 @@ Does not own:
 - Collector Profile Manager composition root wiring.
 - Collector Profile Manager checkout eligibility or leasing business rules.
 - Public Profile Manager read DTO expansion for sensitive runtime material.
+- Authority over profile identity, session state, proxy configuration, or fingerprint configuration.
 - Content building.
 - Content publishing.
 

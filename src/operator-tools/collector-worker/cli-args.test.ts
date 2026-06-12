@@ -17,18 +17,21 @@ describe("collector worker CLI args", () => {
       baseUrl: "http://localhost:8081",
       once: true,
       pollIntervalMs: 5_000,
+      browserProvider: "playwright",
     });
   });
 
-  it("parses polling mode and environment base URL fallback", () => {
+  it("parses polling mode and environment fallbacks", () => {
     expect(
       parseCollectorWorkerCliArgs(["--poll-interval-ms=250"], {
+        BROWSER_PROVIDER: "cloakbrowser",
         COLLECTOR_WORKER_BASE_URL: "http://localhost:8081",
       }),
     ).toEqual({
       baseUrl: "http://localhost:8081",
       once: false,
       pollIntervalMs: 250,
+      browserProvider: "cloakbrowser",
     });
   });
 
@@ -45,6 +48,9 @@ describe("collector worker CLI args", () => {
     expect(() => parseCollectorWorkerCliArgs(["--wat"])).toThrow(
       CollectorWorkerCliArgumentError,
     );
+    expect(() =>
+      parseCollectorWorkerCliArgs(["--browser-provider", "unknown"]),
+    ).toThrow(CollectorWorkerCliArgumentError);
   });
 
   it("documents one-shot and polling usage", () => {
@@ -53,6 +59,7 @@ describe("collector worker CLI args", () => {
     expect(usage).toContain("pnpm collector:worker:run");
     expect(usage).toContain("--once");
     expect(usage).toContain("--poll-interval-ms");
+    expect(usage).toContain("--browser-provider");
     expect(usage).toContain("http://localhost:3000");
   });
 });

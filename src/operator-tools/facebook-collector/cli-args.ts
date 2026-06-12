@@ -1,13 +1,18 @@
+import type { BrowserProviderCliValue } from "../../collector-runtime/infrastructure";
+import { normalizeBrowserProviderValue } from "../../collector-runtime/infrastructure";
+
 export interface FacebookCollectorCliArgs {
   readonly groupUrl?: string;
   readonly sourceGroupId: string;
   readonly baseUrl: string;
   readonly maxScrolls: number;
   readonly maxDurationMs: number;
+  readonly browserProvider: BrowserProviderCliValue;
   readonly diagnoseCheckout: boolean;
 }
 
 export interface FacebookCollectorCliEnvironment {
+  readonly BROWSER_PROVIDER?: string;
   readonly COLLECTOR_FACEBOOK_BASE_URL?: string;
   readonly PROFILE_MANAGER_BASE_URL?: string;
   readonly CONTENT_MANAGER_BASE_URL?: string;
@@ -42,6 +47,7 @@ export function parseFacebookCollectorCliArgs(
   let baseUrl: string | undefined;
   let maxScrolls: string | undefined;
   let maxDurationMs: string | undefined;
+  let browserProvider: string | undefined;
   let diagnoseCheckout = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -124,6 +130,23 @@ export function parseFacebookCollectorCliArgs(
       continue;
     }
 
+    if (rawArg === "--browser-provider") {
+      assertOptionNotProvided(browserProvider, "--browser-provider");
+      browserProvider = readSeparatedOptionValue(
+        argv,
+        index,
+        "--browser-provider",
+      );
+      index += 1;
+      continue;
+    }
+
+    if (rawArg.startsWith("--browser-provider=")) {
+      assertOptionNotProvided(browserProvider, "--browser-provider");
+      browserProvider = readInlineOptionValue(rawArg, "--browser-provider");
+      continue;
+    }
+
     if (rawArg === "--diagnose-checkout") {
       if (diagnoseCheckout) {
         throw new FacebookCollectorCliArgumentError(
@@ -169,6 +192,9 @@ export function parseFacebookCollectorCliArgs(
       "--max-duration-ms",
       DEFAULT_FACEBOOK_COLLECTOR_MAX_DURATION_MS,
     ),
+    browserProvider: normalizeBrowserProviderOption(
+      browserProvider ?? environment.BROWSER_PROVIDER,
+    ),
     diagnoseCheckout,
   };
 }
@@ -176,7 +202,7 @@ export function parseFacebookCollectorCliArgs(
 export function getFacebookCollectorCliUsage(): string {
   return [
     "Usage:",
-    "  pnpm collector:facebook:run -- --source-group-id <source-group-id> [--base-url <url>] [--max-scrolls 3] [--max-duration-ms 30000] [--diagnose-checkout]",
+    "  pnpm collector:facebook:run -- --source-group-id <source-group-id> [--base-url <url>] [--max-scrolls 3] [--max-duration-ms 30000] [--browser-provider playwright] [--diagnose-checkout]",
     "",
     "Options:",
     "  --source-group-id    Required Content Manager source group id. The command resolves the stored Facebook group URL before launch.",
@@ -184,10 +210,12 @@ export function getFacebookCollectorCliUsage(): string {
     "  --base-url           API or gateway base URL for Profile Manager and Content Manager.",
     "  --max-scrolls        Maximum page scrolls before capture stops. Default: 3.",
     "  --max-duration-ms    Maximum browser capture duration in milliseconds. Default: 30000.",
+    "  --browser-provider   Browser provider: playwright or cloakbrowser. Default: playwright.",
     "  --diagnose-checkout  Print safe aggregate profile status counts before checkout.",
     "",
     "Defaults:",
     "  --base-url uses COLLECTOR_FACEBOOK_BASE_URL, then PROFILE_MANAGER_BASE_URL, then CONTENT_MANAGER_BASE_URL, then http://localhost:3000.",
+    "  --browser-provider uses BROWSER_PROVIDER, then playwright.",
     "",
     "The command resolves an ACTIVE Facebook source group, checks out one eligible READY profile, captures Facebook GraphQL JSON responses in memory, submits normalized candidates, releases the lease, and prints only safe counts.",
   ].join("\n");
@@ -370,6 +398,18 @@ function normalizePositiveIntegerOption(
   }
 
   return parsedValue;
+}
+
+function normalizeBrowserProviderOption(
+  value: string | undefined,
+): BrowserProviderCliValue {
+  const result = normalizeBrowserProviderValue(value);
+
+  if (!result.ok) {
+    throw new FacebookCollectorCliArgumentError(result.message);
+  }
+
+  return result.value;
 }
 
 function isFacebookHost(hostname: string): boolean {

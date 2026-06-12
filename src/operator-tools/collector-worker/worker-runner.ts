@@ -161,6 +161,7 @@ function buildDependencies(
       input.dependencies?.executor ??
       new FacebookCollectionRunExecutor({
         baseUrl: input.args.baseUrl,
+        browserProvider: input.args.browserProvider,
         ...(input.logger !== undefined ? { logger: input.logger } : {}),
         ...(input.abortSignal !== undefined
           ? { abortSignal: input.abortSignal }

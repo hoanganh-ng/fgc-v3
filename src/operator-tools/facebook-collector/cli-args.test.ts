@@ -21,6 +21,8 @@ describe("parseFacebookCollectorCliArgs", () => {
         "5",
         "--max-duration-ms",
         "45000",
+        "--browser-provider",
+        "cloakbrowser",
         "--diagnose-checkout",
       ]),
     ).toEqual({
@@ -28,6 +30,7 @@ describe("parseFacebookCollectorCliArgs", () => {
       baseUrl: "http://localhost:8081",
       maxScrolls: 5,
       maxDurationMs: 45_000,
+      browserProvider: "cloakbrowser",
       diagnoseCheckout: true,
     });
   });
@@ -46,6 +49,7 @@ describe("parseFacebookCollectorCliArgs", () => {
       baseUrl: "https://gateway.example.test",
       maxScrolls: DEFAULT_FACEBOOK_COLLECTOR_MAX_SCROLLS,
       maxDurationMs: DEFAULT_FACEBOOK_COLLECTOR_MAX_DURATION_MS,
+      browserProvider: "playwright",
       diagnoseCheckout: false,
     });
   });
@@ -82,6 +86,25 @@ describe("parseFacebookCollectorCliArgs", () => {
     });
   });
 
+  it("uses BROWSER_PROVIDER before the Playwright default", () => {
+    expect(
+      parseFacebookCollectorCliArgs(
+        ["--source-group-id", "source-group-1"],
+        {
+          BROWSER_PROVIDER: " cloakbrowser ",
+        },
+      ),
+    ).toMatchObject({
+      browserProvider: "cloakbrowser",
+    });
+
+    expect(
+      parseFacebookCollectorCliArgs(["--source-group-id", "source-group-1"]),
+    ).toMatchObject({
+      browserProvider: "playwright",
+    });
+  });
+
   it("fails safely for missing required values and unexpected options", () => {
     expect(() => parseFacebookCollectorCliArgs([])).toThrow(
       new FacebookCollectorCliArgumentError("--source-group-id is required."),
@@ -106,6 +129,14 @@ describe("parseFacebookCollectorCliArgs", () => {
         "--wat",
       ]),
     ).toThrow("Unknown option --wat.");
+    expect(() =>
+      parseFacebookCollectorCliArgs([
+        "--source-group-id",
+        "source-group-1",
+        "--browser-provider",
+        "unknown",
+      ]),
+    ).toThrow("Unknown browser provider.");
   });
 
   it("rejects invalid URLs, embedded credentials, and non-group URLs", () => {
@@ -172,6 +203,7 @@ describe("parseFacebookCollectorCliArgs", () => {
       "pnpm collector:facebook:run -- --source-group-id",
     );
     expect(getFacebookCollectorCliUsage()).toContain("--diagnose-checkout");
+    expect(getFacebookCollectorCliUsage()).toContain("--browser-provider");
     expect(getFacebookCollectorCliUsage()).not.toContain("password");
   });
 });

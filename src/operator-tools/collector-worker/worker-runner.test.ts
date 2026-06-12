@@ -27,6 +27,7 @@ describe("collector worker runner", () => {
         baseUrl: "http://localhost:8081",
         once: true,
         pollIntervalMs: 5_000,
+        browserProvider: "playwright",
       },
       logger,
       dependencies: {
@@ -70,6 +71,7 @@ describe("collector worker runner", () => {
         baseUrl: "http://localhost:8081",
         once: true,
         pollIntervalMs: 5_000,
+        browserProvider: "playwright",
       },
       logger,
       dependencies: {
@@ -137,6 +139,7 @@ describe("collector worker runner", () => {
         baseUrl: "http://localhost:8081",
         once: true,
         pollIntervalMs: 5_000,
+        browserProvider: "playwright",
       },
       logger,
       dependencies: {

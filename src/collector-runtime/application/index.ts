@@ -4,6 +4,7 @@ export * from "./collector-runtime.errors";
 export * from "./collector-runtime.ports";
 export * from "./collector-runtime.types";
 export * from "./ports/clock.port";
+export * from "./ports/browser-provider.port";
 export * from "./ports/collection-run-executor.port";
 export * from "./ports/collection-run-repository.port";
 export * from "./ports/id-generator.port";

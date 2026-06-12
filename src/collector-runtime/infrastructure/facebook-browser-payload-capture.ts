@@ -1,11 +1,9 @@
-import { chromium } from "playwright";
 import type {
-  Browser,
-  BrowserContext,
-  BrowserContextOptions,
-  Page,
-  Response,
-} from "playwright";
+  BrowserProviderPage,
+  BrowserProviderPort,
+  BrowserProviderResponse,
+  BrowserProviderSession,
+} from "../application";
 import { errorToMessage } from "../application";
 import type {
   CapturedFacebookPayload,
@@ -17,6 +15,11 @@ import type {
   RuntimeProfileConfiguration,
   RuntimeProfileConfigurationPort,
 } from "../application";
+import { BrowserProviderError } from "../application";
+import {
+  PlaywrightChromiumBrowserProvider,
+  buildBrowserProviderLaunchConfig,
+} from "./browser-providers";
 
 const DEFAULT_MAX_SCROLLS = 3;
 const DEFAULT_MAX_DURATION_MS = 30_000;
@@ -28,43 +31,19 @@ const PAGE_CONTEXT_PARSE_FAILURE_BINDING_NAME =
   "__fgcFacebookPayloadParseFailed";
 const FACEBOOK_JSON_PREFIX = "for (;;);";
 
-interface PlaywrightProxySettings {
-  readonly server: string;
-  readonly username?: string;
-  readonly password?: string;
-}
-
-type StorageStateObject = Exclude<
-  BrowserContextOptions["storageState"],
-  string | undefined
->;
-
-interface PlaywrightStorageCookie {
-  readonly name: string;
-  readonly value: string;
-  readonly domain: string;
-  readonly path: string;
-  readonly expires: number;
-  readonly httpOnly: boolean;
-  readonly secure: boolean;
-  readonly sameSite: "Strict" | "Lax" | "None";
-}
-
-interface PlaywrightLocalStorageOrigin {
-  readonly origin: string;
-  readonly localStorage: {
-    readonly name: string;
-    readonly value: string;
-  }[];
-}
-
 export interface FacebookBrowserPayloadCaptureAdapterOptions {
   readonly runtimeProfileConfigurationPort: RuntimeProfileConfigurationPort;
+  readonly browserProvider: BrowserProviderPort;
   readonly maxScrolls?: number;
   readonly maxDurationMs?: number;
   readonly abortSignal?: AbortSignal;
   readonly now?: () => Date;
 }
+
+export type PlaywrightFacebookBrowserPayloadCaptureAdapterOptions = Omit<
+  FacebookBrowserPayloadCaptureAdapterOptions,
+  "browserProvider"
+>;
 
 export interface FacebookGraphQLResponseMetadata {
   readonly url: string;
@@ -86,9 +65,10 @@ export interface FacebookJsonParseResult {
   readonly parseFailed: boolean;
 }
 
-export class PlaywrightFacebookBrowserPayloadCaptureAdapter
+export class FacebookBrowserPayloadCaptureAdapter
   implements FacebookGroupPayloadCapturePort {
   private readonly runtimeProfileConfigurationPort: RuntimeProfileConfigurationPort;
+  private readonly browserProvider: BrowserProviderPort;
   private readonly maxScrolls: number;
   private readonly maxDurationMs: number;
   private readonly abortSignal: AbortSignal | undefined;
@@ -97,6 +77,7 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
   public constructor(options: FacebookBrowserPayloadCaptureAdapterOptions) {
     this.runtimeProfileConfigurationPort =
       options.runtimeProfileConfigurationPort;
+    this.browserProvider = options.browserProvider;
     this.maxScrolls = normalizeNonNegativeInteger(
       options.maxScrolls,
       DEFAULT_MAX_SCROLLS,
@@ -115,8 +96,7 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
     const warnings: CollectorRuntimeWarning[] = [];
     const sensitiveValues = new Set<string>();
     let captureBuffer: FacebookPayloadCaptureBuffer | undefined;
-    let browser: Browser | undefined;
-    let context: BrowserContext | undefined;
+    let browserSession: BrowserProviderSession | undefined;
     let abortCloseListener: (() => void) | undefined;
 
     try {
@@ -152,17 +132,19 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
         };
       }
 
-      browser = await chromium.launch({
-        headless: false,
-      });
-      context = await browser.newContext(toBrowserContextOptions(configuration));
+      browserSession = await this.browserProvider.launch(
+        buildBrowserProviderLaunchConfig({
+          providerName: this.browserProvider.providerName,
+          configuration,
+          headless: false,
+        }),
+      );
       abortCloseListener = createAbortCloseListener(
         this.abortSignal,
-        context,
-        browser,
+        browserSession,
       );
 
-      const page = await context.newPage();
+      const page = await browserSession.newPage();
       const pageCaptureBuffer = new FacebookPayloadCaptureBuffer(this.now);
       captureBuffer = pageCaptureBuffer;
       await installFacebookPageContextCapture(page, pageCaptureBuffer);
@@ -173,7 +155,7 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
         sensitiveValues,
       );
 
-      page.on("response", (response) => {
+      page.onResponse((response) => {
         const capture = captureNetworkResponse(
           response,
           pageCaptureBuffer,
@@ -187,33 +169,34 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
 
       try {
         const navigationResponse = await Promise.race([
-          page.goto(input.sourceGroupUrl, {
+          page.goto({
+            url: input.sourceGroupUrl,
             waitUntil: "domcontentloaded",
-            timeout: this.maxDurationMs,
+            timeoutMs: this.maxDurationMs,
           }),
           pageFailureWatcher.promise,
         ]);
 
         throwIfAborted(this.abortSignal);
 
-        if (navigationResponse !== null && navigationResponse.status() >= 400) {
+        if (navigationResponse !== null && navigationResponse.status >= 400) {
           pageCaptureBuffer.recordFinalPageUrl(page.url());
           return {
             ok: false,
             errorCode: "FACEBOOK_GROUP_NAVIGATION_FAILED",
-            errorMessage: `Facebook group navigation returned HTTP ${navigationResponse.status()}.`,
+            errorMessage: `Facebook group navigation returned HTTP ${navigationResponse.status}.`,
             warnings,
             diagnostics: pageCaptureBuffer.toDiagnostics(),
           };
         }
 
-        if (isFacebookLoginOrCheckpointUrl(page.url())) {
+        const initialAccessFailure = classifyFacebookAccessFailure(page.url());
+        if (initialAccessFailure !== undefined) {
           pageCaptureBuffer.recordFinalPageUrl(page.url());
           return {
             ok: false,
-            errorCode: "FACEBOOK_LOGIN_REQUIRED",
-            errorMessage:
-              "Facebook redirected to login or checkpoint. Re-provision the profile session before retrying.",
+            errorCode: initialAccessFailure.errorCode,
+            errorMessage: initialAccessFailure.errorMessage,
             warnings,
             diagnostics: pageCaptureBuffer.toDiagnostics(),
           };
@@ -229,13 +212,13 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
           pageFailureWatcher.promise,
         ]);
 
-        if (isFacebookLoginOrCheckpointUrl(page.url())) {
+        const finalAccessFailure = classifyFacebookAccessFailure(page.url());
+        if (finalAccessFailure !== undefined) {
           pageCaptureBuffer.recordFinalPageUrl(page.url());
           return {
             ok: false,
-            errorCode: "FACEBOOK_LOGIN_REQUIRED",
-            errorMessage:
-              "Facebook redirected to login or checkpoint. Re-provision the profile session before retrying.",
+            errorCode: finalAccessFailure.errorCode,
+            errorMessage: finalAccessFailure.errorMessage,
             warnings,
             diagnostics: pageCaptureBuffer.toDiagnostics(),
           };
@@ -279,7 +262,10 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
 
       return {
         ok: false,
-        errorCode: "FACEBOOK_BROWSER_CAPTURE_FAILED",
+        errorCode:
+          error instanceof BrowserProviderError
+            ? error.code
+            : "FACEBOOK_BROWSER_CAPTURE_FAILED",
         errorMessage: redactSensitiveText(
           errorToMessage(error),
           sensitiveValues,
@@ -291,8 +277,19 @@ export class PlaywrightFacebookBrowserPayloadCaptureAdapter
       };
     } finally {
       abortCloseListener?.();
-      await closePlaywrightSession(context, browser, warnings);
+      await closeBrowserProviderSession(browserSession, warnings);
     }
+  }
+}
+
+export class PlaywrightFacebookBrowserPayloadCaptureAdapter extends FacebookBrowserPayloadCaptureAdapter {
+  public constructor(
+    options: PlaywrightFacebookBrowserPayloadCaptureAdapterOptions,
+  ) {
+    super({
+      ...options,
+      browserProvider: new PlaywrightChromiumBrowserProvider(),
+    });
   }
 }
 
@@ -449,7 +446,7 @@ class FacebookPayloadCaptureBuffer {
 
   public recordFinalPageUrl(url: string): void {
     this.finalPageUrl = sanitizeFacebookDiagnosticUrl(url);
-    this.loginRedirectSuspected = isFacebookLoginOrCheckpointUrl(url);
+    this.loginRedirectSuspected = classifyFacebookAccessFailure(url) !== undefined;
   }
 
   public getCapturedPayloads(): readonly CapturedFacebookPayload[] {
@@ -497,18 +494,18 @@ class FacebookPayloadCaptureBuffer {
 }
 
 async function installFacebookPageContextCapture(
-  page: Page,
+  page: BrowserProviderPage,
   captureBuffer: FacebookPayloadCaptureBuffer,
 ): Promise<void> {
   await page.exposeBinding(
     PAGE_CONTEXT_CAPTURE_BINDING_NAME,
-    (_source, message: unknown) => {
+    (message: unknown) => {
       captureBuffer.recordPageContextCapture(message);
     },
   );
   await page.exposeBinding(
     PAGE_CONTEXT_PARSE_FAILURE_BINDING_NAME,
-    (_source, message: unknown) => {
+    (message: unknown) => {
       captureBuffer.recordPageContextParseFailure(message);
     },
   );
@@ -518,7 +515,7 @@ async function installFacebookPageContextCapture(
 }
 
 function captureNetworkResponse(
-  response: Response,
+  response: BrowserProviderResponse,
   captureBuffer: FacebookPayloadCaptureBuffer,
   readCurrentPageUrl: () => string,
 ): Promise<void> | undefined {
@@ -888,7 +885,7 @@ function createFacebookPageContextCaptureInitScript(): string {
 }
 
 async function scrollFacebookGroupPage(
-  page: Page,
+  page: BrowserProviderPage,
   maxScrolls: number,
   deadlineAt: number,
   abortSignal: AbortSignal | undefined,
@@ -915,222 +912,16 @@ async function settlePendingCaptures(
   await Promise.allSettled(pendingCaptures);
 }
 
-function toBrowserContextOptions(
-  configuration: RuntimeProfileConfiguration,
-): BrowserContextOptions {
-  const hardwareFingerprint = toRecord(configuration.hardwareFingerprint);
-  const networkContext = toRecord(configuration.networkContext);
-  const storageState = toStorageState(configuration.authenticationState);
-  const options: BrowserContextOptions = {
-    storageState,
-  };
-
-  const userAgent = readString(hardwareFingerprint, "userAgent");
-
-  if (userAgent !== undefined) {
-    options.userAgent = userAgent;
-  }
-
-  const viewport = toRecord(hardwareFingerprint?.viewport);
-  const viewportWidth = readPositiveNumber(viewport, "width");
-  const viewportHeight = readPositiveNumber(viewport, "height");
-
-  if (viewportWidth !== undefined && viewportHeight !== undefined) {
-    options.viewport = {
-      width: Math.round(viewportWidth),
-      height: Math.round(viewportHeight),
-    };
-  }
-
-  const deviceScaleFactor = readPositiveNumber(viewport, "deviceScaleFactor");
-
-  if (deviceScaleFactor !== undefined) {
-    options.deviceScaleFactor = deviceScaleFactor;
-  }
-
-  const languages = readStringArray(hardwareFingerprint, "languages");
-  const firstLanguage = languages[0];
-
-  if (firstLanguage !== undefined) {
-    options.locale = firstLanguage;
-    options.extraHTTPHeaders = {
-      "Accept-Language": languages.join(","),
-    };
-  }
-
-  const timezone =
-    readString(hardwareFingerprint, "timezone") ??
-    readString(toRecord(configuration.temporalRoutine), "timezone");
-
-  if (timezone !== undefined) {
-    options.timezoneId = timezone;
-  }
-
-  const proxy = toPlaywrightProxySettings(toRecord(networkContext?.proxy));
-
-  if (proxy !== undefined) {
-    options.proxy = proxy;
-  }
-
-  return options;
-}
-
-function toStorageState(authenticationState: unknown): StorageStateObject {
-  const state = toRecord(authenticationState);
-
-  return {
-    cookies: readUnknownArray(state, "cookies")
-      .map(toPlaywrightStorageCookie)
-      .filter(
-        (cookie): cookie is PlaywrightStorageCookie => cookie !== undefined,
-      ),
-    origins: toLocalStorageOrigins(readUnknownArray(state, "localStorage")),
-  };
-}
-
-function toPlaywrightStorageCookie(
-  value: unknown,
-): PlaywrightStorageCookie | undefined {
-  const cookie = toRecord(value);
-  const name = readString(cookie, "name");
-  const cookieValue = readNullableString(cookie, "value");
-  const domain = readString(cookie, "domain");
-  const path = readString(cookie, "path");
-
-  if (
-    name === undefined ||
-    cookieValue === undefined ||
-    domain === undefined ||
-    path === undefined
-  ) {
-    return undefined;
-  }
-
-  const expires = toCookieExpires(readNullableString(cookie, "expiresAt"));
-  const sameSite = toPlaywrightSameSite(readString(cookie, "sameSite"));
-
-  return {
-    name,
-    value: cookieValue,
-    domain,
-    path,
-    expires: expires ?? -1,
-    httpOnly: readBoolean(cookie, "httpOnly") ?? false,
-    secure: readBoolean(cookie, "secure") ?? false,
-    sameSite: sameSite ?? "Lax",
-  };
-}
-
-function toLocalStorageOrigins(
-  entries: readonly unknown[],
-): PlaywrightLocalStorageOrigin[] {
-  const origins = new Map<string, Array<{ name: string; value: string }>>();
-
-  for (const entryValue of entries) {
-    const entry = toRecord(entryValue);
-    const origin = readHttpOrigin(readString(entry, "origin"));
-    const key = readString(entry, "key");
-    const value = readNullableString(entry, "value");
-
-    if (origin === undefined || key === undefined || value === undefined) {
-      continue;
-    }
-
-    const originEntries = origins.get(origin) ?? [];
-    originEntries.push({
-      name: key,
-      value,
-    });
-    origins.set(origin, originEntries);
-  }
-
-  return [...origins.entries()].map(([origin, localStorage]) => ({
-    origin,
-    localStorage,
-  }));
-}
-
-function toCookieExpires(value: string | undefined): number | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  const expiresMs = Date.parse(value);
-
-  if (!Number.isFinite(expiresMs)) {
-    return undefined;
-  }
-
-  return Math.floor(expiresMs / 1000);
-}
-
-function toPlaywrightSameSite(
-  value: string | undefined,
-): "Strict" | "Lax" | "None" | undefined {
-  if (value === "STRICT") {
-    return "Strict";
-  }
-
-  if (value === "LAX") {
-    return "Lax";
-  }
-
-  if (value === "NONE") {
-    return "None";
-  }
-
-  return undefined;
-}
-
-function toPlaywrightProxySettings(
-  proxy: Record<string, unknown> | undefined,
-): PlaywrightProxySettings | undefined {
-  if (proxy === undefined) {
-    return undefined;
-  }
-
-  const protocol = readString(proxy, "protocol");
-  const host = readString(proxy, "host");
-  const port = readPositiveNumber(proxy, "port");
-
-  if (protocol === undefined || host === undefined || port === undefined) {
-    return undefined;
-  }
-
-  const credentials = toRecord(proxy.credentials);
-  const username = readString(credentials, "username");
-  const password = readString(credentials, "password");
-
-  return {
-    server: `${toProxyScheme(protocol)}://${host}:${Math.round(port)}`,
-    ...(username !== undefined && password !== undefined
-      ? {
-          username,
-          password,
-        }
-      : {}),
-  };
-}
-
-function toProxyScheme(protocol: string): string {
-  if (protocol === "SOCKS5") {
-    return "socks5";
-  }
-
-  return protocol.toLowerCase();
-}
-
 function createAbortCloseListener(
   signal: AbortSignal | undefined,
-  context: BrowserContext,
-  browser: Browser,
+  browserSession: BrowserProviderSession,
 ): (() => void) | undefined {
   if (signal === undefined) {
     return undefined;
   }
 
   const onAbort = (): void => {
-    void closePlaywrightSession(context, browser, []);
+    void browserSession.close();
   };
 
   signal.addEventListener("abort", onAbort, { once: true });
@@ -1141,7 +932,7 @@ function createAbortCloseListener(
 }
 
 function createPageFailureWatcher(
-  page: Page,
+  page: BrowserProviderPage,
   sensitiveValues: ReadonlySet<string>,
 ): {
   readonly promise: Promise<never>;
@@ -1160,56 +951,63 @@ function createPageFailureWatcher(
     rejectPromise(new Error("Facebook browser page crashed."));
   };
 
-  page.once("pageerror", onPageError);
-  page.once("crash", onCrash);
+  page.oncePageError(onPageError);
+  page.onceCrash(onCrash);
 
   return {
     promise,
     dispose: () => {
-      page.off("pageerror", onPageError);
-      page.off("crash", onCrash);
+      page.offPageError(onPageError);
+      page.offCrash(onCrash);
     },
   };
 }
 
-async function closePlaywrightSession(
-  context: BrowserContext | undefined,
-  browser: Browser | undefined,
+async function closeBrowserProviderSession(
+  browserSession: BrowserProviderSession | undefined,
   warnings: CollectorRuntimeWarning[],
 ): Promise<void> {
   try {
-    await context?.close();
+    await browserSession?.close();
   } catch {
     warnings.push({
-      code: "BROWSER_CONTEXT_CLOSE_FAILED",
+      code: "BROWSER_PROVIDER_CLOSE_FAILED",
       message:
-        "Browser context close reported an error. Check for a leftover Chromium process before retrying.",
-    });
-  }
-
-  try {
-    await browser?.close();
-  } catch {
-    warnings.push({
-      code: "BROWSER_CLOSE_FAILED",
-      message:
-        "Browser close reported an error. Check for a leftover Chromium process before retrying.",
+        "Browser provider close reported an error. Check for a leftover browser process before retrying.",
     });
   }
 }
 
-function isFacebookLoginOrCheckpointUrl(value: string): boolean {
+function classifyFacebookAccessFailure(
+  value: string,
+): { readonly errorCode: string; readonly errorMessage: string } | undefined {
   let parsedUrl: URL;
 
   try {
     parsedUrl = new URL(value);
   } catch {
-    return false;
+    return undefined;
   }
 
   const pathname = parsedUrl.pathname.toLowerCase();
 
-  return pathname.includes("/login") || pathname.includes("/checkpoint");
+  if (pathname.includes("/checkpoint")) {
+    return {
+      errorCode: "CHECKPOINT_REQUIRED",
+      errorMessage:
+        "Facebook redirected to checkpoint. Re-provision or review the profile session before retrying.",
+    };
+  }
+
+  if (pathname.includes("/login")) {
+    return {
+      errorCode: "LOGIN_REQUIRED",
+      errorMessage:
+        "Facebook redirected to login. Re-provision the profile session before retrying.",
+    };
+  }
+
+  return undefined;
 }
 
 function readHeader(

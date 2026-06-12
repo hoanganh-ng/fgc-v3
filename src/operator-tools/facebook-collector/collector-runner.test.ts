@@ -36,6 +36,7 @@ describe("runFacebookCollectorCommand", () => {
       args: {
         sourceGroupId: "source-group-1",
         baseUrl: "http://localhost:8081",
+        browserProvider: "playwright",
         maxScrolls: 3,
         maxDurationMs: 30_000,
         diagnoseCheckout: false,
@@ -126,6 +127,7 @@ describe("runFacebookCollectorCommand", () => {
         groupUrl: "https://www.facebook.com/groups/group-1",
         sourceGroupId: "source-group-1",
         baseUrl: "http://localhost:8081",
+        browserProvider: "playwright",
         maxScrolls: 3,
         maxDurationMs: 30_000,
         diagnoseCheckout: false,
@@ -169,6 +171,7 @@ describe("runFacebookCollectorCommand", () => {
         groupUrl: "https://www.facebook.com/groups/override-group",
         sourceGroupId: "source-group-1",
         baseUrl: "http://localhost:8081",
+        browserProvider: "playwright",
         maxScrolls: 3,
         maxDurationMs: 30_000,
         diagnoseCheckout: false,
@@ -207,6 +210,7 @@ describe("runFacebookCollectorCommand", () => {
       args: {
         sourceGroupId: "source-group-1",
         baseUrl: "http://localhost:8081",
+        browserProvider: "playwright",
         maxScrolls: 3,
         maxDurationMs: 30_000,
         diagnoseCheckout: false,
@@ -244,6 +248,7 @@ describe("runFacebookCollectorCommand", () => {
       args: {
         sourceGroupId: "missing-source-group",
         baseUrl: "http://localhost:8081",
+        browserProvider: "playwright",
         maxScrolls: 3,
         maxDurationMs: 30_000,
         diagnoseCheckout: false,
@@ -287,6 +292,7 @@ describe("runFacebookCollectorCommand", () => {
       args: {
         sourceGroupId: "source-group-1",
         baseUrl: "http://localhost:8081",
+        browserProvider: "playwright",
         maxScrolls: 3,
         maxDurationMs: 30_000,
         diagnoseCheckout: false,
@@ -321,6 +327,7 @@ describe("runFacebookCollectorCommand", () => {
       args: {
         sourceGroupId: "source-group-1",
         baseUrl: "http://localhost:8081",
+        browserProvider: "playwright",
         maxScrolls: 3,
         maxDurationMs: 30_000,
         diagnoseCheckout: true,
