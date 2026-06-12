@@ -8,9 +8,11 @@ import type {
 import type {
   CollectionRun,
   CollectionRunId,
+  CollectionRunIsoDateTime,
 } from "../../../collector-runtime/domain";
 import type { DatabaseSession } from "../client";
 import {
+  type CollectionRunRow,
   toCollectionRunDomain,
   toCollectionRunRow,
 } from "../mappers/collector-runtime.mapper";
@@ -80,6 +82,44 @@ export class DrizzleCollectionRunRepository
       items: rows.map((row) => toCollectionRunDomain(row)),
       total: Number(totalRow?.total ?? 0),
     };
+  }
+
+  public async claimNextQueued(
+    startedAt: CollectionRunIsoDateTime,
+  ): Promise<CollectionRun | null> {
+    const result = await this.db.execute<CollectionRunRow>(sql`
+      WITH next_run AS (
+        SELECT id
+        FROM collector_collection_runs
+        WHERE status = 'QUEUED'
+        ORDER BY requested_at ASC, created_at ASC, id ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT 1
+      )
+      UPDATE collector_collection_runs
+      SET
+        status = 'RUNNING',
+        started_at = ${startedAt},
+        updated_at = ${startedAt}
+      FROM next_run
+      WHERE collector_collection_runs.id = next_run.id
+      RETURNING
+        collector_collection_runs.id,
+        collector_collection_runs.source_group_id AS "sourceGroupId",
+        collector_collection_runs.status,
+        collector_collection_runs.trigger_type AS "triggerType",
+        collector_collection_runs.parameters,
+        collector_collection_runs.summary,
+        collector_collection_runs.failure_reason AS "failureReason",
+        collector_collection_runs.requested_at AS "requestedAt",
+        collector_collection_runs.started_at AS "startedAt",
+        collector_collection_runs.finished_at AS "finishedAt",
+        collector_collection_runs.created_at AS "createdAt",
+        collector_collection_runs.updated_at AS "updatedAt"
+    `);
+    const [row] = result.rows;
+
+    return row === undefined ? null : toCollectionRunDomain(row);
   }
 }
 

@@ -8,17 +8,17 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, Start Provisioning UI was added in Sprint 029, the Profile Provisioning Browser CLI was added in Sprint 030, provisioning E2E verification and hardening was completed in Sprint 031, the Facebook Browser Payload Capture Adapter was added in Sprint 032, Web UI content category/source group management was added in Sprint 033, Collector CLI source group resolution and checkout diagnostics were added in Sprint 034A, page-context Facebook fetch/XHR capture was added in Sprint 034B, Content Items review UI screens were added in Sprint 035, Content Items review layout polish was completed in Sprint 035A, and collection run records plus API trigger work is active in Sprint 036.
+The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, Start Provisioning UI was added in Sprint 029, the Profile Provisioning Browser CLI was added in Sprint 030, provisioning E2E verification and hardening was completed in Sprint 031, the Facebook Browser Payload Capture Adapter was added in Sprint 032, Web UI content category/source group management was added in Sprint 033, Collector CLI source group resolution and checkout diagnostics were added in Sprint 034A, page-context Facebook fetch/XHR capture was added in Sprint 034B, Content Items review UI screens were added in Sprint 035, Content Items review layout polish was completed in Sprint 035A, collection run records plus API trigger work was completed in Sprint 036, and the Collector Worker Process is active in Sprint 037.
 
-The next active work is durable Collector Runtime collection-run records and an API trigger that queues runs without executing browser collection in the HTTP request.
+The next active work is a Collector Runtime worker process that claims queued collection runs and executes them through the existing Facebook collector orchestration.
 
 ## Current Sprint
 
-Sprint 036: Collection Run Records + API Trigger
+Sprint 037: Collector Worker Process
 
-Active sprint file: `docs/SPRINTS/SPRINT-036-collection-run-records-api-trigger.md`
+Active sprint file: `docs/SPRINTS/SPRINT-037-collector-worker-process.md`
 
-Sprint 036 adds a Collector Runtime collection-run record slice with durable storage and safe HTTP endpoints to request, list, read, and optionally cancel queued collection runs. The request API creates `QUEUED` run records only. It must not launch Playwright, perform profile checkout, execute collection, add a scheduler or worker, change Content Items UI, or persist raw payloads.
+Sprint 037 adds a Collector Runtime worker process that atomically claims queued collection runs and executes them through the existing Facebook collector orchestration. It must not run collection from HTTP routes, add scheduler or queue infrastructure, duplicate manual collector logic, change Content Items UI, or persist raw payloads.
 
 ## Decided Items
 
@@ -75,6 +75,7 @@ Sprint 036 adds a Collector Runtime collection-run record slice with durable sto
 - Sprint 035 adds Web UI Content Items list/detail review screens and status actions backed by existing Content Manager safe read and lifecycle APIs.
 - Sprint 035A polishes Web UI Content Items list/detail review layouts without changing backend behavior or exposing sensitive/raw collector data.
 - Sprint 036 introduces durable Collector Runtime collection-run records and API-triggered queued run creation without executing browser collection from HTTP requests.
+- Sprint 037 introduces a Collector Runtime worker process that claims queued collection runs and executes them through existing Facebook collector orchestration.
 - Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
 - Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.
 - The Content Collector module separation is Collector Profile Manager, Content Manager, and Collector Runtime.

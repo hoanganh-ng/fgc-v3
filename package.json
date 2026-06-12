@@ -10,6 +10,7 @@
     "start": "tsx src/main.ts",
     "profile:provision": "tsx src/operator-tools/profile-provisioning/cli.ts",
     "collector:facebook:run": "tsx src/operator-tools/facebook-collector/cli.ts",
+    "collector:worker:run": "tsx src/operator-tools/collector-worker/cli.ts",
     "build": "tsc --noEmit",
     "build:web": "pnpm --filter @fgc/web build",
     "typecheck": "tsc --noEmit",

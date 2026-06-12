@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CancelCollectionRunUseCase,
+  ClaimNextCollectionRunUseCase,
   GetCollectionRunUseCase,
   ListCollectionRunsUseCase,
   MarkCollectionRunFailedUseCase,
@@ -48,6 +49,9 @@ describe("collector runtime composition container", () => {
     );
     expect(services.cancelCollectionRun).toBeInstanceOf(
       CancelCollectionRunUseCase,
+    );
+    expect(services.claimNextCollectionRun).toBeInstanceOf(
+      ClaimNextCollectionRunUseCase,
     );
 
     await services.close();

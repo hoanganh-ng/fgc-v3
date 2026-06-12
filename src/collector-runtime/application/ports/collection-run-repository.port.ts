@@ -1,6 +1,7 @@
 import type {
   CollectionRun,
   CollectionRunId,
+  CollectionRunIsoDateTime,
   CollectionRunSourceGroupId,
   CollectionRunStatus,
 } from "../../domain";
@@ -21,4 +22,5 @@ export interface CollectionRunRepository {
   save(collectionRun: CollectionRun): Promise<void>;
   findById(id: CollectionRunId): Promise<CollectionRun | null>;
   list(query: CollectionRunListQuery): Promise<CollectionRunListResult>;
+  claimNextQueued(startedAt: CollectionRunIsoDateTime): Promise<CollectionRun | null>;
 }

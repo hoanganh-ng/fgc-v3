@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   CancelCollectionRunUseCase,
+  ClaimNextCollectionRunUseCase,
   CollectionRunSourceGroupNotActiveError,
   CollectionRunSourceGroupNotFoundError,
   CollectionRunSourceGroupPlatformUnsupportedError,
+  ExecuteCollectionRunUseCase,
   GetCollectionRunUseCase,
   InvalidCollectionRunStatusTransitionError,
   ListCollectionRunsUseCase,
@@ -14,6 +16,9 @@ import {
 } from "./index";
 import type {
   Clock,
+  CollectionRunExecutorInput,
+  CollectionRunExecutorPort,
+  CollectionRunExecutorResult,
   IdGenerator,
   SourceGroupLookupPort,
   SourceGroupLookupResult,
@@ -22,6 +27,7 @@ import { InMemoryCollectionRunRepository } from "./test-support/in-memory-collec
 import type {
   CollectionRun,
   CollectionRunStatus,
+  CollectionRunSummary,
 } from "../domain";
 
 const createdAt = "2026-04-01T10:00:00.000Z";
@@ -194,6 +200,216 @@ describe("collector runtime collection run application use cases", () => {
     });
   });
 
+  it("claims the oldest queued collection run and transitions it to running", async () => {
+    const context = createTestContext();
+
+    await seedCollectionRun(context, {
+      id: "collection-run-newer",
+      status: "QUEUED",
+      requestedAt: "2026-04-01T10:05:00.000Z",
+      createdAt: "2026-04-01T10:05:00.000Z",
+    });
+    await seedCollectionRun(context, {
+      id: "collection-run-older",
+      status: "QUEUED",
+      requestedAt: "2026-04-01T10:00:00.000Z",
+      createdAt: "2026-04-01T10:00:00.000Z",
+    });
+    context.clock.setNow(updatedAt);
+
+    const claimedCollectionRun = await new ClaimNextCollectionRunUseCase(
+      context.collectionRuns,
+      context.clock,
+    ).execute();
+
+    expect(claimedCollectionRun).toMatchObject({
+      id: "collection-run-older",
+      status: "RUNNING",
+      startedAt: updatedAt,
+      updatedAt,
+    });
+    await expect(
+      context.collectionRuns.findById("collection-run-older"),
+    ).resolves.toMatchObject({
+      status: "RUNNING",
+      startedAt: updatedAt,
+    });
+    await expect(
+      context.collectionRuns.findById("collection-run-newer"),
+    ).resolves.toMatchObject({
+      status: "QUEUED",
+    });
+  });
+
+  it("does not claim canceled, running, succeeded, or failed collection runs", async () => {
+    const context = createTestContext();
+
+    await seedCollectionRun(context, {
+      id: "collection-run-canceled",
+      status: "CANCELED",
+      finishedAt: updatedAt,
+    });
+    await seedCollectionRun(context, {
+      id: "collection-run-running",
+      status: "RUNNING",
+      startedAt: createdAt,
+    });
+    await seedCollectionRun(context, {
+      id: "collection-run-succeeded",
+      status: "SUCCEEDED",
+      startedAt: createdAt,
+      finishedAt: updatedAt,
+    });
+    await seedCollectionRun(context, {
+      id: "collection-run-failed",
+      status: "FAILED",
+      startedAt: createdAt,
+      finishedAt: updatedAt,
+      failureReason: {
+        code: "WORKER_FAILED",
+        message: "Worker failed.",
+      },
+    });
+
+    await expect(
+      new ClaimNextCollectionRunUseCase(
+        context.collectionRuns,
+        context.clock,
+      ).execute(),
+    ).resolves.toBeNull();
+  });
+
+  it("does not claim the same queued run twice", async () => {
+    const context = createTestContext();
+
+    await seedCollectionRun(context, { status: "QUEUED" });
+
+    const useCase = new ClaimNextCollectionRunUseCase(
+      context.collectionRuns,
+      context.clock,
+    );
+
+    await expect(useCase.execute()).resolves.toMatchObject({
+      id: "collection-run-1",
+      status: "RUNNING",
+    });
+    await expect(useCase.execute()).resolves.toBeNull();
+  });
+
+  it("executes a running collection run and marks it succeeded with a safe summary", async () => {
+    const context = createTestContext();
+    const summary: CollectionRunSummary = {
+      capturedPayloads: 2,
+      extractorCandidates: 3,
+      contentItemsSubmitted: 3,
+      failedSubmissions: 0,
+      leaseReleased: true,
+    };
+
+    await seedCollectionRun(context, {
+      status: "RUNNING",
+      startedAt: createdAt,
+      parameters: {
+        maxScrolls: 4,
+        maxDurationMs: 20_000,
+      },
+    });
+    context.executor.setResult({
+      ok: true,
+      summary,
+    });
+    context.clock.setNow(updatedAt);
+
+    const collectionRun = await new ExecuteCollectionRunUseCase(
+      context.collectionRuns,
+      context.executor,
+      context.clock,
+    ).execute({
+      collectionRunId: "collection-run-1",
+    });
+
+    expect(collectionRun).toMatchObject({
+      id: "collection-run-1",
+      status: "SUCCEEDED",
+      summary,
+      finishedAt: updatedAt,
+      updatedAt,
+    });
+    expect(context.executor.calls).toEqual([
+      {
+        collectionRunId: "collection-run-1",
+        sourceGroupId,
+        parameters: {
+          maxScrolls: 4,
+          maxDurationMs: 20_000,
+        },
+      },
+    ]);
+  });
+
+  it("executes a running collection run and marks it failed with a sanitized failure reason", async () => {
+    const context = createTestContext();
+
+    await seedCollectionRun(context, {
+      status: "RUNNING",
+      startedAt: createdAt,
+    });
+    context.executor.setResult({
+      ok: false,
+      failureReason: {
+        code: "SOURCE_GROUP_NOT_ACTIVE",
+        message: "Source group must be ACTIVE before collection.",
+      },
+      summary: {
+        capturedPayloads: 0,
+        extractorCandidates: 0,
+        contentItemsSubmitted: 0,
+        failedSubmissions: 0,
+        leaseReleased: false,
+      },
+    });
+    context.clock.setNow(updatedAt);
+
+    const collectionRun = await new ExecuteCollectionRunUseCase(
+      context.collectionRuns,
+      context.executor,
+      context.clock,
+    ).execute({
+      collectionRunId: "collection-run-1",
+    });
+
+    expect(collectionRun).toMatchObject({
+      status: "FAILED",
+      failureReason: {
+        code: "SOURCE_GROUP_NOT_ACTIVE",
+        message: "Source group must be ACTIVE before collection.",
+      },
+      summary: {
+        capturedPayloads: 0,
+        leaseReleased: false,
+      },
+      finishedAt: updatedAt,
+      updatedAt,
+    });
+  });
+
+  it("does not execute collection runs that are not running", async () => {
+    const context = createTestContext();
+
+    await seedCollectionRun(context, { status: "SUCCEEDED" });
+
+    await expect(
+      new ExecuteCollectionRunUseCase(
+        context.collectionRuns,
+        context.executor,
+        context.clock,
+      ).execute({
+        collectionRunId: "collection-run-1",
+      }),
+    ).rejects.toThrow(InvalidCollectionRunStatusTransitionError);
+    expect(context.executor.calls).toEqual([]);
+  });
+
   it("rejects invalid status transitions", async () => {
     const context = createTestContext();
 
@@ -283,6 +499,7 @@ interface TestContext {
   readonly sourceGroups: FakeSourceGroupLookupPort;
   readonly clock: FixedClock;
   readonly ids: FakeIdGenerator;
+  readonly executor: FakeCollectionRunExecutor;
 }
 
 function createTestContext(ids: readonly string[] = []): TestContext {
@@ -291,6 +508,7 @@ function createTestContext(ids: readonly string[] = []): TestContext {
     sourceGroups: new FakeSourceGroupLookupPort(),
     clock: new FixedClock(),
     ids: new FakeIdGenerator(ids),
+    executor: new FakeCollectionRunExecutor(),
   };
 }
 
@@ -407,5 +625,31 @@ class FakeSourceGroupLookupPort implements SourceGroupLookupPort {
         url: options.url ?? "https://www.facebook.com/groups/source-group-1",
       },
     };
+  }
+}
+
+class FakeCollectionRunExecutor implements CollectionRunExecutorPort {
+  public readonly calls: CollectionRunExecutorInput[] = [];
+  private result: CollectionRunExecutorResult = {
+    ok: true,
+    summary: {
+      capturedPayloads: 0,
+      extractorCandidates: 0,
+      contentItemsSubmitted: 0,
+      failedSubmissions: 0,
+      leaseReleased: true,
+    },
+  };
+
+  public async execute(
+    input: CollectionRunExecutorInput,
+  ): Promise<CollectionRunExecutorResult> {
+    this.calls.push(input);
+
+    return this.result;
+  }
+
+  public setResult(result: CollectionRunExecutorResult): void {
+    this.result = result;
   }
 }

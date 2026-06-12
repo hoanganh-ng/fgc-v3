@@ -1,5 +1,6 @@
 import {
   CancelCollectionRunUseCase,
+  ClaimNextCollectionRunUseCase,
   GetCollectionRunUseCase,
   ListCollectionRunsUseCase,
   MarkCollectionRunFailedUseCase,
@@ -30,6 +31,7 @@ export interface CollectorRuntimeContainer {
   readonly markCollectionRunSucceeded: MarkCollectionRunSucceededUseCase;
   readonly markCollectionRunFailed: MarkCollectionRunFailedUseCase;
   readonly cancelCollectionRun: CancelCollectionRunUseCase;
+  readonly claimNextCollectionRun: ClaimNextCollectionRunUseCase;
   close(): Promise<void>;
 }
 
@@ -65,6 +67,10 @@ export function createCollectorRuntime(
       clock,
     ),
     cancelCollectionRun: new CancelCollectionRunUseCase(
+      collectionRuns,
+      clock,
+    ),
+    claimNextCollectionRun: new ClaimNextCollectionRunUseCase(
       collectionRuns,
       clock,
     ),

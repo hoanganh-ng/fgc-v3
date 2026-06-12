@@ -1,6 +1,7 @@
 import type {
   CollectionRun,
   CollectionRunId,
+  CollectionRunIsoDateTime,
 } from "../../domain";
 import type {
   CollectionRunListQuery,
@@ -46,6 +47,29 @@ export class InMemoryCollectionRunRepository
       total: matchingCollectionRuns.length,
     };
   }
+
+  public async claimNextQueued(
+    startedAt: CollectionRunIsoDateTime,
+  ): Promise<CollectionRun | null> {
+    const collectionRun = [...this.collectionRuns.values()]
+      .filter((candidate) => candidate.status === "QUEUED")
+      .sort(compareCollectionRunsByRequestedAtAsc)[0];
+
+    if (collectionRun === undefined) {
+      return null;
+    }
+
+    const claimedCollectionRun: CollectionRun = {
+      ...collectionRun,
+      status: "RUNNING",
+      startedAt,
+      updatedAt: startedAt,
+    };
+
+    this.collectionRuns.set(claimedCollectionRun.id, claimedCollectionRun);
+
+    return claimedCollectionRun;
+  }
 }
 
 function compareCollectionRunsByCreatedAtDesc(
@@ -59,4 +83,25 @@ function compareCollectionRunsByCreatedAtDesc(
   }
 
   return right.id.localeCompare(left.id);
+}
+
+function compareCollectionRunsByRequestedAtAsc(
+  left: CollectionRun,
+  right: CollectionRun,
+): number {
+  const requestedAtComparison =
+    Date.parse(left.requestedAt) - Date.parse(right.requestedAt);
+
+  if (requestedAtComparison !== 0) {
+    return requestedAtComparison;
+  }
+
+  const createdAtComparison =
+    Date.parse(left.createdAt) - Date.parse(right.createdAt);
+
+  if (createdAtComparison !== 0) {
+    return createdAtComparison;
+  }
+
+  return left.id.localeCompare(right.id);
 }
