@@ -7,6 +7,7 @@ import {
   InvalidProfileConfigurationError,
   InvalidProvisioningTokenError,
   StartProfileProvisioningUseCase,
+  UpdateProfileAccountStageUseCase,
   UpdateProfileConfigurationUseCase,
 } from "./index";
 import type {
@@ -41,6 +42,7 @@ describe("collector profile application use cases", () => {
     });
 
     expect(profile.identity.status).toBe("PENDING_CONFIG");
+    expect(profile.identity.accountStage).toBe("NEW_ACCOUNT");
     expect(profile.networkContext).toBeDefined();
     expect(profile.hardwareFingerprint).toBeNull();
     expect(profile.authenticationState).toEqual({
@@ -161,6 +163,7 @@ describe("collector profile application use cases", () => {
     );
 
     expect(readyProfile.identity.status).toBe("READY");
+    expect(readyProfile.identity.accountStage).toBe("NEW_ACCOUNT");
     expect(readyProfile.authenticationState).toEqual({
       cookies: createCookies(),
       localStorage: createLocalStorage(),
@@ -221,6 +224,49 @@ describe("collector profile application use cases", () => {
       createAlternateNetworkContext(),
     );
     expect(updatedProfile.identity.status).toBe("READY");
+  });
+
+  it("persists a valid account stage transition and returns a safe profile DTO", async () => {
+    const context = createTestContext();
+    const profile = await createConfiguredPendingProfile(context);
+    const detail = await new UpdateProfileAccountStageUseCase(
+      context.profiles,
+      context.clock,
+    ).execute({
+      profileId: profile.identity.id,
+      accountStage: "WARMING",
+    });
+    const persistedProfile = await context.profiles.findById(
+      profile.identity.id,
+    );
+
+    expect(detail).toMatchObject({
+      id: profile.identity.id,
+      accountStage: "WARMING",
+    });
+    expect(detail).not.toHaveProperty("authenticationState");
+    expect(detail).not.toHaveProperty("provisioningToken");
+    expect(detail.networkContext.proxy).not.toHaveProperty("credentials");
+    expect(persistedProfile?.identity.accountStage).toBe("WARMING");
+  });
+
+  it("rejects invalid account stage transitions", async () => {
+    const context = createTestContext();
+    const profile = await createConfiguredPendingProfile(context);
+
+    await expect(
+      new UpdateProfileAccountStageUseCase(
+        context.profiles,
+        context.clock,
+      ).execute({
+        profileId: profile.identity.id,
+        accountStage: "COLLECTION_READY",
+      }),
+    ).rejects.toThrow("Invalid profile account stage transition");
+
+    await expect(context.profiles.findById(profile.identity.id)).resolves.toEqual(
+      profile,
+    );
   });
 
   it("rejects hardware fingerprint overwrite", async () => {

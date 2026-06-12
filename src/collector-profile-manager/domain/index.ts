@@ -1,5 +1,7 @@
 export * from "./checkout-eligibility";
 export * from "./profile";
+export * from "./profile-account-stage";
+export * from "./profile-account-stage-state-machine";
 export * from "./profile-errors";
 export * from "./profile-lease";
 export * from "./profile-properties";

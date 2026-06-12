@@ -1,7 +1,9 @@
 import type { ProfileStatus } from "./profile-status";
+import type { ProfileAccountStage } from "./profile-account-stage";
 
 export type CollectorProfileDomainErrorCode =
   | "INVALID_PROFILE_STATE_TRANSITION"
+  | "INVALID_PROFILE_ACCOUNT_STAGE_TRANSITION"
   | "MISSING_REQUIRED_PROFILE_CONFIGURATION"
   | "INVALID_PROVISIONING_TOKEN_STATE"
   | "IMMUTABLE_FINGERPRINT_VIOLATION";
@@ -25,6 +27,20 @@ export class InvalidProfileStateTransitionError extends CollectorProfileDomainEr
     super(
       "INVALID_PROFILE_STATE_TRANSITION",
       `Invalid profile state transition: ${from} -> ${to}.`,
+    );
+    this.from = from;
+    this.to = to;
+  }
+}
+
+export class InvalidProfileAccountStageTransitionError extends CollectorProfileDomainError {
+  public readonly from: ProfileAccountStage;
+  public readonly to: ProfileAccountStage;
+
+  public constructor(from: ProfileAccountStage, to: ProfileAccountStage) {
+    super(
+      "INVALID_PROFILE_ACCOUNT_STAGE_TRANSITION",
+      `Invalid profile account stage transition: ${from} -> ${to}.`,
     );
     this.from = from;
     this.to = to;

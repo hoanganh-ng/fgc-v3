@@ -312,6 +312,7 @@ describe("runFacebookCollectorCommand", () => {
 
     expect(output).toContain("NO_ELIGIBLE_PROFILE_AVAILABLE");
     expect(output).toContain("No profile is READY in this API/database.");
+    expect(output).toContain("accountStage COLLECTION_READY");
     expect(output).toContain("temporal routine");
     expect(output).toContain("Cooldown or safety thresholds");
     expect(output).toContain("leased or BUSY");

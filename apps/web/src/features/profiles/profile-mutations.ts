@@ -6,8 +6,10 @@ import {
 import {
   profileManagerClient,
   type CreateProfileRequest,
+  type ProfileDetailResponse,
   type ProfileMutationResponse,
   type StartProfileProvisioningResponse,
+  type UpdateProfileAccountStageRequest,
   type UpdateProfileConfigurationRequest,
 } from "@/lib/api/profile-manager-client";
 import {
@@ -23,6 +25,11 @@ export interface UpdateProfileConfigurationVariables {
 
 export interface StartProfileProvisioningVariables {
   readonly profileId: string;
+}
+
+export interface UpdateProfileAccountStageVariables {
+  readonly profileId: string;
+  readonly request: UpdateProfileAccountStageRequest;
 }
 
 export function useCreateProfileMutation(): UseMutationResult<
@@ -95,6 +102,36 @@ export function useStartProfileProvisioningMutation(): UseMutationResult<
     mutationFn: async ({ profileId }) =>
       unwrapApiResult(
         await profileManagerClient.startProfileProvisioning(profileId),
+      ),
+    onSuccess: async (_response, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: profileQueryKeys.all }),
+        queryClient.invalidateQueries({
+          queryKey: profileQueryKeys.detail(variables.profileId),
+        }),
+      ]);
+    },
+  });
+}
+
+export function useUpdateProfileAccountStageMutation(): UseMutationResult<
+  ProfileDetailResponse,
+  ApiResultError,
+  UpdateProfileAccountStageVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    ProfileDetailResponse,
+    ApiResultError,
+    UpdateProfileAccountStageVariables
+  >({
+    mutationFn: async ({ profileId, request }) =>
+      unwrapApiResult(
+        await profileManagerClient.updateProfileAccountStage(
+          profileId,
+          request,
+        ),
       ),
     onSuccess: async (_response, variables) => {
       await Promise.all([

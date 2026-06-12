@@ -20,12 +20,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useStartProfileProvisioningMutation } from "@/features/profiles/profile-mutations";
+import { ProfileAccountStageBadge } from "@/features/profiles/profile-account-stage-badge";
+import {
+  useStartProfileProvisioningMutation,
+  useUpdateProfileAccountStageMutation,
+} from "@/features/profiles/profile-mutations";
 import { ProfileStatusBadge } from "@/features/profiles/profile-status-badge";
 import { useProfileQuery } from "@/features/profiles/profile-queries";
 import { isApiResultError } from "@/lib/api/http-client";
-import type { ProfileDetail } from "@/lib/api/profile-manager-client";
+import type {
+  KnownProfileAccountStage,
+  ProfileAccountStage,
+  ProfileDetail,
+} from "@/lib/api/profile-manager-client";
 import { PageShell } from "@/pages/page-shell";
 
 export function ProfileDetailPage(): JSX.Element {
@@ -101,6 +110,10 @@ function ProfileDetailView({
       </div>
       <div className="grid content-start gap-5">
         <StatusSummaryCard profile={profile} />
+        <AccountStageCard
+          key={`${profile.id}-${profile.accountStage}`}
+          profile={profile}
+        />
         <StartProvisioningCard key={profile.id} profile={profile} />
         <TimestampSummaryCard profile={profile} />
       </div>
@@ -163,6 +176,10 @@ function StatusSummaryCard({
           <ProfileStatusBadge status={profile.status} />
         </div>
         <div className="flex items-center justify-between gap-3">
+          <span className="text-sm text-muted-foreground">Account Stage</span>
+          <ProfileAccountStageBadge accountStage={profile.accountStage} />
+        </div>
+        <div className="flex items-center justify-between gap-3">
           <span className="text-sm text-muted-foreground">Authentication</span>
           <StatusBadge
             label={profile.hasAuthenticationState ? "Captured" : "Missing"}
@@ -183,6 +200,101 @@ function StatusSummaryCard({
             tone={profile.networkContext.proxy === null ? "neutral" : "info"}
           />
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AccountStageCard({
+  profile,
+}: {
+  readonly profile: ProfileDetail;
+}): JSX.Element {
+  const updateAccountStage = useUpdateProfileAccountStageMutation();
+  const allowedStages = getAllowedAccountStageTransitions(profile.accountStage);
+  const [selectedStage, setSelectedStage] = useState<
+    KnownProfileAccountStage | ""
+  >(allowedStages[0] ?? "");
+  const canSubmit =
+    selectedStage !== "" &&
+    selectedStage !== profile.accountStage &&
+    !updateAccountStage.isPending;
+
+  function updateStage(): void {
+    if (selectedStage === "" || !canSubmit) {
+      return;
+    }
+
+    updateAccountStage.reset();
+    void updateAccountStage.mutateAsync({
+      profileId: profile.id,
+      request: {
+        accountStage: selectedStage,
+      },
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Account Stage</CardTitle>
+        <CardDescription>
+          Manual maturity gate for collection checkout.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm text-muted-foreground">Current Stage</span>
+          <ProfileAccountStageBadge accountStage={profile.accountStage} />
+        </div>
+
+        {allowedStages.length > 0 ? (
+          <div className="grid gap-2">
+            <Select
+              aria-label="Account stage"
+              disabled={updateAccountStage.isPending}
+              value={selectedStage}
+              onChange={(event) =>
+                setSelectedStage(
+                  event.currentTarget.value as KnownProfileAccountStage,
+                )
+              }
+            >
+              {allowedStages.map((stage) => (
+                <option key={stage} value={stage}>
+                  {stage}
+                </option>
+              ))}
+            </Select>
+            <Button
+              className="w-full"
+              disabled={!canSubmit}
+              onClick={updateStage}
+            >
+              <ShieldCheck aria-hidden="true" className="size-4" />
+              {updateAccountStage.isPending ? "Updating Stage" : "Update Stage"}
+            </Button>
+          </div>
+        ) : (
+          <StatusBadge label="No transition" tone="neutral" />
+        )}
+
+        {updateAccountStage.isError ? (
+          <div
+            className="rounded border border-[#e4a0a0] bg-[#fff5f5] px-3 py-3 text-sm text-[#7f1d1d]"
+            role="alert"
+          >
+            <div className="flex gap-2">
+              <AlertTriangle
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0"
+              />
+              <p className="min-w-0 break-words">
+                {formatApiError(updateAccountStage.error)}
+              </p>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -380,6 +492,43 @@ function StartProvisioningCard({
 interface ImmediateProvisioningSuccess {
   readonly provisioningToken?: string;
   readonly expiresAt?: string;
+}
+
+const profileAccountStages = [
+  "NEW_ACCOUNT",
+  "WARMING",
+  "COLLECTION_READY",
+  "LIMITED",
+  "NEEDS_REVIEW",
+  "RETIRED",
+] as const satisfies readonly KnownProfileAccountStage[];
+
+const allowedAccountStageTransitions = {
+  NEW_ACCOUNT: ["WARMING", "NEEDS_REVIEW"],
+  WARMING: ["COLLECTION_READY", "LIMITED", "NEEDS_REVIEW"],
+  COLLECTION_READY: ["LIMITED", "NEEDS_REVIEW", "RETIRED"],
+  LIMITED: ["WARMING", "COLLECTION_READY", "RETIRED"],
+  NEEDS_REVIEW: ["WARMING", "RETIRED"],
+  RETIRED: [],
+} satisfies Record<
+  KnownProfileAccountStage,
+  readonly KnownProfileAccountStage[]
+>;
+
+function getAllowedAccountStageTransitions(
+  accountStage: ProfileAccountStage,
+): readonly KnownProfileAccountStage[] {
+  if (!isKnownAccountStage(accountStage)) {
+    return [];
+  }
+
+  return allowedAccountStageTransitions[accountStage];
+}
+
+function isKnownAccountStage(
+  accountStage: ProfileAccountStage,
+): accountStage is KnownProfileAccountStage {
+  return profileAccountStages.some((stage) => stage === accountStage);
 }
 
 function ConfigurationSummaryCard({

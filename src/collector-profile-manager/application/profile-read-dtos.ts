@@ -8,6 +8,7 @@ import type {
   IsoDateTime,
   NetworkKillswitch,
   ProfileId,
+  ProfileAccountStage,
   ProfileStatus,
   ProxyRouting,
   SafetyThresholds,
@@ -25,6 +26,7 @@ export interface ProfileSummary {
   readonly id: ProfileId;
   readonly displayName: string;
   readonly status: ProfileStatus;
+  readonly accountStage: ProfileAccountStage;
   readonly timezone: IanaTimezone;
   readonly createdAt: IsoDateTime;
   readonly updatedAt: IsoDateTime;
@@ -54,6 +56,7 @@ export function toProfileSummaryDto(
     id: profile.identity.id,
     displayName: profile.identity.displayName,
     status: profile.identity.status,
+    accountStage: profile.identity.accountStage,
     timezone: profile.temporalRoutine.timezone,
     createdAt: profile.identity.createdAt,
     updatedAt: profile.identity.updatedAt,

@@ -245,6 +245,7 @@ const applicationErrorStatus: Record<CollectorProfileApplicationErrorCode, numbe
 
 const domainErrorStatus: Record<CollectorProfileDomainErrorCode, number> = {
   INVALID_PROFILE_STATE_TRANSITION: 409,
+  INVALID_PROFILE_ACCOUNT_STAGE_TRANSITION: 409,
   MISSING_REQUIRED_PROFILE_CONFIGURATION: 400,
   INVALID_PROVISIONING_TOKEN_STATE: 400,
   IMMUTABLE_FINGERPRINT_VIOLATION: 409,

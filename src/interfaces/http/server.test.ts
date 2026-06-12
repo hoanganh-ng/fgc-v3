@@ -23,9 +23,11 @@ import type {
   RuntimeProfileConfiguration,
   StartProfileProvisioningInput,
   StartProfileProvisioningOutput,
+  UpdateProfileAccountStageInput,
   UpdateProfileConfigurationInput,
 } from "../../collector-profile-manager/application";
 import {
+  InvalidProfileAccountStageTransitionError,
   createPendingCollectorProfile,
 } from "../../collector-profile-manager/domain";
 import type {
@@ -37,6 +39,7 @@ import type {
   HardwareFingerprint,
   LocalStorageEntry,
   NetworkContext,
+  ProfileAccountStage,
   ProfileLease,
   SafetyThresholds,
   TemporalRoutine,
@@ -112,6 +115,7 @@ describe("HTTP server", () => {
             id: "profile-1",
             displayName: "Profile 1",
             status: "READY",
+            accountStage: "NEW_ACCOUNT",
             timezone: "America/Los_Angeles",
             hasAuthenticationState: true,
           },
@@ -206,6 +210,7 @@ describe("HTTP server", () => {
           id: "profile-1",
           displayName: "Profile 1",
           status: "PENDING_LOGIN",
+          accountStage: "NEW_ACCOUNT",
           timezone: "America/Los_Angeles",
           hasAuthenticationState: true,
         },
@@ -272,6 +277,7 @@ describe("HTTP server", () => {
           id: "profile-1",
           displayName: "Profile 1",
           status: "PENDING_CONFIG",
+          accountStage: "NEW_ACCOUNT",
           hasAuthenticationState: false,
           hasHardwareFingerprint: false,
           provisioningTokenStatus: "NOT_ISSUED",
@@ -304,6 +310,76 @@ describe("HTTP server", () => {
         },
       });
       expect(service.createProfile.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("updates profile account stage through the Collector Profile Manager service", async () => {
+    const { server, service } = createTestServer();
+
+    service.updateProfileAccountStage.setOutput(
+      toProfileDetailDto(createProfile({ accountStage: "WARMING" })),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PATCH",
+        url: "/collector/profiles/profile-1/account-stage",
+        payload: {
+          accountStage: "WARMING",
+        },
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(service.updateProfileAccountStage.calls).toEqual([
+        {
+          profileId: "profile-1",
+          accountStage: "WARMING",
+        },
+      ]);
+      expect(body).toMatchObject({
+        profile: {
+          id: "profile-1",
+          accountStage: "WARMING",
+        },
+      });
+      expect(body.profile).not.toHaveProperty("authenticationState");
+      expect(body.profile).not.toHaveProperty("provisioningToken");
+      expect(body.profile.networkContext.proxy).not.toHaveProperty(
+        "credentials",
+      );
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects invalid account stage transition requests", async () => {
+    const { server, service } = createTestServer();
+
+    service.updateProfileAccountStage.setError(
+      new InvalidProfileAccountStageTransitionError(
+        "NEW_ACCOUNT",
+        "COLLECTION_READY",
+      ),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PATCH",
+        url: "/collector/profiles/profile-1/account-stage",
+        payload: {
+          accountStage: "COLLECTION_READY",
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "INVALID_PROFILE_ACCOUNT_STAGE_TRANSITION",
+        },
+      });
     } finally {
       await server.close();
     }
@@ -680,6 +756,10 @@ interface FakeCollectorProfileManager extends CollectorProfileManagerHttpService
     UpdateProfileConfigurationInput,
     CollectorProfile
   >;
+  readonly updateProfileAccountStage: StubUseCase<
+    UpdateProfileAccountStageInput,
+    ProfileDetail
+  >;
   readonly startProfileProvisioning: StubUseCase<
     StartProfileProvisioningInput,
     StartProfileProvisioningOutput
@@ -723,6 +803,7 @@ function createTestServer(): {
       },
     }),
     updateProfileConfiguration: new StubUseCase(profile),
+    updateProfileAccountStage: new StubUseCase(toProfileDetailDto(profile)),
     startProfileProvisioning: new StubUseCase({
       profile: createProfile({
         status: "PENDING_LOGIN",
@@ -769,6 +850,7 @@ function createTestServer(): {
 
 interface CreateProfileOptions {
   readonly status?: CollectorProfile["identity"]["status"];
+  readonly accountStage?: ProfileAccountStage;
   readonly authenticationState?: AuthenticationState;
   readonly provisioningTokenStatus?: CollectorProfile["provisioningToken"]["status"];
 }
@@ -795,6 +877,7 @@ function createProfile(options: CreateProfileOptions = {}): CollectorProfile {
     identity: {
       ...profile.identity,
       status,
+      accountStage: options.accountStage ?? profile.identity.accountStage,
     },
     authenticationState:
       options.authenticationState ?? profile.authenticationState,

@@ -7,6 +7,8 @@ import {
 import { ProvisioningTokenStateSchema } from "./profile.schemas";
 import type { CollectorProfileSchema } from "./profile.schemas";
 import type { ProfileStatus } from "./profile-status";
+import type { ProfileAccountStage } from "./profile-account-stage";
+import { transitionProfileAccountStage } from "./profile-account-stage-state-machine";
 import { transitionProfileStatus } from "./profile-state-machine";
 import type {
   AuthenticationState,
@@ -44,6 +46,7 @@ export function createPendingCollectorProfile(
     id: input.id,
     displayName: input.displayName,
     status: "PENDING_CONFIG",
+    accountStage: "NEW_ACCOUNT",
     createdAt: input.createdAt,
     updatedAt: input.createdAt,
     lastCheckoutAt: null,
@@ -64,6 +67,26 @@ export function createPendingCollectorProfile(
     contentAffinities:
       input.contentAffinities ?? createUnconfiguredContentAffinities(),
     provisioningToken: createNotIssuedProvisioningTokenState(),
+  };
+}
+
+export function transitionCollectorProfileAccountStage(
+  profile: CollectorProfile,
+  to: ProfileAccountStage,
+  updatedAt: IsoDateTime,
+): CollectorProfile {
+  const nextStage = transitionProfileAccountStage(
+    profile.identity.accountStage,
+    to,
+  );
+
+  return {
+    ...profile,
+    identity: {
+      ...profile.identity,
+      accountStage: nextStage,
+      updatedAt,
+    },
   };
 }
 

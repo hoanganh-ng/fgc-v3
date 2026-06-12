@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ProfileAccountStageBadge } from "@/features/profiles/profile-account-stage-badge";
 import { ProfileStatusBadge } from "@/features/profiles/profile-status-badge";
 import { useProfilesQuery } from "@/features/profiles/profile-queries";
 import { isApiResultError } from "@/lib/api/http-client";
@@ -85,11 +86,12 @@ function ProfilesTable({
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[58rem] border-collapse text-left text-sm">
+          <table className="w-full min-w-[66rem] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/45 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Account Stage</th>
                 <th className="px-4 py-3">Timezone</th>
                 <th className="px-4 py-3">Created</th>
                 <th className="px-4 py-3">Updated</th>
@@ -117,6 +119,11 @@ function ProfilesTable({
                   </td>
                   <td className="px-4 py-4">
                     <ProfileStatusBadge status={profile.status} />
+                  </td>
+                  <td className="px-4 py-4">
+                    <ProfileAccountStageBadge
+                      accountStage={profile.accountStage}
+                    />
                   </td>
                   <td className="px-4 py-4 text-muted-foreground">
                     {profile.timezone}

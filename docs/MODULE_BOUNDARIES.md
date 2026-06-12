@@ -5,11 +5,13 @@
 Owns:
 
 - Profile lifecycle and state machine rules.
+- Account maturity/readiness stage and transition rules.
 - Profile property model and invariants.
 - Provisioning token lifecycle.
 - Session ingestion rules.
 - Checkout eligibility rules.
 - Domain-level validation for profile readiness, busy state, cooldowns, temporal windows, and safety thresholds.
+- Checkout eligibility gating for normal collection, including the requirement that `accountStage = COLLECTION_READY`.
 
 Does not own:
 
@@ -91,6 +93,7 @@ Does not own:
 - Collector Profile Manager repository access.
 - Collector Profile Manager composition root wiring.
 - Collector Profile Manager checkout eligibility or leasing business rules.
+- Collector Profile Manager account maturity/readiness stage rules.
 - Public Profile Manager read DTO expansion for sensitive runtime material.
 - Authority over profile identity, session state, proxy configuration, or fingerprint configuration.
 - Content building.
@@ -109,6 +112,8 @@ The Sprint 021 submission flow accepts already-captured payloads only. It invoke
 The Sprint 022 profile-orchestrated collection flow invokes the Sprint 021 submission flow for each captured payload. It does not move extractor rules, Content Manager deduplication/upsert behavior, or Profile Manager checkout eligibility/leasing rules into Collector Runtime.
 
 The Sprint 024 trusted runtime profile configuration contract remains owned by Collector Profile Manager and is guarded by `leaseId`. Collector Runtime may consume that contract after checkout, but public profile read DTOs must continue to omit authentication state, local storage, proxy credentials, provisioning tokens, and token hashes.
+
+Sprint 038 keeps profile operational status separate from account maturity. A profile may be `READY` after login/session ingestion while its `accountStage` remains `NEW_ACCOUNT`; Collector Runtime must still rely on Profile Manager checkout instead of interpreting or bypassing account-stage rules itself.
 
 Extractor fixtures must be sanitized. They must not include cookies, tokens, authorization headers, viewer IDs, private user data, raw request headers, or sensitive account/session details. Synthetic fixtures should be clearly named as synthetic. Real payload fixtures must be sanitized before they are used in tests.
 

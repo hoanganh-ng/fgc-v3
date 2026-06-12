@@ -21,6 +21,25 @@ export const ProfileStatusSchema = z
   .min(1)
   .transform((status) => status as ProfileStatus);
 
+export const KnownProfileAccountStageSchema = z.enum([
+  "NEW_ACCOUNT",
+  "WARMING",
+  "COLLECTION_READY",
+  "LIMITED",
+  "NEEDS_REVIEW",
+  "RETIRED",
+]);
+
+export type KnownProfileAccountStage = z.infer<
+  typeof KnownProfileAccountStageSchema
+>;
+export type ProfileAccountStage = KnownProfileAccountStage | (string & {});
+
+export const ProfileAccountStageSchema = z
+  .string()
+  .min(1)
+  .transform((stage) => stage as ProfileAccountStage);
+
 export const ProvisioningTokenStatusSchema = z.enum([
   "NOT_ISSUED",
   "ISSUED",
@@ -185,6 +204,7 @@ export const ProfileSummarySchema = z
     id: NonEmptyStringSchema,
     displayName: NonEmptyStringSchema,
     status: ProfileStatusSchema,
+    accountStage: ProfileAccountStageSchema,
     timezone: z.string(),
     createdAt: NonEmptyStringSchema,
     updatedAt: NonEmptyStringSchema,
@@ -204,6 +224,7 @@ export const ProfileMutationSummarySchema = z
     id: NonEmptyStringSchema,
     displayName: NonEmptyStringSchema,
     status: ProfileStatusSchema,
+    accountStage: ProfileAccountStageSchema,
     createdAt: NonEmptyStringSchema,
     updatedAt: NonEmptyStringSchema,
     lastCheckoutAt: z.string().nullable(),
@@ -276,6 +297,12 @@ export const UpdateProfileConfigurationRequestSchema = z
     },
   );
 
+export const UpdateProfileAccountStageRequestSchema = z
+  .object({
+    accountStage: KnownProfileAccountStageSchema,
+  })
+  .strict();
+
 export const ProfileMutationResponseSchema = z
   .object({
     profile: ProfileMutationSummarySchema,
@@ -319,6 +346,9 @@ export type CreateProfileRequest = z.infer<typeof CreateProfileRequestSchema>;
 export type UpdateProfileConfigurationRequest = z.infer<
   typeof UpdateProfileConfigurationRequestSchema
 >;
+export type UpdateProfileAccountStageRequest = z.infer<
+  typeof UpdateProfileAccountStageRequestSchema
+>;
 export type ProfileMutationResponse = z.infer<
   typeof ProfileMutationResponseSchema
 >;
@@ -346,6 +376,10 @@ export interface ProfileManagerClient {
     profileId: string,
     request: UpdateProfileConfigurationRequest,
   ) => Promise<ApiResult<ProfileMutationResponse>>;
+  readonly updateProfileAccountStage: (
+    profileId: string,
+    request: UpdateProfileAccountStageRequest,
+  ) => Promise<ApiResult<ProfileDetailResponse>>;
   readonly startProfileProvisioning: (
     profileId: string,
   ) => Promise<ApiResult<StartProfileProvisioningResponse>>;
@@ -382,6 +416,14 @@ export function createProfileManagerClient(
         method: "PATCH",
         body: request,
         responseSchema: ProfileMutationResponseSchema,
+      });
+    },
+    updateProfileAccountStage(profileId, request) {
+      return httpClient.request({
+        path: `/collector/profiles/${encodeURIComponent(profileId)}/account-stage`,
+        method: "PATCH",
+        body: request,
+        responseSchema: ProfileDetailResponseSchema,
       });
     },
     startProfileProvisioning(profileId) {

@@ -9,6 +9,7 @@ import {
   ListProfilesUseCase,
   ReleaseProfileLeaseUseCase,
   StartProfileProvisioningUseCase,
+  UpdateProfileAccountStageUseCase,
   UpdateProfileConfigurationUseCase,
 } from "../../collector-profile-manager/application";
 import type {
@@ -39,6 +40,9 @@ describe("collector profile manager composition container", () => {
     expect(services.listProfiles).toBeInstanceOf(ListProfilesUseCase);
     expect(services.updateProfileConfiguration).toBeInstanceOf(
       UpdateProfileConfigurationUseCase,
+    );
+    expect(services.updateProfileAccountStage).toBeInstanceOf(
+      UpdateProfileAccountStageUseCase,
     );
     expect(services.startProfileProvisioning).toBeInstanceOf(
       StartProfileProvisioningUseCase,

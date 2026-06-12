@@ -236,8 +236,9 @@ Prerequisites:
 
 1. Start the dev or preview stack.
 2. Complete profile provisioning so at least one profile is `READY`.
-3. Ensure Content Manager has an `ACTIVE` Facebook source group record for the target Facebook group.
-4. Copy the `sourceGroupId` from the Web UI Source Groups page.
+3. Promote the profile account stage through valid manual transitions to `COLLECTION_READY`.
+4. Ensure Content Manager has an `ACTIVE` Facebook source group record for the target Facebook group.
+5. Copy the `sourceGroupId` from the Web UI Source Groups page.
 
 Run against the preview gateway:
 
@@ -273,7 +274,7 @@ Expected operator flow:
 
 1. The command resolves the source group through `GET /collector/source-groups/:sourceGroupId`.
 2. It verifies the source group exists, uses platform `FACEBOOK`, is `ACTIVE`, and has a Facebook group URL before browser launch.
-3. The command checks out one eligible `READY` profile through `POST /collector/profiles/checkout`.
+3. The command checks out one eligible `READY` and `COLLECTION_READY` profile through `POST /collector/profiles/checkout`.
 4. It fetches trusted runtime configuration from `GET /collector/profile-leases/:leaseId/runtime-configuration`.
 5. The selected browser provider opens a headed browser with the profile cookies, localStorage, browser fingerprint, locale/language, timezone, viewport, and proxy settings it can honor from Profile Manager runtime configuration.
 6. The browser visits the stored Facebook group URL, unless `--group-url` was provided as a development override.
@@ -436,7 +437,7 @@ Current limitations:
 - No scheduler, multi-group run, multi-profile run, Web UI trigger, source group selection UI, automatic group discovery, retry policy, stuck-run recovery, heartbeat, or worker lease.
 - Zero page-context and network captures can happen if Facebook does not return matching JSON responses during the stop window, the group is inaccessible, the profile is redirected to login or checkpoint, the page has not loaded enough feed content, or Facebook changes response shapes.
 - Non-zero captures with zero extracted candidates means the collector saw JSON payloads, but the current extractor did not find supported post candidates in those payloads.
-- A profile shown as `READY` is not always checkout-eligible. Checkout can still be blocked by temporal routine windows, cooldowns, daily safety thresholds, or an existing lease/BUSY state.
+- A profile shown as `READY` is not always checkout-eligible. Checkout also requires `accountStage = COLLECTION_READY` and can still be blocked by temporal routine windows, cooldowns, daily safety thresholds, or an existing lease/BUSY state.
 - `NO_ELIGIBLE_PROFILE_AVAILABLE` can also happen when the CLI `--base-url` points to a different API/database than the Web UI. For preview stack testing, prefer `--base-url http://localhost:8081`; use `--base-url http://localhost:3000` only for the direct API stack.
 
 Safety boundaries:

@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   ImmutableFingerprintViolationError,
+  InvalidProfileAccountStageTransitionError,
   InvalidProfileStateTransitionError,
   assignHardwareFingerprint,
   createPendingCollectorProfile,
+  transitionProfileAccountStage,
   transitionProfileStatus,
   validateCollectorProfile,
 } from "./index";
 import type {
   CollectorProfile,
   HardwareFingerprint,
+  ProfileAccountStage,
   ProfileStatus,
 } from "./index";
 
@@ -65,11 +68,66 @@ describe("profile state machine", () => {
   }
 });
 
+describe("profile account stage state machine", () => {
+  const allowedTransitions: readonly (readonly [
+    ProfileAccountStage,
+    ProfileAccountStage,
+  ])[] = [
+    ["NEW_ACCOUNT", "WARMING"],
+    ["NEW_ACCOUNT", "NEEDS_REVIEW"],
+    ["WARMING", "COLLECTION_READY"],
+    ["WARMING", "LIMITED"],
+    ["WARMING", "NEEDS_REVIEW"],
+    ["COLLECTION_READY", "LIMITED"],
+    ["COLLECTION_READY", "NEEDS_REVIEW"],
+    ["COLLECTION_READY", "RETIRED"],
+    ["LIMITED", "WARMING"],
+    ["LIMITED", "COLLECTION_READY"],
+    ["LIMITED", "RETIRED"],
+    ["NEEDS_REVIEW", "WARMING"],
+    ["NEEDS_REVIEW", "RETIRED"],
+  ];
+
+  for (const [from, to] of allowedTransitions) {
+    it(`allows ${from} -> ${to}`, () => {
+      expect(transitionProfileAccountStage(from, to)).toBe(to);
+    });
+  }
+
+  const invalidTransitions: readonly (readonly [
+    ProfileAccountStage,
+    ProfileAccountStage,
+  ])[] = [
+    ["RETIRED", "WARMING"],
+    ["RETIRED", "COLLECTION_READY"],
+    ["NEW_ACCOUNT", "COLLECTION_READY"],
+    ["NEW_ACCOUNT", "RETIRED"],
+    ["NEEDS_REVIEW", "COLLECTION_READY"],
+    ["LIMITED", "NEW_ACCOUNT"],
+    ["COLLECTION_READY", "NEW_ACCOUNT"],
+    ["NEW_ACCOUNT", "NEW_ACCOUNT"],
+  ];
+
+  for (const [from, to] of invalidTransitions) {
+    it(`rejects ${from} -> ${to}`, () => {
+      expect(() => transitionProfileAccountStage(from, to)).toThrow(
+        InvalidProfileAccountStageTransitionError,
+      );
+    });
+  }
+});
+
 describe("profile domain errors", () => {
   it("throws InvalidProfileStateTransitionError for invalid transitions", () => {
     expect(() => transitionProfileStatus("READY", "PENDING_CONFIG")).toThrow(
       InvalidProfileStateTransitionError,
     );
+  });
+
+  it("throws InvalidProfileAccountStageTransitionError for invalid account stage transitions", () => {
+    expect(() =>
+      transitionProfileAccountStage("NEEDS_REVIEW", "COLLECTION_READY"),
+    ).toThrow(InvalidProfileAccountStageTransitionError);
   });
 
   it("throws ImmutableFingerprintViolationError when assigning hardware fingerprint twice", () => {
@@ -87,6 +145,10 @@ describe("profile domain errors", () => {
 });
 
 describe("collector profile validation", () => {
+  it("defaults new profiles to NEW_ACCOUNT", () => {
+    expect(createMinimalProfile().identity.accountStage).toBe("NEW_ACCOUNT");
+  });
+
   it("passes a valid minimal profile", () => {
     const result = validateCollectorProfile(createMinimalProfile());
 
@@ -104,6 +166,19 @@ describe("collector profile validation", () => {
     });
 
     expectValidationIssue(result, "identity.status");
+  });
+
+  it("fails when account stage is invalid", () => {
+    const profile = createMinimalProfile();
+    const result = validateCollectorProfile({
+      ...profile,
+      identity: {
+        ...profile.identity,
+        accountStage: "UNKNOWN",
+      },
+    });
+
+    expectValidationIssue(result, "identity.accountStage");
   });
 
   it("fails when a required property group is missing", () => {

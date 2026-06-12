@@ -33,6 +33,18 @@ export const collectorProfileStatusEnum = pgEnum("collector_profile_status", [
   "BUSY",
 ]);
 
+export const collectorProfileAccountStageEnum = pgEnum(
+  "collector_profile_account_stage",
+  [
+    "NEW_ACCOUNT",
+    "WARMING",
+    "COLLECTION_READY",
+    "LIMITED",
+    "NEEDS_REVIEW",
+    "RETIRED",
+  ],
+);
+
 export const provisioningTokenStatusEnum = pgEnum("provisioning_token_status", [
   "NOT_ISSUED",
   "ISSUED",
@@ -56,6 +68,9 @@ export const collectorProfiles = pgTable(
     status: collectorProfileStatusEnum("status")
       .notNull()
       .default("PENDING_CONFIG"),
+    accountStage: collectorProfileAccountStageEnum("account_stage")
+      .notNull()
+      .default("NEW_ACCOUNT"),
     provisioningTokenStatus: provisioningTokenStatusEnum(
       "provisioning_token_status",
     )
@@ -102,6 +117,7 @@ export const collectorProfiles = pgTable(
   },
   (table) => [
     index("collector_profiles_status_idx").on(table.status),
+    index("collector_profiles_account_stage_idx").on(table.accountStage),
     uniqueIndex("collector_profiles_issued_token_hash_uidx")
       .on(table.provisioningTokenHash)
       .where(
@@ -109,6 +125,7 @@ export const collectorProfiles = pgTable(
       ),
     index("collector_profiles_checkout_availability_idx").on(
       table.status,
+      table.accountStage,
       table.nextAvailableAt,
     ),
   ],

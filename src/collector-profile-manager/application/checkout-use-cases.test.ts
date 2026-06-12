@@ -7,6 +7,7 @@ import {
   ProfileNotCheckoutEligibleError,
   ReleaseProfileLeaseUseCase,
   StartProfileProvisioningUseCase,
+  UpdateProfileAccountStageUseCase,
   UpdateProfileConfigurationUseCase,
 } from "./index";
 import type {
@@ -27,6 +28,7 @@ import type {
   LocalStorageEntry,
   NetworkContext,
   ProfileId,
+  ProfileAccountStage,
   ProfileLease,
   ProfileLeaseId,
   SafetyThresholds,
@@ -118,6 +120,27 @@ describe("collector profile checkout use cases", () => {
 
     await expectCheckoutRejection(context, "PROFILE_NOT_READY");
   });
+
+  const nonCollectionReadyStages: readonly ProfileAccountStage[] = [
+    "NEW_ACCOUNT",
+    "WARMING",
+    "LIMITED",
+    "NEEDS_REVIEW",
+    "RETIRED",
+  ];
+
+  for (const accountStage of nonCollectionReadyStages) {
+    it(`rejects READY profiles in ${accountStage}`, async () => {
+      const context = createTestContext();
+
+      await createReadyProfile(context, { accountStage });
+
+      await expectCheckoutRejection(
+        context,
+        "ACCOUNT_STAGE_NOT_COLLECTION_READY",
+      );
+    });
+  }
 
   it("rejects profiles outside their active window", async () => {
     const context = createTestContext();
@@ -257,6 +280,7 @@ function createTestContext(): TestContext {
 
 async function createReadyProfile(
   context: TestContext,
+  options: { readonly accountStage?: ProfileAccountStage } = {},
 ): Promise<CollectorProfile> {
   await new CreateProfileUseCase(context.profiles, context.clock).execute({
     id: "profile-1",
@@ -282,7 +306,7 @@ async function createReadyProfile(
     context.clock,
   ).execute({ profileId: "profile-1" });
 
-  return new IngestProfileSessionUseCase(
+  const readyProfile = await new IngestProfileSessionUseCase(
     context.profiles,
     context.clock,
   ).execute({
@@ -291,6 +315,65 @@ async function createReadyProfile(
     localStorage: createLocalStorage(),
     sessionExpiresAt: "2026-01-06T18:00:00.000Z",
   });
+
+  return setProfileAccountStage(
+    context,
+    readyProfile.identity.id,
+    options.accountStage ?? "COLLECTION_READY",
+  );
+}
+
+async function setProfileAccountStage(
+  context: TestContext,
+  profileId: ProfileId,
+  accountStage: ProfileAccountStage,
+): Promise<CollectorProfile> {
+  const transitionUseCase = new UpdateProfileAccountStageUseCase(
+    context.profiles,
+    context.clock,
+  );
+
+  if (accountStage === "NEW_ACCOUNT") {
+    const profile = await context.profiles.findById(profileId);
+
+    if (profile === null) {
+      throw new Error("Expected profile to exist.");
+    }
+
+    return profile;
+  }
+
+  if (accountStage === "WARMING") {
+    await transitionUseCase.execute({ profileId, accountStage: "WARMING" });
+  } else if (accountStage === "COLLECTION_READY") {
+    await transitionUseCase.execute({ profileId, accountStage: "WARMING" });
+    await transitionUseCase.execute({
+      profileId,
+      accountStage: "COLLECTION_READY",
+    });
+  } else if (accountStage === "LIMITED") {
+    await transitionUseCase.execute({ profileId, accountStage: "WARMING" });
+    await transitionUseCase.execute({ profileId, accountStage: "LIMITED" });
+  } else if (accountStage === "NEEDS_REVIEW") {
+    await transitionUseCase.execute({
+      profileId,
+      accountStage: "NEEDS_REVIEW",
+    });
+  } else {
+    await transitionUseCase.execute({
+      profileId,
+      accountStage: "NEEDS_REVIEW",
+    });
+    await transitionUseCase.execute({ profileId, accountStage: "RETIRED" });
+  }
+
+  const profile = await context.profiles.findById(profileId);
+
+  if (profile === null) {
+    throw new Error("Expected profile to exist.");
+  }
+
+  return profile;
 }
 
 async function checkoutProfile(

@@ -124,6 +124,7 @@ if (!shouldRunHttpDbTests) {
           id: profileId,
           displayName,
           status: "PENDING_CONFIG",
+          accountStage: "NEW_ACCOUNT",
           hasHardwareFingerprint: false,
           hasAuthenticationState: false,
         },
@@ -140,6 +141,7 @@ if (!shouldRunHttpDbTests) {
           id: profileId,
           displayName,
           status: "PENDING_CONFIG",
+          accountStage: "NEW_ACCOUNT",
         },
       });
       expectReadPayloadIsSafe(createdReadBody);
@@ -155,6 +157,7 @@ if (!shouldRunHttpDbTests) {
         profile: {
           id: profileId,
           status: "PENDING_CONFIG",
+          accountStage: "NEW_ACCOUNT",
           hasHardwareFingerprint: true,
         },
       });
@@ -169,6 +172,7 @@ if (!shouldRunHttpDbTests) {
         profile: {
           id: profileId,
           status: "PENDING_CONFIG",
+          accountStage: "NEW_ACCOUNT",
           timezone: "Etc/UTC",
           networkContext: {
             proxy: {
@@ -197,6 +201,7 @@ if (!shouldRunHttpDbTests) {
         profile: {
           id: profileId,
           status: "PENDING_LOGIN",
+          accountStage: "NEW_ACCOUNT",
           provisioningTokenStatus: "ISSUED",
         },
       });
@@ -214,6 +219,7 @@ if (!shouldRunHttpDbTests) {
         profile: {
           id: profileId,
           status: "PENDING_LOGIN",
+          accountStage: "NEW_ACCOUNT",
         },
       });
       expectReadPayloadIsSafe(pendingLoginReadBody, provisioningToken);
@@ -262,6 +268,7 @@ if (!shouldRunHttpDbTests) {
         profile: {
           id: profileId,
           status: "READY",
+          accountStage: "NEW_ACCOUNT",
           hasAuthenticationState: true,
           provisioningTokenStatus: "CONSUMED",
         },
@@ -277,10 +284,83 @@ if (!shouldRunHttpDbTests) {
         profile: {
           id: profileId,
           status: "READY",
+          accountStage: "NEW_ACCOUNT",
           hasAuthenticationState: true,
         },
       });
       expectReadPayloadIsSafe(readyReadBody, provisioningToken);
+
+      const newAccountCheckoutResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/profiles/checkout",
+        payload: {
+          profileId,
+        },
+      });
+      expect(newAccountCheckoutResponse.statusCode).toBe(409);
+      expect(newAccountCheckoutResponse.json()).toMatchObject({
+        error: {
+          code: "PROFILE_NOT_CHECKOUT_ELIGIBLE",
+          reasons: [
+            {
+              code: "ACCOUNT_STAGE_NOT_COLLECTION_READY",
+            },
+          ],
+        },
+      });
+
+      const warmingResponse = await getServer().inject({
+        method: "PATCH",
+        url: `/collector/profiles/${profileId}/account-stage`,
+        payload: {
+          accountStage: "WARMING",
+        },
+      });
+      expect(warmingResponse.statusCode).toBe(200);
+      expect(warmingResponse.json()).toMatchObject({
+        profile: {
+          id: profileId,
+          status: "READY",
+          accountStage: "WARMING",
+        },
+      });
+      expectReadPayloadIsSafe(warmingResponse.json(), provisioningToken);
+
+      const warmingCheckoutResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/profiles/checkout",
+        payload: {
+          profileId,
+        },
+      });
+      expect(warmingCheckoutResponse.statusCode).toBe(409);
+      expect(warmingCheckoutResponse.json()).toMatchObject({
+        error: {
+          code: "PROFILE_NOT_CHECKOUT_ELIGIBLE",
+          reasons: [
+            {
+              code: "ACCOUNT_STAGE_NOT_COLLECTION_READY",
+            },
+          ],
+        },
+      });
+
+      const collectionReadyResponse = await getServer().inject({
+        method: "PATCH",
+        url: `/collector/profiles/${profileId}/account-stage`,
+        payload: {
+          accountStage: "COLLECTION_READY",
+        },
+      });
+      expect(collectionReadyResponse.statusCode).toBe(200);
+      expect(collectionReadyResponse.json()).toMatchObject({
+        profile: {
+          id: profileId,
+          status: "READY",
+          accountStage: "COLLECTION_READY",
+        },
+      });
+      expectReadPayloadIsSafe(collectionReadyResponse.json(), provisioningToken);
 
       const listResponse = await getServer().inject({
         method: "GET",
@@ -347,6 +427,7 @@ if (!shouldRunHttpDbTests) {
         profile: {
           id: profileId,
           status: "BUSY",
+          accountStage: "COLLECTION_READY",
           hasAuthenticationState: true,
         },
       });
@@ -369,6 +450,7 @@ if (!shouldRunHttpDbTests) {
         profile: {
           id: profileId,
           status: "READY",
+          accountStage: "COLLECTION_READY",
           hasAuthenticationState: true,
         },
       });
@@ -383,6 +465,7 @@ if (!shouldRunHttpDbTests) {
         profile: {
           id: profileId,
           status: "READY",
+          accountStage: "COLLECTION_READY",
           hasAuthenticationState: true,
         },
       });

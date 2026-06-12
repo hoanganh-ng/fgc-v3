@@ -22,6 +22,13 @@
       "when": 1781177372223,
       "tag": "0002_nice_zombie",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781251907160,
+      "tag": "0003_legal_leo",
+      "breakpoints": true
     }
   ]
 }

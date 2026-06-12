@@ -8,6 +8,7 @@ import {
   ListProfilesUseCase,
   ReleaseProfileLeaseUseCase,
   StartProfileProvisioningUseCase,
+  UpdateProfileAccountStageUseCase,
   UpdateProfileConfigurationUseCase,
 } from "../../collector-profile-manager/application";
 import type {
@@ -34,6 +35,7 @@ export interface CollectorProfileManagerContainer {
   readonly getProfile: GetProfileUseCase;
   readonly listProfiles: ListProfilesUseCase;
   readonly updateProfileConfiguration: UpdateProfileConfigurationUseCase;
+  readonly updateProfileAccountStage: UpdateProfileAccountStageUseCase;
   readonly startProfileProvisioning: StartProfileProvisioningUseCase;
   readonly getProvisioningConfiguration: GetProvisioningConfigurationUseCase;
   readonly getRuntimeProfileConfiguration: GetRuntimeProfileConfigurationUseCase;
@@ -60,6 +62,10 @@ export function createCollectorProfileManager(
     getProfile: new GetProfileUseCase(profiles),
     listProfiles: new ListProfilesUseCase(profiles),
     updateProfileConfiguration: new UpdateProfileConfigurationUseCase(
+      profiles,
+      clock,
+    ),
+    updateProfileAccountStage: new UpdateProfileAccountStageUseCase(
       profiles,
       clock,
     ),

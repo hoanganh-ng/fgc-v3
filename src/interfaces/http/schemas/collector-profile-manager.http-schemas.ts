@@ -7,6 +7,7 @@ import {
   IsoDateTimeSchema,
   LocalStorageEntrySchema,
   NetworkContextSchema,
+  ProfileAccountStageSchema,
   ProfileIdSchema,
   ProfileLeaseIdSchema,
   ProfileStatusSchema,
@@ -79,6 +80,12 @@ export const UpdateProfileConfigurationHttpBodySchema = z
     },
   );
 
+export const UpdateProfileAccountStageHttpBodySchema = z
+  .object({
+    accountStage: ProfileAccountStageSchema,
+  })
+  .strict();
+
 export const IngestProfileSessionHttpBodySchema = z
   .object({
     cookies: z.array(BrowserCookieSchema),
@@ -114,6 +121,9 @@ export type ListProfilesHttpQuery = z.infer<
 >;
 export type UpdateProfileConfigurationHttpBody = z.infer<
   typeof UpdateProfileConfigurationHttpBodySchema
+>;
+export type UpdateProfileAccountStageHttpBody = z.infer<
+  typeof UpdateProfileAccountStageHttpBodySchema
 >;
 export type IngestProfileSessionHttpBody = z.infer<
   typeof IngestProfileSessionHttpBodySchema
@@ -178,6 +188,7 @@ const profileSummaryJsonSchema = {
     "id",
     "displayName",
     "status",
+    "accountStage",
     "createdAt",
     "updatedAt",
     "lastCheckoutAt",
@@ -195,6 +206,17 @@ const profileSummaryJsonSchema = {
     status: {
       type: "string",
       enum: ["PENDING_CONFIG", "PENDING_LOGIN", "READY", "BUSY"],
+    },
+    accountStage: {
+      type: "string",
+      enum: [
+        "NEW_ACCOUNT",
+        "WARMING",
+        "COLLECTION_READY",
+        "LIMITED",
+        "NEEDS_REVIEW",
+        "RETIRED",
+      ],
     },
     createdAt: nonEmptyStringJsonSchema,
     updatedAt: nonEmptyStringJsonSchema,
@@ -217,6 +239,7 @@ const profileReadSummaryJsonSchema = {
     "id",
     "displayName",
     "status",
+    "accountStage",
     "timezone",
     "createdAt",
     "updatedAt",
@@ -235,6 +258,7 @@ const profileReadSummaryJsonSchema = {
       type: "string",
       enum: ["PENDING_CONFIG", "PENDING_LOGIN", "READY", "BUSY"],
     },
+    accountStage: profileSummaryJsonSchema.properties.accountStage,
     timezone: stringJsonSchema,
     createdAt: nonEmptyStringJsonSchema,
     updatedAt: nonEmptyStringJsonSchema,
@@ -453,6 +477,30 @@ export const updateProfileConfigurationHttpRouteSchema = {
       additionalProperties: false,
       properties: {
         profile: profileSummaryJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const updateProfileAccountStageHttpRouteSchema = {
+  params: profileIdParamsJsonSchema,
+  body: {
+    type: "object",
+    required: ["accountStage"],
+    additionalProperties: false,
+    properties: {
+      accountStage: profileSummaryJsonSchema.properties.accountStage,
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      required: ["profile"],
+      additionalProperties: false,
+      properties: {
+        profile: profileDetailJsonSchema,
       },
     },
     "4xx": errorResponseJsonSchema,

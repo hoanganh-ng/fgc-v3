@@ -43,6 +43,7 @@ describe("collector profile query use cases", () => {
       id: "profile-1",
       displayName: "Profile profile-1",
       status: "PENDING_LOGIN",
+      accountStage: "NEW_ACCOUNT",
       timezone: "America/Los_Angeles",
       hasAuthenticationState: true,
     });
@@ -160,6 +161,7 @@ describe("collector profile query use cases", () => {
     expect(summary).not.toHaveProperty("authenticationState");
     expect(summary).not.toHaveProperty("provisioningToken");
     expect(summary).not.toHaveProperty("provisioningTokenStatus");
+    expect(summary.accountStage).toBe("NEW_ACCOUNT");
     expect(outputJson).not.toContain("session-cookie-value");
     expect(outputJson).not.toContain("local-storage-value");
     expect(outputJson).not.toContain("provisioning-token-secret");

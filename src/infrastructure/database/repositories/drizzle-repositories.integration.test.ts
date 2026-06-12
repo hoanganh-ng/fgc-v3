@@ -102,6 +102,7 @@ if (!shouldRunDbTests) {
       const loadedProfile = await profiles.findById(profile.identity.id);
 
       expect(loadedProfile).toEqual(profile);
+      expect(loadedProfile?.identity.accountStage).toBe("NEW_ACCOUNT");
       expect(loadedProfile?.networkContext).toEqual(profile.networkContext);
       expect(loadedProfile?.hardwareFingerprint).toEqual(
         profile.hardwareFingerprint,

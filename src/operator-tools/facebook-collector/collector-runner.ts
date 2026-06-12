@@ -105,6 +105,7 @@ const CHECKOUT_DIAGNOSTIC_STATUSES = [
 
 const NO_ELIGIBLE_PROFILE_HINTS = [
   "No profile is READY in this API/database.",
+  "No READY profile has accountStage COLLECTION_READY.",
   "The current time may be outside a profile temporal routine.",
   "Cooldown or safety thresholds may block checkout.",
   "A profile may already be leased or BUSY.",

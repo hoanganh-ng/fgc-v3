@@ -15,4 +15,5 @@ export * from "./use-cases/ingest-profile-session.use-case";
 export * from "./use-cases/list-profiles.use-case";
 export * from "./use-cases/release-profile-lease.use-case";
 export * from "./use-cases/start-profile-provisioning.use-case";
+export * from "./use-cases/update-profile-account-stage.use-case";
 export * from "./use-cases/update-profile-configuration.use-case";

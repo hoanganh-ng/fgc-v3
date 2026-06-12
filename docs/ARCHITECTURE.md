@@ -17,7 +17,7 @@ The domain must not import or depend on HTTP, database, browser automation, queu
 
 ## Domain Core
 
-The domain core contains business concepts and invariants. For Collector Profile Manager, this includes profile state transitions, property invariants, provisioning token rules, session ingestion rules, and checkout eligibility rules.
+The domain core contains business concepts and invariants. For Collector Profile Manager, this includes profile operational status transitions, account maturity/readiness stage transitions, property invariants, provisioning token rules, session ingestion rules, and checkout eligibility rules.
 
 For Content Manager, this includes source group rules, managed group category rules, content item lifecycle status, content deduplication/upsert rules, high-engagement top comment rules, engagement count invariants, and future builder handoff eligibility.
 
@@ -62,6 +62,15 @@ Collector Runtime will be a future operational module that consumes Collector Pr
 Browser-provider hardening is allowed only behind Collector Runtime infrastructure adapters. Browser provider ports are owned by the Collector Runtime application layer; concrete browser providers consume Profile Manager runtime configuration after checkout and must not randomize or mutate profile identity, session, proxy, or fingerprint settings outside Profile Manager.
 
 Browser providers must not solve CAPTCHAs, automate credentials, bypass checkpoints, bypass rate limits or access controls, post, comment, or like. Login, checkpoint, and session-expired states are profile/session health issues to surface safely, not states to bypass automatically. Browser-provider logs and persisted records must not include cookies, localStorage, raw platform payloads, proxy credentials, session headers, trusted runtime configuration, or fingerprint secrets.
+
+## Profile Readiness
+
+Collector Profile Manager keeps operational profile status separate from account maturity:
+
+- `profile.status` describes operational lifecycle state: `PENDING_CONFIG`, `PENDING_LOGIN`, `READY`, and `BUSY`.
+- `accountStage` describes account readiness/maturity: `NEW_ACCOUNT`, `WARMING`, `COLLECTION_READY`, `LIMITED`, `NEEDS_REVIEW`, and `RETIRED`.
+
+Provisioning and session ingestion may move a profile to operational `READY` without making it collection-ready. Normal collection checkout requires `status = READY` and `accountStage = COLLECTION_READY`, plus the existing authentication, runtime configuration, temporal routine, cooldown, lease, and safety-threshold checks. Account stage transition rules remain Collector Profile Manager domain logic and are not owned by Collector Runtime or browser providers.
 
 ## Platform Extractors
 

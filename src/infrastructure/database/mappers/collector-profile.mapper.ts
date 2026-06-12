@@ -52,6 +52,7 @@ export function toCollectorProfileRow(
     id: validProfile.identity.id,
     displayName: validProfile.identity.displayName,
     status: validProfile.identity.status,
+    accountStage: validProfile.identity.accountStage,
     provisioningTokenStatus: validProfile.provisioningToken.status,
     provisioningTokenHash: toPersistedProvisioningTokenHash(
       validProfile.provisioningToken.tokenHash,
@@ -97,6 +98,7 @@ export function toCollectorProfileDomain(
       id: row.id,
       displayName: row.displayName,
       status: row.status,
+      accountStage: row.accountStage ?? "NEW_ACCOUNT",
       createdAt: normalizeIsoDateTime(row.createdAt),
       updatedAt: normalizeIsoDateTime(row.updatedAt),
       lastCheckoutAt: normalizeNullableIsoDateTime(row.lastCheckoutAt),

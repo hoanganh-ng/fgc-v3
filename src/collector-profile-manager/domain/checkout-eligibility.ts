@@ -11,6 +11,7 @@ import type {
 
 export type CheckoutIneligibilityReasonCode =
   | "PROFILE_NOT_READY"
+  | "ACCOUNT_STAGE_NOT_COLLECTION_READY"
   | "AUTHENTICATION_MISSING"
   | "AUTHENTICATION_EXPIRED"
   | "NETWORK_CONTEXT_MISSING"
@@ -56,6 +57,14 @@ export function evaluateCheckoutEligibility(
     reasons.push({
       code: "PROFILE_NOT_READY",
       message: "Profile must be READY before checkout.",
+    });
+  }
+
+  if (profile.identity.accountStage !== "COLLECTION_READY") {
+    reasons.push({
+      code: "ACCOUNT_STAGE_NOT_COLLECTION_READY",
+      message:
+        "Profile account stage must be COLLECTION_READY before checkout.",
     });
   }
 

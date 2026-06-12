@@ -29,6 +29,7 @@ describe("collector profile database mapper", () => {
 
     expect(mappedProfile).toEqual(profile);
     expect(mappedProfile.identity).toEqual(profile.identity);
+    expect(row.accountStage).toBe(profile.identity.accountStage);
     expect(mappedProfile.networkContext).toEqual(profile.networkContext);
     expect(mappedProfile.hardwareFingerprint).toEqual(
       profile.hardwareFingerprint,

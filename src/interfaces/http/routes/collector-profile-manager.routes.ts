@@ -17,6 +17,7 @@ import type {
   RuntimeProfileConfiguration,
   StartProfileProvisioningInput,
   StartProfileProvisioningOutput,
+  UpdateProfileAccountStageInput,
   UpdateProfileConfigurationInput,
 } from "../../../collector-profile-manager/application";
 import type {
@@ -25,6 +26,7 @@ import type {
   IsoDateTime,
   NetworkContext,
   ProfileId,
+  ProfileAccountStage,
   ProfileStatus,
   ProvisioningTokenStatus,
 } from "../../../collector-profile-manager/domain";
@@ -37,6 +39,7 @@ import {
   ProfileLeaseIdHttpParamsSchema,
   ProvisioningTokenHttpParamsSchema,
   ReleaseProfileLeaseHttpBodySchema,
+  UpdateProfileAccountStageHttpBodySchema,
   UpdateProfileConfigurationHttpBodySchema,
   checkoutProfileHttpRouteSchema,
   createProfileHttpRouteSchema,
@@ -48,6 +51,7 @@ import {
   parseHttpInput,
   releaseProfileLeaseHttpRouteSchema,
   startProfileProvisioningHttpRouteSchema,
+  updateProfileAccountStageHttpRouteSchema,
   updateProfileConfigurationHttpRouteSchema,
 } from "../schemas/collector-profile-manager.http-schemas";
 
@@ -68,6 +72,10 @@ export interface CollectorProfileManagerHttpService {
   readonly updateProfileConfiguration: ExecutableUseCase<
     UpdateProfileConfigurationInput,
     CollectorProfile
+  >;
+  readonly updateProfileAccountStage: ExecutableUseCase<
+    UpdateProfileAccountStageInput,
+    ProfileDetail
   >;
   readonly startProfileProvisioning: ExecutableUseCase<
     StartProfileProvisioningInput,
@@ -103,6 +111,7 @@ interface ProfileSummary {
   readonly id: ProfileId;
   readonly displayName: string;
   readonly status: ProfileStatus;
+  readonly accountStage: ProfileAccountStage;
   readonly createdAt: IsoDateTime;
   readonly updatedAt: IsoDateTime;
   readonly lastCheckoutAt: IsoDateTime | null;
@@ -210,6 +219,30 @@ export function registerCollectorProfileManagerRoutes(
 
       return {
         profile: toProfileSummary(profile),
+      };
+    },
+  );
+
+  server.patch(
+    "/collector/profiles/:profileId/account-stage",
+    { schema: updateProfileAccountStageHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileIdHttpParamsSchema,
+        request.params,
+      );
+      const body = parseHttpInput(
+        UpdateProfileAccountStageHttpBodySchema,
+        request.body,
+      );
+      const profile =
+        await collectorProfileManager.updateProfileAccountStage.execute({
+          profileId: params.profileId,
+          accountStage: body.accountStage,
+        });
+
+      return {
+        profile,
       };
     },
   );
@@ -350,6 +383,7 @@ function toProfileSummary(profile: CollectorProfile): ProfileSummary {
     id: profile.identity.id,
     displayName: profile.identity.displayName,
     status: profile.identity.status,
+    accountStage: profile.identity.accountStage,
     createdAt: profile.identity.createdAt,
     updatedAt: profile.identity.updatedAt,
     lastCheckoutAt: profile.identity.lastCheckoutAt,

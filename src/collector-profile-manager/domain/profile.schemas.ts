@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PROFILE_LEASE_STATUSES } from "./profile-lease";
+import { PROFILE_ACCOUNT_STAGES } from "./profile-account-stage";
 import { PROFILE_STATUSES } from "./profile-status";
 import {
   CHRONOTYPES,
@@ -22,6 +23,7 @@ const PositiveNumberSchema = z.number().finite().positive();
 const ProbabilitySchema = z.number().finite().min(0).max(1);
 
 export const ProfileStatusSchema = z.enum(PROFILE_STATUSES);
+export const ProfileAccountStageSchema = z.enum(PROFILE_ACCOUNT_STAGES);
 export const ProfileIdSchema = NonEmptyStringSchema;
 export const IsoDateTimeSchema = z.iso.datetime({ offset: true });
 export const LocalDateSchema = z.iso.date();
@@ -53,6 +55,7 @@ export const IdentityMetadataSchema = z
     id: ProfileIdSchema,
     displayName: NonEmptyStringSchema,
     status: ProfileStatusSchema,
+    accountStage: ProfileAccountStageSchema,
     createdAt: IsoDateTimeSchema,
     updatedAt: IsoDateTimeSchema,
     lastCheckoutAt: IsoDateTimeSchema.nullable(),

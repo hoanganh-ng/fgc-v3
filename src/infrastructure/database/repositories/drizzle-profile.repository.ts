@@ -44,6 +44,7 @@ export class DrizzleProfileRepository implements ProfileRepository {
         set: {
           displayName: row.displayName,
           status: row.status,
+          accountStage: row.accountStage,
           provisioningTokenStatus: row.provisioningTokenStatus,
           provisioningTokenHash: row.provisioningTokenHash,
           provisioningTokenIssuedAt: row.provisioningTokenIssuedAt,
