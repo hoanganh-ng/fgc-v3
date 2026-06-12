@@ -2,6 +2,61 @@
 
 Sprint 027 provides two Docker Compose runtimes for the current Content Collector management surface.
 
+## Command Groups
+
+Root `package.json` scripts are grouped by operational purpose. New work should prefer the canonical names below; older names remain available as backward-compatible aliases.
+
+### App Runtime
+
+| Command | Purpose | Alias |
+| --- | --- | --- |
+| `pnpm app:dev` | Run the API app in watch mode. | `pnpm dev` |
+| `pnpm app:start` | Run the API app once. | `pnpm start` |
+
+### Web UI
+
+| Command | Purpose | Alias |
+| --- | --- | --- |
+| `pnpm web:dev` | Run the Vite Web UI. | `pnpm dev:web` |
+| `pnpm web:build` | Build the Web UI. | `pnpm build:web` |
+| `pnpm web:typecheck` | Typecheck the Web UI. | `pnpm typecheck:web` |
+
+### Database
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm db:generate` | Generate Drizzle migrations. |
+| `pnpm db:migrate` | Run Drizzle migrations. |
+
+### Tests
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm typecheck` | Typecheck the backend/root TypeScript project. |
+| `pnpm test` | Run default Vitest tests. |
+| `pnpm test:db` | Run opt-in database integration tests. |
+| `pnpm test:http:db` | Run opt-in DB-backed HTTP integration tests. |
+
+### Operator Tools
+
+| Command | Purpose | Alias |
+| --- | --- | --- |
+| `pnpm operator:profile:provision` | Complete manual profile provisioning in a headed browser. | `pnpm profile:provision` |
+| `pnpm operator:collector:facebook` | Run one manual Facebook collection for a source group. | `pnpm collector:facebook:run` |
+| `pnpm operator:collector:worker` | Claim and execute queued collection runs. | `pnpm collector:worker:run` |
+| `pnpm operator:browser:probe` | Probe a browser provider without backend or Facebook login. | `pnpm collector:browser:probe` |
+
+### Docker Stacks
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm stack:dev:start` | Start the development Compose stack. |
+| `pnpm stack:dev:stop` | Stop the development Compose stack. |
+| `pnpm stack:dev:reset` | Stop the development stack and remove volumes. |
+| `pnpm stack:preview:start` | Start the production-like preview Compose stack. |
+| `pnpm stack:preview:stop` | Stop the preview Compose stack. |
+| `pnpm stack:preview:reset` | Stop the preview stack and remove volumes. |
+
 ## Development Stack
 
 Start:
@@ -102,13 +157,13 @@ The token is shown only at the moment provisioning starts. It is one-time-use an
 Run the CLI against the preview gateway:
 
 ```bash
-pnpm profile:provision -- --token <provisioning-token> --base-url http://localhost:8081
+pnpm operator:profile:provision -- --token <provisioning-token> --base-url http://localhost:8081
 ```
 
 Run the CLI against the direct local API:
 
 ```bash
-pnpm profile:provision -- --token <provisioning-token> --base-url http://localhost:3000
+pnpm operator:profile:provision -- --token <provisioning-token> --base-url http://localhost:3000
 ```
 
 If `--base-url` is omitted, the CLI uses `PROFILE_PROVISIONING_BASE_URL`, then `PROFILE_MANAGER_BASE_URL`, then `http://localhost:3000`.
@@ -141,7 +196,7 @@ Prerequisites:
 Run against the preview gateway:
 
 ```bash
-pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081 --max-scrolls 8 --max-duration-ms 60000 --browser-provider playwright
+pnpm operator:collector:facebook -- --source-group-id <source-group-id> --base-url http://localhost:8081 --max-scrolls 8 --max-duration-ms 60000 --browser-provider playwright
 ```
 
 Use the preview gateway (`http://localhost:8081`) when running against the preview stack. This matches the Web UI entrypoint and lets Nginx proxy `/collector/*` to the API.
@@ -149,7 +204,7 @@ Use the preview gateway (`http://localhost:8081`) when running against the previ
 Run against the direct local API:
 
 ```bash
-pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:3000
+pnpm operator:collector:facebook -- --source-group-id <source-group-id> --base-url http://localhost:3000
 ```
 
 Use the direct API URL (`http://localhost:3000`) when you are running the API directly or intentionally bypassing the preview gateway. A base URL mismatch can make the CLI talk to a different API/database than the Web UI.
@@ -163,7 +218,7 @@ If `--browser-provider` is omitted, the command uses `BROWSER_PROVIDER`, then `p
 Optional checkout diagnostics:
 
 ```bash
-pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081 --diagnose-checkout
+pnpm operator:collector:facebook -- --source-group-id <source-group-id> --base-url http://localhost:8081 --diagnose-checkout
 ```
 
 Diagnostic mode prints only safe aggregate profile status counts: total profiles, `READY`, `BUSY`, `PENDING_LOGIN`, and `PENDING_CONFIG`.
@@ -207,26 +262,26 @@ Default provider:
 
 ```bash
 BROWSER_PROVIDER=playwright
-pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081
+pnpm operator:collector:facebook -- --source-group-id <source-group-id> --base-url http://localhost:8081
 ```
 
 Experimental CloakBrowser provider:
 
 ```bash
 BROWSER_PROVIDER=cloakbrowser
-pnpm collector:facebook:run -- --source-group-id <source-group-id> --base-url http://localhost:8081
+pnpm operator:collector:facebook -- --source-group-id <source-group-id> --base-url http://localhost:8081
 ```
 
 Probe the default provider without Facebook login:
 
 ```bash
-pnpm collector:browser:probe -- --browser-provider playwright
+pnpm operator:browser:probe -- --browser-provider playwright
 ```
 
 Probe CloakBrowser setup:
 
 ```bash
-pnpm collector:browser:probe -- --browser-provider cloakbrowser
+pnpm operator:browser:probe -- --browser-provider cloakbrowser
 ```
 
 The probe builds a synthetic safe runtime profile configuration, launches the selected provider, creates one page, and verifies init-script plus binding instrumentation. It does not check out a profile, visit Facebook, automate credentials, or persist session material.
@@ -296,7 +351,7 @@ Sprint 037 adds an operator worker command that claims queued collection runs an
 Run one queued collection run through the preview gateway:
 
 ```bash
-pnpm collector:worker:run -- --base-url http://localhost:8081 --once --browser-provider playwright
+pnpm operator:collector:worker -- --base-url http://localhost:8081 --once --browser-provider playwright
 ```
 
 Use the preview gateway (`http://localhost:8081`) when running against the preview stack.
@@ -304,7 +359,7 @@ Use the preview gateway (`http://localhost:8081`) when running against the previ
 Run one queued collection run through the direct local API:
 
 ```bash
-pnpm collector:worker:run -- --base-url http://localhost:3000 --once
+pnpm operator:collector:worker -- --base-url http://localhost:3000 --once
 ```
 
 Use the direct API URL (`http://localhost:3000`) only when you are running the API directly or intentionally bypassing the preview gateway.
@@ -312,7 +367,7 @@ Use the direct API URL (`http://localhost:3000`) only when you are running the A
 Run the worker in polling mode:
 
 ```bash
-pnpm collector:worker:run -- --base-url http://localhost:8081 --poll-interval-ms 5000 --browser-provider playwright
+pnpm operator:collector:worker -- --base-url http://localhost:8081 --poll-interval-ms 5000 --browser-provider playwright
 ```
 
 The worker:
@@ -392,5 +447,5 @@ Run repository checks:
 ```bash
 pnpm run typecheck
 pnpm test
-pnpm --filter @fgc/web build
+pnpm web:build
 ```
