@@ -1,5 +1,8 @@
 import { z } from "zod";
 import {
+  PROFILE_SOURCE_ACCESS_STATES,
+} from "./profile-source-access-state";
+import {
   PROFILE_LEASE_PURPOSES,
   PROFILE_LEASE_STATUSES,
 } from "./profile-lease";
@@ -20,6 +23,12 @@ const NonEmptyStringSchema = z
   .refine((value) => value.trim().length > 0, {
     message: "Expected non-empty string.",
   });
+const SafeFailureReasonStringSchema = NonEmptyStringSchema.refine(
+  (value) => !containsUnsafeFailureReasonText(value),
+  {
+    message: "Expected sanitized failure reason text.",
+  },
+);
 
 const NonNegativeNumberSchema = z.number().finite().min(0);
 const PositiveNumberSchema = z.number().finite().positive();
@@ -27,7 +36,12 @@ const ProbabilitySchema = z.number().finite().min(0).max(1);
 
 export const ProfileStatusSchema = z.enum(PROFILE_STATUSES);
 export const ProfileAccountStageSchema = z.enum(PROFILE_ACCOUNT_STAGES);
+export const ProfileSourceAccessStateSchema = z.enum(
+  PROFILE_SOURCE_ACCESS_STATES,
+);
 export const ProfileIdSchema = NonEmptyStringSchema;
+export const ProfileSourceAccessIdSchema = NonEmptyStringSchema;
+export const ProfileSourceAccessSourceGroupIdSchema = NonEmptyStringSchema;
 export const IsoDateTimeSchema = z.iso.datetime({ offset: true });
 export const LocalDateSchema = z.iso.date();
 export const IanaTimezoneSchema = z.string();
@@ -367,6 +381,29 @@ export const ProfileLeaseSchema = z
     }
   });
 
+export const ProfileSourceAccessFailureReasonSchema = z
+  .object({
+    code: SafeFailureReasonStringSchema,
+    message: SafeFailureReasonStringSchema,
+  })
+  .strict();
+
+export const ProfileSourceAccessSchema = z
+  .object({
+    id: ProfileSourceAccessIdSchema,
+    profileId: ProfileIdSchema,
+    sourceGroupId: ProfileSourceAccessSourceGroupIdSchema,
+    accessState: ProfileSourceAccessStateSchema,
+    lastCheckedAt: IsoDateTimeSchema.nullable(),
+    lastSuccessfulAt: IsoDateTimeSchema.nullable(),
+    lastFailureReason: ProfileSourceAccessFailureReasonSchema.nullable(),
+    joinRequestedAt: IsoDateTimeSchema.nullable(),
+    notes: NonEmptyStringSchema.optional(),
+    createdAt: IsoDateTimeSchema,
+    updatedAt: IsoDateTimeSchema,
+  })
+  .strict();
+
 export const CollectorProfilePropertyGroupsSchema = z
   .object({
     identity: IdentityMetadataSchema,
@@ -392,4 +429,27 @@ function addProvisioningTokenIssue(
     code: "custom",
     message,
   });
+}
+
+function containsUnsafeFailureReasonText(value: string): boolean {
+  const normalized = value.toLowerCase();
+  const unsafeTerms = [
+    "cookie",
+    "localstorage",
+    "local storage",
+    "authorization",
+    "bearer",
+    "proxy credential",
+    "proxy password",
+    "session header",
+    "provisioning token",
+    "token hash",
+    "fingerprint secret",
+    "raw page html",
+    "screenshot",
+    "raw facebook payload",
+    "raw payload",
+  ];
+
+  return unsafeTerms.some((term) => normalized.includes(term));
 }

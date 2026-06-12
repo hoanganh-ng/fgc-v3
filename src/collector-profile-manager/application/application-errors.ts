@@ -3,6 +3,7 @@ import type {
   ProfileId,
   ProfileLeaseId,
   ProfileLeaseStatus,
+  ProfileSourceAccessSourceGroupId,
   ValidationIssue,
 } from "../domain";
 
@@ -19,7 +20,9 @@ export type CollectorProfileApplicationErrorCode =
   | "PROFILE_NOT_CHECKOUT_ELIGIBLE"
   | "PROFILE_LEASE_NOT_FOUND"
   | "PROFILE_LEASE_ALREADY_CLOSED"
-  | "PROFILE_LEASE_STATE_CONFLICT";
+  | "PROFILE_LEASE_STATE_CONFLICT"
+  | "PROFILE_SOURCE_ACCESS_NOT_FOUND"
+  | "INVALID_PROFILE_SOURCE_ACCESS";
 
 export abstract class CollectorProfileApplicationError extends Error {
   public readonly code: CollectorProfileApplicationErrorCode;
@@ -172,5 +175,34 @@ export class ProfileLeaseAlreadyClosedError extends CollectorProfileApplicationE
 export class ProfileLeaseStateConflictError extends CollectorProfileApplicationError {
   public constructor(message: string) {
     super("PROFILE_LEASE_STATE_CONFLICT", message);
+  }
+}
+
+export class ProfileSourceAccessNotFoundError extends CollectorProfileApplicationError {
+  public readonly profileId: ProfileId;
+  public readonly sourceGroupId: ProfileSourceAccessSourceGroupId;
+
+  public constructor(
+    profileId: ProfileId,
+    sourceGroupId: ProfileSourceAccessSourceGroupId,
+  ) {
+    super(
+      "PROFILE_SOURCE_ACCESS_NOT_FOUND",
+      `Profile-source access record not found: ${profileId}/${sourceGroupId}.`,
+    );
+    this.profileId = profileId;
+    this.sourceGroupId = sourceGroupId;
+  }
+}
+
+export class InvalidProfileSourceAccessError extends CollectorProfileApplicationError {
+  public readonly issues: readonly ValidationIssue[];
+
+  public constructor(issues: readonly ValidationIssue[]) {
+    super(
+      "INVALID_PROFILE_SOURCE_ACCESS",
+      "Profile-source access record is invalid.",
+    );
+    this.issues = issues;
   }
 }

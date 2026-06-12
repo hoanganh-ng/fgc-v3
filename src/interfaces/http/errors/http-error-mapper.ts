@@ -245,6 +245,8 @@ const applicationErrorStatus: Record<CollectorProfileApplicationErrorCode, numbe
   PROFILE_LEASE_NOT_FOUND: 404,
   PROFILE_LEASE_ALREADY_CLOSED: 409,
   PROFILE_LEASE_STATE_CONFLICT: 409,
+  PROFILE_SOURCE_ACCESS_NOT_FOUND: 404,
+  INVALID_PROFILE_SOURCE_ACCESS: 400,
 };
 
 const domainErrorStatus: Record<CollectorProfileDomainErrorCode, number> = {

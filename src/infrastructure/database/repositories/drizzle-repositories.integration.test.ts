@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   createActiveProfileLease,
   createPendingCollectorProfile,
+  createProfileSourceAccess,
   releaseProfileLease,
 } from "../../../collector-profile-manager/domain";
 import type {
@@ -16,6 +17,7 @@ import type {
   LocalStorageEntry,
   NetworkContext,
   ProfileLease,
+  ProfileSourceAccess,
   SafetyThresholds,
   TemporalRoutine,
 } from "../../../collector-profile-manager/domain";
@@ -30,11 +32,15 @@ import {
 } from "../provisioning-token-hashing";
 import {
   collectorProfileLeases,
+  collectorProfileSourceAccess,
   collectorProfiles,
 } from "../schema/collector-profile-manager.schema";
 import { DrizzleTransactionManager } from "../transaction/drizzle-transaction-manager";
 import { DrizzleProfileLeaseRepository } from "./drizzle-profile-lease.repository";
 import { DrizzleProfileRepository } from "./drizzle-profile.repository";
+import {
+  DrizzleProfileSourceAccessRepository,
+} from "./drizzle-profile-source-access.repository";
 
 const shouldRunDbTests = process.env.RUN_DB_TESTS === "true";
 
@@ -47,10 +53,12 @@ if (!shouldRunDbTests) {
     let client: DatabaseClient | undefined;
     let profiles: DrizzleProfileRepository;
     let leases: DrizzleProfileLeaseRepository;
+    let profileSourceAccess: DrizzleProfileSourceAccessRepository;
     let transactionManager: DrizzleTransactionManager;
     let nextId = 0;
     const createdProfileIds = new Set<string>();
     const createdLeaseIds = new Set<string>();
+    const createdProfileSourceAccessIds = new Set<string>();
 
     beforeAll(() => {
       const databaseClient = createDatabaseClient({
@@ -61,6 +69,9 @@ if (!shouldRunDbTests) {
       client = databaseClient;
       profiles = new DrizzleProfileRepository(databaseClient.db);
       leases = new DrizzleProfileLeaseRepository(databaseClient.db);
+      profileSourceAccess = new DrizzleProfileSourceAccessRepository(
+        databaseClient.db,
+      );
       transactionManager = new DrizzleTransactionManager(databaseClient.db);
     });
 
@@ -70,7 +81,16 @@ if (!shouldRunDbTests) {
       }
 
       const leaseIds = [...createdLeaseIds];
+      const profileSourceAccessIds = [...createdProfileSourceAccessIds];
       const profileIds = [...createdProfileIds];
+
+      if (profileSourceAccessIds.length > 0) {
+        await client.db
+          .delete(collectorProfileSourceAccess)
+          .where(
+            inArray(collectorProfileSourceAccess.id, profileSourceAccessIds),
+          );
+      }
 
       if (leaseIds.length > 0) {
         await client.db
@@ -85,6 +105,7 @@ if (!shouldRunDbTests) {
       }
 
       createdLeaseIds.clear();
+      createdProfileSourceAccessIds.clear();
       createdProfileIds.clear();
     });
 
@@ -317,6 +338,68 @@ if (!shouldRunDbTests) {
       await expect(leases.save(secondLease)).rejects.toThrow();
     });
 
+    it("upserts and lists profile-source access records by profile and source group", async () => {
+      const firstProfile = trackProfile(
+        createReadyProfile(nextTestId("access-profile-one")),
+      );
+      const secondProfile = trackProfile(
+        createReadyProfile(nextTestId("access-profile-two")),
+      );
+      const firstAccess = trackProfileSourceAccess(
+        createAccess(nextTestId("access-one"), firstProfile.identity.id, {
+          sourceGroupId: nextTestId("source-group-one"),
+          accessState: "UNKNOWN",
+        }),
+      );
+      const secondAccess = trackProfileSourceAccess(
+        createAccess(nextTestId("access-two"), firstProfile.identity.id, {
+          sourceGroupId: nextTestId("source-group-two"),
+          accessState: "JOIN_REQUIRED",
+          updatedAt: "2026-01-05T18:01:00.000Z",
+        }),
+      );
+      const thirdAccess = trackProfileSourceAccess(
+        createAccess(nextTestId("access-three"), secondProfile.identity.id, {
+          sourceGroupId: firstAccess.sourceGroupId,
+          accessState: "PUBLIC_ACCESSIBLE",
+          lastSuccessfulAt: "2026-01-05T18:02:00.000Z",
+          updatedAt: "2026-01-05T18:02:00.000Z",
+        }),
+      );
+
+      await profiles.save(firstProfile);
+      await profiles.save(secondProfile);
+      await profileSourceAccess.upsert(firstAccess);
+      await profileSourceAccess.upsert(secondAccess);
+      await profileSourceAccess.upsert(thirdAccess);
+
+      const updatedFirstAccess: ProfileSourceAccess = {
+        ...firstAccess,
+        accessState: "ACCESS_DENIED",
+        lastCheckedAt: "2026-01-05T18:03:00.000Z",
+        lastFailureReason: {
+          code: "ACCESS_DENIED",
+          message: "Access denied by group visibility.",
+        },
+        updatedAt: "2026-01-05T18:03:00.000Z",
+      };
+
+      await profileSourceAccess.upsert(updatedFirstAccess);
+
+      await expect(
+        profileSourceAccess.getByProfileAndSourceGroup(
+          firstProfile.identity.id,
+          firstAccess.sourceGroupId,
+        ),
+      ).resolves.toEqual(updatedFirstAccess);
+      await expect(
+        profileSourceAccess.listByProfile(firstProfile.identity.id),
+      ).resolves.toEqual([updatedFirstAccess, secondAccess]);
+      await expect(
+        profileSourceAccess.listBySourceGroup(firstAccess.sourceGroupId),
+      ).resolves.toEqual([updatedFirstAccess, thirdAccess]);
+    });
+
     it("commits profile and lease writes inside a transaction", async () => {
       const profile = trackProfile(
         createReadyProfile(nextTestId("tx-commit-profile")),
@@ -373,6 +456,14 @@ if (!shouldRunDbTests) {
       createdLeaseIds.add(lease.id);
 
       return lease;
+    }
+
+    function trackProfileSourceAccess(
+      access: ProfileSourceAccess,
+    ): ProfileSourceAccess {
+      createdProfileSourceAccessIds.add(access.id);
+
+      return access;
     }
 
     function getClient(): DatabaseClient {
@@ -496,6 +587,33 @@ function createLease(id: string, profileId: string): ProfileLease {
     leasedAt: defaultCreatedAt,
     expiresAt: "2026-01-05T18:45:00.000Z",
   });
+}
+
+function createAccess(
+  id: string,
+  profileId: string,
+  options: Partial<ProfileSourceAccess> = {},
+): ProfileSourceAccess {
+  return {
+    ...createProfileSourceAccess({
+      id,
+      profileId,
+      sourceGroupId: options.sourceGroupId ?? "source-group-1",
+      accessState: options.accessState ?? "UNKNOWN",
+      checkedAt: options.lastCheckedAt ?? defaultCreatedAt,
+      ...(options.lastFailureReason !== undefined
+        ? { lastFailureReason: options.lastFailureReason }
+        : {}),
+      ...(options.notes !== undefined ? { notes: options.notes } : {}),
+    }),
+    ...(options.lastSuccessfulAt !== undefined
+      ? { lastSuccessfulAt: options.lastSuccessfulAt }
+      : {}),
+    ...(options.joinRequestedAt !== undefined
+      ? { joinRequestedAt: options.joinRequestedAt }
+      : {}),
+    ...(options.updatedAt !== undefined ? { updatedAt: options.updatedAt } : {}),
+  };
 }
 
 function createNetworkContext(): NetworkContext {

@@ -5,6 +5,8 @@ export * from "./profile-account-stage-state-machine";
 export * from "./profile-errors";
 export * from "./profile-lease";
 export * from "./profile-properties";
+export * from "./profile-source-access";
+export * from "./profile-source-access-state";
 export * from "./profile.schemas";
 export * from "./profile-state-machine";
 export * from "./profile-status";

@@ -3,20 +3,26 @@ import {
   CheckoutProfileUseCase,
   CreateProfileUseCase,
   GetProfileUseCase,
+  GetProfileSourceAccessUseCase,
   GetProvisioningConfigurationUseCase,
   GetRuntimeProfileConfigurationUseCase,
   IngestProfileSessionUseCase,
+  ListProfileSourceAccessForProfileUseCase,
+  ListProfileSourceAccessForSourceGroupUseCase,
   ListProfilesUseCase,
   ReleaseProfileLeaseUseCase,
   StartProfileProvisioningUseCase,
   UpdateProfileAccountStageUseCase,
   UpdateProfileConfigurationUseCase,
+  UpsertProfileSourceAccessUseCase,
 } from "../../collector-profile-manager/application";
 import type {
   Clock,
+  IdGenerator,
   LeaseIdGenerator,
   ProfileLeaseRepository,
   ProfileRepository,
+  ProfileSourceAccessRepository,
   TokenGenerator,
   TransactionManager,
 } from "../../collector-profile-manager/application";
@@ -24,9 +30,11 @@ import type {
 export interface CollectorProfileManagerDependencies {
   readonly profiles: ProfileRepository;
   readonly leases: ProfileLeaseRepository;
+  readonly profileSourceAccess: ProfileSourceAccessRepository;
   readonly clock: Clock;
   readonly tokenGenerator: TokenGenerator;
   readonly leaseIdGenerator: LeaseIdGenerator;
+  readonly idGenerator: IdGenerator;
   readonly transactionManager?: TransactionManager;
   readonly close?: () => Promise<void>;
 }
@@ -44,6 +52,10 @@ export interface CollectorProfileManagerContainer {
   readonly checkoutProfile: CheckoutProfileUseCase;
   readonly checkoutProfileForExercise: CheckoutProfileForExerciseUseCase;
   readonly releaseProfileLease: ReleaseProfileLeaseUseCase;
+  readonly upsertProfileSourceAccess: UpsertProfileSourceAccessUseCase;
+  readonly getProfileSourceAccess: GetProfileSourceAccessUseCase;
+  readonly listProfileSourceAccessForProfile: ListProfileSourceAccessForProfileUseCase;
+  readonly listProfileSourceAccessForSourceGroup: ListProfileSourceAccessForSourceGroupUseCase;
   close(): Promise<void>;
 }
 
@@ -53,9 +65,11 @@ export function createCollectorProfileManager(
   const {
     profiles,
     leases,
+    profileSourceAccess,
     clock,
     tokenGenerator,
     leaseIdGenerator,
+    idGenerator,
     transactionManager,
   } = dependencies;
 
@@ -106,6 +120,18 @@ export function createCollectorProfileManager(
       clock,
       transactionManager,
     ),
+    upsertProfileSourceAccess: new UpsertProfileSourceAccessUseCase(
+      profileSourceAccess,
+      idGenerator,
+      clock,
+    ),
+    getProfileSourceAccess: new GetProfileSourceAccessUseCase(
+      profileSourceAccess,
+    ),
+    listProfileSourceAccessForProfile:
+      new ListProfileSourceAccessForProfileUseCase(profileSourceAccess),
+    listProfileSourceAccessForSourceGroup:
+      new ListProfileSourceAccessForSourceGroupUseCase(profileSourceAccess),
     close: dependencies.close ?? noopClose,
   };
 }

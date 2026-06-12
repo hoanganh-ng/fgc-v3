@@ -43,6 +43,13 @@
       "when": 1781257354747,
       "tag": "0005_green_pestilence",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781259645431,
+      "tag": "0006_safe_sleepwalker",
+      "breakpoints": true
     }
   ]
 }

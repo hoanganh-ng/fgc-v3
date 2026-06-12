@@ -5,6 +5,7 @@ export * from "./repositories/drizzle-content-category.repository";
 export * from "./repositories/drizzle-content-item.repository";
 export * from "./repositories/drizzle-profile-lease.repository";
 export * from "./repositories/drizzle-profile.repository";
+export * from "./repositories/drizzle-profile-source-access.repository";
 export * from "./repositories/drizzle-source-group.repository";
 export * from "./schema/collector-profile-manager.schema";
 export * from "./schema/collector-runtime.schema";

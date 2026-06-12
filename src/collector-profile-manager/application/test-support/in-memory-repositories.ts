@@ -3,6 +3,8 @@ import type {
   ProfileId,
   ProfileLease,
   ProfileLeaseId,
+  ProfileSourceAccess,
+  ProfileSourceAccessSourceGroupId,
 } from "../../domain";
 import type {
   ProfileCheckoutCandidateQuery,
@@ -11,6 +13,9 @@ import type {
   ProfileRepository,
 } from "../ports/profile-repository.port";
 import type { ProfileLeaseRepository } from "../ports/profile-lease-repository.port";
+import type {
+  ProfileSourceAccessRepository,
+} from "../ports/profile-source-access-repository.port";
 
 export class InMemoryProfileRepository implements ProfileRepository {
   private readonly profiles = new Map<ProfileId, CollectorProfile>();
@@ -135,4 +140,67 @@ export class InMemoryProfileLeaseRepository implements ProfileLeaseRepository {
   public async updateStatus(lease: ProfileLease): Promise<void> {
     this.leases.set(lease.id, lease);
   }
+}
+
+export class InMemoryProfileSourceAccessRepository
+  implements ProfileSourceAccessRepository
+{
+  private readonly records = new Map<string, ProfileSourceAccess>();
+
+  public async upsert(profileSourceAccess: ProfileSourceAccess): Promise<void> {
+    this.records.set(
+      toProfileSourceAccessKey(
+        profileSourceAccess.profileId,
+        profileSourceAccess.sourceGroupId,
+      ),
+      profileSourceAccess,
+    );
+  }
+
+  public async getByProfileAndSourceGroup(
+    profileId: ProfileId,
+    sourceGroupId: ProfileSourceAccessSourceGroupId,
+  ): Promise<ProfileSourceAccess | null> {
+    return (
+      this.records.get(toProfileSourceAccessKey(profileId, sourceGroupId)) ??
+      null
+    );
+  }
+
+  public async listByProfile(
+    profileId: ProfileId,
+  ): Promise<readonly ProfileSourceAccess[]> {
+    return [...this.records.values()]
+      .filter((record) => record.profileId === profileId)
+      .sort(compareProfileSourceAccess);
+  }
+
+  public async listBySourceGroup(
+    sourceGroupId: ProfileSourceAccessSourceGroupId,
+  ): Promise<readonly ProfileSourceAccess[]> {
+    return [...this.records.values()]
+      .filter((record) => record.sourceGroupId === sourceGroupId)
+      .sort(compareProfileSourceAccess);
+  }
+}
+
+function toProfileSourceAccessKey(
+  profileId: ProfileId,
+  sourceGroupId: ProfileSourceAccessSourceGroupId,
+): string {
+  return `${profileId}:${sourceGroupId}`;
+}
+
+function compareProfileSourceAccess(
+  left: ProfileSourceAccess,
+  right: ProfileSourceAccess,
+): number {
+  const leftUpdatedAt = Date.parse(left.updatedAt);
+  const rightUpdatedAt = Date.parse(right.updatedAt);
+
+  if (leftUpdatedAt !== rightUpdatedAt) {
+    return rightUpdatedAt - leftUpdatedAt;
+  }
+
+  return left.id.localeCompare(right.id);
 }

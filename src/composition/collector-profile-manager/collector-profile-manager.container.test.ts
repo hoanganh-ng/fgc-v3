@@ -4,21 +4,30 @@ import {
   CheckoutProfileUseCase,
   CreateProfileUseCase,
   GetProfileUseCase,
+  GetProfileSourceAccessUseCase,
   GetProvisioningConfigurationUseCase,
   GetRuntimeProfileConfigurationUseCase,
   IngestProfileSessionUseCase,
+  ListProfileSourceAccessForProfileUseCase,
+  ListProfileSourceAccessForSourceGroupUseCase,
   ListProfilesUseCase,
   ReleaseProfileLeaseUseCase,
   StartProfileProvisioningUseCase,
   UpdateProfileAccountStageUseCase,
   UpdateProfileConfigurationUseCase,
+  UpsertProfileSourceAccessUseCase,
 } from "../../collector-profile-manager/application";
 import type {
   Clock,
+  IdGenerator,
   LeaseIdGenerator,
   TokenGenerator,
 } from "../../collector-profile-manager/application";
-import { InMemoryProfileLeaseRepository, InMemoryProfileRepository } from "../../collector-profile-manager/application/test-support/in-memory-repositories";
+import {
+  InMemoryProfileLeaseRepository,
+  InMemoryProfileRepository,
+  InMemoryProfileSourceAccessRepository,
+} from "../../collector-profile-manager/application/test-support/in-memory-repositories";
 import type { ProfileLeaseId } from "../../collector-profile-manager/domain";
 import { createCollectorProfileManager } from "./collector-profile-manager.container";
 
@@ -28,9 +37,11 @@ describe("collector profile manager composition container", () => {
     const services = createCollectorProfileManager({
       profiles: new InMemoryProfileRepository(),
       leases: new InMemoryProfileLeaseRepository(),
+      profileSourceAccess: new InMemoryProfileSourceAccessRepository(),
       clock: new FixedClock(),
       tokenGenerator: new FakeTokenGenerator(),
       leaseIdGenerator: new FakeLeaseIdGenerator(),
+      idGenerator: new FakeIdGenerator(),
       close: async () => {
         closed = true;
       },
@@ -64,6 +75,18 @@ describe("collector profile manager composition container", () => {
     expect(services.releaseProfileLease).toBeInstanceOf(
       ReleaseProfileLeaseUseCase,
     );
+    expect(services.upsertProfileSourceAccess).toBeInstanceOf(
+      UpsertProfileSourceAccessUseCase,
+    );
+    expect(services.getProfileSourceAccess).toBeInstanceOf(
+      GetProfileSourceAccessUseCase,
+    );
+    expect(services.listProfileSourceAccessForProfile).toBeInstanceOf(
+      ListProfileSourceAccessForProfileUseCase,
+    );
+    expect(services.listProfileSourceAccessForSourceGroup).toBeInstanceOf(
+      ListProfileSourceAccessForSourceGroupUseCase,
+    );
 
     await services.close();
 
@@ -86,5 +109,11 @@ class FakeTokenGenerator implements TokenGenerator {
 class FakeLeaseIdGenerator implements LeaseIdGenerator {
   public async generateLeaseId(): Promise<ProfileLeaseId> {
     return "lease-1";
+  }
+}
+
+class FakeIdGenerator implements IdGenerator {
+  public async generateId(): Promise<string> {
+    return "profile-source-access-1";
   }
 }

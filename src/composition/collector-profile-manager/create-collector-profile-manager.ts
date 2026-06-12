@@ -1,5 +1,6 @@
 import type {
   Clock,
+  IdGenerator,
   LeaseIdGenerator,
   TokenGenerator,
 } from "../../collector-profile-manager/application";
@@ -9,6 +10,7 @@ import {
   createDatabaseClient,
   DrizzleProfileLeaseRepository,
   DrizzleProfileRepository,
+  DrizzleProfileSourceAccessRepository,
   DrizzleTransactionManager,
 } from "../../infrastructure/database";
 import type {
@@ -16,6 +18,7 @@ import type {
   DatabaseClient,
 } from "../../infrastructure/database";
 import {
+  CryptoIdGenerator,
   CryptoLeaseIdGenerator,
   CryptoTokenGenerator,
   SystemClock,
@@ -33,6 +36,7 @@ export interface CreateCollectorProfileManagerOptions {
   readonly clock?: Clock;
   readonly tokenGenerator?: TokenGenerator;
   readonly leaseIdGenerator?: LeaseIdGenerator;
+  readonly idGenerator?: IdGenerator;
 }
 
 export interface CreateCollectorProfileManagerFromEnvOptions {
@@ -41,6 +45,7 @@ export interface CreateCollectorProfileManagerFromEnvOptions {
   readonly clock?: Clock;
   readonly tokenGenerator?: TokenGenerator;
   readonly leaseIdGenerator?: LeaseIdGenerator;
+  readonly idGenerator?: IdGenerator;
 }
 
 export type CollectorProfileManagerService = CollectorProfileManagerContainer;
@@ -61,6 +66,9 @@ export function createCollectorProfileManagerFromEnv(
       : {}),
     ...(options.leaseIdGenerator !== undefined
       ? { leaseIdGenerator: options.leaseIdGenerator }
+      : {}),
+    ...(options.idGenerator !== undefined
+      ? { idGenerator: options.idGenerator }
       : {}),
   });
 }
@@ -86,22 +94,27 @@ export function createCollectorProfileManagerFromDatabaseClient(
   overrides: Partial<
     Pick<
       CreateCollectorProfileManagerOptions,
-      "clock" | "tokenGenerator" | "leaseIdGenerator"
+      "clock" | "tokenGenerator" | "leaseIdGenerator" | "idGenerator"
     >
   > = {},
 ): CollectorProfileManagerService {
   const profiles = new DrizzleProfileRepository(databaseClient.db);
   const leases = new DrizzleProfileLeaseRepository(databaseClient.db);
+  const profileSourceAccess = new DrizzleProfileSourceAccessRepository(
+    databaseClient.db,
+  );
   const transactionManager = new DrizzleTransactionManager(databaseClient.db);
 
   return createCollectorProfileManager({
     profiles,
     leases,
+    profileSourceAccess,
     transactionManager,
     clock: overrides.clock ?? new SystemClock(),
     tokenGenerator: overrides.tokenGenerator ?? new CryptoTokenGenerator(),
     leaseIdGenerator:
       overrides.leaseIdGenerator ?? new CryptoLeaseIdGenerator(),
+    idGenerator: overrides.idGenerator ?? new CryptoIdGenerator(),
     close: () => databaseClient.close(),
   });
 }

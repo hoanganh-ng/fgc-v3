@@ -23,6 +23,8 @@ For Content Manager, this includes source group rules, source group entry route 
 
 Content Manager domain core must work from normalized content ingestion input. It must not parse raw Facebook GraphQL payloads or own platform-specific extraction rules.
 
+Collector Profile Manager also owns profile-source access state: durable profile-specific facts about whether a given profile can access a given source group. Profile-source access state stores `sourceGroupId` as an external module reference and does not make Content Manager repository calls from the Profile Manager core.
+
 Domain code should be deterministic where possible and should express business errors in domain terms.
 
 ## Application Layer
@@ -75,6 +77,14 @@ Provisioning and session ingestion may move a profile to operational `READY` wit
 Ambient account exercise uses lease purpose `AMBIENT_EXERCISE` for a specified profile. It may exercise `READY` profiles in `NEW_ACCOUNT`, `WARMING`, `LIMITED`, or `COLLECTION_READY`, while `NEEDS_REVIEW` and `RETIRED` remain ineligible. This purpose is only for read-only stability exercise; it must not collect or submit content, and it must not automatically change `accountStage`.
 
 Account stage transition rules and lease-purpose eligibility remain Collector Profile Manager domain logic. Collector Runtime and browser providers consume the resulting lease and trusted runtime configuration, record exercise outcomes, and release leases, but they do not bypass or reinterpret Profile Manager readiness rules.
+
+## Profile-Source Access
+
+Collector Profile Manager owns profile-source access records for `profileId + sourceGroupId` pairs. This state answers whether a particular profile appears able to access a particular source group; it is separate from source group status and profile account stage.
+
+Content Manager remains the owner of source groups and source group entry route metadata. Sprint 041A stores `sourceGroupId` as an external module reference string and does not validate source group existence through Content Manager yet.
+
+Profile-source access state is data only in Sprint 041A. It must not trigger browser automation, assisted group access, group joining, source-group search, collection runs, account-stage promotion/demotion, or platform actions.
 
 ## Source Group Entry Routes
 

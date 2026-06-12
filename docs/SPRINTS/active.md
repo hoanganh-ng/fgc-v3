@@ -1,5 +1,5 @@
 # Active Sprint
 
-Active sprint: `docs/SPRINTS/SPRINT-040-source-group-entry-routes-foundation.md`
+Active sprint: `docs/SPRINTS/SPRINT-041A-profile-source-access-domain-storage.md`
 
-Only Sprint 040 should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.
+Only Sprint 041A should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.

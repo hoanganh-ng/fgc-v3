@@ -2,7 +2,12 @@ import type { ZodIssue } from "zod";
 import { getMissingRequiredProfileConfiguration } from "./profile";
 import type { CollectorProfile } from "./profile";
 import type { ProfileLease } from "./profile-lease";
-import { CollectorProfileSchema, ProfileLeaseSchema } from "./profile.schemas";
+import type { ProfileSourceAccess } from "./profile-source-access";
+import {
+  CollectorProfileSchema,
+  ProfileLeaseSchema,
+  ProfileSourceAccessSchema,
+} from "./profile.schemas";
 
 export interface ValidationIssue {
   readonly path: string;
@@ -42,6 +47,21 @@ export function parseCollectorProfile(
 
 export function validateProfileLease(value: unknown): ValidationResult<ProfileLease> {
   const result = ProfileLeaseSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateProfileSourceAccess(
+  value: unknown,
+): ValidationResult<ProfileSourceAccess> {
+  const result = ProfileSourceAccessSchema.safeParse(value);
 
   if (!result.success) {
     return invalid(formatZodIssues(result.error.issues));

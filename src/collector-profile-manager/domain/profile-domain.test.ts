@@ -4,16 +4,21 @@ import {
   InvalidProfileAccountStageTransitionError,
   InvalidProfileStateTransitionError,
   assignHardwareFingerprint,
+  createProfileSourceAccess,
   createPendingCollectorProfile,
+  updateProfileSourceAccess,
   transitionProfileAccountStage,
   transitionProfileStatus,
   validateCollectorProfile,
+  validateProfileSourceAccess,
 } from "./index";
 import type {
   CollectorProfile,
   HardwareFingerprint,
   ProfileAccountStage,
+  ProfileSourceAccess,
   ProfileStatus,
+  ValidationIssue,
 } from "./index";
 
 const createdAt = "2026-01-01T00:00:00.000Z";
@@ -286,6 +291,83 @@ describe("collector profile validation", () => {
   });
 });
 
+describe("profile-source access domain", () => {
+  it("creates access records with checked and success timestamps", () => {
+    const access = createProfileSourceAccess({
+      id: "access-1",
+      profileId: "profile-1",
+      sourceGroupId: "source-group-1",
+      accessState: "PUBLIC_ACCESSIBLE",
+      checkedAt: createdAt,
+    });
+
+    expect(access).toMatchObject({
+      id: "access-1",
+      profileId: "profile-1",
+      sourceGroupId: "source-group-1",
+      accessState: "PUBLIC_ACCESSIBLE",
+      lastCheckedAt: createdAt,
+      lastSuccessfulAt: createdAt,
+      joinRequestedAt: null,
+      createdAt,
+      updatedAt: createdAt,
+    });
+    expect(validateProfileSourceAccess(access).valid).toBe(true);
+  });
+
+  it("updates timestamps while preserving createdAt", () => {
+    const access = createProfileSourceAccess({
+      id: "access-1",
+      profileId: "profile-1",
+      sourceGroupId: "source-group-1",
+      accessState: "UNKNOWN",
+      checkedAt: createdAt,
+    });
+    const updatedAccess = updateProfileSourceAccess(access, {
+      accessState: "JOIN_REQUESTED",
+      checkedAt: updatedAt,
+    });
+
+    expect(updatedAccess.createdAt).toBe(createdAt);
+    expect(updatedAccess.updatedAt).toBe(updatedAt);
+    expect(updatedAccess.lastCheckedAt).toBe(updatedAt);
+    expect(updatedAccess.joinRequestedAt).toBe(updatedAt);
+  });
+
+  it("sets lastSuccessfulAt for joined access", () => {
+    const access = createProfileSourceAccess({
+      id: "access-1",
+      profileId: "profile-1",
+      sourceGroupId: "source-group-1",
+      accessState: "JOINED_ACCESSIBLE",
+      checkedAt: updatedAt,
+    });
+
+    expect(access.lastSuccessfulAt).toBe(updatedAt);
+  });
+
+  it("fails when access state is invalid", () => {
+    const result = validateProfileSourceAccess({
+      ...createMinimalProfileSourceAccess(),
+      accessState: "MAYBE_ACCESSIBLE",
+    });
+
+    expectValidationIssue(result, "accessState");
+  });
+
+  it("fails when failure reason text is unsafe", () => {
+    const result = validateProfileSourceAccess({
+      ...createMinimalProfileSourceAccess(),
+      lastFailureReason: {
+        code: "COOKIE_VISIBLE",
+        message: "Cookie value was present.",
+      },
+    });
+
+    expectValidationIssue(result, "lastFailureReason.code");
+  });
+});
+
 function createMinimalProfile(): CollectorProfile {
   return createPendingCollectorProfile({
     id: "profile-1",
@@ -294,8 +376,26 @@ function createMinimalProfile(): CollectorProfile {
   });
 }
 
+function createMinimalProfileSourceAccess(): ProfileSourceAccess {
+  return createProfileSourceAccess({
+    id: "access-1",
+    profileId: "profile-1",
+    sourceGroupId: "source-group-1",
+    accessState: "UNKNOWN",
+    checkedAt: createdAt,
+  });
+}
+
 function expectValidationIssue(
-  result: ReturnType<typeof validateCollectorProfile>,
+  result:
+    | {
+        readonly valid: true;
+        readonly value: unknown;
+      }
+    | {
+        readonly valid: false;
+        readonly issues: readonly ValidationIssue[];
+      },
   path: string,
 ): void {
   expect(result.valid).toBe(false);

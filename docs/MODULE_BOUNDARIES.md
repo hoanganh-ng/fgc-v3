@@ -14,11 +14,14 @@ Owns:
 - Checkout eligibility gating for normal collection, including the requirement that `accountStage = COLLECTION_READY`.
 - Profile lease purpose rules for `COLLECTION` and `AMBIENT_EXERCISE`.
 - Specified-profile ambient exercise checkout eligibility for `READY` profiles, including allowed account stages and rejected review/retired stages.
+- Profile-source access state for `profileId + sourceGroupId` pairs, stored with `sourceGroupId` as an external module reference string.
 
 Does not own:
 
 - Browser automation execution.
 - Collection task orchestration.
+- Content Manager source group records or source group entry route metadata.
+- Source group existence validation through Content Manager until an explicit port/API adapter is introduced.
 - Web UI rendering.
 - Database technology selection.
 - HTTP framework implementation.
@@ -44,7 +47,7 @@ Owns:
 Does not own:
 
 - Profile or session management.
-- Profile-source access state.
+- Profile-source access state for individual profiles.
 - Browser automation.
 - Network payload capture.
 - Raw Facebook GraphQL parsing.

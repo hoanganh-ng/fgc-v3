@@ -4,6 +4,8 @@ import {
   collectorProfileLeaseStatusEnum,
   collectorProfileLeases,
   collectorProfileAccountStageEnum,
+  collectorProfileSourceAccess,
+  collectorProfileSourceAccessStateEnum,
   collectorProfileStatusEnum,
   collectorProfiles,
   provisioningTokenStatusEnum,
@@ -27,6 +29,18 @@ describe("collector profile manager database schema", () => {
     expect(collectorProfileLeases.purpose.name).toBe("purpose");
     expect(collectorProfileLeases.status.name).toBe("status");
     expect(collectorProfileLeases.expiresAt.name).toBe("expires_at");
+  });
+
+  it("exports profile-source access table metadata for migration generation", () => {
+    expect(collectorProfileSourceAccess.id.name).toBe("id");
+    expect(collectorProfileSourceAccess.profileId.name).toBe("profile_id");
+    expect(collectorProfileSourceAccess.sourceGroupId.name).toBe(
+      "source_group_id",
+    );
+    expect(collectorProfileSourceAccess.accessState.name).toBe("access_state");
+    expect(collectorProfileSourceAccess.lastFailureReason.name).toBe(
+      "last_failure_reason",
+    );
   });
 
   it("keeps database enum values aligned with the Collector Profile Manager model", () => {
@@ -58,6 +72,17 @@ describe("collector profile manager database schema", () => {
     expect(collectorProfileLeasePurposeEnum.enumValues).toEqual([
       "COLLECTION",
       "AMBIENT_EXERCISE",
+    ]);
+    expect(collectorProfileSourceAccessStateEnum.enumValues).toEqual([
+      "UNKNOWN",
+      "PUBLIC_ACCESSIBLE",
+      "JOIN_REQUIRED",
+      "JOIN_REQUESTED",
+      "JOINED_ACCESSIBLE",
+      "ACCESS_DENIED",
+      "LOGIN_REQUIRED",
+      "CHECKPOINT_REQUIRED",
+      "NEEDS_MANUAL_REVIEW",
     ]);
   });
 });

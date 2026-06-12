@@ -17,9 +17,11 @@ import type {
   HardwareFingerprint,
   IdentityMetadata,
   NetworkContext,
+  ProfileSourceAccessFailureReason,
   SafetyThresholds,
   TemporalRoutine,
 } from "../../../collector-profile-manager/domain";
+import { PROFILE_SOURCE_ACCESS_STATES } from "../../../collector-profile-manager/domain";
 
 type IdentityMetadataJson = Pick<
   IdentityMetadata,
@@ -60,6 +62,11 @@ export const collectorProfileLeaseStatusEnum = pgEnum(
 export const collectorProfileLeasePurposeEnum = pgEnum(
   "collector_profile_lease_purpose",
   ["COLLECTION", "AMBIENT_EXERCISE"],
+);
+
+export const collectorProfileSourceAccessStateEnum = pgEnum(
+  "collector_profile_source_access_state",
+  PROFILE_SOURCE_ACCESS_STATES,
 );
 
 const timestampWithTimezone = (name: string) =>
@@ -164,5 +171,41 @@ export const collectorProfileLeases = pgTable(
     uniqueIndex("collector_profile_leases_active_profile_uidx")
       .on(table.profileId)
       .where(sql`${table.status} = 'ACTIVE'`),
+  ],
+);
+
+export const collectorProfileSourceAccess = pgTable(
+  "collector_profile_source_access",
+  {
+    id: text("id").primaryKey(),
+    profileId: text("profile_id")
+      .notNull()
+      .references(() => collectorProfiles.id, { onDelete: "restrict" }),
+    sourceGroupId: text("source_group_id").notNull(),
+    accessState: collectorProfileSourceAccessStateEnum("access_state")
+      .notNull()
+      .default("UNKNOWN"),
+    lastCheckedAt: timestampWithTimezone("last_checked_at"),
+    lastSuccessfulAt: timestampWithTimezone("last_successful_at"),
+    lastFailureReason:
+      jsonb("last_failure_reason").$type<ProfileSourceAccessFailureReason>(),
+    joinRequestedAt: timestampWithTimezone("join_requested_at"),
+    notes: text("notes"),
+    createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
+    updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("collector_profile_source_access_profile_source_uidx").on(
+      table.profileId,
+      table.sourceGroupId,
+    ),
+    index("collector_profile_source_access_profile_id_idx").on(
+      table.profileId,
+    ),
+    index("collector_profile_source_access_source_group_id_idx").on(
+      table.sourceGroupId,
+    ),
+    index("collector_profile_source_access_state_idx").on(table.accessState),
+    index("collector_profile_source_access_updated_at_idx").on(table.updatedAt),
   ],
 );
