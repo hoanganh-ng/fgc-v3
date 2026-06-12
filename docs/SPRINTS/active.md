@@ -1,5 +1,5 @@
 # Active Sprint
 
-Active sprint: `docs/SPRINTS/SPRINT-038-profile-account-stage-readiness-gate.md`
+Active sprint: `docs/SPRINTS/SPRINT-039-ambient-account-exercise-foundation.md`
 
-Only Sprint 038 should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.
+Only Sprint 039 should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.

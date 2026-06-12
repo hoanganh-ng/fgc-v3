@@ -57,6 +57,11 @@ export const collectorProfileLeaseStatusEnum = pgEnum(
   ["ACTIVE", "RELEASED", "EXPIRED"],
 );
 
+export const collectorProfileLeasePurposeEnum = pgEnum(
+  "collector_profile_lease_purpose",
+  ["COLLECTION", "AMBIENT_EXERCISE"],
+);
+
 const timestampWithTimezone = (name: string) =>
   timestamp(name, { mode: "string", withTimezone: true });
 
@@ -141,6 +146,9 @@ export const collectorProfileLeases = pgTable(
     status: collectorProfileLeaseStatusEnum("status")
       .notNull()
       .default("ACTIVE"),
+    purpose: collectorProfileLeasePurposeEnum("purpose")
+      .notNull()
+      .default("COLLECTION"),
     leasedAt: timestampWithTimezone("leased_at").notNull(),
     expiresAt: timestampWithTimezone("expires_at").notNull(),
     releasedAt: timestampWithTimezone("released_at"),

@@ -1,4 +1,5 @@
 import {
+  CheckoutProfileForExerciseUseCase,
   CheckoutProfileUseCase,
   CreateProfileUseCase,
   GetProfileUseCase,
@@ -41,6 +42,7 @@ export interface CollectorProfileManagerContainer {
   readonly getRuntimeProfileConfiguration: GetRuntimeProfileConfigurationUseCase;
   readonly ingestProfileSession: IngestProfileSessionUseCase;
   readonly checkoutProfile: CheckoutProfileUseCase;
+  readonly checkoutProfileForExercise: CheckoutProfileForExerciseUseCase;
   readonly releaseProfileLease: ReleaseProfileLeaseUseCase;
   close(): Promise<void>;
 }
@@ -85,6 +87,13 @@ export function createCollectorProfileManager(
     ),
     ingestProfileSession: new IngestProfileSessionUseCase(profiles, clock),
     checkoutProfile: new CheckoutProfileUseCase(
+      profiles,
+      leases,
+      leaseIdGenerator,
+      clock,
+      transactionManager,
+    ),
+    checkoutProfileForExercise: new CheckoutProfileForExerciseUseCase(
       profiles,
       leases,
       leaseIdGenerator,

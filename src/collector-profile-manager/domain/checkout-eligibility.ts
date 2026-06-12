@@ -1,6 +1,6 @@
 import { transitionCollectorProfileStatus } from "./profile";
 import type { CollectorProfile } from "./profile";
-import type { ProfileLease } from "./profile-lease";
+import type { ProfileLease, ProfileLeasePurpose } from "./profile-lease";
 import type {
   ActiveTimeWindow,
   DailySafetyUsage,
@@ -12,6 +12,7 @@ import type {
 export type CheckoutIneligibilityReasonCode =
   | "PROFILE_NOT_READY"
   | "ACCOUNT_STAGE_NOT_COLLECTION_READY"
+  | "ACCOUNT_STAGE_NOT_EXERCISE_ELIGIBLE"
   | "AUTHENTICATION_MISSING"
   | "AUTHENTICATION_EXPIRED"
   | "NETWORK_CONTEXT_MISSING"
@@ -41,6 +42,10 @@ export type CheckoutEligibilityResult =
       readonly localDate?: LocalDate;
     };
 
+export interface CheckoutEligibilityOptions {
+  readonly purpose?: ProfileLeasePurpose;
+}
+
 interface LocalTemporalContext {
   readonly localDate: LocalDate;
   readonly dayOfWeek: DayOfWeek;
@@ -50,8 +55,10 @@ interface LocalTemporalContext {
 export function evaluateCheckoutEligibility(
   profile: CollectorProfile,
   now: Date,
+  options: CheckoutEligibilityOptions = {},
 ): CheckoutEligibilityResult {
   const reasons: CheckoutIneligibilityReason[] = [];
+  const purpose = options.purpose ?? "COLLECTION";
 
   if (profile.identity.status !== "READY") {
     reasons.push({
@@ -60,11 +67,25 @@ export function evaluateCheckoutEligibility(
     });
   }
 
-  if (profile.identity.accountStage !== "COLLECTION_READY") {
+  if (
+    purpose === "COLLECTION" &&
+    profile.identity.accountStage !== "COLLECTION_READY"
+  ) {
     reasons.push({
       code: "ACCOUNT_STAGE_NOT_COLLECTION_READY",
       message:
         "Profile account stage must be COLLECTION_READY before checkout.",
+    });
+  }
+
+  if (
+    purpose === "AMBIENT_EXERCISE" &&
+    !isAccountStageEligibleForAmbientExercise(profile.identity.accountStage)
+  ) {
+    reasons.push({
+      code: "ACCOUNT_STAGE_NOT_EXERCISE_ELIGIBLE",
+      message:
+        "Profile account stage must allow ambient exercise before exercise checkout.",
     });
   }
 
@@ -201,6 +222,17 @@ export function evaluateCheckoutEligibility(
     eligible: true,
     localDate: localContext.localDate,
   };
+}
+
+function isAccountStageEligibleForAmbientExercise(
+  accountStage: CollectorProfile["identity"]["accountStage"],
+): boolean {
+  return (
+    accountStage === "NEW_ACCOUNT" ||
+    accountStage === "WARMING" ||
+    accountStage === "LIMITED" ||
+    accountStage === "COLLECTION_READY"
+  );
 }
 
 export function markProfileCheckedOut(

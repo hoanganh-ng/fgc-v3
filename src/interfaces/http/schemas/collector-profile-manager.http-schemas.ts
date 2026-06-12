@@ -353,11 +353,23 @@ const listProfilesPageJsonSchema = {
 
 const profileLeaseJsonSchema = {
   type: "object",
-  required: ["id", "profileId", "leasedAt", "expiresAt", "releasedAt", "status"],
+  required: [
+    "id",
+    "profileId",
+    "purpose",
+    "leasedAt",
+    "expiresAt",
+    "releasedAt",
+    "status",
+  ],
   additionalProperties: false,
   properties: {
     id: nonEmptyStringJsonSchema,
     profileId: nonEmptyStringJsonSchema,
+    purpose: {
+      type: "string",
+      enum: ["COLLECTION", "AMBIENT_EXERCISE"],
+    },
     leasedAt: nonEmptyStringJsonSchema,
     expiresAt: nonEmptyStringJsonSchema,
     releasedAt: nullableIsoDateTimeJsonSchema,
@@ -613,6 +625,31 @@ export const checkoutProfileHttpRouteSchema = {
             temporalRoutine: looseObjectJsonSchema,
             safetyThresholds: looseObjectJsonSchema,
             contentAffinities: looseObjectJsonSchema,
+          },
+        },
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const checkoutProfileForExerciseHttpRouteSchema = {
+  params: profileIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["lease", "profile"],
+      additionalProperties: false,
+      properties: {
+        lease: profileLeaseJsonSchema,
+        profile: {
+          type: "object",
+          required: ["profileId", "accountStage"],
+          additionalProperties: false,
+          properties: {
+            profileId: nonEmptyStringJsonSchema,
+            accountStage: profileSummaryJsonSchema.properties.accountStage,
           },
         },
       },

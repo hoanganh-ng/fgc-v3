@@ -22,6 +22,7 @@ describe("profile lease database mapper", () => {
     const row = toProfileLeaseRow(lease);
 
     expect(toProfileLeaseDomain(row)).toEqual(lease);
+    expect(row.purpose).toBe("COLLECTION");
   });
 
   it("rejects invalid persisted lease data on read", () => {

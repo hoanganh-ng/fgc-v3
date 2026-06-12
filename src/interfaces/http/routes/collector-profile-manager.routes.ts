@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import type {
   CheckoutProfileInput,
   CheckoutProfileOutput,
+  CheckoutProfileForExerciseInput,
+  CheckoutProfileForExerciseOutput,
   CreateProfileInput,
   GetProfileInput,
   GetProvisioningConfigurationInput,
@@ -42,6 +44,7 @@ import {
   UpdateProfileAccountStageHttpBodySchema,
   UpdateProfileConfigurationHttpBodySchema,
   checkoutProfileHttpRouteSchema,
+  checkoutProfileForExerciseHttpRouteSchema,
   createProfileHttpRouteSchema,
   getProvisioningConfigurationHttpRouteSchema,
   getProfileHttpRouteSchema,
@@ -96,6 +99,10 @@ export interface CollectorProfileManagerHttpService {
   readonly checkoutProfile: ExecutableUseCase<
     CheckoutProfileInput | undefined,
     CheckoutProfileOutput
+  >;
+  readonly checkoutProfileForExercise: ExecutableUseCase<
+    CheckoutProfileForExerciseInput,
+    CheckoutProfileForExerciseOutput
   >;
   readonly releaseProfileLease: ExecutableUseCase<
     ReleaseProfileLeaseInput,
@@ -331,6 +338,21 @@ export function registerCollectorProfileManagerRoutes(
             } satisfies CheckoutProfileInput);
 
       return collectorProfileManager.checkoutProfile.execute(input);
+    },
+  );
+
+  server.post(
+    "/collector/profiles/:profileId/exercise-checkout",
+    { schema: checkoutProfileForExerciseHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileIdHttpParamsSchema,
+        request.params,
+      );
+
+      return collectorProfileManager.checkoutProfileForExercise.execute({
+        profileId: params.profileId,
+      });
     },
   );
 

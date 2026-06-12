@@ -70,7 +70,11 @@ Collector Profile Manager keeps operational profile status separate from account
 - `profile.status` describes operational lifecycle state: `PENDING_CONFIG`, `PENDING_LOGIN`, `READY`, and `BUSY`.
 - `accountStage` describes account readiness/maturity: `NEW_ACCOUNT`, `WARMING`, `COLLECTION_READY`, `LIMITED`, `NEEDS_REVIEW`, and `RETIRED`.
 
-Provisioning and session ingestion may move a profile to operational `READY` without making it collection-ready. Normal collection checkout requires `status = READY` and `accountStage = COLLECTION_READY`, plus the existing authentication, runtime configuration, temporal routine, cooldown, lease, and safety-threshold checks. Account stage transition rules remain Collector Profile Manager domain logic and are not owned by Collector Runtime or browser providers.
+Provisioning and session ingestion may move a profile to operational `READY` without making it collection-ready. Normal collection checkout uses lease purpose `COLLECTION` and requires `status = READY` and `accountStage = COLLECTION_READY`, plus the existing authentication, runtime configuration, temporal routine, cooldown, lease, and safety-threshold checks.
+
+Ambient account exercise uses lease purpose `AMBIENT_EXERCISE` for a specified profile. It may exercise `READY` profiles in `NEW_ACCOUNT`, `WARMING`, `LIMITED`, or `COLLECTION_READY`, while `NEEDS_REVIEW` and `RETIRED` remain ineligible. This purpose is only for read-only stability exercise; it must not collect or submit content, and it must not automatically change `accountStage`.
+
+Account stage transition rules and lease-purpose eligibility remain Collector Profile Manager domain logic. Collector Runtime and browser providers consume the resulting lease and trusted runtime configuration, record exercise outcomes, and release leases, but they do not bypass or reinterpret Profile Manager readiness rules.
 
 ## Platform Extractors
 

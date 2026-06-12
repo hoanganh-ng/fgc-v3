@@ -9,6 +9,8 @@ import {
 import type {
   CheckoutProfileInput,
   CheckoutProfileOutput,
+  CheckoutProfileForExerciseInput,
+  CheckoutProfileForExerciseOutput,
   CreateProfileInput,
   GetProfileInput,
   GetProvisioningConfigurationInput,
@@ -535,6 +537,35 @@ describe("HTTP server", () => {
     }
   });
 
+  it("checks out a profile for ambient exercise and returns a safe stage snapshot", async () => {
+    const { server, service } = createTestServer();
+    const checkoutOutput = createExerciseCheckoutOutput();
+
+    service.checkoutProfileForExercise.setOutput(checkoutOutput);
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/profile-1/exercise-checkout",
+      });
+      const body = response.json();
+      const bodyText = JSON.stringify(body);
+
+      expect(response.statusCode).toBe(200);
+      expect(service.checkoutProfileForExercise.calls).toEqual([
+        {
+          profileId: "profile-1",
+        },
+      ]);
+      expect(body).toEqual(checkoutOutput);
+      expect(bodyText).not.toContain("cookie");
+      expect(bodyText).not.toContain("localStorage");
+      expect(bodyText).not.toContain("proxy");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("releases a profile lease", async () => {
     const { server, service } = createTestServer();
     const lease = createReleasedLease();
@@ -780,6 +811,10 @@ interface FakeCollectorProfileManager extends CollectorProfileManagerHttpService
     CheckoutProfileInput | undefined,
     CheckoutProfileOutput
   >;
+  readonly checkoutProfileForExercise: StubUseCase<
+    CheckoutProfileForExerciseInput,
+    CheckoutProfileForExerciseOutput
+  >;
   readonly releaseProfileLease: StubUseCase<
     ReleaseProfileLeaseInput,
     ReleaseProfileLeaseOutput
@@ -828,6 +863,7 @@ function createTestServer(): {
       }),
     ),
     checkoutProfile: new StubUseCase(createCheckoutOutput()),
+    checkoutProfileForExercise: new StubUseCase(createExerciseCheckoutOutput()),
     releaseProfileLease: new StubUseCase({
       lease: createReleasedLease(),
       profile: createProfile({
@@ -918,6 +954,19 @@ function createCheckoutOutput(): CheckoutProfileOutput {
   };
 }
 
+function createExerciseCheckoutOutput(): CheckoutProfileForExerciseOutput {
+  return {
+    lease: {
+      ...createActiveLease(),
+      purpose: "AMBIENT_EXERCISE",
+    },
+    profile: {
+      profileId: "profile-1",
+      accountStage: "NEW_ACCOUNT",
+    },
+  };
+}
+
 function createRuntimeProfileConfiguration(): RuntimeProfileConfiguration {
   return {
     profileId: "profile-1",
@@ -936,6 +985,7 @@ function createActiveLease(): ProfileLease {
   return {
     id: "lease-1",
     profileId: "profile-1",
+    purpose: "COLLECTION",
     leasedAt: now,
     expiresAt: "2026-01-05T18:45:00.000Z",
     releasedAt: null,

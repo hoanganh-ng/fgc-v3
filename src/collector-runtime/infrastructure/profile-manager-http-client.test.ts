@@ -137,6 +137,50 @@ describe("ProfileManagerHttpClient", () => {
     });
   });
 
+  it("posts exercise checkout requests for a specific profile", async () => {
+    const fetch = new FakeFetch(createExerciseCheckoutResponse());
+    const client = createClient(fetch.fetch);
+
+    const result = await client.checkoutProfileForExercise("profile-1");
+
+    expect(result).toEqual({
+      ok: true,
+      profileId: "profile-1",
+      accountStage: "NEW_ACCOUNT",
+      leaseId: "lease-1",
+      leaseExpiresAt: "2026-01-05T18:45:00.000Z",
+    });
+    expect(fetch.calls[0]).toMatchObject({
+      input:
+        "https://profile-manager.test/collector/profiles/profile-1/exercise-checkout",
+      init: {
+        method: "POST",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("cookie");
+    expect(JSON.stringify(result)).not.toContain("localStorage");
+    expect(JSON.stringify(result)).not.toContain("proxy");
+  });
+
+  it("gets safe profile account stage from profile detail", async () => {
+    const fetch = new FakeFetch(createProfileDetailResponse());
+    const client = createClient(fetch.fetch);
+
+    const result = await client.getSafeProfileAccountStage("profile-1");
+
+    expect(result).toEqual({
+      ok: true,
+      profileId: "profile-1",
+      accountStage: "NEW_ACCOUNT",
+    });
+    expect(fetch.calls[0]).toMatchObject({
+      input: "https://profile-manager.test/collector/profiles/profile-1",
+      init: {
+        method: "GET",
+      },
+    });
+  });
+
   it("posts release requests to /collector/profile-leases/:leaseId/release", async () => {
     const fetch = new FakeFetch(createReleaseResponse());
     const client = new ProfileManagerHttpClient(
@@ -624,6 +668,7 @@ function createCheckoutResponse(): FetchLikeResponse {
     lease: {
       id: "lease-1",
       profileId: "profile-1",
+      purpose: "COLLECTION",
       leasedAt: "2026-01-05T18:00:00.000Z",
       expiresAt: "2026-01-05T18:45:00.000Z",
       releasedAt: null,
@@ -666,6 +711,35 @@ function createCheckoutResponse(): FetchLikeResponse {
       temporalRoutine: {},
       safetyThresholds: {},
       contentAffinities: {},
+    },
+  });
+}
+
+function createExerciseCheckoutResponse(): FetchLikeResponse {
+  return createResponse(200, {
+    lease: {
+      id: "lease-1",
+      profileId: "profile-1",
+      purpose: "AMBIENT_EXERCISE",
+      leasedAt: "2026-01-05T18:00:00.000Z",
+      expiresAt: "2026-01-05T18:45:00.000Z",
+      releasedAt: null,
+      status: "ACTIVE",
+    },
+    profile: {
+      profileId: "profile-1",
+      accountStage: "NEW_ACCOUNT",
+    },
+  });
+}
+
+function createProfileDetailResponse(): FetchLikeResponse {
+  return createResponse(200, {
+    profile: {
+      id: "profile-1",
+      displayName: "Profile 1",
+      status: "READY",
+      accountStage: "NEW_ACCOUNT",
     },
   });
 }
@@ -760,6 +834,7 @@ function createReleaseResponse(): FetchLikeResponse {
     lease: {
       id: "lease-1",
       profileId: "profile-1",
+      purpose: "COLLECTION",
       leasedAt: "2026-01-05T18:00:00.000Z",
       expiresAt: "2026-01-05T18:45:00.000Z",
       releasedAt: "2026-01-05T18:10:00.000Z",

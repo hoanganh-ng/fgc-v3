@@ -1,14 +1,22 @@
 import {
+  CancelAccountExerciseRunUseCase,
   CancelCollectionRunUseCase,
   ClaimNextCollectionRunUseCase,
+  GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
+  ListAccountExerciseRunsUseCase,
   ListCollectionRunsUseCase,
+  MarkAccountExerciseRunFailedUseCase,
+  MarkAccountExerciseRunRunningUseCase,
+  MarkAccountExerciseRunSucceededUseCase,
   MarkCollectionRunFailedUseCase,
   MarkCollectionRunRunningUseCase,
   MarkCollectionRunSucceededUseCase,
+  RequestAccountExerciseRunUseCase,
   RequestCollectionRunUseCase,
 } from "../../collector-runtime/application";
 import type {
+  AccountExerciseRunRepository,
   Clock,
   CollectionRunRepository,
   IdGenerator,
@@ -16,6 +24,7 @@ import type {
 } from "../../collector-runtime/application";
 
 export interface CollectorRuntimeDependencies {
+  readonly accountExerciseRuns: AccountExerciseRunRepository;
   readonly collectionRuns: CollectionRunRepository;
   readonly sourceGroups: SourceGroupLookupPort;
   readonly clock: Clock;
@@ -24,6 +33,13 @@ export interface CollectorRuntimeDependencies {
 }
 
 export interface CollectorRuntimeContainer {
+  readonly requestAccountExerciseRun: RequestAccountExerciseRunUseCase;
+  readonly getAccountExerciseRun: GetAccountExerciseRunUseCase;
+  readonly listAccountExerciseRuns: ListAccountExerciseRunsUseCase;
+  readonly markAccountExerciseRunRunning: MarkAccountExerciseRunRunningUseCase;
+  readonly markAccountExerciseRunSucceeded: MarkAccountExerciseRunSucceededUseCase;
+  readonly markAccountExerciseRunFailed: MarkAccountExerciseRunFailedUseCase;
+  readonly cancelAccountExerciseRun: CancelAccountExerciseRunUseCase;
   readonly requestCollectionRun: RequestCollectionRunUseCase;
   readonly getCollectionRun: GetCollectionRunUseCase;
   readonly listCollectionRuns: ListCollectionRunsUseCase;
@@ -39,6 +55,7 @@ export function createCollectorRuntime(
   dependencies: CollectorRuntimeDependencies,
 ): CollectorRuntimeContainer {
   const {
+    accountExerciseRuns,
     collectionRuns,
     sourceGroups,
     clock,
@@ -46,6 +63,33 @@ export function createCollectorRuntime(
   } = dependencies;
 
   return {
+    requestAccountExerciseRun: new RequestAccountExerciseRunUseCase(
+      accountExerciseRuns,
+      idGenerator,
+      clock,
+    ),
+    getAccountExerciseRun: new GetAccountExerciseRunUseCase(
+      accountExerciseRuns,
+    ),
+    listAccountExerciseRuns: new ListAccountExerciseRunsUseCase(
+      accountExerciseRuns,
+    ),
+    markAccountExerciseRunRunning: new MarkAccountExerciseRunRunningUseCase(
+      accountExerciseRuns,
+      clock,
+    ),
+    markAccountExerciseRunSucceeded: new MarkAccountExerciseRunSucceededUseCase(
+      accountExerciseRuns,
+      clock,
+    ),
+    markAccountExerciseRunFailed: new MarkAccountExerciseRunFailedUseCase(
+      accountExerciseRuns,
+      clock,
+    ),
+    cancelAccountExerciseRun: new CancelAccountExerciseRunUseCase(
+      accountExerciseRuns,
+      clock,
+    ),
     requestCollectionRun: new RequestCollectionRunUseCase(
       collectionRuns,
       sourceGroups,

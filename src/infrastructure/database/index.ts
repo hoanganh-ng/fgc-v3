@@ -1,4 +1,5 @@
 export * from "./client";
+export * from "./repositories/drizzle-account-exercise-run.repository";
 export * from "./repositories/drizzle-collection-run.repository";
 export * from "./repositories/drizzle-content-category.repository";
 export * from "./repositories/drizzle-content-item.repository";

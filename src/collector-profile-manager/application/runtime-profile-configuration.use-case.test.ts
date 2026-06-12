@@ -194,6 +194,7 @@ function createActiveLease(): ProfileLease {
   return {
     id: "lease-1",
     profileId: "profile-1",
+    purpose: "COLLECTION",
     leasedAt: now,
     expiresAt: leaseExpiresAt,
     releasedAt: null,

@@ -5,6 +5,7 @@ import type {
 } from "../../collector-runtime/application";
 import { ContentManagerHttpClient } from "../../collector-runtime/infrastructure";
 import {
+  DrizzleAccountExerciseRunRepository,
   DrizzleCollectionRunRepository,
   createDatabaseClient,
 } from "../../infrastructure/database";
@@ -91,6 +92,9 @@ export function createCollectorRuntimeFromDatabaseClient(
   > = {},
 ): CollectorRuntimeService {
   const collectionRuns = new DrizzleCollectionRunRepository(databaseClient.db);
+  const accountExerciseRuns = new DrizzleAccountExerciseRunRepository(
+    databaseClient.db,
+  );
   const sourceGroups =
     overrides.sourceGroupLookupPort ??
     new ContentManagerHttpClient({
@@ -98,6 +102,7 @@ export function createCollectorRuntimeFromDatabaseClient(
     });
 
   return createCollectorRuntime({
+    accountExerciseRuns,
     collectionRuns,
     sourceGroups,
     clock: overrides.clock ?? new SystemClock(),

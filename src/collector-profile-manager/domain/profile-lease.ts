@@ -1,6 +1,7 @@
 import type { infer as zInfer } from "zod";
 import type {
   ProfileLeaseIdSchema,
+  ProfileLeasePurposeSchema,
   ProfileLeaseSchema,
   ProfileLeaseStatusSchema,
 } from "./profile.schemas";
@@ -12,13 +13,20 @@ export const PROFILE_LEASE_STATUSES = [
   "EXPIRED",
 ] as const;
 
+export const PROFILE_LEASE_PURPOSES = [
+  "COLLECTION",
+  "AMBIENT_EXERCISE",
+] as const;
+
 export type ProfileLeaseStatus = zInfer<typeof ProfileLeaseStatusSchema>;
+export type ProfileLeasePurpose = zInfer<typeof ProfileLeasePurposeSchema>;
 export type ProfileLeaseId = zInfer<typeof ProfileLeaseIdSchema>;
 export type ProfileLease = zInfer<typeof ProfileLeaseSchema>;
 
 export interface CreateActiveProfileLeaseInput {
   readonly id: ProfileLeaseId;
   readonly profileId: ProfileId;
+  readonly purpose?: ProfileLeasePurpose;
   readonly leasedAt: IsoDateTime;
   readonly expiresAt: IsoDateTime;
 }
@@ -29,6 +37,7 @@ export function createActiveProfileLease(
   return {
     id: input.id,
     profileId: input.profileId,
+    purpose: input.purpose ?? "COLLECTION",
     leasedAt: input.leasedAt,
     expiresAt: input.expiresAt,
     releasedAt: null,

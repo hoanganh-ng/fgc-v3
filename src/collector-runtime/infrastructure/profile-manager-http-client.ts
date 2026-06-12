@@ -80,6 +80,34 @@ export type SafeProfileStatusCountsResult =
       readonly errorMessage: string;
     };
 
+export type SafeProfileAccountStageResult =
+  | {
+      readonly ok: true;
+      readonly profileId: string;
+      readonly accountStage: string;
+    }
+  | {
+      readonly ok: false;
+      readonly statusCode?: number;
+      readonly errorCode: string;
+      readonly errorMessage: string;
+    };
+
+export type ProfileExerciseCheckoutResult =
+  | {
+      readonly ok: true;
+      readonly profileId: string;
+      readonly accountStage: string;
+      readonly leaseId: string;
+      readonly leaseExpiresAt?: string;
+    }
+  | {
+      readonly ok: false;
+      readonly statusCode?: number;
+      readonly errorCode: string;
+      readonly errorMessage: string;
+    };
+
 interface HttpFailure {
   readonly statusCode: number;
   readonly errorCode: string;
@@ -129,6 +157,45 @@ export class ProfileManagerHttpClient
         statusCode: response.status,
         errorCode: PROFILE_MANAGER_RESPONSE_ERROR,
         errorMessage: "Profile Manager checkout response is invalid.",
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        errorCode: PROFILE_MANAGER_NETWORK_ERROR,
+        errorMessage: errorToProfileManagerMessage(error),
+      };
+    }
+  }
+
+  public async checkoutProfileForExercise(
+    profileId: string,
+  ): Promise<ProfileExerciseCheckoutResult> {
+    try {
+      const response = await this.fetchImplementation(
+        buildCheckoutProfileForExerciseUrl(this.baseUrl, profileId),
+        {
+          method: "POST",
+          headers: jsonHeaders(),
+          body: JSON.stringify({}),
+        },
+      );
+
+      if (!isSuccessStatusCode(response.status)) {
+        return toExerciseCheckoutFailure(await readHttpFailure(response));
+      }
+
+      const body = await readJsonBody(response);
+      const result = toExerciseCheckoutSuccessResult(body);
+
+      if (result !== undefined) {
+        return result;
+      }
+
+      return {
+        ok: false,
+        statusCode: response.status,
+        errorCode: PROFILE_MANAGER_RESPONSE_ERROR,
+        errorMessage: "Profile Manager exercise checkout response is invalid.",
       };
     } catch (error) {
       return {
@@ -209,6 +276,44 @@ export class ProfileManagerHttpClient
         errorCode: PROFILE_MANAGER_RESPONSE_ERROR,
         errorMessage:
           "Profile Manager runtime configuration response is invalid.",
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        errorCode: PROFILE_MANAGER_NETWORK_ERROR,
+        errorMessage: errorToProfileManagerMessage(error),
+      };
+    }
+  }
+
+  public async getSafeProfileAccountStage(
+    profileId: string,
+  ): Promise<SafeProfileAccountStageResult> {
+    try {
+      const response = await this.fetchImplementation(
+        buildProfileUrl(this.baseUrl, profileId),
+        {
+          method: "GET",
+          headers: jsonHeaders(),
+        },
+      );
+
+      if (!isSuccessStatusCode(response.status)) {
+        return toSafeProfileAccountStageFailure(await readHttpFailure(response));
+      }
+
+      const body = await readJsonBody(response);
+      const result = toSafeProfileAccountStageSuccessResult(body);
+
+      if (result !== undefined) {
+        return result;
+      }
+
+      return {
+        ok: false,
+        statusCode: response.status,
+        errorCode: PROFILE_MANAGER_RESPONSE_ERROR,
+        errorMessage: "Profile Manager profile response is invalid.",
       };
     } catch (error) {
       return {
@@ -354,10 +459,24 @@ function buildProfilesUrl(
   return url.toString();
 }
 
+function buildProfileUrl(baseUrl: string, profileId: string): string {
+  return buildUrl(baseUrl, `collector/profiles/${encodeURIComponent(profileId)}`);
+}
+
 function buildReleaseProfileLeaseUrl(baseUrl: string, leaseId: string): string {
   return buildUrl(
     baseUrl,
     `collector/profile-leases/${encodeURIComponent(leaseId)}/release`,
+  );
+}
+
+function buildCheckoutProfileForExerciseUrl(
+  baseUrl: string,
+  profileId: string,
+): string {
+  return buildUrl(
+    baseUrl,
+    `collector/profiles/${encodeURIComponent(profileId)}/exercise-checkout`,
   );
 }
 
@@ -417,6 +536,66 @@ function toCheckoutSuccessResult(
     ...(typeof leaseExpiresAt === "string" && leaseExpiresAt.trim().length > 0
       ? { leaseExpiresAt }
       : {}),
+  };
+}
+
+function toExerciseCheckoutSuccessResult(
+  body: unknown,
+): Extract<ProfileExerciseCheckoutResult, { readonly ok: true }> | undefined {
+  if (!isRecord(body) || !isRecord(body.lease) || !isRecord(body.profile)) {
+    return undefined;
+  }
+
+  const leaseId = body.lease.id;
+  const leaseExpiresAt = body.lease.expiresAt;
+  const profileId = body.profile.profileId;
+  const accountStage = body.profile.accountStage;
+
+  if (typeof leaseId !== "string" || leaseId.trim().length === 0) {
+    return undefined;
+  }
+
+  if (typeof profileId !== "string" || profileId.trim().length === 0) {
+    return undefined;
+  }
+
+  if (typeof accountStage !== "string" || accountStage.trim().length === 0) {
+    return undefined;
+  }
+
+  return {
+    ok: true,
+    profileId,
+    accountStage,
+    leaseId,
+    ...(typeof leaseExpiresAt === "string" && leaseExpiresAt.trim().length > 0
+      ? { leaseExpiresAt }
+      : {}),
+  };
+}
+
+function toSafeProfileAccountStageSuccessResult(
+  body: unknown,
+): Extract<SafeProfileAccountStageResult, { readonly ok: true }> | undefined {
+  if (!isRecord(body) || !isRecord(body.profile)) {
+    return undefined;
+  }
+
+  const profileId = body.profile.id;
+  const accountStage = body.profile.accountStage;
+
+  if (typeof profileId !== "string" || profileId.trim().length === 0) {
+    return undefined;
+  }
+
+  if (typeof accountStage !== "string" || accountStage.trim().length === 0) {
+    return undefined;
+  }
+
+  return {
+    ok: true,
+    profileId,
+    accountStage,
   };
 }
 
@@ -509,6 +688,28 @@ function toProfileListCount(body: unknown): number | undefined {
 function toSafeProfileStatusCountsFailure(
   failure: HttpFailure,
 ): Extract<SafeProfileStatusCountsResult, { readonly ok: false }> {
+  return {
+    ok: false,
+    statusCode: failure.statusCode,
+    errorCode: failure.errorCode,
+    errorMessage: failure.errorMessage,
+  };
+}
+
+function toSafeProfileAccountStageFailure(
+  failure: HttpFailure,
+): Extract<SafeProfileAccountStageResult, { readonly ok: false }> {
+  return {
+    ok: false,
+    statusCode: failure.statusCode,
+    errorCode: failure.errorCode,
+    errorMessage: failure.errorMessage,
+  };
+}
+
+function toExerciseCheckoutFailure(
+  failure: HttpFailure,
+): Extract<ProfileExerciseCheckoutResult, { readonly ok: false }> {
   return {
     ok: false,
     statusCode: failure.statusCode,

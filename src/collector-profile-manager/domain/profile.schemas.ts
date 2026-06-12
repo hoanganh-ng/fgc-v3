@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { PROFILE_LEASE_STATUSES } from "./profile-lease";
+import {
+  PROFILE_LEASE_PURPOSES,
+  PROFILE_LEASE_STATUSES,
+} from "./profile-lease";
 import { PROFILE_ACCOUNT_STAGES } from "./profile-account-stage";
 import { PROFILE_STATUSES } from "./profile-status";
 import {
@@ -316,12 +319,14 @@ export const ProvisioningTokenStateSchema = z
   });
 
 export const ProfileLeaseStatusSchema = z.enum(PROFILE_LEASE_STATUSES);
+export const ProfileLeasePurposeSchema = z.enum(PROFILE_LEASE_PURPOSES);
 export const ProfileLeaseIdSchema = NonEmptyStringSchema;
 
 export const ProfileLeaseSchema = z
   .object({
     id: ProfileLeaseIdSchema,
     profileId: ProfileIdSchema,
+    purpose: ProfileLeasePurposeSchema,
     leasedAt: IsoDateTimeSchema,
     expiresAt: IsoDateTimeSchema,
     releasedAt: IsoDateTimeSchema.nullable(),

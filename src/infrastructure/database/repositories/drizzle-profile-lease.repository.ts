@@ -29,6 +29,7 @@ export class DrizzleProfileLeaseRepository implements ProfileLeaseRepository {
         target: collectorProfileLeases.id,
         set: {
           profileId: row.profileId,
+          purpose: row.purpose,
           status: row.status,
           leasedAt: row.leasedAt,
           expiresAt: row.expiresAt,

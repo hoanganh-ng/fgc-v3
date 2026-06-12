@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  CheckoutProfileForExerciseUseCase,
   CheckoutProfileUseCase,
   CreateProfileUseCase,
   IngestProfileSessionUseCase,
   ProfileLeaseAlreadyClosedError,
+  ProfileLeaseStateConflictError,
   ProfileNotCheckoutEligibleError,
   ReleaseProfileLeaseUseCase,
   StartProfileProvisioningUseCase,
@@ -55,6 +57,7 @@ describe("collector profile checkout use cases", () => {
     expect(output.lease).toEqual({
       id: "lease-1",
       profileId: readyProfile.identity.id,
+      purpose: "COLLECTION",
       leasedAt: checkoutNow,
       expiresAt: "2026-01-05T18:45:00.000Z",
       releasedAt: null,
@@ -97,6 +100,7 @@ describe("collector profile checkout use cases", () => {
     expect(output.lease).toMatchObject({
       leasedAt: "2026-01-06T09:00:00.000Z",
       expiresAt: "2026-01-06T09:45:00.000Z",
+      purpose: "COLLECTION",
       status: "ACTIVE",
     });
     expect(savedProfile?.identity.status).toBe("BUSY");
@@ -203,6 +207,76 @@ describe("collector profile checkout use cases", () => {
     await expectCheckoutRejection(context, "AUTHENTICATION_MISSING");
   });
 
+  it.each([
+    "NEW_ACCOUNT",
+    "WARMING",
+    "LIMITED",
+    "COLLECTION_READY",
+  ] as const)(
+    "checks out a READY profile in %s for ambient exercise",
+    async (accountStage) => {
+      const context = createTestContext();
+      const readyProfile = await createReadyProfile(context, {
+        accountStage,
+      });
+
+      const output = await checkoutProfileForExercise(
+        context,
+        readyProfile.identity.id,
+      );
+      const savedProfile = await context.profiles.findById(
+        readyProfile.identity.id,
+      );
+
+      expect(output.lease).toMatchObject({
+        id: "lease-1",
+        profileId: readyProfile.identity.id,
+        purpose: "AMBIENT_EXERCISE",
+        status: "ACTIVE",
+      });
+      expect(output.profile).toEqual({
+        profileId: readyProfile.identity.id,
+        accountStage,
+      });
+      expect(savedProfile?.identity.status).toBe("BUSY");
+    },
+  );
+
+  it.each(["NEEDS_REVIEW", "RETIRED"] as const)(
+    "rejects ambient exercise checkout for %s profiles",
+    async (accountStage) => {
+      const context = createTestContext();
+
+      await createReadyProfile(context, { accountStage });
+
+      await expectExerciseCheckoutRejection(
+        context,
+        "ACCOUNT_STAGE_NOT_EXERCISE_ELIGIBLE",
+      );
+    },
+  );
+
+  it("rejects ambient exercise checkout when the profile already has an active lease", async () => {
+    const context = createTestContext();
+    const readyProfile = await createReadyProfile(context, {
+      accountStage: "NEW_ACCOUNT",
+    });
+
+    await context.leases.save({
+      id: "lease-1",
+      profileId: readyProfile.identity.id,
+      purpose: "COLLECTION",
+      leasedAt: checkoutNow,
+      expiresAt: "2026-01-05T18:45:00.000Z",
+      releasedAt: null,
+      status: "ACTIVE",
+    });
+
+    await expect(
+      checkoutProfileForExercise(context, readyProfile.identity.id),
+    ).rejects.toThrow(ProfileLeaseStateConflictError);
+  });
+
   it("releases a BUSY profile back to READY", async () => {
     const context = createTestContext();
     const readyProfile = await createReadyProfile(context);
@@ -268,12 +342,14 @@ interface TestContext {
   readonly clock: FixedClock;
 }
 
-function createTestContext(): TestContext {
+function createTestContext(
+  leaseIds: readonly ProfileLeaseId[] = ["lease-1"],
+): TestContext {
   return {
     profiles: new InMemoryProfileRepository(),
     leases: new InMemoryProfileLeaseRepository(),
     tokens: new FakeTokenGenerator(["provisioning-token-1"]),
-    leaseIds: new FakeLeaseIdGenerator(["lease-1"]),
+    leaseIds: new FakeLeaseIdGenerator(leaseIds),
     clock: new FixedClock(checkoutNow),
   };
 }
@@ -388,6 +464,18 @@ async function checkoutProfile(
   ).execute({ profileId });
 }
 
+async function checkoutProfileForExercise(
+  context: TestContext,
+  profileId: ProfileId,
+): Promise<{ readonly lease: ProfileLease; readonly profile: unknown }> {
+  return new CheckoutProfileForExerciseUseCase(
+    context.profiles,
+    context.leases,
+    context.leaseIds,
+    context.clock,
+  ).execute({ profileId });
+}
+
 async function expectCheckoutRejection(
   context: TestContext,
   expectedCode: string,
@@ -395,6 +483,28 @@ async function expectCheckoutRejection(
   try {
     await checkoutProfile(context, "profile-1");
     throw new Error("Expected checkout to fail.");
+  } catch (error) {
+    expect(error).toBeInstanceOf(ProfileNotCheckoutEligibleError);
+
+    if (error instanceof ProfileNotCheckoutEligibleError) {
+      expect(error.reasons).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: expectedCode,
+          }),
+        ]),
+      );
+    }
+  }
+}
+
+async function expectExerciseCheckoutRejection(
+  context: TestContext,
+  expectedCode: string,
+): Promise<void> {
+  try {
+    await checkoutProfileForExercise(context, "profile-1");
+    throw new Error("Expected exercise checkout to fail.");
   } catch (error) {
     expect(error).toBeInstanceOf(ProfileNotCheckoutEligibleError);
 

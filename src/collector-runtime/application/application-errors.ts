@@ -1,9 +1,16 @@
-import type { CollectionRunStatus, ValidationIssue } from "../domain";
+import type {
+  AccountExerciseRunStatus,
+  CollectionRunStatus,
+  ValidationIssue,
+} from "../domain";
 
 export type CollectorRuntimeApplicationErrorCode =
   | "COLLECTION_RUN_NOT_FOUND"
+  | "ACCOUNT_EXERCISE_RUN_NOT_FOUND"
   | "INVALID_COLLECTION_RUN_STATUS_TRANSITION"
+  | "INVALID_ACCOUNT_EXERCISE_RUN_STATUS_TRANSITION"
   | "COLLECTION_RUN_VALIDATION_ERROR"
+  | "ACCOUNT_EXERCISE_RUN_VALIDATION_ERROR"
   | "COLLECTION_RUN_SOURCE_GROUP_NOT_FOUND"
   | "COLLECTION_RUN_SOURCE_GROUP_NOT_ACTIVE"
   | "COLLECTION_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED"
@@ -35,6 +42,18 @@ export class CollectionRunNotFoundError extends CollectorRuntimeApplicationError
   }
 }
 
+export class AccountExerciseRunNotFoundError extends CollectorRuntimeApplicationError {
+  public readonly accountExerciseRunId: string;
+
+  public constructor(accountExerciseRunId: string) {
+    super(
+      "ACCOUNT_EXERCISE_RUN_NOT_FOUND",
+      `Account exercise run not found: ${accountExerciseRunId}.`,
+    );
+    this.accountExerciseRunId = accountExerciseRunId;
+  }
+}
+
 export class InvalidCollectionRunStatusTransitionError extends CollectorRuntimeApplicationError {
   public readonly from: CollectionRunStatus;
   public readonly to: CollectionRunStatus;
@@ -49,6 +68,23 @@ export class InvalidCollectionRunStatusTransitionError extends CollectorRuntimeA
   }
 }
 
+export class InvalidAccountExerciseRunStatusTransitionError extends CollectorRuntimeApplicationError {
+  public readonly from: AccountExerciseRunStatus;
+  public readonly to: AccountExerciseRunStatus;
+
+  public constructor(
+    from: AccountExerciseRunStatus,
+    to: AccountExerciseRunStatus,
+  ) {
+    super(
+      "INVALID_ACCOUNT_EXERCISE_RUN_STATUS_TRANSITION",
+      `Invalid account exercise run status transition: ${from} -> ${to}.`,
+    );
+    this.from = from;
+    this.to = to;
+  }
+}
+
 export class CollectionRunValidationError extends CollectorRuntimeApplicationError {
   public readonly issues: readonly ValidationIssue[];
 
@@ -56,6 +92,18 @@ export class CollectionRunValidationError extends CollectorRuntimeApplicationErr
     super(
       "COLLECTION_RUN_VALIDATION_ERROR",
       "Collection run input is invalid.",
+    );
+    this.issues = issues;
+  }
+}
+
+export class AccountExerciseRunValidationError extends CollectorRuntimeApplicationError {
+  public readonly issues: readonly ValidationIssue[];
+
+  public constructor(issues: readonly ValidationIssue[]) {
+    super(
+      "ACCOUNT_EXERCISE_RUN_VALIDATION_ERROR",
+      "Account exercise run input is invalid.",
     );
     this.issues = issues;
   }

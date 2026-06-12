@@ -22,6 +22,7 @@ import {
 } from "../../../content-manager/domain";
 import {
   CollectionRunValidationError,
+  AccountExerciseRunValidationError,
   CollectorRuntimeApplicationError,
   type CollectorRuntimeApplicationErrorCode,
 } from "../../../collector-runtime/application";
@@ -155,7 +156,10 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
     };
   }
 
-  if (error instanceof CollectionRunValidationError) {
+  if (
+    error instanceof CollectionRunValidationError ||
+    error instanceof AccountExerciseRunValidationError
+  ) {
     return {
       statusCode: 400,
       body: {
@@ -269,8 +273,11 @@ const collectorRuntimeApplicationErrorStatus: Record<
   number
 > = {
   COLLECTION_RUN_NOT_FOUND: 404,
+  ACCOUNT_EXERCISE_RUN_NOT_FOUND: 404,
   INVALID_COLLECTION_RUN_STATUS_TRANSITION: 409,
+  INVALID_ACCOUNT_EXERCISE_RUN_STATUS_TRANSITION: 409,
   COLLECTION_RUN_VALIDATION_ERROR: 400,
+  ACCOUNT_EXERCISE_RUN_VALIDATION_ERROR: 400,
   COLLECTION_RUN_SOURCE_GROUP_NOT_FOUND: 404,
   COLLECTION_RUN_SOURCE_GROUP_NOT_ACTIVE: 409,
   COLLECTION_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED: 409,
@@ -286,6 +293,7 @@ const collectorRuntimeDomainErrorStatus: Record<
   number
 > = {
   INVALID_COLLECTION_RUN_STATUS_TRANSITION: 409,
+  INVALID_ACCOUNT_EXERCISE_RUN_STATUS_TRANSITION: 409,
 };
 
 function mapKnownError(

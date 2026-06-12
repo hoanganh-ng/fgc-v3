@@ -42,6 +42,7 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | Command | Purpose | Alias |
 | --- | --- | --- |
 | `pnpm operator:profile:provision` | Complete manual profile provisioning in a headed browser. | `pnpm profile:provision` |
+| `pnpm operator:profile:exercise` | Run one read-only ambient account exercise attempt for a specified profile. | `pnpm profile:exercise:run` |
 | `pnpm operator:collector:facebook` | Run one manual Facebook collection for a source group. | `pnpm collector:facebook:run` |
 | `pnpm operator:collector:worker` | Claim and execute queued collection runs. | `pnpm collector:worker:run` |
 | `pnpm operator:browser:probe` | Probe a browser provider without backend or Facebook login. | `pnpm collector:browser:probe` |
@@ -227,6 +228,63 @@ Expected operator flow:
 The CLI does not automate credentials, store passwords, solve CAPTCHAs, add stealth tooling, capture Facebook content, capture GraphQL responses, implement collection runtime behavior, or write cookies/localStorage to disk.
 
 The CLI prints only operational progress and counts. It must not print cookies, localStorage values, proxy passwords, token hashes, raw session material, or trusted runtime secrets. The one-time provisioning configuration route may include proxy credentials so Playwright can use the configured proxy, but public profile list/detail reads continue to omit proxy credentials and captured session state.
+
+## Ambient Profile Exercise Command
+
+Sprint 039 adds an operator-only command for read-only ambient account exercise. It is intended for `READY` profiles whose account stage is not yet normal collection-ready.
+
+Prerequisites:
+
+1. Start the dev or preview stack.
+2. Complete profile provisioning so the target profile is operational `READY`.
+3. Keep or set the target profile `accountStage` to one of `NEW_ACCOUNT`, `WARMING`, `LIMITED`, or `COLLECTION_READY`.
+4. Copy the profile id from the Web UI profile detail page or the safe profile API.
+
+Run against the preview gateway:
+
+```bash
+pnpm operator:profile:exercise -- --profile-id <profile-id> --base-url http://localhost:8081 --max-duration-ms 120000 --max-scrolls 2 --browser-provider playwright
+```
+
+Use the preview gateway (`http://localhost:8081`) when running against the preview stack. This matches the Web UI entrypoint and lets Nginx proxy `/collector/*` to the API.
+
+Run against the direct local API:
+
+```bash
+pnpm operator:profile:exercise -- --profile-id <profile-id> --base-url http://localhost:3000
+```
+
+Use the direct API URL (`http://localhost:3000`) only when you are running the API directly or intentionally bypassing the preview gateway. A base URL mismatch can make the CLI talk to a different API/database than the Web UI.
+
+If `--base-url` is omitted, the command uses `PROFILE_EXERCISE_BASE_URL`, then `PROFILE_MANAGER_BASE_URL`, then `COLLECTOR_FACEBOOK_BASE_URL`, then `http://localhost:3000`.
+
+If `--browser-provider` is omitted, the command uses `BROWSER_PROVIDER`, then `playwright`. Supported operator values are `playwright` and `cloakbrowser`. `playwright` maps to provider name `PLAYWRIGHT_CHROMIUM` and remains the default behavior. `cloakbrowser` maps to provider name `CLOAK_BROWSER` and is experimental.
+
+Expected operator flow:
+
+1. The command reads the profile's safe `accountStage`.
+2. It creates an Ambient Exercise Run record through `POST /collector/account-exercise-runs`.
+3. It checks out the specified profile through `POST /collector/profiles/:profileId/exercise-checkout`, which creates an `AMBIENT_EXERCISE` lease.
+4. It fetches trusted runtime configuration from `GET /collector/profile-leases/:leaseId/runtime-configuration`.
+5. The selected browser provider opens a headed browser with the profile runtime configuration it can honor.
+6. The browser visits `https://www.facebook.com/`.
+7. The command performs only read-only dwell and light scroll actions within the action budget.
+8. It records only safe booleans/counts such as page loaded, login required, checkpoint detected, scroll count, duration, and lease released.
+9. It marks the exercise run `SUCCEEDED` or `FAILED` with sanitized failure data.
+10. The profile lease is released even when browser launch, navigation, or safe-state detection fails.
+
+Exercise checkout eligibility:
+
+- Normal collection checkout still requires `accountStage = COLLECTION_READY`.
+- Ambient exercise checkout allows `NEW_ACCOUNT`, `WARMING`, `LIMITED`, and `COLLECTION_READY`.
+- Ambient exercise checkout rejects `NEEDS_REVIEW` and `RETIRED`.
+- Exercise does not automatically promote or demote `accountStage`.
+
+Safety boundaries:
+
+- The command does not submit content items.
+- The command does not join groups, post, comment, like, share, message, send friend requests, solve CAPTCHAs, bypass checkpoints, bypass rate limits/access controls, or automate credentials.
+- CLI output and exercise run records must not include cookies, localStorage, raw Facebook payloads, proxy credentials, session headers, provisioning tokens, trusted runtime configuration, browser fingerprint secrets, or checkpoint page HTML.
 
 ## Manual Facebook Collector Command
 

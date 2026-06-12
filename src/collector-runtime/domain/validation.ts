@@ -5,6 +5,18 @@ import type {
   CollectionRunParameters,
   CollectionRunSummary,
 } from "./collection-run";
+import type {
+  AccountExerciseRun,
+  AccountExerciseRunActionBudget,
+  AccountExerciseRunFailureReason,
+  AccountExerciseRunSafeSummary,
+} from "./account-exercise-run";
+import {
+  AccountExerciseRunActionBudgetSchema,
+  AccountExerciseRunFailureReasonSchema,
+  AccountExerciseRunSafeSummarySchema,
+  AccountExerciseRunSchema,
+} from "./account-exercise-run.schemas";
 import {
   CollectionRunFailureReasonSchema,
   CollectionRunParametersSchema,
@@ -82,6 +94,66 @@ export function validateCollectionRunFailureReason(
   value: unknown,
 ): ValidationResult<CollectionRunFailureReason> {
   const result = CollectionRunFailureReasonSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateAccountExerciseRun(
+  value: unknown,
+): ValidationResult<AccountExerciseRun> {
+  const result = AccountExerciseRunSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateAccountExerciseRunActionBudget(
+  value: unknown,
+): ValidationResult<AccountExerciseRunActionBudget> {
+  const result = AccountExerciseRunActionBudgetSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateAccountExerciseRunSafeSummary(
+  value: unknown,
+): ValidationResult<AccountExerciseRunSafeSummary> {
+  const result = AccountExerciseRunSafeSummarySchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateAccountExerciseRunFailureReason(
+  value: unknown,
+): ValidationResult<AccountExerciseRunFailureReason> {
+  const result = AccountExerciseRunFailureReasonSchema.safeParse(value);
 
   if (!result.success) {
     return invalid(formatZodIssues(result.error.issues));

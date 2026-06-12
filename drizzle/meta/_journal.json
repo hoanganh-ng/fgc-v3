@@ -29,6 +29,13 @@
       "when": 1781251907160,
       "tag": "0003_legal_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781254386387,
+      "tag": "0004_opposite_squadron_sinister",
+      "breakpoints": true
     }
   ]
 }

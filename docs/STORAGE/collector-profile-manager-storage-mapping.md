@@ -24,6 +24,7 @@ Root-level columns:
 - `profile_id`: primary key, maps to `identity.id`.
 - `display_name`: maps to `identity.displayName`.
 - `status`: maps to `identity.status`; indexed for lifecycle and checkout queries.
+- `account_stage`: maps to `accountStage` and supports account maturity/readiness gating for checkout.
 - `created_at`: maps to `identity.createdAt`.
 - `updated_at`: maps to `identity.updatedAt` and supports future concurrency checks.
 - `version`: integer for future optimistic conflict detection if the adapter needs compare-and-swap saves.
@@ -67,6 +68,7 @@ Root-level columns:
 - `lease_id`: primary key, maps to `ProfileLease.id`.
 - `profile_id`: foreign key candidate to `collector_profiles.profile_id`.
 - `status`: maps to `ProfileLease.status`.
+- `purpose`: maps to `ProfileLease.purpose`; `COLLECTION` remains the default for normal checkout and `AMBIENT_EXERCISE` is used only for read-only account exercise checkout.
 - `leased_at`: maps to `ProfileLease.leasedAt`.
 - `expires_at`: maps to `ProfileLease.expiresAt`.
 - `released_at`: maps to `ProfileLease.releasedAt`.

@@ -12,6 +12,8 @@ Owns:
 - Checkout eligibility rules.
 - Domain-level validation for profile readiness, busy state, cooldowns, temporal windows, and safety thresholds.
 - Checkout eligibility gating for normal collection, including the requirement that `accountStage = COLLECTION_READY`.
+- Profile lease purpose rules for `COLLECTION` and `AMBIENT_EXERCISE`.
+- Specified-profile ambient exercise checkout eligibility for `READY` profiles, including allowed account stages and rejected review/retired stages.
 
 Does not own:
 
@@ -57,8 +59,11 @@ Content Manager should not accept raw Facebook GraphQL payloads as its primary i
 Owns:
 
 - Future execution of collection workflows.
+- Durable Collector Runtime run records for collection runs and ambient account exercise runs.
 - Checking out eligible profiles from Collector Profile Manager.
+- Calling specified-profile ambient exercise checkout for read-only account exercise attempts.
 - Visiting Facebook groups and posts.
+- Visiting safe Facebook home/feed surfaces for read-only account exercise.
 - Browser automation and network payload capture.
 - Browser provider orchestration and provider adapters inside infrastructure.
 - Platform Extractors that convert raw platform artifacts into normalized Content Manager ingestion input.
@@ -75,10 +80,13 @@ Owns:
 - Requesting lease-scoped runtime profile configuration from Collector Profile Manager through trusted application/API contracts after checkout.
 - Profile lease release orchestration.
 - Returning profile usage outcomes and runtime metrics.
+- Recording safe ambient exercise summaries and sanitized failure reasons.
 
 The Sprint 022 orchestration flow coordinates Profile Manager checkout/release behavior, captured payload collection, and Content Manager submission through Collector Runtime-owned ports and use cases. Payload capture is represented by a port only in Sprint 022; real browser automation, network interception, login, navigation, scheduling, queues, and database access remain out of scope.
 
 Browser-provider hardening must stay inside Collector Runtime infrastructure. Providers consume Profile Manager trusted runtime configuration after checkout; they must not become a profile manager, randomly mutate profile identity, regenerate fingerprints outside Profile Manager, solve CAPTCHAs, automate credentials, bypass checkpoints, bypass rate limits/access controls, post, comment, or like.
+
+Ambient account exercise is a Collector Runtime workflow for safe stability exercise only. It may record that a page loaded, login was required, a checkpoint was detected, how many light scrolls ran, whether the lease was released, and the run duration. It must not collect or submit content items, join groups, create platform actions, or write raw browser/platform/session material to records or logs.
 
 Does not own:
 
@@ -88,12 +96,14 @@ Does not own:
 - Content item lifecycle rules.
 - Content deduplication or upsert rules.
 - Group category management.
-- Direct database access.
+- Direct database access to Collector Profile Manager or Content Manager storage.
 - Direct Content Manager repository access.
 - Collector Profile Manager repository access.
 - Collector Profile Manager composition root wiring.
 - Collector Profile Manager checkout eligibility or leasing business rules.
+- Collector Profile Manager lease-purpose eligibility rules.
 - Collector Profile Manager account maturity/readiness stage rules.
+- Automatic account-stage promotion or demotion after exercise.
 - Public Profile Manager read DTO expansion for sensitive runtime material.
 - Authority over profile identity, session state, proxy configuration, or fingerprint configuration.
 - Content building.
@@ -113,7 +123,7 @@ The Sprint 022 profile-orchestrated collection flow invokes the Sprint 021 submi
 
 The Sprint 024 trusted runtime profile configuration contract remains owned by Collector Profile Manager and is guarded by `leaseId`. Collector Runtime may consume that contract after checkout, but public profile read DTOs must continue to omit authentication state, local storage, proxy credentials, provisioning tokens, and token hashes.
 
-Sprint 038 keeps profile operational status separate from account maturity. A profile may be `READY` after login/session ingestion while its `accountStage` remains `NEW_ACCOUNT`; Collector Runtime must still rely on Profile Manager checkout instead of interpreting or bypassing account-stage rules itself.
+Sprint 038 keeps profile operational status separate from account maturity. A profile may be `READY` after login/session ingestion while its `accountStage` remains `NEW_ACCOUNT`; Collector Runtime must still rely on Profile Manager checkout instead of interpreting or bypassing account-stage rules itself. Sprint 039 adds ambient exercise checkout for specified profiles, but exercise outcomes do not automatically change `accountStage` and do not grant normal collection eligibility.
 
 Extractor fixtures must be sanitized. They must not include cookies, tokens, authorization headers, viewer IDs, private user data, raw request headers, or sensitive account/session details. Synthetic fixtures should be clearly named as synthetic. Real payload fixtures must be sanitized before they are used in tests.
 

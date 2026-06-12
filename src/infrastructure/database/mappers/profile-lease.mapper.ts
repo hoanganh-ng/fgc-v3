@@ -36,6 +36,7 @@ export function toProfileLeaseRow(
   return {
     id: validLease.id,
     profileId: validLease.profileId,
+    purpose: validLease.purpose,
     status: validLease.status,
     leasedAt: validLease.leasedAt,
     expiresAt: validLease.expiresAt,
@@ -53,6 +54,7 @@ export function toProfileLeaseInsert(
   return {
     id: validLease.id,
     profileId: validLease.profileId,
+    purpose: validLease.purpose,
     status: validLease.status,
     leasedAt: validLease.leasedAt,
     expiresAt: validLease.expiresAt,
@@ -64,6 +66,7 @@ export function toProfileLeaseDomain(row: ProfileLeaseRow): ProfileLease {
   const candidate = {
     id: row.id,
     profileId: row.profileId,
+    purpose: row.purpose ?? "COLLECTION",
     status: row.status,
     leasedAt: normalizeIsoDateTime(row.leasedAt),
     expiresAt: normalizeIsoDateTime(row.expiresAt),

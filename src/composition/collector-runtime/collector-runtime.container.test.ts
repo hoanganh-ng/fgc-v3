@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  CancelAccountExerciseRunUseCase,
   CancelCollectionRunUseCase,
   ClaimNextCollectionRunUseCase,
+  GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
+  ListAccountExerciseRunsUseCase,
   ListCollectionRunsUseCase,
+  MarkAccountExerciseRunFailedUseCase,
+  MarkAccountExerciseRunRunningUseCase,
+  MarkAccountExerciseRunSucceededUseCase,
   MarkCollectionRunFailedUseCase,
   MarkCollectionRunRunningUseCase,
   MarkCollectionRunSucceededUseCase,
+  RequestAccountExerciseRunUseCase,
   RequestCollectionRunUseCase,
 } from "../../collector-runtime/application";
 import type {
@@ -16,12 +23,14 @@ import type {
   SourceGroupLookupResult,
 } from "../../collector-runtime/application";
 import { InMemoryCollectionRunRepository } from "../../collector-runtime/application/test-support/in-memory-collection-run-repository";
+import { InMemoryAccountExerciseRunRepository } from "../../collector-runtime/application/test-support/in-memory-account-exercise-run-repository";
 import { createCollectorRuntime } from "./collector-runtime.container";
 
 describe("collector runtime composition container", () => {
   it("creates all expected services from supplied dependencies", async () => {
     let closed = false;
     const services = createCollectorRuntime({
+      accountExerciseRuns: new InMemoryAccountExerciseRunRepository(),
       collectionRuns: new InMemoryCollectionRunRepository(),
       sourceGroups: new FakeSourceGroupLookupPort(),
       clock: new FixedClock(),
@@ -31,6 +40,27 @@ describe("collector runtime composition container", () => {
       },
     });
 
+    expect(services.requestAccountExerciseRun).toBeInstanceOf(
+      RequestAccountExerciseRunUseCase,
+    );
+    expect(services.getAccountExerciseRun).toBeInstanceOf(
+      GetAccountExerciseRunUseCase,
+    );
+    expect(services.listAccountExerciseRuns).toBeInstanceOf(
+      ListAccountExerciseRunsUseCase,
+    );
+    expect(services.markAccountExerciseRunRunning).toBeInstanceOf(
+      MarkAccountExerciseRunRunningUseCase,
+    );
+    expect(services.markAccountExerciseRunSucceeded).toBeInstanceOf(
+      MarkAccountExerciseRunSucceededUseCase,
+    );
+    expect(services.markAccountExerciseRunFailed).toBeInstanceOf(
+      MarkAccountExerciseRunFailedUseCase,
+    );
+    expect(services.cancelAccountExerciseRun).toBeInstanceOf(
+      CancelAccountExerciseRunUseCase,
+    );
     expect(services.requestCollectionRun).toBeInstanceOf(
       RequestCollectionRunUseCase,
     );

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  collectorProfileLeasePurposeEnum,
   collectorProfileLeaseStatusEnum,
   collectorProfileLeases,
   collectorProfileAccountStageEnum,
@@ -23,6 +24,7 @@ describe("collector profile manager database schema", () => {
   it("exports lease table metadata for migration generation", () => {
     expect(collectorProfileLeases.id.name).toBe("lease_id");
     expect(collectorProfileLeases.profileId.name).toBe("profile_id");
+    expect(collectorProfileLeases.purpose.name).toBe("purpose");
     expect(collectorProfileLeases.status.name).toBe("status");
     expect(collectorProfileLeases.expiresAt.name).toBe("expires_at");
   });
@@ -52,6 +54,10 @@ describe("collector profile manager database schema", () => {
       "ACTIVE",
       "RELEASED",
       "EXPIRED",
+    ]);
+    expect(collectorProfileLeasePurposeEnum.enumValues).toEqual([
+      "COLLECTION",
+      "AMBIENT_EXERCISE",
     ]);
   });
 });
