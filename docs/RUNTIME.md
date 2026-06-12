@@ -1,6 +1,6 @@
 # Full-Stack Runtime
 
-Sprint 027 provides two Docker Compose runtimes for the current Content Collector management surface.
+Sprint 027 provides two Docker Compose runtimes for the current Content Collector management surface. Sprint 037B adds an opt-in containerized worker service for consuming queued collection runs from those stacks.
 
 ## Command Groups
 
@@ -51,9 +51,15 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | Command | Purpose |
 | --- | --- |
 | `pnpm stack:dev:start` | Start the development Compose stack. |
+| `pnpm stack:dev:worker:start` | Start the development stack worker service in polling mode. |
+| `pnpm stack:dev:worker:once` | Run one development stack worker iteration in a disposable container. |
+| `pnpm stack:dev:worker:logs` | Follow development stack worker logs. |
 | `pnpm stack:dev:stop` | Stop the development Compose stack. |
 | `pnpm stack:dev:reset` | Stop the development stack and remove volumes. |
 | `pnpm stack:preview:start` | Start the production-like preview Compose stack. |
+| `pnpm stack:preview:worker:start` | Start the preview stack worker service in polling mode. |
+| `pnpm stack:preview:worker:once` | Run one preview stack worker iteration in a disposable container. |
+| `pnpm stack:preview:worker:logs` | Follow preview stack worker logs. |
 | `pnpm stack:preview:stop` | Stop the preview Compose stack. |
 | `pnpm stack:preview:reset` | Stop the preview stack and remove volumes. |
 
@@ -138,6 +144,46 @@ pnpm stack:preview:reset
 ```
 
 In preview, `apps/web` is built into static files and served by Nginx. The browser uses the Nginx entrypoint at `http://localhost:8081`. Nginx proxies `/collector/*` to `http://api:3000` before applying the React SPA fallback, so refreshing `http://localhost:8081/profiles` returns the React app.
+
+## Containerized Collector Worker Service
+
+Sprint 037B adds an opt-in Docker Compose service named `collector-worker`. It is behind the Compose `worker` profile, exposes no ports, and is not started by normal stack boot commands.
+
+Start the development stack and worker:
+
+```bash
+pnpm stack:dev:start
+pnpm stack:dev:worker:start
+pnpm stack:dev:worker:logs
+```
+
+Start the preview stack and worker:
+
+```bash
+pnpm stack:preview:start
+pnpm stack:preview:worker:start
+pnpm stack:preview:worker:logs
+```
+
+Run one disposable worker iteration through Docker:
+
+```bash
+pnpm stack:dev:worker:once
+pnpm stack:preview:worker:once
+```
+
+Stop the polling worker without stopping the whole stack:
+
+```bash
+docker compose -f docker-compose.dev.yml stop collector-worker
+docker compose -f docker-compose.preview.yml stop collector-worker
+```
+
+Inside Docker, the worker uses `http://api:3000` as its API base URL and `postgres:5432` through `DATABASE_URL`. Do not use `http://localhost:8081` or `http://localhost:3000` from inside the worker container; those are host entrypoints for browser/operator commands running on the host. The preview gateway remains the host browser entrypoint, while service-to-service Compose traffic goes directly to the `api` service.
+
+The worker image uses the Playwright runtime base image aligned to the locked Playwright package version. Its container entrypoint starts Xvfb and forwards `SIGINT`/`SIGTERM` to the existing worker CLI so the current headed Playwright path can launch Chromium in the container and still stop cleanly. `BROWSER_PROVIDER=playwright` is the default. CloakBrowser remains experimental and is not required for the worker container to start; if an operator overrides `BROWSER_PROVIDER=cloakbrowser` without a working CloakBrowser installation, the existing provider boundary should fail with sanitized setup guidance.
+
+When no jobs exist, the polling worker logs safe operational lines such as `Collector worker started.` and `No queued collection run found.`. The one-shot worker exits after a single no-job check. When a queued run exists, the worker claims the oldest `QUEUED` run, marks it `RUNNING`, executes the existing Facebook collector orchestration, and records either `SUCCEEDED` with safe summary counts or `FAILED` with a sanitized failure reason. Profile leases should be released by the existing collector flow when a profile was checked out.
 
 ## Profile Provisioning CLI
 

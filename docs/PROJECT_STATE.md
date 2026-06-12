@@ -8,17 +8,17 @@ The project is a Content Video Pipeline with three stages:
 2. Content Builder
 3. Content Publisher
 
-The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, Start Provisioning UI was added in Sprint 029, the Profile Provisioning Browser CLI was added in Sprint 030, provisioning E2E verification and hardening was completed in Sprint 031, the Facebook Browser Payload Capture Adapter was added in Sprint 032, Web UI content category/source group management was added in Sprint 033, Collector CLI source group resolution and checkout diagnostics were added in Sprint 034A, page-context Facebook fetch/XHR capture was added in Sprint 034B, Content Items review UI screens were added in Sprint 035, Content Items review layout polish was completed in Sprint 035A, collection run records plus API trigger work was completed in Sprint 036, the Collector Worker Process was added in Sprint 037, and the Collector Runtime browser-provider boundary plus optional experimental CloakBrowser adapter were added in Sprint 037A. Sprint 037A.1 is active for runtime command hygiene and the root README.
+The current focus is the Content Collector stage. Collector Profile Manager is complete through Sprint 013 and accepted as the first backend module. Content Manager backend is complete through Sprint 019. Web UI foundation work started in Sprint 025, read-only Profile Manager list/detail integration was added in Sprint 026, Dockerized full-stack runtime support was added in Sprint 027, structured profile create/configure forms were added in Sprint 028, Start Provisioning UI was added in Sprint 029, the Profile Provisioning Browser CLI was added in Sprint 030, provisioning E2E verification and hardening was completed in Sprint 031, the Facebook Browser Payload Capture Adapter was added in Sprint 032, Web UI content category/source group management was added in Sprint 033, Collector CLI source group resolution and checkout diagnostics were added in Sprint 034A, page-context Facebook fetch/XHR capture was added in Sprint 034B, Content Items review UI screens were added in Sprint 035, Content Items review layout polish was completed in Sprint 035A, collection run records plus API trigger work was completed in Sprint 036, the Collector Worker Process was added in Sprint 037, the Collector Runtime browser-provider boundary plus optional experimental CloakBrowser adapter were added in Sprint 037A, and runtime command hygiene plus the root README were completed in Sprint 037A.1. Sprint 037B is active for the containerized collector worker runtime.
 
-The next active work is documentation and command naming hygiene before adding future containerized worker and scheduler commands.
+The next active work is the containerized worker runtime before adding future scheduler commands.
 
 ## Current Sprint
 
-Sprint 037A.1: Runtime Command Hygiene + Root README
+Sprint 037B: Containerized Collector Worker Runtime
 
-Active sprint file: `docs/SPRINTS/SPRINT-037A.1-runtime-command-hygiene-root-readme.md`
+Active sprint file: `docs/SPRINTS/SPRINT-037B-containerized-collector-worker-runtime.md`
 
-Sprint 037A.1 cleans up root `package.json` script naming, keeps backward-compatible aliases, adds a root `README.md`, and documents command groups in runtime docs. It must not refactor collector logic, change browser provider behavior, change Docker Compose behavior, remove old scripts, rename source files, or add Web UI changes.
+Sprint 037B adds an opt-in Docker Compose `collector-worker` service for development and preview stacks, using internal Compose API networking and the default Playwright browser provider. It must not implement the scheduler, change collection-run domain behavior, change worker execution behavior beyond container runtime configuration, change Web UI, make CloakBrowser the default, or add retry/concurrency/queue infrastructure.
 
 ## Decided Items
 
@@ -78,6 +78,7 @@ Sprint 037A.1 cleans up root `package.json` script naming, keeps backward-compat
 - Sprint 037 introduces a Collector Runtime worker process that claims queued collection runs and executes them through existing Facebook collector orchestration.
 - Sprint 037A introduces a Collector Runtime browser provider boundary, keeps `PLAYWRIGHT_CHROMIUM` as the default provider, and adds `CLOAK_BROWSER` as an optional experimental provider selected by operator configuration.
 - Sprint 037A.1 introduces canonical root script names for app runtime, Web UI, and operator tools; preserves existing command aliases; adds the root README as the repo front door; and documents command groups without changing runtime behavior.
+- Sprint 037B introduces an opt-in Compose `collector-worker` service that runs the existing worker process through internal Docker networking with Playwright as the default provider.
 - Browser-provider hardening is allowed only inside Collector Runtime infrastructure. Profile Manager remains the source of truth for profile identity, session state, proxy configuration, and fingerprint configuration.
 - Content Manager owns validation of normalized content ingestion input, content item storage, content deduplication/upsert behavior, content lifecycle status, source group records, managed group categories, engagement counts, top comments as normalized metadata, safe read contracts, and future Content Builder handoff shape.
 - Content Manager does not own profile/session management, browser automation, network payload capture, raw Facebook GraphQL parsing, scraping strategy, platform-specific extraction rules, comment crawling strategy, video generation, or publishing workflows.

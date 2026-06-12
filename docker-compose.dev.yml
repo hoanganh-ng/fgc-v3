@@ -58,5 +58,26 @@ services:
     depends_on:
       - api
 
+  collector-worker:
+    profiles:
+      - worker
+    build:
+      context: .
+      target: worker-runtime
+    init: true
+    command:
+      - sh
+      - scripts/run-collector-worker-container.sh
+    environment:
+      DATABASE_URL: postgres://content_pipeline:content_pipeline@postgres:5432/content_pipeline
+      COLLECTOR_WORKER_BASE_URL: http://api:3000
+      COLLECTOR_WORKER_MODE_ARGS: "--poll-interval-ms 5000"
+      BROWSER_PROVIDER: playwright
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+
 volumes:
   fgc_dev_postgres_data:

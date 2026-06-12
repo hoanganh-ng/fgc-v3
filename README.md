@@ -17,6 +17,7 @@ The current focus is the Content Collector: collecting normalized content from c
 - Profile provisioning works through the Web UI plus operator browser CLI.
 - Manual Facebook collection works against configured source groups with provisioned `READY` profiles.
 - A collector worker exists for claiming and executing queued collection runs.
+- The collector worker is available as an opt-in Docker Compose service for dev and preview stacks.
 - A Collector Runtime browser provider boundary exists.
 - CloakBrowser support is experimental and not yet production-proven; Playwright Chromium remains the default provider.
 
@@ -51,6 +52,13 @@ Run the core checks:
 ```bash
 pnpm typecheck
 pnpm test
+```
+
+Start the containerized worker when queued collection runs should be consumed automatically:
+
+```bash
+pnpm stack:dev:worker:start
+pnpm stack:dev:worker:logs
 ```
 
 ## Commands
@@ -91,7 +99,11 @@ pnpm test
 ### Docker Stacks
 
 - `pnpm stack:dev:start`, `pnpm stack:dev:stop`, `pnpm stack:dev:reset`
+- `pnpm stack:dev:worker:start`, `pnpm stack:dev:worker:once`, `pnpm stack:dev:worker:logs`
 - `pnpm stack:preview:start`, `pnpm stack:preview:stop`, `pnpm stack:preview:reset`
+- `pnpm stack:preview:worker:start`, `pnpm stack:preview:worker:once`, `pnpm stack:preview:worker:logs`
+
+The `collector-worker` Compose service is behind the `worker` profile and exposes no ports. Inside Docker it talks to the API at `http://api:3000`; host commands still use `http://localhost:8081` for preview gateway access or `http://localhost:3000` for direct API access.
 
 ## Deeper Docs
 

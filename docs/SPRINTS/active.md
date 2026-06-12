@@ -1,5 +1,5 @@
 # Active Sprint
 
-Active sprint: `docs/SPRINTS/SPRINT-037A.1-runtime-command-hygiene-root-readme.md`
+Active sprint: `docs/SPRINTS/SPRINT-037B-containerized-collector-worker-runtime.md`
 
-Only Sprint 037A.1 should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.
+Only Sprint 037B should be worked on. No other sprint, roadmap item, implementation module, or future-stage work should be started unless this file is updated first.
