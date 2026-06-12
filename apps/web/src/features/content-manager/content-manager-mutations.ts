@@ -6,13 +6,18 @@ import {
 import {
   contentManagerClient,
   type ContentStatus,
+  type CreateSourceGroupEntryRouteRequest,
+  type CreateSourceGroupEntryRouteResponse,
   type CreateContentCategoryRequest,
   type CreateContentCategoryResponse,
   type CreateSourceGroupRequest,
   type CreateSourceGroupResponse,
   type SourceGroupStatus,
   type UpdateContentItemStatusResponse,
+  type UpdateSourceGroupEntryRouteRequest,
+  type UpdateSourceGroupEntryRouteResponse,
   type UpdateSourceGroupStatusResponse,
+  type RemoveSourceGroupEntryRouteResponse,
 } from "@/lib/api/content-manager-client";
 import {
   unwrapApiResult,
@@ -23,6 +28,22 @@ import { contentManagerQueryKeys } from "@/features/content-manager/content-mana
 export interface UpdateSourceGroupStatusVariables {
   readonly sourceGroupId: string;
   readonly status: SourceGroupStatus;
+}
+
+export interface CreateSourceGroupEntryRouteVariables {
+  readonly sourceGroupId: string;
+  readonly request: CreateSourceGroupEntryRouteRequest;
+}
+
+export interface UpdateSourceGroupEntryRouteVariables {
+  readonly sourceGroupId: string;
+  readonly entryRouteId: string;
+  readonly request: UpdateSourceGroupEntryRouteRequest;
+}
+
+export interface RemoveSourceGroupEntryRouteVariables {
+  readonly sourceGroupId: string;
+  readonly entryRouteId: string;
 }
 
 export interface UpdateContentItemStatusVariables {
@@ -96,6 +117,88 @@ export function useUpdateSourceGroupStatusMutation(): UseMutationResult<
         await contentManagerClient.updateSourceGroupStatus(
           sourceGroupId,
           status,
+        ),
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: contentManagerQueryKeys.all,
+      });
+    },
+  });
+}
+
+export function useCreateSourceGroupEntryRouteMutation(): UseMutationResult<
+  CreateSourceGroupEntryRouteResponse,
+  ApiResultError,
+  CreateSourceGroupEntryRouteVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    CreateSourceGroupEntryRouteResponse,
+    ApiResultError,
+    CreateSourceGroupEntryRouteVariables
+  >({
+    mutationFn: async ({ sourceGroupId, request }) =>
+      unwrapApiResult(
+        await contentManagerClient.createSourceGroupEntryRoute(
+          sourceGroupId,
+          request,
+        ),
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: contentManagerQueryKeys.all,
+      });
+    },
+  });
+}
+
+export function useUpdateSourceGroupEntryRouteMutation(): UseMutationResult<
+  UpdateSourceGroupEntryRouteResponse,
+  ApiResultError,
+  UpdateSourceGroupEntryRouteVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    UpdateSourceGroupEntryRouteResponse,
+    ApiResultError,
+    UpdateSourceGroupEntryRouteVariables
+  >({
+    mutationFn: async ({ sourceGroupId, entryRouteId, request }) =>
+      unwrapApiResult(
+        await contentManagerClient.updateSourceGroupEntryRoute(
+          sourceGroupId,
+          entryRouteId,
+          request,
+        ),
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: contentManagerQueryKeys.all,
+      });
+    },
+  });
+}
+
+export function useRemoveSourceGroupEntryRouteMutation(): UseMutationResult<
+  RemoveSourceGroupEntryRouteResponse,
+  ApiResultError,
+  RemoveSourceGroupEntryRouteVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    RemoveSourceGroupEntryRouteResponse,
+    ApiResultError,
+    RemoveSourceGroupEntryRouteVariables
+  >({
+    mutationFn: async ({ sourceGroupId, entryRouteId }) =>
+      unwrapApiResult(
+        await contentManagerClient.removeSourceGroupEntryRoute(
+          sourceGroupId,
+          entryRouteId,
         ),
       ),
     onSuccess: async () => {

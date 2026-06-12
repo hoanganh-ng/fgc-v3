@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -8,7 +9,10 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import type { TopComment } from "../../../content-manager/domain";
+import type {
+  SourceGroupEntryRoute,
+  TopComment,
+} from "../../../content-manager/domain";
 
 export const contentPlatformEnum = pgEnum("content_platform", ["FACEBOOK"]);
 
@@ -57,6 +61,10 @@ export const sourceGroups = pgTable(
     status: sourceGroupStatusEnum("status").notNull(),
     collectionPriority: integer("collection_priority").notNull(),
     notes: text("notes"),
+    entryRoutes: jsonb("entry_routes")
+      .$type<readonly SourceGroupEntryRoute[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
     updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow(),
   },

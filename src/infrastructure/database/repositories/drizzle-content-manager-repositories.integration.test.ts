@@ -7,6 +7,7 @@ import type {
   SourceGroup,
   TopComment,
 } from "../../../content-manager/domain";
+import { createDefaultSourceGroupEntryRoute } from "../../../content-manager/domain";
 import { createDatabaseClient } from "../client";
 import type { DatabaseClient } from "../client";
 import {
@@ -420,6 +421,7 @@ interface CategoryOptions {
 interface SourceGroupOptions {
   readonly externalGroupId?: string;
   readonly status?: SourceGroup["status"];
+  readonly entryRoutes?: SourceGroup["entryRoutes"];
   readonly createdAt?: IsoDateTime;
   readonly updatedAt?: IsoDateTime;
 }
@@ -459,7 +461,7 @@ function createSourceGroup(
   categoryId: string,
   options: SourceGroupOptions = {},
 ): SourceGroup {
-  return {
+  const base = {
     id,
     platform: "FACEBOOK",
     externalGroupId: options.externalGroupId ?? `external-group-${id}`,
@@ -471,6 +473,12 @@ function createSourceGroup(
     notes: `Notes for ${id}`,
     createdAt: options.createdAt ?? defaultCreatedAt,
     updatedAt: options.updatedAt ?? options.createdAt ?? defaultCreatedAt,
+  } satisfies Omit<SourceGroup, "entryRoutes">;
+
+  return {
+    ...base,
+    entryRoutes:
+      options.entryRoutes ?? [createDefaultSourceGroupEntryRoute(base)],
   };
 }
 

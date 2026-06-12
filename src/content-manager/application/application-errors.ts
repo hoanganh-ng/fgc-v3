@@ -9,6 +9,7 @@ export type ContentManagerApplicationErrorCode =
   | "CONTENT_CATEGORY_NOT_FOUND"
   | "SOURCE_GROUP_ALREADY_EXISTS"
   | "SOURCE_GROUP_NOT_FOUND"
+  | "SOURCE_GROUP_ENTRY_ROUTE_NOT_FOUND"
   | "CONTENT_ITEM_NOT_FOUND"
   | "INVALID_CONTENT_STATUS_TRANSITION"
   | "CONTENT_VALIDATION_ERROR";
@@ -73,6 +74,20 @@ export class SourceGroupNotFoundError extends ContentManagerApplicationError {
   public constructor(sourceGroupId: string) {
     super("SOURCE_GROUP_NOT_FOUND", `Source group not found: ${sourceGroupId}.`);
     this.sourceGroupId = sourceGroupId;
+  }
+}
+
+export class SourceGroupEntryRouteNotFoundError extends ContentManagerApplicationError {
+  public readonly sourceGroupId: string;
+  public readonly entryRouteId: string;
+
+  public constructor(sourceGroupId: string, entryRouteId: string) {
+    super(
+      "SOURCE_GROUP_ENTRY_ROUTE_NOT_FOUND",
+      `Source group entry route not found: ${sourceGroupId}/${entryRouteId}.`,
+    );
+    this.sourceGroupId = sourceGroupId;
+    this.entryRouteId = entryRouteId;
   }
 }
 

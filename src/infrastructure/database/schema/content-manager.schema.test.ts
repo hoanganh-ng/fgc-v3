@@ -21,6 +21,7 @@ describe("content manager database schema", () => {
     expect(sourceGroups.externalGroupId.name).toBe("external_group_id");
     expect(sourceGroups.categoryId.name).toBe("category_id");
     expect(sourceGroups.collectionPriority.name).toBe("collection_priority");
+    expect(sourceGroups.entryRoutes.name).toBe("entry_routes");
   });
 
   it("exports content item table metadata for migration generation", () => {

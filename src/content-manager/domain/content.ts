@@ -9,10 +9,16 @@ import type {
   ExternalGroupIdSchema,
   ExternalPostIdSchema,
   IsoDateTimeSchema,
+  SourceGroupEntryRouteIdSchema,
+  SourceGroupEntryRouteSchema,
   SourceGroupIdSchema,
   SourceGroupSchema,
   TopCommentSchema,
 } from "./content.schemas";
+import {
+  SOURCE_GROUP_DEFAULT_ENTRY_ROUTE_ID,
+  SOURCE_GROUP_DEFAULT_ENTRY_ROUTE_RISK_LEVEL,
+} from "./source-group-entry-route";
 
 export const DEFAULT_TOP_COMMENT_LIMIT = 10;
 
@@ -20,10 +26,16 @@ export type IsoDateTime = zInfer<typeof IsoDateTimeSchema>;
 export type ContentId = zInfer<typeof ContentIdSchema>;
 export type ContentCategoryId = zInfer<typeof ContentCategoryIdSchema>;
 export type SourceGroupId = zInfer<typeof SourceGroupIdSchema>;
+export type SourceGroupEntryRouteId = zInfer<
+  typeof SourceGroupEntryRouteIdSchema
+>;
 export type ExternalGroupId = zInfer<typeof ExternalGroupIdSchema>;
 export type ExternalPostId = zInfer<typeof ExternalPostIdSchema>;
 export type ExternalCommentId = zInfer<typeof ExternalCommentIdSchema>;
 export type ContentCategory = zInfer<typeof ContentCategorySchema>;
+export type SourceGroupEntryRoute = zInfer<
+  typeof SourceGroupEntryRouteSchema
+>;
 export type SourceGroup = zInfer<typeof SourceGroupSchema>;
 export type TopComment = zInfer<typeof TopCommentSchema>;
 export type ContentItem = zInfer<typeof ContentItemSchema>;
@@ -32,6 +44,52 @@ export type CollectedContentInput = zInfer<typeof CollectedContentInputSchema>;
 export interface MergeCollectedContentOptions {
   readonly updatedAt: IsoDateTime;
   readonly topCommentLimit?: number;
+}
+
+export function createDefaultSourceGroupEntryRoute(
+  sourceGroup: Pick<SourceGroup, "url" | "createdAt" | "updatedAt">,
+): SourceGroupEntryRoute {
+  return {
+    id: SOURCE_GROUP_DEFAULT_ENTRY_ROUTE_ID,
+    type: "DIRECT_GROUP_URL",
+    url: sourceGroup.url,
+    riskLevel: SOURCE_GROUP_DEFAULT_ENTRY_ROUTE_RISK_LEVEL,
+    isDefault: true,
+    createdAt: sourceGroup.createdAt,
+    updatedAt: sourceGroup.updatedAt,
+  };
+}
+
+export function resolveSourceGroupEntryRoutes(
+  sourceGroup: SourceGroup,
+): readonly SourceGroupEntryRoute[] {
+  if (sourceGroup.entryRoutes.some((route) => route.isDefault)) {
+    return sourceGroup.entryRoutes;
+  }
+
+  const directRouteIndex = sourceGroup.entryRoutes.findIndex(
+    (route) => route.id === SOURCE_GROUP_DEFAULT_ENTRY_ROUTE_ID,
+  );
+
+  if (directRouteIndex >= 0) {
+    return sourceGroup.entryRoutes.map((route, index) =>
+      index === directRouteIndex ? { ...route, isDefault: true } : route,
+    );
+  }
+
+  return [
+    createDefaultSourceGroupEntryRoute(sourceGroup),
+    ...sourceGroup.entryRoutes,
+  ];
+}
+
+export function withDefaultSourceGroupEntryRoutes(
+  sourceGroup: SourceGroup,
+): SourceGroup {
+  return {
+    ...sourceGroup,
+    entryRoutes: [...resolveSourceGroupEntryRoutes(sourceGroup)],
+  };
 }
 
 export function normalizeTopComments(

@@ -11,6 +11,11 @@ import {
   ExternalGroupIdSchema,
   ExternalPostIdSchema,
   IsoDateTimeSchema,
+  SourceGroupEntryRouteIdSchema,
+  SourceGroupEntryRouteRiskLevelSchema,
+  SourceGroupEntryRouteTypeSchema,
+  SOURCE_GROUP_ENTRY_ROUTE_RISK_LEVELS,
+  SOURCE_GROUP_ENTRY_ROUTE_TYPES,
   SourceGroupIdSchema,
   SourceGroupStatusSchema,
   SOURCE_GROUP_STATUSES,
@@ -37,6 +42,13 @@ export const CreateContentCategoryHttpBodySchema = z
 export const SourceGroupIdHttpParamsSchema = z
   .object({
     sourceGroupId: SourceGroupIdSchema,
+  })
+  .strict();
+
+export const SourceGroupEntryRouteIdHttpParamsSchema = z
+  .object({
+    sourceGroupId: SourceGroupIdSchema,
+    entryRouteId: SourceGroupEntryRouteIdSchema,
   })
   .strict();
 
@@ -79,6 +91,31 @@ export const UpdateSourceGroupStatusHttpBodySchema = z
   })
   .strict();
 
+export const CreateSourceGroupEntryRouteHttpBodySchema = z
+  .object({
+    type: SourceGroupEntryRouteTypeSchema,
+    url: z.url(),
+    label: NonEmptyStringHttpSchema.optional(),
+    notes: NonEmptyStringHttpSchema.optional(),
+    riskLevel: SourceGroupEntryRouteRiskLevelSchema,
+    isDefault: z.boolean().optional(),
+  })
+  .strict();
+
+export const UpdateSourceGroupEntryRouteHttpBodySchema = z
+  .object({
+    type: SourceGroupEntryRouteTypeSchema.optional(),
+    url: z.url().optional(),
+    label: NonEmptyStringHttpSchema.nullable().optional(),
+    notes: NonEmptyStringHttpSchema.nullable().optional(),
+    riskLevel: SourceGroupEntryRouteRiskLevelSchema.optional(),
+    isDefault: z.boolean().optional(),
+  })
+  .strict()
+  .refine((body) => Object.keys(body).length > 0, {
+    message: "At least one entry route field is required.",
+  });
+
 export const IngestCollectedContentHttpBodySchema = CollectedContentInputSchema;
 
 export const ListContentItemsHttpQuerySchema = z
@@ -107,6 +144,9 @@ export type CreateContentCategoryHttpBody = z.infer<
 export type SourceGroupIdHttpParams = z.infer<
   typeof SourceGroupIdHttpParamsSchema
 >;
+export type SourceGroupEntryRouteIdHttpParams = z.infer<
+  typeof SourceGroupEntryRouteIdHttpParamsSchema
+>;
 export type ContentItemIdHttpParams = z.infer<
   typeof ContentItemIdHttpParamsSchema
 >;
@@ -118,6 +158,12 @@ export type ListSourceGroupsHttpQuery = z.infer<
 >;
 export type UpdateSourceGroupStatusHttpBody = z.infer<
   typeof UpdateSourceGroupStatusHttpBodySchema
+>;
+export type CreateSourceGroupEntryRouteHttpBody = z.infer<
+  typeof CreateSourceGroupEntryRouteHttpBodySchema
+>;
+export type UpdateSourceGroupEntryRouteHttpBody = z.infer<
+  typeof UpdateSourceGroupEntryRouteHttpBodySchema
 >;
 export type IngestCollectedContentHttpBody = z.infer<
   typeof IngestCollectedContentHttpBodySchema
@@ -190,6 +236,39 @@ const contentCategoryJsonSchema = {
   },
 } as const;
 
+const sourceGroupEntryRouteJsonSchema = {
+  type: "object",
+  required: [
+    "id",
+    "type",
+    "url",
+    "riskLevel",
+    "isDefault",
+    "createdAt",
+    "updatedAt",
+  ],
+  additionalProperties: false,
+  properties: {
+    id: nonEmptyStringJsonSchema,
+    type: {
+      type: "string",
+      enum: SOURCE_GROUP_ENTRY_ROUTE_TYPES,
+    },
+    url: nonEmptyStringJsonSchema,
+    label: nonEmptyStringJsonSchema,
+    notes: nonEmptyStringJsonSchema,
+    riskLevel: {
+      type: "string",
+      enum: SOURCE_GROUP_ENTRY_ROUTE_RISK_LEVELS,
+    },
+    isDefault: {
+      type: "boolean",
+    },
+    createdAt: nonEmptyStringJsonSchema,
+    updatedAt: nonEmptyStringJsonSchema,
+  },
+} as const;
+
 const sourceGroupJsonSchema = {
   type: "object",
   required: [
@@ -201,6 +280,7 @@ const sourceGroupJsonSchema = {
     "categoryId",
     "status",
     "collectionPriority",
+    "entryRoutes",
     "createdAt",
     "updatedAt",
   ],
@@ -225,6 +305,10 @@ const sourceGroupJsonSchema = {
       maximum: 100,
     },
     notes: nonEmptyStringJsonSchema,
+    entryRoutes: {
+      type: "array",
+      items: sourceGroupEntryRouteJsonSchema,
+    },
     createdAt: nonEmptyStringJsonSchema,
     updatedAt: nonEmptyStringJsonSchema,
   },
@@ -366,6 +450,16 @@ const sourceGroupIdParamsJsonSchema = {
   },
 } as const;
 
+const sourceGroupEntryRouteIdParamsJsonSchema = {
+  type: "object",
+  required: ["sourceGroupId", "entryRouteId"],
+  additionalProperties: false,
+  properties: {
+    sourceGroupId: nonEmptyStringJsonSchema,
+    entryRouteId: nonEmptyStringJsonSchema,
+  },
+} as const;
+
 const contentItemIdParamsJsonSchema = {
   type: "object",
   required: ["contentItemId"],
@@ -427,6 +521,54 @@ const sourceGroupStatusBodyJsonSchema = {
     status: {
       type: "string",
       enum: SOURCE_GROUP_STATUSES,
+    },
+  },
+} as const;
+
+const sourceGroupEntryRouteCreateBodyJsonSchema = {
+  type: "object",
+  required: ["type", "url", "riskLevel"],
+  additionalProperties: false,
+  properties: {
+    type: {
+      type: "string",
+      enum: SOURCE_GROUP_ENTRY_ROUTE_TYPES,
+    },
+    url: nonEmptyStringJsonSchema,
+    label: nonEmptyStringJsonSchema,
+    notes: nonEmptyStringJsonSchema,
+    riskLevel: {
+      type: "string",
+      enum: SOURCE_GROUP_ENTRY_ROUTE_RISK_LEVELS,
+    },
+    isDefault: {
+      type: "boolean",
+    },
+  },
+} as const;
+
+const sourceGroupEntryRouteUpdateBodyJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  properties: {
+    type: {
+      type: "string",
+      enum: SOURCE_GROUP_ENTRY_ROUTE_TYPES,
+    },
+    url: nonEmptyStringJsonSchema,
+    label: {
+      anyOf: [nonEmptyStringJsonSchema, { type: "null" }],
+    },
+    notes: {
+      anyOf: [nonEmptyStringJsonSchema, { type: "null" }],
+    },
+    riskLevel: {
+      type: "string",
+      enum: SOURCE_GROUP_ENTRY_ROUTE_RISK_LEVELS,
+    },
+    isDefault: {
+      type: "boolean",
     },
   },
 } as const;
@@ -584,6 +726,56 @@ export const getSourceGroupHttpRouteSchema = {
 export const updateSourceGroupStatusHttpRouteSchema = {
   params: sourceGroupIdParamsJsonSchema,
   body: sourceGroupStatusBodyJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["sourceGroup"],
+      additionalProperties: false,
+      properties: {
+        sourceGroup: sourceGroupJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const createSourceGroupEntryRouteHttpRouteSchema = {
+  params: sourceGroupIdParamsJsonSchema,
+  body: sourceGroupEntryRouteCreateBodyJsonSchema,
+  response: {
+    201: {
+      type: "object",
+      required: ["sourceGroup"],
+      additionalProperties: false,
+      properties: {
+        sourceGroup: sourceGroupJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const updateSourceGroupEntryRouteHttpRouteSchema = {
+  params: sourceGroupEntryRouteIdParamsJsonSchema,
+  body: sourceGroupEntryRouteUpdateBodyJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["sourceGroup"],
+      additionalProperties: false,
+      properties: {
+        sourceGroup: sourceGroupJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const removeSourceGroupEntryRouteHttpRouteSchema = {
+  params: sourceGroupEntryRouteIdParamsJsonSchema,
   response: {
     200: {
       type: "object",

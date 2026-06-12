@@ -159,6 +159,14 @@ describe("Content Manager HTTP routes", () => {
           id: "source-group-1",
           platform: "FACEBOOK",
           categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "direct-group-url",
+              type: "DIRECT_GROUP_URL",
+              riskLevel: "MEDIUM",
+              isDefault: true,
+            },
+          ],
         },
       });
     } finally {
@@ -220,6 +228,12 @@ describe("Content Manager HTTP routes", () => {
         items: [
           {
             id: "source-group-1",
+            entryRoutes: [
+              {
+                id: "direct-group-url",
+                isDefault: true,
+              },
+            ],
           },
         ],
         page: {
@@ -261,11 +275,228 @@ describe("Content Manager HTTP routes", () => {
           platform: "FACEBOOK",
           url: "https://facebook.test/groups/fb-group-1",
           status: "ACTIVE",
+          entryRoutes: [
+            {
+              id: "direct-group-url",
+              type: "DIRECT_GROUP_URL",
+              url: "https://facebook.test/groups/fb-group-1",
+              riskLevel: "MEDIUM",
+              isDefault: true,
+            },
+          ],
         },
       });
       expect(body.sourceGroup).not.toHaveProperty("rawPayloadRef");
       expect(body.sourceGroup).not.toHaveProperty("cookies");
       expect(body.sourceGroup).not.toHaveProperty("localStorage");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("adds source group entry routes", async () => {
+    const { server, service } = createTestServer();
+
+    service.addSourceGroupEntryRoute.setOutput(
+      createSourceGroup({
+        entryRoutes: [
+          createSourceGroup().entryRoutes[0]!,
+          {
+            id: "entry-route-2",
+            type: "CATEGORY_ENTRY_URL",
+            url: "https://facebook.test/groups/category-entry",
+            label: "Category entry",
+            notes: "Use as a lower-risk entry point.",
+            riskLevel: "LOW",
+            isDefault: false,
+            createdAt: "2026-02-01T10:05:00.000Z",
+            updatedAt: "2026-02-01T10:05:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-groups/source-group-1/entry-routes",
+        payload: {
+          type: "CATEGORY_ENTRY_URL",
+          url: "https://facebook.test/groups/category-entry",
+          label: "Category entry",
+          notes: "Use as a lower-risk entry point.",
+          riskLevel: "LOW",
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(service.addSourceGroupEntryRoute.calls).toEqual([
+        {
+          sourceGroupId: "source-group-1",
+          type: "CATEGORY_ENTRY_URL",
+          url: "https://facebook.test/groups/category-entry",
+          label: "Category entry",
+          notes: "Use as a lower-risk entry point.",
+          riskLevel: "LOW",
+        },
+      ]);
+      expect(response.json()).toMatchObject({
+        sourceGroup: {
+          entryRoutes: [
+            {
+              id: "direct-group-url",
+              isDefault: true,
+            },
+            {
+              id: "entry-route-2",
+              type: "CATEGORY_ENTRY_URL",
+              riskLevel: "LOW",
+              isDefault: false,
+            },
+          ],
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects invalid source group entry route create requests", async () => {
+    const invalidPayloads = [
+      {
+        type: "UNKNOWN",
+        url: "https://facebook.test/groups/category-entry",
+        riskLevel: "LOW",
+      },
+      {
+        type: "CATEGORY_ENTRY_URL",
+        url: "not-a-url",
+        riskLevel: "LOW",
+      },
+      {
+        type: "CATEGORY_ENTRY_URL",
+        url: "https://facebook.test/groups/category-entry",
+        riskLevel: "UNKNOWN",
+      },
+    ];
+
+    for (const payload of invalidPayloads) {
+      const { server, service } = createTestServer();
+
+      try {
+        const response = await server.inject({
+          method: "POST",
+          url: "/collector/source-groups/source-group-1/entry-routes",
+          payload,
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect(service.addSourceGroupEntryRoute.calls).toEqual([]);
+      } finally {
+        await server.close();
+      }
+    }
+  });
+
+  it("updates source group entry routes", async () => {
+    const { server, service } = createTestServer();
+
+    service.updateSourceGroupEntryRoute.setOutput(
+      createSourceGroup({
+        entryRoutes: [
+          {
+            ...createSourceGroup().entryRoutes[0]!,
+            isDefault: false,
+          },
+          {
+            id: "entry-route-2",
+            type: "PUBLIC_PAGE_THEN_GROUP",
+            url: "https://facebook.test/public-page",
+            label: "Public page",
+            riskLevel: "LOW",
+            isDefault: true,
+            createdAt: "2026-02-01T10:05:00.000Z",
+            updatedAt: "2026-02-01T10:06:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PATCH",
+        url: "/collector/source-groups/source-group-1/entry-routes/entry-route-2",
+        payload: {
+          type: "PUBLIC_PAGE_THEN_GROUP",
+          url: "https://facebook.test/public-page",
+          label: "Public page",
+          notes: null,
+          riskLevel: "LOW",
+          isDefault: true,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.updateSourceGroupEntryRoute.calls).toEqual([
+        {
+          sourceGroupId: "source-group-1",
+          entryRouteId: "entry-route-2",
+          type: "PUBLIC_PAGE_THEN_GROUP",
+          url: "https://facebook.test/public-page",
+          label: "Public page",
+          notes: null,
+          riskLevel: "LOW",
+          isDefault: true,
+        },
+      ]);
+      expect(response.json()).toMatchObject({
+        sourceGroup: {
+          entryRoutes: [
+            {
+              id: "direct-group-url",
+              isDefault: false,
+            },
+            {
+              id: "entry-route-2",
+              isDefault: true,
+            },
+          ],
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("deletes source group entry routes", async () => {
+    const { server, service } = createTestServer();
+
+    service.removeSourceGroupEntryRoute.setOutput(createSourceGroup());
+
+    try {
+      const response = await server.inject({
+        method: "DELETE",
+        url: "/collector/source-groups/source-group-1/entry-routes/entry-route-2",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.removeSourceGroupEntryRoute.calls).toEqual([
+        {
+          sourceGroupId: "source-group-1",
+          entryRouteId: "entry-route-2",
+        },
+      ]);
+      expect(response.json()).toMatchObject({
+        sourceGroup: {
+          id: "source-group-1",
+          entryRoutes: [
+            {
+              id: "direct-group-url",
+              isDefault: true,
+            },
+          ],
+        },
+      });
     } finally {
       await server.close();
     }

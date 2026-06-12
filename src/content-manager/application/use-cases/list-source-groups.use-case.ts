@@ -1,6 +1,7 @@
 import { ContentValidationError } from "../application-errors";
 import { validateSourceGroupForApplication } from "../content-validation";
 import type { SourceGroupRepository } from "../ports/source-group-repository.port";
+import { withDefaultSourceGroupEntryRoutes } from "../../domain";
 import type {
   ContentCategoryId,
   SourceGroup,
@@ -38,7 +39,9 @@ export class ListSourceGroupsUseCase {
     const query = normalizeListSourceGroupsInput(input);
     const result = await this.sourceGroups.list(query);
     const items = result.items.map((sourceGroup) =>
-      validateSourceGroupForApplication(sourceGroup),
+      withDefaultSourceGroupEntryRoutes(
+        validateSourceGroupForApplication(sourceGroup),
+      ),
     );
 
     return {

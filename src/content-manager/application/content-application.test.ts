@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  AddSourceGroupEntryRouteUseCase,
   ContentCategoryAlreadyExistsError,
   ContentCategoryNotFoundError,
+  ContentValidationError,
   ContentItemNotFoundError,
   CreateContentCategoryUseCase,
   CreateSourceGroupUseCase,
@@ -14,12 +16,15 @@ import {
   ListSourceGroupsUseCase,
   MAX_CONTENT_ITEM_LIST_LIMIT,
   MAX_SOURCE_GROUP_LIST_LIMIT,
+  RemoveSourceGroupEntryRouteUseCase,
   SourceGroupAlreadyExistsError,
   SourceGroupNotFoundError,
   UpdateContentStatusUseCase,
+  UpdateSourceGroupEntryRouteUseCase,
   UpdateSourceGroupStatusUseCase,
 } from "./index";
 import type { Clock, IdGenerator } from "./index";
+import { createDefaultSourceGroupEntryRoute } from "../domain";
 import {
   InMemoryContentCategoryRepository,
   InMemoryContentItemRepository,
@@ -31,6 +36,7 @@ import type {
   ContentItem,
   ContentStatus,
   SourceGroup,
+  SourceGroupEntryRoute,
   TopComment,
 } from "../domain";
 
@@ -110,6 +116,17 @@ describe("content manager application use cases", () => {
       categoryId: "category-1",
       status: "ACTIVE",
       collectionPriority: 80,
+      entryRoutes: [
+        {
+          id: "direct-group-url",
+          type: "DIRECT_GROUP_URL",
+          url: "https://www.facebook.com/groups/knowledge",
+          riskLevel: "MEDIUM",
+          isDefault: true,
+          createdAt,
+          updatedAt: createdAt,
+        },
+      ],
       createdAt,
       updatedAt: createdAt,
     });
@@ -206,6 +223,234 @@ describe("content manager application use cases", () => {
         sourceGroupId: "source-group-missing",
       }),
     ).rejects.toThrow(SourceGroupNotFoundError);
+  });
+
+  it("reads existing source groups without explicit routes with a derived default direct route", async () => {
+    const context = createTestContext();
+
+    await seedSourceGroup(context, { entryRoutes: [] });
+
+    const sourceGroup = await new GetSourceGroupUseCase(
+      context.sourceGroups,
+    ).execute({
+      sourceGroupId: "source-group-1",
+    });
+
+    expect(sourceGroup.entryRoutes).toEqual([
+      createDefaultSourceGroupEntryRoute(sourceGroup),
+    ]);
+  });
+
+  it("adds a source group entry route", async () => {
+    const context = createTestContext(["category-entry-route"]);
+
+    await seedSourceGroup(context);
+    context.clock.setNow(updatedAt);
+
+    const sourceGroup = await new AddSourceGroupEntryRouteUseCase(
+      context.sourceGroups,
+      context.ids,
+      context.clock,
+    ).execute({
+      sourceGroupId: "source-group-1",
+      type: "CATEGORY_ENTRY_URL",
+      url: "https://www.facebook.com/groups/category-entry",
+      label: "Category surface",
+      notes: "Use after ambient exercise.",
+      riskLevel: "LOW",
+    });
+
+    expect(sourceGroup.entryRoutes).toEqual([
+      createDefaultSourceGroupEntryRoute({
+        url: "https://www.facebook.com/groups/group-1",
+        createdAt,
+        updatedAt: createdAt,
+      }),
+      {
+        id: "category-entry-route",
+        type: "CATEGORY_ENTRY_URL",
+        url: "https://www.facebook.com/groups/category-entry",
+        label: "Category surface",
+        notes: "Use after ambient exercise.",
+        riskLevel: "LOW",
+        isDefault: false,
+        createdAt: updatedAt,
+        updatedAt,
+      },
+    ]);
+    await expect(context.sourceGroups.findById("source-group-1")).resolves.toEqual(
+      sourceGroup,
+    );
+  });
+
+  it("rejects invalid source group entry route values", async () => {
+    const invalidCases = [
+      {
+        name: "type",
+        input: {
+          type: "UNKNOWN" as SourceGroupEntryRoute["type"],
+          url: "https://www.facebook.com/groups/category-entry",
+          riskLevel: "LOW" as const,
+        },
+      },
+      {
+        name: "url",
+        input: {
+          type: "CATEGORY_ENTRY_URL" as const,
+          url: "not-a-url",
+          riskLevel: "LOW" as const,
+        },
+      },
+      {
+        name: "riskLevel",
+        input: {
+          type: "CATEGORY_ENTRY_URL" as const,
+          url: "https://www.facebook.com/groups/category-entry",
+          riskLevel: "UNKNOWN" as SourceGroupEntryRoute["riskLevel"],
+        },
+      },
+    ];
+
+    for (const { input, name } of invalidCases) {
+      const context = createTestContext([`invalid-route-${name}`]);
+
+      await seedSourceGroup(context);
+
+      await expect(
+        new AddSourceGroupEntryRouteUseCase(
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          sourceGroupId: "source-group-1",
+          ...input,
+        }),
+      ).rejects.toThrow(ContentValidationError);
+    }
+  });
+
+  it("sets a new source group entry route as default and clears the previous default", async () => {
+    const context = createTestContext(["new-default-route"]);
+
+    await seedSourceGroup(context);
+    context.clock.setNow(updatedAt);
+
+    const sourceGroup = await new AddSourceGroupEntryRouteUseCase(
+      context.sourceGroups,
+      context.ids,
+      context.clock,
+    ).execute({
+      sourceGroupId: "source-group-1",
+      type: "PUBLIC_PAGE_THEN_GROUP",
+      url: "https://www.facebook.com/public-page",
+      riskLevel: "LOW",
+      isDefault: true,
+    });
+
+    expect(sourceGroup.entryRoutes).toEqual([
+      {
+        ...createDefaultSourceGroupEntryRoute({
+          url: "https://www.facebook.com/groups/group-1",
+          createdAt,
+          updatedAt: createdAt,
+        }),
+        isDefault: false,
+      },
+      {
+        id: "new-default-route",
+        type: "PUBLIC_PAGE_THEN_GROUP",
+        url: "https://www.facebook.com/public-page",
+        riskLevel: "LOW",
+        isDefault: true,
+        createdAt: updatedAt,
+        updatedAt,
+      },
+    ]);
+  });
+
+  it("updates a source group entry route", async () => {
+    const context = createTestContext();
+
+    await seedSourceGroup(context, {
+      entryRoutes: [
+        createSourceGroupEntryRoute(),
+        createSourceGroupEntryRoute({
+          id: "category-entry-route",
+          type: "CATEGORY_ENTRY_URL",
+          url: "https://www.facebook.com/groups/category-entry",
+          label: "Old label",
+          riskLevel: "LOW",
+          isDefault: false,
+        }),
+      ],
+    });
+    context.clock.setNow(updatedAt);
+
+    const sourceGroup = await new UpdateSourceGroupEntryRouteUseCase(
+      context.sourceGroups,
+      context.clock,
+    ).execute({
+      sourceGroupId: "source-group-1",
+      entryRouteId: "category-entry-route",
+      label: "Updated label",
+      notes: "Operator-selected referral.",
+      riskLevel: "MEDIUM",
+    });
+
+    expect(sourceGroup.entryRoutes[1]).toMatchObject({
+      id: "category-entry-route",
+      label: "Updated label",
+      notes: "Operator-selected referral.",
+      riskLevel: "MEDIUM",
+      updatedAt,
+    });
+  });
+
+  it("removes a non-default source group entry route", async () => {
+    const context = createTestContext();
+
+    await seedSourceGroup(context, {
+      entryRoutes: [
+        createSourceGroupEntryRoute(),
+        createSourceGroupEntryRoute({
+          id: "category-entry-route",
+          type: "CATEGORY_ENTRY_URL",
+          url: "https://www.facebook.com/groups/category-entry",
+          riskLevel: "LOW",
+          isDefault: false,
+        }),
+      ],
+    });
+    context.clock.setNow(updatedAt);
+
+    const sourceGroup = await new RemoveSourceGroupEntryRouteUseCase(
+      context.sourceGroups,
+      context.clock,
+    ).execute({
+      sourceGroupId: "source-group-1",
+      entryRouteId: "category-entry-route",
+    });
+
+    expect(sourceGroup.entryRoutes.map((route) => route.id)).toEqual([
+      "direct-group-url",
+    ]);
+    expect(sourceGroup.updatedAt).toBe(updatedAt);
+  });
+
+  it("rejects deleting the default source group entry route", async () => {
+    const context = createTestContext();
+
+    await seedSourceGroup(context);
+
+    await expect(
+      new RemoveSourceGroupEntryRouteUseCase(
+        context.sourceGroups,
+        context.clock,
+      ).execute({
+        sourceGroupId: "source-group-1",
+        entryRouteId: "direct-group-url",
+      }),
+    ).rejects.toThrow(ContentValidationError);
   });
 
   it("creates a new COLLECTED content item from normalized input", async () => {
@@ -678,16 +923,37 @@ function createContentCategory(
 }
 
 function createSourceGroup(overrides: Partial<SourceGroup> = {}): SourceGroup {
-  return {
+  const base = {
     id: "source-group-1",
     platform: "FACEBOOK",
     externalGroupId: "facebook-group-1",
     name: "Knowledge Group 1",
-    url: "https://www.facebook.com/groups/group-1",
+    url: overrides.url ?? "https://www.facebook.com/groups/group-1",
     categoryId: "category-1",
     status: "ACTIVE",
     collectionPriority: 80,
     notes: "High-signal group.",
+    createdAt: overrides.createdAt ?? createdAt,
+    updatedAt: overrides.updatedAt ?? createdAt,
+  } satisfies Omit<SourceGroup, "entryRoutes">;
+
+  return {
+    ...base,
+    entryRoutes:
+      overrides.entryRoutes ?? [createDefaultSourceGroupEntryRoute(base)],
+    ...overrides,
+  };
+}
+
+function createSourceGroupEntryRoute(
+  overrides: Partial<SourceGroupEntryRoute> = {},
+): SourceGroupEntryRoute {
+  return {
+    id: "direct-group-url",
+    type: "DIRECT_GROUP_URL",
+    url: "https://www.facebook.com/groups/group-1",
+    riskLevel: "MEDIUM",
+    isDefault: true,
     createdAt,
     updatedAt: createdAt,
     ...overrides,

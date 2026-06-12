@@ -38,6 +38,7 @@ export class DrizzleSourceGroupRepository implements SourceGroupRepository {
           status: row.status,
           collectionPriority: row.collectionPriority,
           notes: row.notes,
+          entryRoutes: row.entryRoutes,
           updatedAt: row.updatedAt,
         },
       });

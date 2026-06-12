@@ -19,7 +19,7 @@ The domain must not import or depend on HTTP, database, browser automation, queu
 
 The domain core contains business concepts and invariants. For Collector Profile Manager, this includes profile operational status transitions, account maturity/readiness stage transitions, property invariants, provisioning token rules, session ingestion rules, and checkout eligibility rules.
 
-For Content Manager, this includes source group rules, managed group category rules, content item lifecycle status, content deduplication/upsert rules, high-engagement top comment rules, engagement count invariants, and future builder handoff eligibility.
+For Content Manager, this includes source group rules, source group entry route metadata rules, managed group category rules, content item lifecycle status, content deduplication/upsert rules, high-engagement top comment rules, engagement count invariants, and future builder handoff eligibility.
 
 Content Manager domain core must work from normalized content ingestion input. It must not parse raw Facebook GraphQL payloads or own platform-specific extraction rules.
 
@@ -75,6 +75,16 @@ Provisioning and session ingestion may move a profile to operational `READY` wit
 Ambient account exercise uses lease purpose `AMBIENT_EXERCISE` for a specified profile. It may exercise `READY` profiles in `NEW_ACCOUNT`, `WARMING`, `LIMITED`, or `COLLECTION_READY`, while `NEEDS_REVIEW` and `RETIRED` remain ineligible. This purpose is only for read-only stability exercise; it must not collect or submit content, and it must not automatically change `accountStage`.
 
 Account stage transition rules and lease-purpose eligibility remain Collector Profile Manager domain logic. Collector Runtime and browser providers consume the resulting lease and trusted runtime configuration, record exercise outcomes, and release leases, but they do not bypass or reinterpret Profile Manager readiness rules.
+
+## Source Group Entry Routes
+
+Content Manager owns source group entry route metadata. Entry routes describe possible future paths toward a source group, such as direct group URLs, category entry URLs, public page then group routes, operator-assisted search, or saved referral URLs.
+
+Entry routes are metadata only. They do not grant access, imply that any profile can access the group, create profile-source access state, run browser automation, join groups, search automatically, or change profile account stage.
+
+Source groups without stored entry routes are treated as having a derived default `DIRECT_GROUP_URL` route from the source group URL. New source groups store that direct default route explicitly with `riskLevel = MEDIUM`. Setting a different route as default clears the previous default. Deleting the current default route is rejected so source groups keep an obvious entry path.
+
+Collector Runtime may consume entry route metadata later through explicit Content Manager contracts or runtime-owned ports, but it must not own, persist, or mutate source group route metadata directly.
 
 ## Platform Extractors
 

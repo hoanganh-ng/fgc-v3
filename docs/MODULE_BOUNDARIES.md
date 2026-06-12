@@ -34,6 +34,7 @@ Owns:
 - Content deduplication and upsert rules.
 - Content lifecycle status.
 - Source group records.
+- Source group entry route metadata for future access and exercise paths.
 - Group categories as managed entities.
 - Engagement counts.
 - Top comments as normalized metadata for each content item.
@@ -43,6 +44,7 @@ Owns:
 Does not own:
 
 - Profile or session management.
+- Profile-source access state.
 - Browser automation.
 - Network payload capture.
 - Raw Facebook GraphQL parsing.
@@ -63,6 +65,7 @@ Owns:
 - Checking out eligible profiles from Collector Profile Manager.
 - Calling specified-profile ambient exercise checkout for read-only account exercise attempts.
 - Visiting Facebook groups and posts.
+- Future consumption of Content Manager source group entry route metadata through explicit contracts.
 - Visiting safe Facebook home/feed surfaces for read-only account exercise.
 - Browser automation and network payload capture.
 - Browser provider orchestration and provider adapters inside infrastructure.
@@ -88,6 +91,8 @@ Browser-provider hardening must stay inside Collector Runtime infrastructure. Pr
 
 Ambient account exercise is a Collector Runtime workflow for safe stability exercise only. It may record that a page loaded, login was required, a checkpoint was detected, how many light scrolls ran, whether the lease was released, and the run duration. It must not collect or submit content items, join groups, create platform actions, or write raw browser/platform/session material to records or logs.
 
+Sprint 040 source group entry routes remain Content Manager metadata. Collector Runtime does not use them for navigation in Sprint 040, and it must not treat a route as proof of group access.
+
 Does not own:
 
 - Profile property invariants.
@@ -96,6 +101,7 @@ Does not own:
 - Content item lifecycle rules.
 - Content deduplication or upsert rules.
 - Group category management.
+- Source group entry route metadata ownership or direct mutation.
 - Direct database access to Collector Profile Manager or Content Manager storage.
 - Direct Content Manager repository access.
 - Collector Profile Manager repository access.

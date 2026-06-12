@@ -4,10 +4,14 @@ import {
   CheckCircle2,
   Clipboard,
   FolderKanban,
+  Pencil,
   Plus,
   RefreshCw,
+  Route,
   Save,
   Tags,
+  Trash2,
+  X,
 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -29,8 +33,11 @@ import {
   getErrorMessage,
 } from "@/features/profiles/profile-form-support";
 import {
+  useCreateSourceGroupEntryRouteMutation,
   useCreateContentCategoryMutation,
   useCreateSourceGroupMutation,
+  useRemoveSourceGroupEntryRouteMutation,
+  useUpdateSourceGroupEntryRouteMutation,
   useUpdateSourceGroupStatusMutation,
 } from "@/features/content-manager/content-manager-mutations";
 import {
@@ -40,9 +47,13 @@ import {
 import { isApiResultError } from "@/lib/api/http-client";
 import {
   ContentPlatformSchema,
+  SourceGroupEntryRouteRiskLevelSchema,
+  SourceGroupEntryRouteTypeSchema,
   SourceGroupStatusSchema,
   type ContentCategory,
   type SourceGroup,
+  type SourceGroupEntryRoute,
+  type SourceGroupEntryRouteRiskLevel,
   type SourceGroupStatus,
 } from "@/lib/api/content-manager-client";
 import { PageShell } from "@/pages/page-shell";
@@ -77,10 +88,32 @@ const SourceGroupFormSchema = z
   })
   .strict();
 
+const SourceGroupEntryRouteFormSchema = z
+  .object({
+    type: SourceGroupEntryRouteTypeSchema,
+    url: z.string().trim().url("Entry URL must be valid."),
+    label: z.string(),
+    notes: z.string(),
+    riskLevel: SourceGroupEntryRouteRiskLevelSchema,
+    isDefault: z.boolean(),
+  })
+  .strict();
+
 type ContentCategoryFormValues = z.infer<typeof ContentCategoryFormSchema>;
 type SourceGroupFormValues = z.infer<typeof SourceGroupFormSchema>;
+type SourceGroupEntryRouteFormValues = z.infer<
+  typeof SourceGroupEntryRouteFormSchema
+>;
 
 const sourceGroupStatuses = ["ACTIVE", "PAUSED", "ARCHIVED"] as const;
+const sourceGroupEntryRouteTypes = [
+  "DIRECT_GROUP_URL",
+  "CATEGORY_ENTRY_URL",
+  "PUBLIC_PAGE_THEN_GROUP",
+  "OPERATOR_ASSISTED_SEARCH",
+  "SAVED_REFERRAL_URL",
+] as const;
+const sourceGroupEntryRouteRiskLevels = ["LOW", "MEDIUM", "HIGH"] as const;
 
 export function SourceGroupsPage(): JSX.Element {
   const categoriesQuery = useContentCategoriesQuery();
@@ -792,12 +825,489 @@ function SourceGroupsList({
                     </div>
                   ) : null}
                 </dl>
+
+                <SourceGroupEntryRoutesPanel sourceGroup={sourceGroup} />
               </article>
             );
           })}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function SourceGroupEntryRoutesPanel({
+  sourceGroup,
+}: {
+  readonly sourceGroup: SourceGroup;
+}): JSX.Element {
+  const createRoute = useCreateSourceGroupEntryRouteMutation();
+  const [validationSummary, setValidationSummary] = useState<string>();
+  const form = useForm<SourceGroupEntryRouteFormValues>({
+    defaultValues: {
+      type: "CATEGORY_ENTRY_URL",
+      url: "",
+      label: "",
+      notes: "",
+      riskLevel: "LOW",
+      isDefault: false,
+    },
+  });
+
+  async function submit(values: SourceGroupEntryRouteFormValues): Promise<void> {
+    setValidationSummary(undefined);
+    createRoute.reset();
+
+    const parsed = SourceGroupEntryRouteFormSchema.safeParse(values);
+
+    if (!parsed.success) {
+      setValidationSummary(
+        applyZodFieldErrors(parsed.error, form.setError) ??
+          "Entry route is invalid.",
+      );
+      return;
+    }
+
+    const label = parsed.data.label.trim();
+    const notes = parsed.data.notes.trim();
+
+    try {
+      await createRoute.mutateAsync({
+        sourceGroupId: sourceGroup.id,
+        request: {
+          type: parsed.data.type,
+          url: parsed.data.url,
+          ...(label.length > 0 ? { label } : {}),
+          ...(notes.length > 0 ? { notes } : {}),
+          riskLevel: parsed.data.riskLevel,
+          ...(parsed.data.isDefault
+            ? { isDefault: parsed.data.isDefault }
+            : {}),
+        },
+      });
+
+      form.reset({
+        type: "CATEGORY_ENTRY_URL",
+        url: "",
+        label: "",
+        notes: "",
+        riskLevel: "LOW",
+        isDefault: false,
+      });
+    } catch {
+      return;
+    }
+  }
+
+  return (
+    <div className="grid min-w-0 gap-3 rounded border border-border bg-muted/25 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Route aria-hidden="true" className="size-4 text-primary" />
+          <h4 className="text-sm font-semibold text-foreground">Entry Routes</h4>
+        </div>
+        <StatusBadge
+          label={formatCount(sourceGroup.entryRoutes.length, "route")}
+          tone="neutral"
+        />
+      </div>
+
+      <div className="grid gap-3">
+        {sourceGroup.entryRoutes.map((route) => (
+          <SourceGroupEntryRouteRow
+            key={route.id}
+            route={route}
+            sourceGroupId={sourceGroup.id}
+          />
+        ))}
+      </div>
+
+      <form
+        className="grid gap-3 border-t border-border pt-3"
+        onSubmit={(event) => {
+          void form.handleSubmit(submit)(event);
+        }}
+      >
+        {validationSummary !== undefined ? (
+          <ValidationSummary message={validationSummary} />
+        ) : null}
+
+        <BackendErrorPanel
+          error={createRoute.error}
+          fallbackMessage="Entry route creation failed."
+        />
+
+        <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+          <FormField
+            error={getErrorMessage(form.formState.errors.type)}
+            htmlFor={`${sourceGroup.id}-entry-route-type`}
+            label="Type"
+          >
+            <Select
+              id={`${sourceGroup.id}-entry-route-type`}
+              {...form.register("type")}
+            >
+              {sourceGroupEntryRouteTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <FormField
+            error={getErrorMessage(form.formState.errors.riskLevel)}
+            htmlFor={`${sourceGroup.id}-entry-route-risk`}
+            label="Risk"
+          >
+            <Select
+              id={`${sourceGroup.id}-entry-route-risk`}
+              {...form.register("riskLevel")}
+            >
+              {sourceGroupEntryRouteRiskLevels.map((riskLevel) => (
+                <option key={riskLevel} value={riskLevel}>
+                  {riskLevel}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        </div>
+
+        <FormField
+          error={getErrorMessage(form.formState.errors.url)}
+          htmlFor={`${sourceGroup.id}-entry-route-url`}
+          label="URL"
+        >
+          <Input
+            id={`${sourceGroup.id}-entry-route-url`}
+            autoComplete="off"
+            {...form.register("url")}
+          />
+        </FormField>
+
+        <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+          <FormField
+            error={getErrorMessage(form.formState.errors.label)}
+            htmlFor={`${sourceGroup.id}-entry-route-label`}
+            label="Label"
+          >
+            <Input
+              id={`${sourceGroup.id}-entry-route-label`}
+              autoComplete="off"
+              {...form.register("label")}
+            />
+          </FormField>
+
+          <label className="flex min-h-10 items-center gap-2 self-end text-sm font-medium text-foreground">
+            <input
+              className="size-4 rounded border-border text-primary focus:ring-primary"
+              type="checkbox"
+              {...form.register("isDefault")}
+            />
+            Default route
+          </label>
+        </div>
+
+        <FormField
+          error={getErrorMessage(form.formState.errors.notes)}
+          htmlFor={`${sourceGroup.id}-entry-route-notes`}
+          label="Notes"
+        >
+          <Textarea
+            id={`${sourceGroup.id}-entry-route-notes`}
+            {...form.register("notes")}
+          />
+        </FormField>
+
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button disabled={createRoute.isPending} size="sm" type="submit">
+            <Plus aria-hidden="true" className="size-4" />
+            {createRoute.isPending ? "Adding" : "Add Route"}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function SourceGroupEntryRouteRow({
+  route,
+  sourceGroupId,
+}: {
+  readonly route: SourceGroupEntryRoute;
+  readonly sourceGroupId: string;
+}): JSX.Element {
+  const [editing, setEditing] = useState(false);
+  const removeRoute = useRemoveSourceGroupEntryRouteMutation();
+
+  async function remove(): Promise<void> {
+    removeRoute.reset();
+
+    try {
+      await removeRoute.mutateAsync({
+        sourceGroupId,
+        entryRouteId: route.id,
+      });
+    } catch {
+      return;
+    }
+  }
+
+  return (
+    <div className="grid min-w-0 gap-3 rounded border border-border bg-white p-3">
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+        <div className="grid min-w-0 gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge label={route.type} tone="info" />
+            <StatusBadge
+              label={route.riskLevel}
+              tone={getEntryRouteRiskTone(route.riskLevel)}
+            />
+            {route.isDefault ? (
+              <StatusBadge label="Default" tone="success" />
+            ) : null}
+          </div>
+          <a
+            className="min-w-0 truncate text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary"
+            href={route.url}
+            rel="noreferrer"
+            target="_blank"
+            title={route.url}
+          >
+            {route.url}
+          </a>
+          {route.label !== undefined ? (
+            <p
+              className="truncate text-sm font-medium text-foreground"
+              title={route.label}
+            >
+              {route.label}
+            </p>
+          ) : null}
+          {route.notes !== undefined ? (
+            <p
+              className="max-h-12 overflow-hidden text-sm leading-6 text-muted-foreground"
+              title={route.notes}
+            >
+              {route.notes}
+            </p>
+          ) : null}
+          <p className="truncate font-mono text-xs text-muted-foreground">
+            {route.id}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 lg:justify-end">
+          <Button
+            aria-label={`Edit entry route ${route.id}`}
+            size="sm"
+            variant="secondary"
+            onClick={() => setEditing((current) => !current)}
+          >
+            {editing ? (
+              <X aria-hidden="true" className="size-4" />
+            ) : (
+              <Pencil aria-hidden="true" className="size-4" />
+            )}
+            {editing ? "Cancel" : "Edit"}
+          </Button>
+          {!route.isDefault ? (
+            <Button
+              aria-label={`Delete entry route ${route.id}`}
+              disabled={removeRoute.isPending}
+              size="sm"
+              variant="danger"
+              onClick={() => {
+                void remove();
+              }}
+            >
+              <Trash2 aria-hidden="true" className="size-4" />
+              {removeRoute.isPending ? "Deleting" : "Delete"}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <BackendErrorPanel
+        error={removeRoute.error}
+        fallbackMessage="Entry route deletion failed."
+      />
+
+      {editing ? (
+        <SourceGroupEntryRouteEditForm
+          route={route}
+          sourceGroupId={sourceGroupId}
+          onSaved={() => setEditing(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function SourceGroupEntryRouteEditForm({
+  onSaved,
+  route,
+  sourceGroupId,
+}: {
+  readonly onSaved: () => void;
+  readonly route: SourceGroupEntryRoute;
+  readonly sourceGroupId: string;
+}): JSX.Element {
+  const updateRoute = useUpdateSourceGroupEntryRouteMutation();
+  const [validationSummary, setValidationSummary] = useState<string>();
+  const form = useForm<SourceGroupEntryRouteFormValues>({
+    defaultValues: {
+      type: route.type,
+      url: route.url,
+      label: route.label ?? "",
+      notes: route.notes ?? "",
+      riskLevel: route.riskLevel,
+      isDefault: route.isDefault,
+    },
+  });
+
+  async function submit(values: SourceGroupEntryRouteFormValues): Promise<void> {
+    setValidationSummary(undefined);
+    updateRoute.reset();
+
+    const parsed = SourceGroupEntryRouteFormSchema.safeParse(values);
+
+    if (!parsed.success) {
+      setValidationSummary(
+        applyZodFieldErrors(parsed.error, form.setError) ??
+          "Entry route is invalid.",
+      );
+      return;
+    }
+
+    const label = parsed.data.label.trim();
+    const notes = parsed.data.notes.trim();
+
+    try {
+      await updateRoute.mutateAsync({
+        sourceGroupId,
+        entryRouteId: route.id,
+        request: {
+          type: parsed.data.type,
+          url: parsed.data.url,
+          label: label.length > 0 ? label : null,
+          notes: notes.length > 0 ? notes : null,
+          riskLevel: parsed.data.riskLevel,
+          isDefault: route.isDefault ? true : parsed.data.isDefault,
+        },
+      });
+      onSaved();
+    } catch {
+      return;
+    }
+  }
+
+  return (
+    <form
+      className="grid gap-3 border-t border-border pt-3"
+      onSubmit={(event) => {
+        void form.handleSubmit(submit)(event);
+      }}
+    >
+      {validationSummary !== undefined ? (
+        <ValidationSummary message={validationSummary} />
+      ) : null}
+
+      <BackendErrorPanel
+        error={updateRoute.error}
+        fallbackMessage="Entry route update failed."
+      />
+
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+        <FormField
+          error={getErrorMessage(form.formState.errors.type)}
+          htmlFor={`${sourceGroupId}-${route.id}-edit-type`}
+          label="Type"
+        >
+          <Select
+            id={`${sourceGroupId}-${route.id}-edit-type`}
+            {...form.register("type")}
+          >
+            {sourceGroupEntryRouteTypes.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+
+        <FormField
+          error={getErrorMessage(form.formState.errors.riskLevel)}
+          htmlFor={`${sourceGroupId}-${route.id}-edit-risk`}
+          label="Risk"
+        >
+          <Select
+            id={`${sourceGroupId}-${route.id}-edit-risk`}
+            {...form.register("riskLevel")}
+          >
+            {sourceGroupEntryRouteRiskLevels.map((riskLevel) => (
+              <option key={riskLevel} value={riskLevel}>
+                {riskLevel}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+      </div>
+
+      <FormField
+        error={getErrorMessage(form.formState.errors.url)}
+        htmlFor={`${sourceGroupId}-${route.id}-edit-url`}
+        label="URL"
+      >
+        <Input
+          id={`${sourceGroupId}-${route.id}-edit-url`}
+          autoComplete="off"
+          {...form.register("url")}
+        />
+      </FormField>
+
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+        <FormField
+          error={getErrorMessage(form.formState.errors.label)}
+          htmlFor={`${sourceGroupId}-${route.id}-edit-label`}
+          label="Label"
+        >
+          <Input
+            id={`${sourceGroupId}-${route.id}-edit-label`}
+            autoComplete="off"
+            {...form.register("label")}
+          />
+        </FormField>
+
+        <label className="flex min-h-10 items-center gap-2 self-end text-sm font-medium text-foreground">
+          <input
+            className="size-4 rounded border-border text-primary focus:ring-primary"
+            disabled={route.isDefault}
+            type="checkbox"
+            {...form.register("isDefault")}
+          />
+          Default route
+        </label>
+      </div>
+
+      <FormField
+        error={getErrorMessage(form.formState.errors.notes)}
+        htmlFor={`${sourceGroupId}-${route.id}-edit-notes`}
+        label="Notes"
+      >
+        <Textarea
+          id={`${sourceGroupId}-${route.id}-edit-notes`}
+          {...form.register("notes")}
+        />
+      </FormField>
+
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button disabled={updateRoute.isPending} size="sm" type="submit">
+          <Save aria-hidden="true" className="size-4" />
+          {updateRoute.isPending ? "Saving" : "Save Route"}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -1031,6 +1541,20 @@ function getSourceGroupStatusTone(
   }
 
   return "neutral";
+}
+
+function getEntryRouteRiskTone(
+  riskLevel: SourceGroupEntryRouteRiskLevel,
+): StatusBadgeTone {
+  if (riskLevel === "LOW") {
+    return "success";
+  }
+
+  if (riskLevel === "MEDIUM") {
+    return "warning";
+  }
+
+  return "danger";
 }
 
 function formatCount(count: number, singularLabel: string): string {

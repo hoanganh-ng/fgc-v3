@@ -7,6 +7,18 @@ import {
 } from "@/lib/api/http-client";
 
 export const SourceGroupStatusSchema = z.enum(["ACTIVE", "PAUSED", "ARCHIVED"]);
+export const SourceGroupEntryRouteTypeSchema = z.enum([
+  "DIRECT_GROUP_URL",
+  "CATEGORY_ENTRY_URL",
+  "PUBLIC_PAGE_THEN_GROUP",
+  "OPERATOR_ASSISTED_SEARCH",
+  "SAVED_REFERRAL_URL",
+]);
+export const SourceGroupEntryRouteRiskLevelSchema = z.enum([
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+]);
 export const ContentStatusSchema = z.enum([
   "COLLECTED",
   "SELECTED",
@@ -16,6 +28,12 @@ export const ContentStatusSchema = z.enum([
 export const ContentPlatformSchema = z.enum(["FACEBOOK"]);
 
 export type SourceGroupStatus = z.infer<typeof SourceGroupStatusSchema>;
+export type SourceGroupEntryRouteType = z.infer<
+  typeof SourceGroupEntryRouteTypeSchema
+>;
+export type SourceGroupEntryRouteRiskLevel = z.infer<
+  typeof SourceGroupEntryRouteRiskLevelSchema
+>;
 export type ContentStatus = z.infer<typeof ContentStatusSchema>;
 export type ContentPlatform = z.infer<typeof ContentPlatformSchema>;
 
@@ -40,6 +58,20 @@ export const ContentCategorySchema = z
   })
   .strict();
 
+export const SourceGroupEntryRouteSchema = z
+  .object({
+    id: NonEmptyStringSchema,
+    type: SourceGroupEntryRouteTypeSchema,
+    url: NonEmptyStringSchema,
+    label: NonEmptyStringSchema.optional(),
+    notes: NonEmptyStringSchema.optional(),
+    riskLevel: SourceGroupEntryRouteRiskLevelSchema,
+    isDefault: z.boolean(),
+    createdAt: NonEmptyStringSchema,
+    updatedAt: NonEmptyStringSchema,
+  })
+  .strict();
+
 export const SourceGroupSchema = z
   .object({
     id: NonEmptyStringSchema,
@@ -51,6 +83,7 @@ export const SourceGroupSchema = z
     status: SourceGroupStatusSchema,
     collectionPriority: z.number().int().min(0).max(100),
     notes: NonEmptyStringSchema.optional(),
+    entryRoutes: z.array(SourceGroupEntryRouteSchema),
     createdAt: NonEmptyStringSchema,
     updatedAt: NonEmptyStringSchema,
   })
@@ -144,6 +177,34 @@ export const UpdateSourceGroupStatusResponseSchema = z
   })
   .strict();
 
+export const CreateSourceGroupEntryRouteRequestSchema = z
+  .object({
+    type: SourceGroupEntryRouteTypeSchema,
+    url: NonEmptyStringSchema,
+    label: NonEmptyStringSchema.optional(),
+    notes: NonEmptyStringSchema.optional(),
+    riskLevel: SourceGroupEntryRouteRiskLevelSchema,
+    isDefault: z.boolean().optional(),
+  })
+  .strict();
+
+export const UpdateSourceGroupEntryRouteRequestSchema = z
+  .object({
+    type: SourceGroupEntryRouteTypeSchema.optional(),
+    url: NonEmptyStringSchema.optional(),
+    label: NonEmptyStringSchema.nullable().optional(),
+    notes: NonEmptyStringSchema.nullable().optional(),
+    riskLevel: SourceGroupEntryRouteRiskLevelSchema.optional(),
+    isDefault: z.boolean().optional(),
+  })
+  .strict();
+
+export const SourceGroupResponseSchema = z
+  .object({
+    sourceGroup: SourceGroupSchema,
+  })
+  .strict();
+
 export const SourceGroupsListResponseSchema = z
   .object({
     items: z.array(SourceGroupSchema),
@@ -171,6 +232,9 @@ export const UpdateContentItemStatusRequestSchema = z
   .strict();
 
 export type ContentCategory = z.infer<typeof ContentCategorySchema>;
+export type SourceGroupEntryRoute = z.infer<
+  typeof SourceGroupEntryRouteSchema
+>;
 export type SourceGroup = z.infer<typeof SourceGroupSchema>;
 export type ContentItem = z.infer<typeof ContentItemSchema>;
 export type ContentCategoriesListResponse = z.infer<
@@ -194,6 +258,16 @@ export type UpdateSourceGroupStatusRequest = z.infer<
 export type UpdateSourceGroupStatusResponse = z.infer<
   typeof UpdateSourceGroupStatusResponseSchema
 >;
+export type CreateSourceGroupEntryRouteRequest = z.infer<
+  typeof CreateSourceGroupEntryRouteRequestSchema
+>;
+export type UpdateSourceGroupEntryRouteRequest = z.infer<
+  typeof UpdateSourceGroupEntryRouteRequestSchema
+>;
+export type SourceGroupResponse = z.infer<typeof SourceGroupResponseSchema>;
+export type CreateSourceGroupEntryRouteResponse = SourceGroupResponse;
+export type UpdateSourceGroupEntryRouteResponse = SourceGroupResponse;
+export type RemoveSourceGroupEntryRouteResponse = SourceGroupResponse;
 export type SourceGroupsListResponse = z.infer<
   typeof SourceGroupsListResponseSchema
 >;
@@ -237,6 +311,19 @@ export interface ContentManagerClient {
     sourceGroupId: string,
     status: SourceGroupStatus,
   ) => Promise<ApiResult<UpdateSourceGroupStatusResponse>>;
+  readonly createSourceGroupEntryRoute: (
+    sourceGroupId: string,
+    request: CreateSourceGroupEntryRouteRequest,
+  ) => Promise<ApiResult<CreateSourceGroupEntryRouteResponse>>;
+  readonly updateSourceGroupEntryRoute: (
+    sourceGroupId: string,
+    entryRouteId: string,
+    request: UpdateSourceGroupEntryRouteRequest,
+  ) => Promise<ApiResult<UpdateSourceGroupEntryRouteResponse>>;
+  readonly removeSourceGroupEntryRoute: (
+    sourceGroupId: string,
+    entryRouteId: string,
+  ) => Promise<ApiResult<RemoveSourceGroupEntryRouteResponse>>;
   readonly listContentItems: (
     query?: ListContentItemsQuery,
   ) => Promise<ApiResult<ContentItemsListResponse>>;
@@ -288,6 +375,29 @@ export function createContentManagerClient(
         method: "PATCH",
         body: { status } satisfies UpdateSourceGroupStatusRequest,
         responseSchema: UpdateSourceGroupStatusResponseSchema,
+      });
+    },
+    createSourceGroupEntryRoute(sourceGroupId, request) {
+      return httpClient.request({
+        path: `/collector/source-groups/${encodeURIComponent(sourceGroupId)}/entry-routes`,
+        method: "POST",
+        body: request,
+        responseSchema: SourceGroupResponseSchema,
+      });
+    },
+    updateSourceGroupEntryRoute(sourceGroupId, entryRouteId, request) {
+      return httpClient.request({
+        path: `/collector/source-groups/${encodeURIComponent(sourceGroupId)}/entry-routes/${encodeURIComponent(entryRouteId)}`,
+        method: "PATCH",
+        body: request,
+        responseSchema: SourceGroupResponseSchema,
+      });
+    },
+    removeSourceGroupEntryRoute(sourceGroupId, entryRouteId) {
+      return httpClient.request({
+        path: `/collector/source-groups/${encodeURIComponent(sourceGroupId)}/entry-routes/${encodeURIComponent(entryRouteId)}`,
+        method: "DELETE",
+        responseSchema: SourceGroupResponseSchema,
       });
     },
     listContentItems(query) {

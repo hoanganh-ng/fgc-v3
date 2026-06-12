@@ -1,4 +1,5 @@
 import type {
+  AddSourceGroupEntryRouteInput,
   CreateContentCategoryInput,
   CreateSourceGroupInput,
   GetContentItemInput,
@@ -7,7 +8,9 @@ import type {
   ListContentItemsOutput,
   ListSourceGroupsInput,
   ListSourceGroupsOutput,
+  RemoveSourceGroupEntryRouteInput,
   UpdateContentStatusInput,
+  UpdateSourceGroupEntryRouteInput,
   UpdateSourceGroupStatusInput,
 } from "../../../content-manager/application";
 import type {
@@ -19,6 +22,7 @@ import type {
   SourceGroupStatus,
   TopComment,
 } from "../../../content-manager/domain";
+import { createDefaultSourceGroupEntryRoute } from "../../../content-manager/domain";
 import type { ContentManagerHttpService } from "../routes/content-manager.routes";
 
 export const contentManagerHttpTestNow = "2026-02-01T10:00:00.000Z";
@@ -87,6 +91,18 @@ export interface FakeContentManagerHttpService
     SourceGroup
   >;
   readonly getSourceGroup: StubUseCase<GetSourceGroupInput, SourceGroup>;
+  readonly addSourceGroupEntryRoute: StubUseCase<
+    AddSourceGroupEntryRouteInput,
+    SourceGroup
+  >;
+  readonly updateSourceGroupEntryRoute: StubUseCase<
+    UpdateSourceGroupEntryRouteInput,
+    SourceGroup
+  >;
+  readonly removeSourceGroupEntryRoute: StubUseCase<
+    RemoveSourceGroupEntryRouteInput,
+    SourceGroup
+  >;
   readonly updateSourceGroupStatus: StubUseCase<
     UpdateSourceGroupStatusInput,
     SourceGroup
@@ -120,6 +136,25 @@ export function createFakeContentManagerHttpService(): FakeContentManagerHttpSer
     listContentCategories: new StubNoInputUseCase([category]),
     createSourceGroup: new StubUseCase(sourceGroup),
     getSourceGroup: new StubUseCase(sourceGroup),
+    addSourceGroupEntryRoute: new StubUseCase(
+      createSourceGroup({
+        entryRoutes: [
+          ...sourceGroup.entryRoutes,
+          {
+            id: "entry-route-2",
+            type: "CATEGORY_ENTRY_URL",
+            url: "https://facebook.test/groups/category-entry",
+            label: "Category entry",
+            riskLevel: "LOW",
+            isDefault: false,
+            createdAt: contentManagerHttpTestNow,
+            updatedAt: contentManagerHttpTestNow,
+          },
+        ],
+      }),
+    ),
+    updateSourceGroupEntryRoute: new StubUseCase(sourceGroup),
+    removeSourceGroupEntryRoute: new StubUseCase(sourceGroup),
     updateSourceGroupStatus: new StubUseCase(
       createSourceGroup({ status: "PAUSED" }),
     ),
@@ -165,7 +200,7 @@ export function createContentCategory(
 export function createSourceGroup(
   options: Partial<SourceGroup> = {},
 ): SourceGroup {
-  return {
+  const base = {
     id: options.id ?? "source-group-1",
     platform: options.platform ?? "FACEBOOK",
     externalGroupId: options.externalGroupId ?? "fb-group-1",
@@ -177,6 +212,13 @@ export function createSourceGroup(
     ...(options.notes !== undefined ? { notes: options.notes } : {}),
     createdAt: options.createdAt ?? contentManagerHttpTestNow,
     updatedAt: options.updatedAt ?? contentManagerHttpTestNow,
+  } satisfies Omit<SourceGroup, "entryRoutes">;
+
+  return {
+    ...base,
+    entryRoutes:
+      options.entryRoutes ?? [createDefaultSourceGroupEntryRoute(base)],
+    ...options,
   };
 }
 

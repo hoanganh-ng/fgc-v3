@@ -1,0 +1,1 @@
+ALTER TABLE "source_groups" ADD COLUMN "entry_routes" jsonb DEFAULT '[]'::jsonb NOT NULL;

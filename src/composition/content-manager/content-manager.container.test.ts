@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AddSourceGroupEntryRouteUseCase,
   CreateContentCategoryUseCase,
   CreateSourceGroupUseCase,
   GetContentItemUseCase,
@@ -8,7 +9,9 @@ import {
   ListContentCategoriesUseCase,
   ListContentItemsUseCase,
   ListSourceGroupsUseCase,
+  RemoveSourceGroupEntryRouteUseCase,
   UpdateContentStatusUseCase,
+  UpdateSourceGroupEntryRouteUseCase,
   UpdateSourceGroupStatusUseCase,
 } from "../../content-manager/application";
 import type { Clock, IdGenerator } from "../../content-manager/application";
@@ -69,6 +72,9 @@ function expectContentManagerServices(services: {
   readonly listContentCategories: unknown;
   readonly createSourceGroup: unknown;
   readonly getSourceGroup: unknown;
+  readonly addSourceGroupEntryRoute: unknown;
+  readonly updateSourceGroupEntryRoute: unknown;
+  readonly removeSourceGroupEntryRoute: unknown;
   readonly updateSourceGroupStatus: unknown;
   readonly listSourceGroups: unknown;
   readonly ingestCollectedContent: unknown;
@@ -84,6 +90,15 @@ function expectContentManagerServices(services: {
   );
   expect(services.createSourceGroup).toBeInstanceOf(CreateSourceGroupUseCase);
   expect(services.getSourceGroup).toBeInstanceOf(GetSourceGroupUseCase);
+  expect(services.addSourceGroupEntryRoute).toBeInstanceOf(
+    AddSourceGroupEntryRouteUseCase,
+  );
+  expect(services.updateSourceGroupEntryRoute).toBeInstanceOf(
+    UpdateSourceGroupEntryRouteUseCase,
+  );
+  expect(services.removeSourceGroupEntryRoute).toBeInstanceOf(
+    RemoveSourceGroupEntryRouteUseCase,
+  );
   expect(services.updateSourceGroupStatus).toBeInstanceOf(
     UpdateSourceGroupStatusUseCase,
   );

@@ -1,4 +1,5 @@
 import {
+  AddSourceGroupEntryRouteUseCase,
   CreateContentCategoryUseCase,
   CreateSourceGroupUseCase,
   GetContentItemUseCase,
@@ -7,7 +8,9 @@ import {
   ListContentCategoriesUseCase,
   ListContentItemsUseCase,
   ListSourceGroupsUseCase,
+  RemoveSourceGroupEntryRouteUseCase,
   UpdateContentStatusUseCase,
+  UpdateSourceGroupEntryRouteUseCase,
   UpdateSourceGroupStatusUseCase,
 } from "../../content-manager/application";
 import type {
@@ -32,6 +35,9 @@ export interface ContentManagerContainer {
   readonly listContentCategories: ListContentCategoriesUseCase;
   readonly createSourceGroup: CreateSourceGroupUseCase;
   readonly getSourceGroup: GetSourceGroupUseCase;
+  readonly addSourceGroupEntryRoute: AddSourceGroupEntryRouteUseCase;
+  readonly updateSourceGroupEntryRoute: UpdateSourceGroupEntryRouteUseCase;
+  readonly removeSourceGroupEntryRoute: RemoveSourceGroupEntryRouteUseCase;
   readonly updateSourceGroupStatus: UpdateSourceGroupStatusUseCase;
   readonly listSourceGroups: ListSourceGroupsUseCase;
   readonly ingestCollectedContent: IngestCollectedContentUseCase;
@@ -66,6 +72,19 @@ export function createContentManager(
       clock,
     ),
     getSourceGroup: new GetSourceGroupUseCase(sourceGroups),
+    addSourceGroupEntryRoute: new AddSourceGroupEntryRouteUseCase(
+      sourceGroups,
+      idGenerator,
+      clock,
+    ),
+    updateSourceGroupEntryRoute: new UpdateSourceGroupEntryRouteUseCase(
+      sourceGroups,
+      clock,
+    ),
+    removeSourceGroupEntryRoute: new RemoveSourceGroupEntryRouteUseCase(
+      sourceGroups,
+      clock,
+    ),
     updateSourceGroupStatus: new UpdateSourceGroupStatusUseCase(
       sourceGroups,
       clock,

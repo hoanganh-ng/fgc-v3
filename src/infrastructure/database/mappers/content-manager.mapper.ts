@@ -97,6 +97,7 @@ export function toSourceGroupRow(
     status: validSourceGroup.status,
     collectionPriority: validSourceGroup.collectionPriority,
     notes: validSourceGroup.notes ?? null,
+    entryRoutes: validSourceGroup.entryRoutes.map((route) => ({ ...route })),
     createdAt: validSourceGroup.createdAt,
     updatedAt: validSourceGroup.updatedAt,
   };
@@ -113,6 +114,7 @@ export function toSourceGroupDomain(row: SourceGroupRow): SourceGroup {
     status: row.status,
     collectionPriority: row.collectionPriority,
     ...optional("notes", row.notes),
+    entryRoutes: row.entryRoutes ?? [],
     createdAt: normalizeIsoDateTime(row.createdAt),
     updatedAt: normalizeIsoDateTime(row.updatedAt),
   };

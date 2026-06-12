@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { CONTENT_PLATFORMS } from "./content-platform";
 import { CONTENT_STATUSES } from "./content-status";
+import {
+  SOURCE_GROUP_ENTRY_ROUTE_RISK_LEVELS,
+  SOURCE_GROUP_ENTRY_ROUTE_TYPES,
+} from "./source-group-entry-route";
 import { SOURCE_GROUP_STATUSES } from "./source-group-status";
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -17,11 +21,18 @@ export const IsoDateTimeSchema = z.iso.datetime({ offset: true });
 export const ContentIdSchema = NonEmptyStringSchema;
 export const ContentCategoryIdSchema = NonEmptyStringSchema;
 export const SourceGroupIdSchema = NonEmptyStringSchema;
+export const SourceGroupEntryRouteIdSchema = NonEmptyStringSchema;
 export const ExternalGroupIdSchema = NonEmptyStringSchema;
 export const ExternalPostIdSchema = NonEmptyStringSchema;
 export const ExternalCommentIdSchema = NonEmptyStringSchema;
 export const ContentPlatformSchema = z.enum(CONTENT_PLATFORMS);
 export const SourceGroupStatusSchema = z.enum(SOURCE_GROUP_STATUSES);
+export const SourceGroupEntryRouteTypeSchema = z.enum(
+  SOURCE_GROUP_ENTRY_ROUTE_TYPES,
+);
+export const SourceGroupEntryRouteRiskLevelSchema = z.enum(
+  SOURCE_GROUP_ENTRY_ROUTE_RISK_LEVELS,
+);
 export const ContentStatusSchema = z.enum(CONTENT_STATUSES);
 export const ContentCategorySlugSchema = z
   .string()
@@ -38,6 +49,20 @@ export const ContentCategorySchema = z
   })
   .strict();
 
+export const SourceGroupEntryRouteSchema = z
+  .object({
+    id: SourceGroupEntryRouteIdSchema,
+    type: SourceGroupEntryRouteTypeSchema,
+    url: z.url(),
+    label: NonEmptyStringSchema.optional(),
+    notes: NonEmptyStringSchema.optional(),
+    riskLevel: SourceGroupEntryRouteRiskLevelSchema,
+    isDefault: z.boolean(),
+    createdAt: IsoDateTimeSchema,
+    updatedAt: IsoDateTimeSchema,
+  })
+  .strict();
+
 export const SourceGroupSchema = z
   .object({
     id: SourceGroupIdSchema,
@@ -49,10 +74,38 @@ export const SourceGroupSchema = z
     status: SourceGroupStatusSchema,
     collectionPriority: z.number().int().min(0).max(100),
     notes: NonEmptyStringSchema.optional(),
+    entryRoutes: z.array(SourceGroupEntryRouteSchema),
     createdAt: IsoDateTimeSchema,
     updatedAt: IsoDateTimeSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((sourceGroup, context) => {
+    const defaultRoutes = sourceGroup.entryRoutes.filter(
+      (route) => route.isDefault,
+    );
+
+    if (defaultRoutes.length > 1) {
+      context.addIssue({
+        code: "custom",
+        path: ["entryRoutes"],
+        message: "At most one source group entry route can be default.",
+      });
+    }
+
+    const routeIds = new Set<string>();
+
+    for (const [index, route] of sourceGroup.entryRoutes.entries()) {
+      if (routeIds.has(route.id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["entryRoutes", index, "id"],
+          message: "Source group entry route ids must be unique.",
+        });
+      }
+
+      routeIds.add(route.id);
+    }
+  });
 
 export const TopCommentSchema = z
   .object({

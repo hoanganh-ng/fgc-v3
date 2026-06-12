@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type {
+  AddSourceGroupEntryRouteInput,
   CreateContentCategoryInput,
   CreateSourceGroupInput,
   GetContentItemInput,
@@ -8,7 +9,9 @@ import type {
   ListContentItemsOutput,
   ListSourceGroupsInput,
   ListSourceGroupsOutput,
+  RemoveSourceGroupEntryRouteInput,
   UpdateContentStatusInput,
+  UpdateSourceGroupEntryRouteInput,
   UpdateSourceGroupStatusInput,
 } from "../../../content-manager/application";
 import type {
@@ -20,21 +23,29 @@ import type {
   ContentStatus,
   IsoDateTime,
   SourceGroup,
+  SourceGroupEntryRoute,
+  SourceGroupEntryRouteRiskLevel,
+  SourceGroupEntryRouteType,
   SourceGroupId,
   SourceGroupStatus,
   TopComment,
 } from "../../../content-manager/domain";
+import { resolveSourceGroupEntryRoutes } from "../../../content-manager/domain";
 import {
   ContentItemIdHttpParamsSchema,
   CreateContentCategoryHttpBodySchema,
+  CreateSourceGroupEntryRouteHttpBodySchema,
   CreateSourceGroupHttpBodySchema,
   IngestCollectedContentHttpBodySchema,
   ListContentItemsHttpQuerySchema,
   ListSourceGroupsHttpQuerySchema,
+  SourceGroupEntryRouteIdHttpParamsSchema,
   SourceGroupIdHttpParamsSchema,
   UpdateContentStatusHttpBodySchema,
+  UpdateSourceGroupEntryRouteHttpBodySchema,
   UpdateSourceGroupStatusHttpBodySchema,
   createContentCategoryHttpRouteSchema,
+  createSourceGroupEntryRouteHttpRouteSchema,
   createSourceGroupHttpRouteSchema,
   getContentItemHttpRouteSchema,
   getSourceGroupHttpRouteSchema,
@@ -43,7 +54,9 @@ import {
   listContentItemsHttpRouteSchema,
   listSourceGroupsHttpRouteSchema,
   parseHttpInput,
+  removeSourceGroupEntryRouteHttpRouteSchema,
   updateContentStatusHttpRouteSchema,
+  updateSourceGroupEntryRouteHttpRouteSchema,
   updateSourceGroupStatusHttpRouteSchema,
 } from "../schemas/content-manager.http-schemas";
 
@@ -68,6 +81,18 @@ export interface ContentManagerHttpService {
     SourceGroup
   >;
   readonly getSourceGroup: ExecutableUseCase<GetSourceGroupInput, SourceGroup>;
+  readonly addSourceGroupEntryRoute: ExecutableUseCase<
+    AddSourceGroupEntryRouteInput,
+    SourceGroup
+  >;
+  readonly updateSourceGroupEntryRoute: ExecutableUseCase<
+    UpdateSourceGroupEntryRouteInput,
+    SourceGroup
+  >;
+  readonly removeSourceGroupEntryRoute: ExecutableUseCase<
+    RemoveSourceGroupEntryRouteInput,
+    SourceGroup
+  >;
   readonly updateSourceGroupStatus: ExecutableUseCase<
     UpdateSourceGroupStatusInput,
     SourceGroup
@@ -114,6 +139,19 @@ export interface SourceGroupDto {
   readonly status: SourceGroupStatus;
   readonly collectionPriority: number;
   readonly notes?: string;
+  readonly entryRoutes: readonly SourceGroupEntryRouteDto[];
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+}
+
+export interface SourceGroupEntryRouteDto {
+  readonly id: string;
+  readonly type: SourceGroupEntryRouteType;
+  readonly url: string;
+  readonly label?: string;
+  readonly notes?: string;
+  readonly riskLevel: SourceGroupEntryRouteRiskLevel;
+  readonly isDefault: boolean;
   readonly createdAt: IsoDateTime;
   readonly updatedAt: IsoDateTime;
 }
@@ -263,6 +301,89 @@ export function registerContentManagerRoutes(
     },
   );
 
+  server.post(
+    "/collector/source-groups/:sourceGroupId/entry-routes",
+    { schema: createSourceGroupEntryRouteHttpRouteSchema },
+    async (request, reply) => {
+      const params = parseHttpInput(
+        SourceGroupIdHttpParamsSchema,
+        request.params,
+      );
+      const body = parseHttpInput(
+        CreateSourceGroupEntryRouteHttpBodySchema,
+        request.body,
+      );
+      const sourceGroup =
+        await contentManager.addSourceGroupEntryRoute.execute({
+          sourceGroupId: params.sourceGroupId,
+          type: body.type,
+          url: body.url,
+          ...(body.label !== undefined ? { label: body.label } : {}),
+          ...(body.notes !== undefined ? { notes: body.notes } : {}),
+          riskLevel: body.riskLevel,
+          ...(body.isDefault !== undefined
+            ? { isDefault: body.isDefault }
+            : {}),
+        });
+
+      return reply.code(201).send({
+        sourceGroup: toSourceGroupDto(sourceGroup),
+      });
+    },
+  );
+
+  server.patch(
+    "/collector/source-groups/:sourceGroupId/entry-routes/:entryRouteId",
+    { schema: updateSourceGroupEntryRouteHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        SourceGroupEntryRouteIdHttpParamsSchema,
+        request.params,
+      );
+      const body = parseHttpInput(
+        UpdateSourceGroupEntryRouteHttpBodySchema,
+        request.body,
+      );
+      const sourceGroup =
+        await contentManager.updateSourceGroupEntryRoute.execute({
+          sourceGroupId: params.sourceGroupId,
+          entryRouteId: params.entryRouteId,
+          ...(body.type !== undefined ? { type: body.type } : {}),
+          ...(body.url !== undefined ? { url: body.url } : {}),
+          ...(body.label !== undefined ? { label: body.label } : {}),
+          ...(body.notes !== undefined ? { notes: body.notes } : {}),
+          ...(body.riskLevel !== undefined ? { riskLevel: body.riskLevel } : {}),
+          ...(body.isDefault !== undefined
+            ? { isDefault: body.isDefault }
+            : {}),
+        });
+
+      return {
+        sourceGroup: toSourceGroupDto(sourceGroup),
+      };
+    },
+  );
+
+  server.delete(
+    "/collector/source-groups/:sourceGroupId/entry-routes/:entryRouteId",
+    { schema: removeSourceGroupEntryRouteHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        SourceGroupEntryRouteIdHttpParamsSchema,
+        request.params,
+      );
+      const sourceGroup =
+        await contentManager.removeSourceGroupEntryRoute.execute({
+          sourceGroupId: params.sourceGroupId,
+          entryRouteId: params.entryRouteId,
+        });
+
+      return {
+        sourceGroup: toSourceGroupDto(sourceGroup),
+      };
+    },
+  );
+
   server.patch(
     "/collector/source-groups/:sourceGroupId/status",
     { schema: updateSourceGroupStatusHttpRouteSchema },
@@ -397,8 +518,27 @@ export function toSourceGroupDto(sourceGroup: SourceGroup): SourceGroupDto {
     status: sourceGroup.status,
     collectionPriority: sourceGroup.collectionPriority,
     ...(sourceGroup.notes !== undefined ? { notes: sourceGroup.notes } : {}),
+    entryRoutes: resolveSourceGroupEntryRoutes(sourceGroup).map(
+      toSourceGroupEntryRouteDto,
+    ),
     createdAt: sourceGroup.createdAt,
     updatedAt: sourceGroup.updatedAt,
+  };
+}
+
+function toSourceGroupEntryRouteDto(
+  route: SourceGroupEntryRoute,
+): SourceGroupEntryRouteDto {
+  return {
+    id: route.id,
+    type: route.type,
+    url: route.url,
+    ...(route.label !== undefined ? { label: route.label } : {}),
+    ...(route.notes !== undefined ? { notes: route.notes } : {}),
+    riskLevel: route.riskLevel,
+    isDefault: route.isDefault,
+    createdAt: route.createdAt,
+    updatedAt: route.updatedAt,
   };
 }
 

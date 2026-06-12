@@ -165,6 +165,95 @@ if (!shouldRunHttpDbTests) {
           id: sourceGroupId,
           externalGroupId,
           status: "ACTIVE",
+          entryRoutes: [
+            {
+              id: "direct-group-url",
+              type: "DIRECT_GROUP_URL",
+              riskLevel: "MEDIUM",
+              isDefault: true,
+            },
+          ],
+        },
+      });
+
+      const addEntryRouteResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/source-groups/${sourceGroupId}/entry-routes`,
+        payload: {
+          type: "CATEGORY_ENTRY_URL",
+          url: "https://facebook.test/groups/category-entry",
+          label: "Category entry",
+          riskLevel: "LOW",
+        },
+      });
+      const addEntryRouteBody = addEntryRouteResponse.json() as {
+        readonly sourceGroup: {
+          readonly entryRoutes: readonly {
+            readonly id: string;
+            readonly type: string;
+            readonly label?: string;
+            readonly riskLevel: string;
+            readonly isDefault: boolean;
+          }[];
+        };
+      };
+      const categoryEntryRoute = addEntryRouteBody.sourceGroup.entryRoutes.find(
+        (route) => route.type === "CATEGORY_ENTRY_URL",
+      );
+
+      expect(addEntryRouteResponse.statusCode).toBe(201);
+      expect(categoryEntryRoute).toMatchObject({
+        type: "CATEGORY_ENTRY_URL",
+        label: "Category entry",
+        riskLevel: "LOW",
+        isDefault: false,
+      });
+
+      if (categoryEntryRoute === undefined) {
+        throw new Error("Expected category entry route to be returned.");
+      }
+
+      const updateEntryRouteResponse = await getServer().inject({
+        method: "PATCH",
+        url: `/collector/source-groups/${sourceGroupId}/entry-routes/${categoryEntryRoute.id}`,
+        payload: {
+          label: "Updated category entry",
+          riskLevel: "MEDIUM",
+        },
+      });
+
+      expect(updateEntryRouteResponse.statusCode).toBe(200);
+      expect(updateEntryRouteResponse.json()).toMatchObject({
+        sourceGroup: {
+          entryRoutes: [
+            {
+              id: "direct-group-url",
+              isDefault: true,
+            },
+            {
+              id: categoryEntryRoute.id,
+              label: "Updated category entry",
+              riskLevel: "MEDIUM",
+            },
+          ],
+        },
+      });
+
+      const deleteEntryRouteResponse = await getServer().inject({
+        method: "DELETE",
+        url: `/collector/source-groups/${sourceGroupId}/entry-routes/${categoryEntryRoute.id}`,
+      });
+
+      expect(deleteEntryRouteResponse.statusCode).toBe(200);
+      expect(deleteEntryRouteResponse.json()).toMatchObject({
+        sourceGroup: {
+          entryRoutes: [
+            {
+              id: "direct-group-url",
+              type: "DIRECT_GROUP_URL",
+              isDefault: true,
+            },
+          ],
         },
       });
 

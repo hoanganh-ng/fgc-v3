@@ -8,6 +8,7 @@ import type { Clock } from "../ports/clock.port";
 import type { ContentCategoryRepository } from "../ports/content-category-repository.port";
 import type { IdGenerator } from "../ports/id-generator.port";
 import type { SourceGroupRepository } from "../ports/source-group-repository.port";
+import { createDefaultSourceGroupEntryRoute } from "../../domain";
 import type {
   ContentCategoryId,
   ContentPlatform,
@@ -47,6 +48,13 @@ export class CreateSourceGroupUseCase {
       status: input.status ?? "ACTIVE",
       collectionPriority: input.collectionPriority,
       ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      entryRoutes: [
+        createDefaultSourceGroupEntryRoute({
+          url: input.url,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      ],
       createdAt: now,
       updatedAt: now,
     });

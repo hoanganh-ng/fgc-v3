@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   InvalidContentStatusTransitionError,
+  createDefaultSourceGroupEntryRoute,
   mergeCollectedContent,
   normalizeTopComments,
   transitionContentStatus,
@@ -15,6 +16,7 @@ import type {
   ContentItem,
   ContentStatus,
   SourceGroup,
+  SourceGroupEntryRoute,
   TopComment,
   ValidationResult,
 } from "./index";
@@ -50,6 +52,12 @@ describe("source group validation", () => {
     expect(result.valid).toBe(true);
   });
 
+  it("passes source groups with no explicit entry routes", () => {
+    const result = validateSourceGroup(createSourceGroup({ entryRoutes: [] }));
+
+    expect(result.valid).toBe(true);
+  });
+
   it("fails when status is invalid", () => {
     const result = validateSourceGroup({
       ...createSourceGroup(),
@@ -66,6 +74,57 @@ describe("source group validation", () => {
     });
 
     expectValidationIssue(result, "collectionPriority");
+  });
+
+  it("fails when an entry route type is invalid", () => {
+    const result = validateSourceGroup(
+      createSourceGroup({
+        entryRoutes: [
+          createSourceGroupEntryRoute({
+            type: "UNKNOWN" as SourceGroupEntryRoute["type"],
+          }),
+        ],
+      }),
+    );
+
+    expectValidationIssue(result, "entryRoutes.0.type");
+  });
+
+  it("fails when an entry route URL is invalid", () => {
+    const result = validateSourceGroup(
+      createSourceGroup({
+        entryRoutes: [createSourceGroupEntryRoute({ url: "not-a-url" })],
+      }),
+    );
+
+    expectValidationIssue(result, "entryRoutes.0.url");
+  });
+
+  it("fails when an entry route risk level is invalid", () => {
+    const result = validateSourceGroup(
+      createSourceGroup({
+        entryRoutes: [
+          createSourceGroupEntryRoute({
+            riskLevel: "UNKNOWN" as SourceGroupEntryRoute["riskLevel"],
+          }),
+        ],
+      }),
+    );
+
+    expectValidationIssue(result, "entryRoutes.0.riskLevel");
+  });
+
+  it("fails when more than one entry route is default", () => {
+    const result = validateSourceGroup(
+      createSourceGroup({
+        entryRoutes: [
+          createSourceGroupEntryRoute({ id: "route-1", isDefault: true }),
+          createSourceGroupEntryRoute({ id: "route-2", isDefault: true }),
+        ],
+      }),
+    );
+
+    expectValidationIssue(result, "entryRoutes");
   });
 });
 
@@ -276,16 +335,37 @@ function createContentCategory(
 }
 
 function createSourceGroup(overrides: Partial<SourceGroup> = {}): SourceGroup {
-  return {
+  const base = {
     id: "source-group-1",
     platform: "FACEBOOK",
     externalGroupId: "facebook-group-1",
     name: "Knowledge Group 1",
-    url: "https://www.facebook.com/groups/group-1",
+    url: overrides.url ?? "https://www.facebook.com/groups/group-1",
     categoryId: "category-1",
     status: "ACTIVE",
     collectionPriority: 80,
     notes: "High-signal group.",
+    createdAt: overrides.createdAt ?? createdAt,
+    updatedAt: overrides.updatedAt ?? updatedAt,
+  } satisfies Omit<SourceGroup, "entryRoutes">;
+
+  return {
+    ...base,
+    entryRoutes:
+      overrides.entryRoutes ?? [createDefaultSourceGroupEntryRoute(base)],
+    ...overrides,
+  };
+}
+
+function createSourceGroupEntryRoute(
+  overrides: Partial<SourceGroupEntryRoute> = {},
+): SourceGroupEntryRoute {
+  return {
+    id: "direct-group-url",
+    type: "DIRECT_GROUP_URL",
+    url: "https://www.facebook.com/groups/group-1",
+    riskLevel: "MEDIUM",
+    isDefault: true,
     createdAt,
     updatedAt,
     ...overrides,

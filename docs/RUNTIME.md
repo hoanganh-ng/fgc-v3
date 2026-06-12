@@ -320,6 +320,8 @@ If `--browser-provider` is omitted, the command uses `BROWSER_PROVIDER`, then `p
 
 `--group-url` is only a development override. When it is provided, the CLI still requires `--source-group-id`, resolves and validates the stored source group first, then prints a warning before opening the override URL instead of the stored source URL.
 
+Sprint 040 adds source group entry route metadata to Content Manager source group reads. The current manual collector command still validates and opens the source group `url`; it does not choose from `entryRoutes`. Entry routes are for future access onboarding and exercise flows only. They do not grant access, imply profile eligibility, join groups, run search behavior, or change profile account stage.
+
 Optional checkout diagnostics:
 
 ```bash
