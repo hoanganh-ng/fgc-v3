@@ -15,6 +15,13 @@
       "when": 1780894958583,
       "tag": "0001_colossal_jack_murdock",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781177372223,
+      "tag": "0002_nice_zombie",
+      "breakpoints": true
     }
   ]
 }

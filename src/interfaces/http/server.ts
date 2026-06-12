@@ -6,6 +6,10 @@ import {
   type CollectorProfileManagerHttpService,
 } from "./routes/collector-profile-manager.routes";
 import {
+  registerCollectorRuntimeRoutes,
+  type CollectorRuntimeHttpService,
+} from "./routes/collector-runtime.routes";
+import {
   registerContentManagerRoutes,
   type ContentManagerHttpService,
 } from "./routes/content-manager.routes";
@@ -13,6 +17,7 @@ import { registerHealthRoutes } from "./routes/health.routes";
 
 export interface CreateHttpServerOptions {
   readonly collectorProfileManager: CollectorProfileManagerHttpService;
+  readonly collectorRuntime: CollectorRuntimeHttpService;
   readonly contentManager: ContentManagerHttpService;
   readonly logger?: FastifyServerOptions["logger"];
 }
@@ -38,6 +43,9 @@ export function createHttpServer(
   registerHealthRoutes(server);
   registerCollectorProfileManagerRoutes(server, {
     collectorProfileManager: options.collectorProfileManager,
+  });
+  registerCollectorRuntimeRoutes(server, {
+    collectorRuntime: options.collectorRuntime,
   });
   registerContentManagerRoutes(server, {
     contentManager: options.contentManager,

@@ -1,4 +1,5 @@
 import { createCollectorProfileManagerFromEnv } from "./composition/collector-profile-manager";
+import { createCollectorRuntimeFromEnv } from "./composition/collector-runtime";
 import { createContentManagerFromEnv } from "./composition/content-manager";
 import { createHttpServer } from "./interfaces/http";
 
@@ -27,9 +28,11 @@ function loadHttpRuntimeConfig(
 async function main(): Promise<void> {
   const config = loadHttpRuntimeConfig();
   const collectorProfileManager = createCollectorProfileManagerFromEnv();
+  const collectorRuntime = createCollectorRuntimeFromEnv();
   const contentManager = createContentManagerFromEnv();
   const server = createHttpServer({
     collectorProfileManager,
+    collectorRuntime,
     contentManager,
   });
   let shutdownStarted = false;
@@ -42,6 +45,7 @@ async function main(): Promise<void> {
     shutdownStarted = true;
     await server.close();
     await collectorProfileManager.close();
+    await collectorRuntime.close();
     await contentManager.close();
   }
 

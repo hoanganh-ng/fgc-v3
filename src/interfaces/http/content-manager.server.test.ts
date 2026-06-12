@@ -11,6 +11,9 @@ import {
   createUnusedCollectorProfileManagerHttpService,
 } from "./test-support/collector-profile-manager-http-service";
 import {
+  createUnusedCollectorRuntimeHttpService,
+} from "./test-support/collector-runtime-http-service";
+import {
   createCollectedContentInput,
   createContentCategory,
   createContentItem,
@@ -627,6 +630,7 @@ function createTestServer(): {
   return {
     server: createHttpServer({
       collectorProfileManager: createUnusedCollectorProfileManagerHttpService(),
+      collectorRuntime: createUnusedCollectorRuntimeHttpService(),
       contentManager: service,
     }),
     service,

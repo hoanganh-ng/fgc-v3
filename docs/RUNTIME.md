@@ -197,12 +197,59 @@ The safe summary prints counts only:
 - Warning count.
 - Duration in milliseconds.
 
+## Collection Run API Trigger
+
+Sprint 036 adds durable collection run records and an API trigger that queues a run request without executing browser collection inside the HTTP request.
+
+Request a queued run through the preview gateway:
+
+```bash
+curl -X POST http://localhost:8081/collector/collection-runs \
+  -H 'content-type: application/json' \
+  -d '{"sourceGroupId":"<source-group-id>","maxScrolls":8,"maxDurationMs":60000}'
+```
+
+Use the preview gateway (`http://localhost:8081`) when running against the preview stack.
+
+Request a queued run through the direct local API:
+
+```bash
+curl -X POST http://localhost:3000/collector/collection-runs \
+  -H 'content-type: application/json' \
+  -d '{"sourceGroupId":"<source-group-id>"}'
+```
+
+Use the direct API URL (`http://localhost:3000`) only when you are running the API directly or intentionally bypassing the preview gateway.
+
+The request endpoint validates that the source group exists, is `ACTIVE`, and uses platform `FACEBOOK`. A successful request returns `201` with a safe collection run DTO whose status is `QUEUED` and trigger type is `MANUAL_API`.
+
+Read queued and historical run records:
+
+```bash
+curl http://localhost:8081/collector/collection-runs
+curl http://localhost:8081/collector/collection-runs/<collection-run-id>
+```
+
+Cancel a queued run:
+
+```bash
+curl -X POST http://localhost:8081/collector/collection-runs/<collection-run-id>/cancel
+```
+
+Current API trigger limitations:
+
+- It creates durable run records only.
+- It does not launch Playwright.
+- It does not check out a profile.
+- It does not execute browser collection.
+- A future worker will claim and execute queued runs.
+
 Current limitations:
 
 - One profile.
 - One Facebook group URL.
 - One browser session.
-- No scheduler, queue, `collection_runs` table, multi-group run, multi-profile run, Web UI trigger, source group selection UI, or automatic group discovery.
+- No scheduler, worker process, automatic queued-run execution, multi-group run, multi-profile run, Web UI trigger, source group selection UI, or automatic group discovery.
 - Zero page-context and network captures can happen if Facebook does not return matching JSON responses during the stop window, the group is inaccessible, the profile is redirected to login or checkpoint, the page has not loaded enough feed content, or Facebook changes response shapes.
 - Non-zero captures with zero extracted candidates means the collector saw JSON payloads, but the current extractor did not find supported post candidates in those payloads.
 - A profile shown as `READY` is not always checkout-eligible. Checkout can still be blocked by temporal routine windows, cooldowns, daily safety thresholds, or an existing lease/BUSY state.

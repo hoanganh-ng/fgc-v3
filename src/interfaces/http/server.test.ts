@@ -48,6 +48,9 @@ import type {
 import {
   createFakeContentManagerHttpService,
 } from "./test-support/content-manager-http-service";
+import {
+  createUnusedCollectorRuntimeHttpService,
+} from "./test-support/collector-runtime-http-service";
 
 const now = "2026-01-05T18:00:00.000Z";
 
@@ -757,6 +760,7 @@ function createTestServer(): {
   return {
     server: createHttpServer({
       collectorProfileManager: service,
+      collectorRuntime: createUnusedCollectorRuntimeHttpService(),
       contentManager: createFakeContentManagerHttpService(),
     }),
     service,

@@ -4,6 +4,9 @@ import type {
   CollectedContentTopCommentSubmissionInput,
   ContentManagerContentSubmissionPort,
   ContentSubmissionResult,
+  SourceGroupLookupPort,
+  SourceGroupLookupResult,
+  SourceGroupLookupSourceGroup,
 } from "../application";
 
 const CONTENT_ITEMS_PATH = "collector/content-items";
@@ -65,25 +68,8 @@ export interface ContentManagerHttpClientOptions {
   readonly fetchImplementation?: FetchLike;
 }
 
-export interface ContentManagerSourceGroup {
-  readonly id: string;
-  readonly platform: string;
-  readonly status: string;
-  readonly url: string;
-}
-
-export type ContentManagerSourceGroupLookupResult =
-  | {
-      readonly ok: true;
-      readonly statusCode: number;
-      readonly sourceGroup: ContentManagerSourceGroup;
-    }
-  | {
-      readonly ok: false;
-      readonly statusCode?: number;
-      readonly errorCode: string;
-      readonly errorMessage: string;
-    };
+export type ContentManagerSourceGroup = SourceGroupLookupSourceGroup;
+export type ContentManagerSourceGroupLookupResult = SourceGroupLookupResult;
 
 interface ContentManagerHttpFailure {
   readonly statusCode: number;
@@ -92,7 +78,7 @@ interface ContentManagerHttpFailure {
 }
 
 export class ContentManagerHttpClient
-  implements ContentManagerContentSubmissionPort {
+  implements ContentManagerContentSubmissionPort, SourceGroupLookupPort {
   private readonly baseUrl: string;
   private readonly fetchImplementation: FetchLike;
 

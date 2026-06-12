@@ -20,6 +20,15 @@ import {
   ContentManagerDomainError,
   type ContentManagerDomainErrorCode,
 } from "../../../content-manager/domain";
+import {
+  CollectionRunValidationError,
+  CollectorRuntimeApplicationError,
+  type CollectorRuntimeApplicationErrorCode,
+} from "../../../collector-runtime/application";
+import {
+  CollectorRuntimeDomainError,
+  type CollectorRuntimeDomainErrorCode,
+} from "../../../collector-runtime/domain";
 import { HttpRequestValidationError } from "../schemas/http-validation";
 
 export interface HttpErrorBody {
@@ -146,6 +155,19 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
     };
   }
 
+  if (error instanceof CollectionRunValidationError) {
+    return {
+      statusCode: 400,
+      body: {
+        error: {
+          code: error.code,
+          message: error.message,
+          issues: error.issues,
+        },
+      },
+    };
+  }
+
   if (error instanceof CollectorProfileApplicationError) {
     return mapKnownError(
       error.code,
@@ -162,6 +184,14 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
     );
   }
 
+  if (error instanceof CollectorRuntimeApplicationError) {
+    return mapKnownError(
+      error.code,
+      collectorRuntimeApplicationErrorStatus[error.code],
+      error.message,
+    );
+  }
+
   if (error instanceof CollectorProfileDomainError) {
     return mapKnownError(
       error.code,
@@ -174,6 +204,14 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
     return mapKnownError(
       error.code,
       contentDomainErrorStatus[error.code],
+      error.message,
+    );
+  }
+
+  if (error instanceof CollectorRuntimeDomainError) {
+    return mapKnownError(
+      error.code,
+      collectorRuntimeDomainErrorStatus[error.code],
       error.message,
     );
   }
@@ -225,8 +263,28 @@ const contentApplicationErrorStatus: Record<
   CONTENT_VALIDATION_ERROR: 400,
 };
 
+const collectorRuntimeApplicationErrorStatus: Record<
+  CollectorRuntimeApplicationErrorCode,
+  number
+> = {
+  COLLECTION_RUN_NOT_FOUND: 404,
+  INVALID_COLLECTION_RUN_STATUS_TRANSITION: 409,
+  COLLECTION_RUN_VALIDATION_ERROR: 400,
+  COLLECTION_RUN_SOURCE_GROUP_NOT_FOUND: 404,
+  COLLECTION_RUN_SOURCE_GROUP_NOT_ACTIVE: 409,
+  COLLECTION_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED: 409,
+  SOURCE_GROUP_LOOKUP_FAILED: 502,
+};
+
 const contentDomainErrorStatus: Record<ContentManagerDomainErrorCode, number> = {
   INVALID_CONTENT_STATUS_TRANSITION: 409,
+};
+
+const collectorRuntimeDomainErrorStatus: Record<
+  CollectorRuntimeDomainErrorCode,
+  number
+> = {
+  INVALID_COLLECTION_RUN_STATUS_TRANSITION: 409,
 };
 
 function mapKnownError(

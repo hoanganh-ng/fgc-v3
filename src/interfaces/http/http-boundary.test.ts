@@ -19,6 +19,12 @@ describe("HTTP adapter architecture boundary", () => {
       ...collectTypeScriptFiles(
         new URL("../../content-manager/application/", import.meta.url),
       ),
+      ...collectTypeScriptFiles(
+        new URL("../../collector-runtime/domain/", import.meta.url),
+      ),
+      ...collectTypeScriptFiles(
+        new URL("../../collector-runtime/application/", import.meta.url),
+      ),
     ];
     const offendingFiles = files.filter((file) =>
       forbiddenHttpImportPattern.test(readFileSync(file, "utf8")),
