@@ -7,10 +7,15 @@ import {
   parseAssistedGroupAccessCliArgs,
 } from "./cli-args";
 import {
-  runAssistedAccessCommand,
   type AssistedAccessCommandResult,
   type AssistedAccessSessionControlPort,
 } from "./assisted-access-runner";
+import {
+  promptForAssistedAccessOutcome,
+  runAssistedAccessWorkflow,
+  type AssistedAccessOutcomePromptPort,
+  type AssistedAccessWorkflowResult,
+} from "./access-outcome-workflow";
 
 async function main(): Promise<void> {
   let parsedArgs;
@@ -50,7 +55,7 @@ async function main(): Promise<void> {
   process.once("SIGTERM", onInterrupt);
 
   try {
-    const result = await runAssistedAccessCommand({
+    const result = await runAssistedAccessWorkflow({
       args: parsedArgs,
       logger: {
         info: (message) => console.log(message),
@@ -59,7 +64,10 @@ async function main(): Promise<void> {
       },
       abortSignal: abortController.signal,
       dependencies: {
-        sessionControl: new StdinAssistedAccessSessionControl(),
+        assistedAccess: {
+          sessionControl: new StdinAssistedAccessSessionControl(),
+        },
+        outcomePrompt: new StdinAssistedAccessOutcomePrompt(),
       },
     });
 
@@ -117,8 +125,42 @@ class StdinAssistedAccessSessionControl
   }
 }
 
+class StdinAssistedAccessOutcomePrompt
+  implements AssistedAccessOutcomePromptPort
+{
+  public async promptOutcome(): Promise<
+    | "PUBLIC_ACCESSIBLE"
+    | "JOIN_REQUIRED"
+    | "JOINED_ACCESSIBLE"
+    | "ACCESS_DENIED"
+    | "LOGIN_REQUIRED"
+    | "CHECKPOINT_REQUIRED"
+    | "SKIP"
+  > {
+    const readline = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    try {
+      return await promptForAssistedAccessOutcome({
+        writeLine: (message) => console.log(message),
+        readLine: async () => {
+          try {
+            return await readline.question("> ");
+          } catch {
+            return undefined;
+          }
+        },
+      });
+    } finally {
+      readline.close();
+    }
+  }
+}
+
 function applyProcessExitCode(
-  result: AssistedAccessCommandResult,
+  result: AssistedAccessCommandResult | AssistedAccessWorkflowResult,
   interrupted: boolean,
 ): void {
   if (result.ok) {

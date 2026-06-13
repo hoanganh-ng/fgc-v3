@@ -188,7 +188,7 @@ export function getAssistedGroupAccessCliUsage(): string {
     "Defaults:",
     "  --browser-provider uses BROWSER_PROVIDER, then playwright.",
     "",
-    "The command checks out the profile for ASSISTED_GROUP_ACCESS, opens only the selected safe entry-route URL in a headed browser for manual inspection, waits for Enter or timeout, then closes the browser and releases the lease.",
+    "The command checks out the profile for ASSISTED_GROUP_ACCESS, opens only the selected safe entry-route URL in a headed browser for manual inspection, waits for Enter or timeout, closes the browser, releases the lease, then prompts for an observed access outcome when eligible.",
   ].join("\n");
 }
 

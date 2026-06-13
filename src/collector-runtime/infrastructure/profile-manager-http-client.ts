@@ -110,6 +110,38 @@ export type ProfileExerciseCheckoutResult =
 
 export type ProfileAssistedGroupAccessCheckoutResult = ProfileExerciseCheckoutResult;
 
+export type ProfileSourceAccessReportableState =
+  | "PUBLIC_ACCESSIBLE"
+  | "JOIN_REQUIRED"
+  | "JOINED_ACCESSIBLE"
+  | "ACCESS_DENIED"
+  | "LOGIN_REQUIRED"
+  | "CHECKPOINT_REQUIRED";
+
+export interface UpsertProfileSourceAccessInput {
+  readonly profileId: string;
+  readonly sourceGroupId: string;
+  readonly accessState: ProfileSourceAccessReportableState;
+  readonly lastFailureReason: {
+    readonly code: string;
+    readonly message: string;
+  } | null;
+}
+
+export type UpsertProfileSourceAccessResult =
+  | {
+      readonly ok: true;
+      readonly profileId: string;
+      readonly sourceGroupId: string;
+      readonly accessState: ProfileSourceAccessReportableState;
+    }
+  | {
+      readonly ok: false;
+      readonly statusCode?: number;
+      readonly errorCode: string;
+      readonly errorMessage: string;
+    };
+
 interface HttpFailure {
   readonly statusCode: number;
   readonly errorCode: string;
@@ -329,6 +361,54 @@ export class ProfileManagerHttpClient
     }
   }
 
+  public async upsertProfileSourceAccess(
+    input: UpsertProfileSourceAccessInput,
+  ): Promise<UpsertProfileSourceAccessResult> {
+    try {
+      const response = await this.fetchImplementation(
+        buildProfileSourceAccessUrl(
+          this.baseUrl,
+          input.profileId,
+          input.sourceGroupId,
+        ),
+        {
+          method: "PUT",
+          headers: jsonHeaders(),
+          body: JSON.stringify({
+            accessState: input.accessState,
+            lastFailureReason: input.lastFailureReason,
+          }),
+        },
+      );
+
+      if (response.status !== 200 && response.status !== 201) {
+        return toUpsertProfileSourceAccessFailure(
+          readSanitizedHttpFailure(response),
+        );
+      }
+
+      const body = await readJsonBody(response);
+      const result = toUpsertProfileSourceAccessSuccessResult(input, body);
+
+      if (result !== undefined) {
+        return result;
+      }
+
+      return {
+        ok: false,
+        statusCode: response.status,
+        errorCode: PROFILE_MANAGER_RESPONSE_ERROR,
+        errorMessage: "Profile Manager profile-source access response is invalid.",
+      };
+    } catch {
+      return {
+        ok: false,
+        errorCode: PROFILE_MANAGER_NETWORK_ERROR,
+        errorMessage: "Profile Manager profile-source access request failed.",
+      };
+    }
+  }
+
   public async getSafeProfileAccountStage(
     profileId: string,
   ): Promise<SafeProfileAccountStageResult> {
@@ -543,6 +623,17 @@ function buildRuntimeProfileConfigurationUrl(
   );
 }
 
+function buildProfileSourceAccessUrl(
+  baseUrl: string,
+  profileId: string,
+  sourceGroupId: string,
+): string {
+  return buildUrl(
+    baseUrl,
+    `collector/profiles/${encodeURIComponent(profileId)}/source-access/${encodeURIComponent(sourceGroupId)}`,
+  );
+}
+
 function buildUrl(baseUrl: string, path: string): string {
   const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
 
@@ -724,6 +815,38 @@ function toRuntimeProfileConfigurationSuccessResult(
   };
 }
 
+function toUpsertProfileSourceAccessSuccessResult(
+  input: UpsertProfileSourceAccessInput,
+  body: unknown,
+): Extract<UpsertProfileSourceAccessResult, { readonly ok: true }> | undefined {
+  if (!isRecord(body) || !isRecord(body.profileSourceAccess)) {
+    return undefined;
+  }
+
+  const profileId = body.profileSourceAccess.profileId;
+  const sourceGroupId = body.profileSourceAccess.sourceGroupId;
+  const accessState = body.profileSourceAccess.accessState;
+
+  if (profileId !== input.profileId || sourceGroupId !== input.sourceGroupId) {
+    return undefined;
+  }
+
+  if (accessState !== input.accessState) {
+    return undefined;
+  }
+
+  if (!isProfileSourceAccessReportableState(accessState)) {
+    return undefined;
+  }
+
+  return {
+    ok: true,
+    profileId,
+    sourceGroupId,
+    accessState,
+  };
+}
+
 function toProfileListCount(body: unknown): number | undefined {
   if (!isRecord(body) || !Array.isArray(body.items) || !isRecord(body.page)) {
     return undefined;
@@ -815,6 +938,25 @@ function toRuntimeProfileConfigurationFailure(
   };
 }
 
+function toUpsertProfileSourceAccessFailure(
+  failure: HttpFailure,
+): Extract<UpsertProfileSourceAccessResult, { readonly ok: false }> {
+  return {
+    ok: false,
+    statusCode: failure.statusCode,
+    errorCode: failure.errorCode,
+    errorMessage: failure.errorMessage,
+  };
+}
+
+function readSanitizedHttpFailure(response: FetchLikeResponse): HttpFailure {
+  return {
+    statusCode: response.status,
+    errorCode: PROFILE_MANAGER_HTTP_ERROR,
+    errorMessage: `Profile Manager responded with HTTP ${response.status}.`,
+  };
+}
+
 async function readHttpFailure(response: FetchLikeResponse): Promise<HttpFailure> {
   const fallbackMessage = `Profile Manager responded with HTTP ${response.status}.`;
 
@@ -880,6 +1022,19 @@ async function readJsonBody(response: FetchLikeResponse): Promise<unknown> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isProfileSourceAccessReportableState(
+  value: unknown,
+): value is ProfileSourceAccessReportableState {
+  return (
+    value === "PUBLIC_ACCESSIBLE" ||
+    value === "JOIN_REQUIRED" ||
+    value === "JOINED_ACCESSIBLE" ||
+    value === "ACCESS_DENIED" ||
+    value === "LOGIN_REQUIRED" ||
+    value === "CHECKPOINT_REQUIRED"
+  );
 }
 
 function errorToProfileManagerMessage(error: unknown): string {

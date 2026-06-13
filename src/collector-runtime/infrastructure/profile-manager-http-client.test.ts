@@ -226,6 +226,142 @@ describe("ProfileManagerHttpClient", () => {
     });
   });
 
+  it.each([200, 201])(
+    "upserts profile-source access and accepts HTTP %s",
+    async (statusCode) => {
+      const fetch = new FakeFetch(
+        createProfileSourceAccessResponse(statusCode, {
+          profileId: "profile/1",
+          sourceGroupId: "source group/1",
+          accessState: "PUBLIC_ACCESSIBLE",
+        }),
+      );
+      const client = createClient(fetch.fetch);
+
+      const result = await client.upsertProfileSourceAccess({
+        profileId: "profile/1",
+        sourceGroupId: "source group/1",
+        accessState: "PUBLIC_ACCESSIBLE",
+        lastFailureReason: null,
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        profileId: "profile/1",
+        sourceGroupId: "source group/1",
+        accessState: "PUBLIC_ACCESSIBLE",
+      });
+      expect(fetch.calls[0]).toMatchObject({
+        input:
+          "https://profile-manager.test/collector/profiles/profile%2F1/source-access/source%20group%2F1",
+        init: {
+          method: "PUT",
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+          },
+        },
+      });
+      expect(parseRequestBody(fetch)).toEqual({
+        accessState: "PUBLIC_ACCESSIBLE",
+        lastFailureReason: null,
+      });
+    },
+  );
+
+  it("rejects malformed or mismatched profile-source access responses", async () => {
+    const cases = [
+      createResponse(200, { profileSourceAccess: null }),
+      createProfileSourceAccessResponse(200, {
+        profileId: "other-profile",
+        sourceGroupId: "source-group-1",
+        accessState: "JOIN_REQUIRED",
+      }),
+      createProfileSourceAccessResponse(200, {
+        profileId: "profile-1",
+        sourceGroupId: "other-source",
+        accessState: "JOIN_REQUIRED",
+      }),
+      createProfileSourceAccessResponse(200, {
+        profileId: "profile-1",
+        sourceGroupId: "source-group-1",
+        accessState: "ACCESS_DENIED",
+      }),
+    ];
+
+    for (const response of cases) {
+      const fetch = new FakeFetch(response);
+      const client = createClient(fetch.fetch);
+
+      await expect(
+        client.upsertProfileSourceAccess({
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+          accessState: "JOIN_REQUIRED",
+          lastFailureReason: {
+            code: "JOIN_REQUIRED",
+            message: "Operator observed that group membership is required.",
+          },
+        }),
+      ).resolves.toEqual({
+        ok: false,
+        statusCode: 200,
+        errorCode: "PROFILE_MANAGER_RESPONSE_ERROR",
+        errorMessage:
+          "Profile Manager profile-source access response is invalid.",
+      });
+    }
+  });
+
+  it("sanitizes profile-source access server and network failures", async () => {
+    const serverFetch = new FakeFetch(
+      createResponse(500, {
+        error: {
+          code: "INTERNAL_SERVER_ERROR",
+          message: "raw private body",
+        },
+      }),
+    );
+    const serverClient = createClient(serverFetch.fetch);
+
+    await expect(
+      serverClient.upsertProfileSourceAccess({
+        profileId: "profile-1",
+        sourceGroupId: "source-group-1",
+        accessState: "ACCESS_DENIED",
+        lastFailureReason: {
+          code: "ACCESS_DENIED",
+          message: "Operator observed that access was denied.",
+        },
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      statusCode: 500,
+      errorCode: "PROFILE_MANAGER_HTTP_ERROR",
+      errorMessage: "Profile Manager responded with HTTP 500.",
+    });
+
+    const networkFetch = new FakeFetch(createProfileSourceAccessResponse());
+    networkFetch.setError(new Error("raw network failure"));
+    const networkClient = createClient(networkFetch.fetch);
+
+    await expect(
+      networkClient.upsertProfileSourceAccess({
+        profileId: "profile-1",
+        sourceGroupId: "source-group-1",
+        accessState: "ACCESS_DENIED",
+        lastFailureReason: {
+          code: "ACCESS_DENIED",
+          message: "Operator observed that access was denied.",
+        },
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      errorCode: "PROFILE_MANAGER_NETWORK_ERROR",
+      errorMessage: "Profile Manager profile-source access request failed.",
+    });
+  });
+
   it("posts release requests to /collector/profile-leases/:leaseId/release", async () => {
     const fetch = new FakeFetch(createReleaseResponse());
     const client = new ProfileManagerHttpClient(
@@ -810,6 +946,28 @@ function createProfileDetailResponse(): FetchLikeResponse {
       displayName: "Profile 1",
       status: "READY",
       accountStage: "NEW_ACCOUNT",
+    },
+  });
+}
+
+function createProfileSourceAccessResponse(
+  status = 200,
+  options: {
+    readonly profileId?: string;
+    readonly sourceGroupId?: string;
+    readonly accessState?: string;
+  } = {},
+): FetchLikeResponse {
+  return createResponse(status, {
+    profileSourceAccess: {
+      id: "profile-source-access-1",
+      profileId: options.profileId ?? "profile-1",
+      sourceGroupId: options.sourceGroupId ?? "source-group-1",
+      accessState: options.accessState ?? "PUBLIC_ACCESSIBLE",
+      lastVerifiedAt: "2026-01-05T18:10:00.000Z",
+      lastFailureReason: null,
+      createdAt: "2026-01-05T18:00:00.000Z",
+      updatedAt: "2026-01-05T18:10:00.000Z",
     },
   });
 }
