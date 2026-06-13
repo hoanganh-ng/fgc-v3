@@ -17,6 +17,7 @@ import {
 import {
   createFakeContentManagerHttpService,
 } from "./test-support/content-manager-http-service";
+import { FakeSourceGroupReferencePort } from "./test-support/source-group-reference-port";
 
 describe("Collector Runtime HTTP routes", () => {
   it("requests account exercise runs without executing browser exercise", async () => {
@@ -641,6 +642,7 @@ function createTestServer(): {
   return {
     server: createHttpServer({
       collectorProfileManager: createUnusedCollectorProfileManagerHttpService(),
+      sourceGroupReferences: new FakeSourceGroupReferencePort(),
       collectorRuntime: service,
       contentManager: createFakeContentManagerHttpService(),
     }),

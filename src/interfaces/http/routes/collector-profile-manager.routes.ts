@@ -1,4 +1,7 @@
 import type { FastifyInstance } from "fastify";
+import {
+  ProfileSourceAccessNotFoundError,
+} from "../../../collector-profile-manager/application";
 import type {
   CheckoutProfileInput,
   CheckoutProfileOutput,
@@ -13,14 +16,20 @@ import type {
   ListProfilesOutput,
   ProfileReadNetworkContext,
   ProfileDetail,
+  ProfileSourceAccessDto,
   ProvisioningConfiguration,
   ReleaseProfileLeaseInput,
   ReleaseProfileLeaseOutput,
   RuntimeProfileConfiguration,
+  SourceGroupReferencePort,
   StartProfileProvisioningInput,
   StartProfileProvisioningOutput,
   UpdateProfileAccountStageInput,
   UpdateProfileConfigurationInput,
+  UpsertProfileSourceAccessInput,
+  GetProfileSourceAccessInput,
+  ListProfileSourceAccessForProfileInput,
+  ListProfileSourceAccessForSourceGroupInput,
 } from "../../../collector-profile-manager/application";
 import type {
   CollectorProfile,
@@ -30,8 +39,10 @@ import type {
   ProfileId,
   ProfileAccountStage,
   ProfileStatus,
+  ProfileSourceAccessSourceGroupId,
   ProvisioningTokenStatus,
 } from "../../../collector-profile-manager/domain";
+import { SourceGroupNotFoundError } from "../../../content-manager/application";
 import {
   CheckoutProfileHttpBodySchema,
   CreateProfileHttpBodySchema,
@@ -39,23 +50,30 @@ import {
   IngestProfileSessionHttpBodySchema,
   ProfileIdHttpParamsSchema,
   ProfileLeaseIdHttpParamsSchema,
+  ProfileSourceAccessHttpParamsSchema,
+  ProfileSourceAccessSourceGroupHttpParamsSchema,
   ProvisioningTokenHttpParamsSchema,
   ReleaseProfileLeaseHttpBodySchema,
+  UpsertProfileSourceAccessHttpBodySchema,
   UpdateProfileAccountStageHttpBodySchema,
   UpdateProfileConfigurationHttpBodySchema,
   checkoutProfileHttpRouteSchema,
   checkoutProfileForExerciseHttpRouteSchema,
   createProfileHttpRouteSchema,
+  getProfileSourceAccessHttpRouteSchema,
   getProvisioningConfigurationHttpRouteSchema,
   getProfileHttpRouteSchema,
   getRuntimeProfileConfigurationHttpRouteSchema,
   ingestProfileSessionHttpRouteSchema,
+  listProfileSourceAccessForProfileHttpRouteSchema,
+  listProfileSourceAccessForSourceGroupHttpRouteSchema,
   listProfilesHttpRouteSchema,
   parseHttpInput,
   releaseProfileLeaseHttpRouteSchema,
   startProfileProvisioningHttpRouteSchema,
   updateProfileAccountStageHttpRouteSchema,
   updateProfileConfigurationHttpRouteSchema,
+  upsertProfileSourceAccessHttpRouteSchema,
 } from "../schemas/collector-profile-manager.http-schemas";
 
 interface ExecutableUseCase<Input, Output> {
@@ -108,10 +126,27 @@ export interface CollectorProfileManagerHttpService {
     ReleaseProfileLeaseInput,
     ReleaseProfileLeaseOutput
   >;
+  readonly upsertProfileSourceAccess: ExecutableUseCase<
+    UpsertProfileSourceAccessInput,
+    ProfileSourceAccessDto
+  >;
+  readonly getProfileSourceAccess: ExecutableUseCase<
+    GetProfileSourceAccessInput,
+    ProfileSourceAccessDto
+  >;
+  readonly listProfileSourceAccessForProfile: ExecutableUseCase<
+    ListProfileSourceAccessForProfileInput,
+    readonly ProfileSourceAccessDto[]
+  >;
+  readonly listProfileSourceAccessForSourceGroup: ExecutableUseCase<
+    ListProfileSourceAccessForSourceGroupInput,
+    readonly ProfileSourceAccessDto[]
+  >;
 }
 
 export interface RegisterCollectorProfileManagerRoutesOptions {
   readonly collectorProfileManager: CollectorProfileManagerHttpService;
+  readonly sourceGroupReferences: SourceGroupReferencePort;
 }
 
 interface ProfileSummary {
@@ -134,7 +169,7 @@ export function registerCollectorProfileManagerRoutes(
   server: FastifyInstance,
   options: RegisterCollectorProfileManagerRoutesOptions,
 ): void {
-  const { collectorProfileManager } = options;
+  const { collectorProfileManager, sourceGroupReferences } = options;
 
   server.get(
     "/collector/profiles",
@@ -398,6 +433,152 @@ export function registerCollectorProfileManagerRoutes(
       });
     },
   );
+
+  server.put(
+    "/collector/profiles/:profileId/source-access/:sourceGroupId",
+    { schema: upsertProfileSourceAccessHttpRouteSchema },
+    async (request, reply) => {
+      const params = parseHttpInput(
+        ProfileSourceAccessHttpParamsSchema,
+        request.params,
+      );
+      const body = parseHttpInput(
+        UpsertProfileSourceAccessHttpBodySchema,
+        request.body,
+      );
+
+      await ensureProfileExists(collectorProfileManager, params.profileId);
+      await ensureSourceGroupExists(
+        sourceGroupReferences,
+        params.sourceGroupId,
+      );
+      const existed = await profileSourceAccessExists(
+        collectorProfileManager,
+        params.profileId,
+        params.sourceGroupId,
+      );
+      const profileSourceAccess =
+        await collectorProfileManager.upsertProfileSourceAccess.execute({
+          profileId: params.profileId,
+          sourceGroupId: params.sourceGroupId,
+          accessState: body.accessState,
+          ...(body.lastFailureReason !== undefined
+            ? { lastFailureReason: body.lastFailureReason }
+            : {}),
+          ...(body.notes !== undefined ? { notes: body.notes } : {}),
+        });
+
+      return reply.code(existed ? 200 : 201).send({
+        profileSourceAccess,
+      });
+    },
+  );
+
+  server.get(
+    "/collector/profiles/:profileId/source-access",
+    { schema: listProfileSourceAccessForProfileHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileIdHttpParamsSchema,
+        request.params,
+      );
+
+      await ensureProfileExists(collectorProfileManager, params.profileId);
+      const items =
+        await collectorProfileManager.listProfileSourceAccessForProfile.execute(
+          {
+            profileId: params.profileId,
+          },
+        );
+
+      return { items };
+    },
+  );
+
+  server.get(
+    "/collector/profiles/:profileId/source-access/:sourceGroupId",
+    { schema: getProfileSourceAccessHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileSourceAccessHttpParamsSchema,
+        request.params,
+      );
+
+      await ensureProfileExists(collectorProfileManager, params.profileId);
+      const profileSourceAccess =
+        await collectorProfileManager.getProfileSourceAccess.execute({
+          profileId: params.profileId,
+          sourceGroupId: params.sourceGroupId,
+        });
+
+      return {
+        profileSourceAccess,
+      };
+    },
+  );
+
+  server.get(
+    "/collector/source-groups/:sourceGroupId/profile-access",
+    { schema: listProfileSourceAccessForSourceGroupHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileSourceAccessSourceGroupHttpParamsSchema,
+        request.params,
+      );
+
+      await ensureSourceGroupExists(
+        sourceGroupReferences,
+        params.sourceGroupId,
+      );
+      const items =
+        await collectorProfileManager.listProfileSourceAccessForSourceGroup.execute(
+          {
+            sourceGroupId: params.sourceGroupId,
+          },
+        );
+
+      return { items };
+    },
+  );
+}
+
+async function ensureProfileExists(
+  collectorProfileManager: CollectorProfileManagerHttpService,
+  profileId: ProfileId,
+): Promise<void> {
+  await collectorProfileManager.getProfile.execute({ profileId });
+}
+
+async function ensureSourceGroupExists(
+  sourceGroupReferences: SourceGroupReferencePort,
+  sourceGroupId: ProfileSourceAccessSourceGroupId,
+): Promise<void> {
+  const exists = await sourceGroupReferences.exists(sourceGroupId);
+
+  if (!exists) {
+    throw new SourceGroupNotFoundError(sourceGroupId);
+  }
+}
+
+async function profileSourceAccessExists(
+  collectorProfileManager: CollectorProfileManagerHttpService,
+  profileId: ProfileId,
+  sourceGroupId: ProfileSourceAccessSourceGroupId,
+): Promise<boolean> {
+  try {
+    await collectorProfileManager.getProfileSourceAccess.execute({
+      profileId,
+      sourceGroupId,
+    });
+
+    return true;
+  } catch (error) {
+    if (error instanceof ProfileSourceAccessNotFoundError) {
+      return false;
+    }
+
+    throw error;
+  }
 }
 
 function toProfileSummary(profile: CollectorProfile): ProfileSummary {

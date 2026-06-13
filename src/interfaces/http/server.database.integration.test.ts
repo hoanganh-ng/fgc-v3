@@ -1,22 +1,29 @@
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
+  ContentManagerSourceGroupReferenceAdapter,
   createCollectorProfileManagerFromDatabaseClient,
 } from "../../composition/collector-profile-manager";
 import type {
   CollectorProfileManagerService,
 } from "../../composition/collector-profile-manager";
 import {
+  createContentManagerFromDatabaseClient,
+} from "../../composition/content-manager";
+import type {
+  ContentManagerService,
+} from "../../composition/content-manager";
+import {
+  collectorProfileSourceAccess,
   collectorProfileLeases,
   collectorProfiles,
+  contentCategories,
   createDatabaseClient,
+  sourceGroups,
 } from "../../infrastructure/database";
 import type { DatabaseClient } from "../../infrastructure/database";
 import { createHttpServer } from "./server";
-import {
-  createFakeContentManagerHttpService,
-} from "./test-support/content-manager-http-service";
 import {
   createUnusedCollectorRuntimeHttpService,
 } from "./test-support/collector-runtime-http-service";
@@ -40,10 +47,13 @@ if (!shouldRunHttpDbTests) {
   describe("HTTP PostgreSQL integration", () => {
     let client: DatabaseClient | undefined;
     let service: CollectorProfileManagerService | undefined;
+    let contentManager: ContentManagerService | undefined;
     let server: FastifyInstance | undefined;
     let nextId = 0;
     const createdProfileIds = new Set<string>();
     const createdLeaseIds = new Set<string>();
+    const createdCategoryIds = new Set<string>();
+    const createdSourceGroupIds = new Set<string>();
 
     beforeAll(() => {
       const databaseClient = createDatabaseClient({
@@ -54,10 +64,14 @@ if (!shouldRunHttpDbTests) {
       });
       client = databaseClient;
       service = createCollectorProfileManagerFromDatabaseClient(databaseClient);
+      contentManager = createContentManagerFromDatabaseClient(databaseClient);
       server = createHttpServer({
         collectorProfileManager: service,
+        sourceGroupReferences: new ContentManagerSourceGroupReferenceAdapter(
+          contentManager.getSourceGroup,
+        ),
         collectorRuntime: createUnusedCollectorRuntimeHttpService(),
-        contentManager: createFakeContentManagerHttpService(),
+        contentManager,
       });
     });
 
@@ -68,6 +82,14 @@ if (!shouldRunHttpDbTests) {
 
       const leaseIds = [...createdLeaseIds];
       const profileIds = [...createdProfileIds];
+      const sourceGroupIds = [...createdSourceGroupIds];
+      const categoryIds = [...createdCategoryIds];
+
+      if (profileIds.length > 0) {
+        await client.db
+          .delete(collectorProfileSourceAccess)
+          .where(inArray(collectorProfileSourceAccess.profileId, profileIds));
+      }
 
       if (leaseIds.length > 0) {
         await client.db
@@ -81,8 +103,22 @@ if (!shouldRunHttpDbTests) {
           .where(inArray(collectorProfiles.id, profileIds));
       }
 
+      if (sourceGroupIds.length > 0) {
+        await client.db
+          .delete(sourceGroups)
+          .where(inArray(sourceGroups.id, sourceGroupIds));
+      }
+
+      if (categoryIds.length > 0) {
+        await client.db
+          .delete(contentCategories)
+          .where(inArray(contentCategories.id, categoryIds));
+      }
+
       createdLeaseIds.clear();
       createdProfileIds.clear();
+      createdSourceGroupIds.clear();
+      createdCategoryIds.clear();
     });
 
     afterAll(async () => {
@@ -472,6 +508,200 @@ if (!shouldRunHttpDbTests) {
       expectReadPayloadIsSafe(releasedReadBody, provisioningToken);
     });
 
+    it("persists profile-source access through HTTP, composition, use cases, repositories, and PostgreSQL", async () => {
+      const profileId = trackProfileId(nextTestId("profile-access-profile"));
+      const categorySlug = nextTestId("profile-access-category");
+
+      const createProfileResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/profiles",
+        payload: {
+          id: profileId,
+          displayName: `HTTP DB Access ${profileId}`,
+        },
+      });
+      expect(createProfileResponse.statusCode).toBe(201);
+
+      const createCategoryResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/content-categories",
+        payload: {
+          name: `Access Category ${categorySlug}`,
+          slug: categorySlug,
+        },
+      });
+      const createCategoryBody = createCategoryResponse.json() as {
+        readonly category: { readonly id: string };
+      };
+      expect(createCategoryResponse.statusCode).toBe(201);
+      const categoryId = trackCategoryId(createCategoryBody.category.id);
+
+      const createSourceGroupResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/source-groups",
+        payload: {
+          platform: "FACEBOOK",
+          externalGroupId: nextTestId("fb-group"),
+          name: "Profile Source Access Group",
+          url: "https://facebook.test/groups/profile-source-access",
+          categoryId,
+          collectionPriority: 50,
+        },
+      });
+      const createSourceGroupBody = createSourceGroupResponse.json() as {
+        readonly sourceGroup: { readonly id: string };
+      };
+      expect(createSourceGroupResponse.statusCode).toBe(201);
+      const sourceGroupId = trackSourceGroupId(
+        createSourceGroupBody.sourceGroup.id,
+      );
+
+      const createAccessResponse = await getServer().inject({
+        method: "PUT",
+        url: `/collector/profiles/${profileId}/source-access/${sourceGroupId}`,
+        payload: {
+          accessState: "JOIN_REQUIRED",
+          lastFailureReason: {
+            code: "JOIN_REQUIRED",
+            message: "Group membership is required.",
+          },
+          notes: "Operator reviewed source access.",
+        },
+      });
+      const createAccessBody = createAccessResponse.json() as {
+        readonly profileSourceAccess: {
+          readonly id: string;
+          readonly profileId: string;
+          readonly sourceGroupId: string;
+          readonly accessState: string;
+          readonly lastCheckedAt: string | null;
+          readonly lastSuccessfulAt: string | null;
+          readonly joinRequestedAt: string | null;
+          readonly createdAt: string;
+          readonly updatedAt: string;
+        };
+      };
+      expect(createAccessResponse.statusCode).toBe(201);
+      expect(createAccessBody).toMatchObject({
+        profileSourceAccess: {
+          profileId,
+          sourceGroupId,
+          accessState: "JOIN_REQUIRED",
+          lastSuccessfulAt: null,
+          joinRequestedAt: null,
+        },
+      });
+      expect(createAccessBody.profileSourceAccess.lastCheckedAt).not.toBeNull();
+      expectProfileSourceAccessPayloadIsSafe(createAccessBody);
+
+      const getCreatedResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/profiles/${profileId}/source-access/${sourceGroupId}`,
+      });
+      expect(getCreatedResponse.statusCode).toBe(200);
+      expect(getCreatedResponse.json()).toMatchObject({
+        profileSourceAccess: {
+          id: createAccessBody.profileSourceAccess.id,
+          profileId,
+          sourceGroupId,
+          accessState: "JOIN_REQUIRED",
+        },
+      });
+
+      await waitForClockTick();
+
+      const updateAccessResponse = await getServer().inject({
+        method: "PUT",
+        url: `/collector/profiles/${profileId}/source-access/${sourceGroupId}`,
+        payload: {
+          accessState: "JOIN_REQUESTED",
+          lastFailureReason: {
+            code: "JOIN_REQUESTED",
+            message: "Join request was submitted by operator.",
+          },
+          notes: "Operator requested access.",
+        },
+      });
+      const updateAccessBody = updateAccessResponse.json() as {
+        readonly profileSourceAccess: {
+          readonly id: string;
+          readonly accessState: string;
+          readonly lastCheckedAt: string | null;
+          readonly lastSuccessfulAt: string | null;
+          readonly joinRequestedAt: string | null;
+          readonly createdAt: string;
+          readonly updatedAt: string;
+        };
+      };
+      expect(updateAccessResponse.statusCode).toBe(200);
+      expect(updateAccessBody).toMatchObject({
+        profileSourceAccess: {
+          id: createAccessBody.profileSourceAccess.id,
+          accessState: "JOIN_REQUESTED",
+          lastSuccessfulAt: null,
+          createdAt: createAccessBody.profileSourceAccess.createdAt,
+        },
+      });
+      expect(updateAccessBody.profileSourceAccess.lastCheckedAt).not.toBeNull();
+      expect(updateAccessBody.profileSourceAccess.joinRequestedAt).toBe(
+        updateAccessBody.profileSourceAccess.lastCheckedAt,
+      );
+      expect(
+        Date.parse(updateAccessBody.profileSourceAccess.updatedAt),
+      ).toBeGreaterThanOrEqual(
+        Date.parse(createAccessBody.profileSourceAccess.updatedAt),
+      );
+
+      const listByProfileResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/profiles/${profileId}/source-access`,
+      });
+      expect(listByProfileResponse.statusCode).toBe(200);
+      expect(listByProfileResponse.json()).toMatchObject({
+        items: [
+          {
+            id: createAccessBody.profileSourceAccess.id,
+            profileId,
+            sourceGroupId,
+            accessState: "JOIN_REQUESTED",
+          },
+        ],
+      });
+
+      const listBySourceGroupResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/source-groups/${sourceGroupId}/profile-access`,
+      });
+      expect(listBySourceGroupResponse.statusCode).toBe(200);
+      expect(listBySourceGroupResponse.json()).toMatchObject({
+        items: [
+          {
+            id: createAccessBody.profileSourceAccess.id,
+            profileId,
+            sourceGroupId,
+            accessState: "JOIN_REQUESTED",
+          },
+        ],
+      });
+
+      const rows = await getClient()
+        .db.select()
+        .from(collectorProfileSourceAccess)
+        .where(
+          and(
+            eq(collectorProfileSourceAccess.profileId, profileId),
+            eq(collectorProfileSourceAccess.sourceGroupId, sourceGroupId),
+          ),
+        );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        id: createAccessBody.profileSourceAccess.id,
+        profileId,
+        sourceGroupId,
+        accessState: "JOIN_REQUESTED",
+      });
+    });
+
     function nextTestId(label: string): string {
       nextId += 1;
 
@@ -490,12 +720,32 @@ if (!shouldRunHttpDbTests) {
       return leaseId;
     }
 
+    function trackCategoryId(categoryId: string): string {
+      createdCategoryIds.add(categoryId);
+
+      return categoryId;
+    }
+
+    function trackSourceGroupId(sourceGroupId: string): string {
+      createdSourceGroupIds.add(sourceGroupId);
+
+      return sourceGroupId;
+    }
+
     function getServer(): FastifyInstance {
       if (server === undefined) {
         throw new Error("HTTP server was not initialized.");
       }
 
       return server;
+    }
+
+    function getClient(): DatabaseClient {
+      if (client === undefined) {
+        throw new Error("Database client was not initialized.");
+      }
+
+      return client;
     }
   });
 }
@@ -645,4 +895,23 @@ function expectProvisioningConfigurationPayloadIsSafe(
   expect(serialized).not.toContain("provisioningToken");
   expect(serialized).not.toContain("tokenHash");
   expect(serialized).not.toContain(provisioningToken);
+}
+
+function expectProfileSourceAccessPayloadIsSafe(payload: unknown): void {
+  const serialized = JSON.stringify(payload);
+
+  expect(serialized).not.toContain("session-cookie-secret");
+  expect(serialized).not.toContain("local-storage-secret");
+  expect(serialized).not.toContain("proxy-password-secret");
+  expect(serialized).not.toContain("provisioningToken");
+  expect(serialized).not.toContain("tokenHash");
+  expect(serialized).not.toContain("hardwareFingerprint");
+  expect(serialized).not.toContain("authenticationState");
+  expect(serialized).not.toContain("runtime");
+  expect(serialized).not.toContain("rawPayload");
+  expect(serialized).not.toContain("raw page HTML");
+}
+
+async function waitForClockTick(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 10));
 }

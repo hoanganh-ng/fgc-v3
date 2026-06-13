@@ -82,9 +82,9 @@ Account stage transition rules and lease-purpose eligibility remain Collector Pr
 
 Collector Profile Manager owns profile-source access records for `profileId + sourceGroupId` pairs. This state answers whether a particular profile appears able to access a particular source group; it is separate from source group status and profile account stage.
 
-Content Manager remains the owner of source groups and source group entry route metadata. Sprint 041A stores `sourceGroupId` as an external module reference string and does not validate source group existence through Content Manager yet.
+Content Manager remains the owner of source groups and source group entry route metadata. Profile-source access stores `sourceGroupId` as an external module reference string. Sprint 041B validates source group existence for HTTP workflows through an explicit Content Manager-facing port/adapter, not through direct repository imports or database foreign keys.
 
-Profile-source access state is data only in Sprint 041A. It must not trigger browser automation, assisted group access, group joining, source-group search, collection runs, account-stage promotion/demotion, or platform actions.
+Profile-source access state and HTTP management must not trigger browser automation, assisted group access, group joining, source-group search, collection runs, account-stage promotion/demotion, or platform actions.
 
 ## Source Group Entry Routes
 

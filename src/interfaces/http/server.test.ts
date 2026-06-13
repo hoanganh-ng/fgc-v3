@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   InvalidApplicationOperationError,
+  ProfileSourceAccessNotFoundError,
   ProfileLeaseAlreadyClosedError,
   ProfileNotFoundError,
+  type ProfileSourceAccessDto,
   toProfileDetailDto,
   toProfileSummaryDto,
 } from "../../collector-profile-manager/application";
@@ -16,6 +18,9 @@ import type {
   GetProvisioningConfigurationInput,
   GetRuntimeProfileConfigurationInput,
   IngestProfileSessionInput,
+  GetProfileSourceAccessInput,
+  ListProfileSourceAccessForProfileInput,
+  ListProfileSourceAccessForSourceGroupInput,
   ListProfilesInput,
   ListProfilesOutput,
   ProfileDetail,
@@ -27,6 +32,7 @@ import type {
   StartProfileProvisioningOutput,
   UpdateProfileAccountStageInput,
   UpdateProfileConfigurationInput,
+  UpsertProfileSourceAccessInput,
 } from "../../collector-profile-manager/application";
 import {
   InvalidProfileAccountStageTransitionError,
@@ -56,6 +62,7 @@ import {
 import {
   createUnusedCollectorRuntimeHttpService,
 } from "./test-support/collector-runtime-http-service";
+import { FakeSourceGroupReferencePort } from "./test-support/source-group-reference-port";
 
 const now = "2026-01-05T18:00:00.000Z";
 
@@ -380,6 +387,441 @@ describe("HTTP server", () => {
       expect(response.json()).toMatchObject({
         error: {
           code: "INVALID_PROFILE_ACCOUNT_STAGE_TRANSITION",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("creates profile-source access records through the Collector Profile Manager service", async () => {
+    const { server, service, sourceGroupReferences } = createTestServer();
+
+    service.getProfileSourceAccess.setError(
+      new ProfileSourceAccessNotFoundError("profile-1", "source-group-1"),
+    );
+    service.upsertProfileSourceAccess.setOutput(
+      createProfileSourceAccess({
+        accessState: "JOIN_REQUIRED",
+        notes: "Operator notes",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/profiles/profile-1/source-access/source-group-1",
+        payload: {
+          accessState: "JOIN_REQUIRED",
+          lastFailureReason: {
+            code: "JOIN_REQUIRED",
+            message: "Group membership is required.",
+          },
+          notes: "Operator notes",
+        },
+      });
+      const body = response.json();
+      const bodyText = JSON.stringify(body);
+
+      expect(response.statusCode).toBe(201);
+      expect(service.getProfile.calls).toEqual([{ profileId: "profile-1" }]);
+      expect(sourceGroupReferences.calls).toEqual(["source-group-1"]);
+      expect(service.getProfileSourceAccess.calls).toEqual([
+        {
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+        },
+      ]);
+      expect(service.upsertProfileSourceAccess.calls).toEqual([
+        {
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+          accessState: "JOIN_REQUIRED",
+          lastFailureReason: {
+            code: "JOIN_REQUIRED",
+            message: "Group membership is required.",
+          },
+          notes: "Operator notes",
+        },
+      ]);
+      expect(body).toMatchObject({
+        profileSourceAccess: {
+          id: "profile-source-access-1",
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+          accessState: "JOIN_REQUIRED",
+          lastCheckedAt: now,
+          lastSuccessfulAt: null,
+          lastFailureReason: {
+            code: "JOIN_REQUIRED",
+            message: "Group membership is required.",
+          },
+          joinRequestedAt: null,
+          notes: "Operator notes",
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+      expectProfileSourceAccessPayloadIsSafe(bodyText);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("updates an existing profile-source access record instead of creating a duplicate response", async () => {
+    const { server, service } = createTestServer();
+
+    service.upsertProfileSourceAccess.setOutput(
+      createProfileSourceAccess({
+        accessState: "JOINED_ACCESSIBLE",
+        lastSuccessfulAt: "2026-01-05T18:05:00.000Z",
+        updatedAt: "2026-01-05T18:05:00.000Z",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/profiles/profile-1/source-access/source-group-1",
+        payload: {
+          accessState: "JOINED_ACCESSIBLE",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.upsertProfileSourceAccess.calls).toEqual([
+        {
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+          accessState: "JOINED_ACCESSIBLE",
+        },
+      ]);
+      expect(response.json()).toMatchObject({
+        profileSourceAccess: {
+          id: "profile-source-access-1",
+          accessState: "JOINED_ACCESSIBLE",
+          lastSuccessfulAt: "2026-01-05T18:05:00.000Z",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects invalid profile-source access states before calling the service", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/profiles/profile-1/source-access/source-group-1",
+        payload: {
+          accessState: "NOT_A_STATE",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "VALIDATION_ERROR",
+        },
+      });
+      expect(service.getProfile.calls).toEqual([]);
+      expect(service.upsertProfileSourceAccess.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects malformed profile-source access failure reasons", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/profiles/profile-1/source-access/source-group-1",
+        payload: {
+          accessState: "ACCESS_DENIED",
+          lastFailureReason: {
+            code: "not safe",
+            message: "Denied.",
+            rawPayload: "secret",
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "VALIDATION_ERROR",
+        },
+      });
+      expect(service.getProfile.calls).toEqual([]);
+      expect(service.upsertProfileSourceAccess.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects oversized or unsafe profile-source access notes", async () => {
+    for (const notes of ["x".repeat(2001), "contains raw payload data"]) {
+      const { server, service } = createTestServer();
+
+      try {
+        const response = await server.inject({
+          method: "PUT",
+          url: "/collector/profiles/profile-1/source-access/source-group-1",
+          payload: {
+            accessState: "NEEDS_MANUAL_REVIEW",
+            notes,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json()).toMatchObject({
+          error: {
+            code: "VALIDATION_ERROR",
+          },
+        });
+        expect(service.getProfile.calls).toEqual([]);
+        expect(service.upsertProfileSourceAccess.calls).toEqual([]);
+      } finally {
+        await server.close();
+      }
+    }
+  });
+
+  it("returns 404 when upserting source access for an unknown profile", async () => {
+    const { server, service, sourceGroupReferences } = createTestServer();
+
+    service.getProfile.setError(new ProfileNotFoundError("missing-profile"));
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/profiles/missing-profile/source-access/source-group-1",
+        payload: {
+          accessState: "JOIN_REQUIRED",
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "PROFILE_NOT_FOUND",
+        },
+      });
+      expect(sourceGroupReferences.calls).toEqual([]);
+      expect(service.upsertProfileSourceAccess.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 404 when upserting source access for an unknown source group", async () => {
+    const { server, service, sourceGroupReferences } = createTestServer();
+
+    sourceGroupReferences.setExists("missing-source-group", false);
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/profiles/profile-1/source-access/missing-source-group",
+        payload: {
+          accessState: "JOIN_REQUIRED",
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "SOURCE_GROUP_NOT_FOUND",
+        },
+      });
+      expect(service.getProfile.calls).toEqual([{ profileId: "profile-1" }]);
+      expect(sourceGroupReferences.calls).toEqual(["missing-source-group"]);
+      expect(service.upsertProfileSourceAccess.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("lists profile-source access records for a profile", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles/profile-1/source-access",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.getProfile.calls).toEqual([{ profileId: "profile-1" }]);
+      expect(service.listProfileSourceAccessForProfile.calls).toEqual([
+        {
+          profileId: "profile-1",
+        },
+      ]);
+      expect(response.json()).toMatchObject({
+        items: [
+          {
+            profileId: "profile-1",
+            sourceGroupId: "source-group-1",
+          },
+        ],
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns an empty profile-source access list for a profile with no records", async () => {
+    const { server, service } = createTestServer();
+
+    service.listProfileSourceAccessForProfile.setOutput([]);
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles/profile-1/source-access",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ items: [] });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("gets one profile-source access record", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles/profile-1/source-access/source-group-1",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.getProfile.calls).toEqual([{ profileId: "profile-1" }]);
+      expect(service.getProfileSourceAccess.calls).toEqual([
+        {
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+        },
+      ]);
+      expect(response.json()).toMatchObject({
+        profileSourceAccess: {
+          id: "profile-source-access-1",
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 404 when one profile-source access record is absent", async () => {
+    const { server, service } = createTestServer();
+
+    service.getProfileSourceAccess.setError(
+      new ProfileSourceAccessNotFoundError("profile-1", "source-group-1"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles/profile-1/source-access/source-group-1",
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "PROFILE_SOURCE_ACCESS_NOT_FOUND",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("lists profile-source access records for a source group", async () => {
+    const { server, service, sourceGroupReferences } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/source-groups/source-group-1/profile-access",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(sourceGroupReferences.calls).toEqual(["source-group-1"]);
+      expect(service.listProfileSourceAccessForSourceGroup.calls).toEqual([
+        {
+          sourceGroupId: "source-group-1",
+        },
+      ]);
+      expect(response.json()).toMatchObject({
+        items: [
+          {
+            profileId: "profile-1",
+            sourceGroupId: "source-group-1",
+          },
+        ],
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns an empty profile-source access list for a source group with no records", async () => {
+    const { server, service } = createTestServer();
+
+    service.listProfileSourceAccessForSourceGroup.setOutput([]);
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/source-groups/source-group-1/profile-access",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ items: [] });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("exposes profile-source access timestamp behavior through the safe DTO", async () => {
+    const { server, service } = createTestServer();
+
+    service.getProfileSourceAccess.setOutput(
+      createProfileSourceAccess({
+        accessState: "JOIN_REQUESTED",
+        lastCheckedAt: "2026-01-05T18:06:00.000Z",
+        lastSuccessfulAt: "2026-01-05T18:05:00.000Z",
+        joinRequestedAt: "2026-01-05T18:06:00.000Z",
+        createdAt: "2026-01-05T18:00:00.000Z",
+        updatedAt: "2026-01-05T18:06:00.000Z",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles/profile-1/source-access/source-group-1",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        profileSourceAccess: {
+          accessState: "JOIN_REQUESTED",
+          lastCheckedAt: "2026-01-05T18:06:00.000Z",
+          lastSuccessfulAt: "2026-01-05T18:05:00.000Z",
+          joinRequestedAt: "2026-01-05T18:06:00.000Z",
+          createdAt: "2026-01-05T18:00:00.000Z",
+          updatedAt: "2026-01-05T18:06:00.000Z",
         },
       });
     } finally {
@@ -819,13 +1261,31 @@ interface FakeCollectorProfileManager extends CollectorProfileManagerHttpService
     ReleaseProfileLeaseInput,
     ReleaseProfileLeaseOutput
   >;
+  readonly upsertProfileSourceAccess: StubUseCase<
+    UpsertProfileSourceAccessInput,
+    ProfileSourceAccessDto
+  >;
+  readonly getProfileSourceAccess: StubUseCase<
+    GetProfileSourceAccessInput,
+    ProfileSourceAccessDto
+  >;
+  readonly listProfileSourceAccessForProfile: StubUseCase<
+    ListProfileSourceAccessForProfileInput,
+    readonly ProfileSourceAccessDto[]
+  >;
+  readonly listProfileSourceAccessForSourceGroup: StubUseCase<
+    ListProfileSourceAccessForSourceGroupInput,
+    readonly ProfileSourceAccessDto[]
+  >;
 }
 
 function createTestServer(): {
   readonly server: ReturnType<typeof createHttpServer>;
   readonly service: FakeCollectorProfileManager;
+  readonly sourceGroupReferences: FakeSourceGroupReferencePort;
 } {
   const profile = createProfile();
+  const profileSourceAccess = createProfileSourceAccess();
   const service: FakeCollectorProfileManager = {
     createProfile: new StubUseCase(profile),
     getProfile: new StubUseCase(toProfileDetailDto(profile)),
@@ -872,16 +1332,39 @@ function createTestServer(): {
         provisioningTokenStatus: "CONSUMED",
       }),
     }),
+    upsertProfileSourceAccess: new StubUseCase(profileSourceAccess),
+    getProfileSourceAccess: new StubUseCase(profileSourceAccess),
+    listProfileSourceAccessForProfile: new StubUseCase([profileSourceAccess]),
+    listProfileSourceAccessForSourceGroup: new StubUseCase([
+      profileSourceAccess,
+    ]),
   };
+  const sourceGroupReferences = new FakeSourceGroupReferencePort();
 
   return {
     server: createHttpServer({
       collectorProfileManager: service,
+      sourceGroupReferences,
       collectorRuntime: createUnusedCollectorRuntimeHttpService(),
       contentManager: createFakeContentManagerHttpService(),
     }),
     service,
+    sourceGroupReferences,
   };
+}
+
+function expectProfileSourceAccessPayloadIsSafe(bodyText: string): void {
+  expect(bodyText).not.toContain("session-cookie-value");
+  expect(bodyText).not.toContain("local-storage-value");
+  expect(bodyText).not.toContain("proxy");
+  expect(bodyText).not.toContain("secret");
+  expect(bodyText).not.toContain("provisioning-token-1");
+  expect(bodyText).not.toContain("tokenHash");
+  expect(bodyText).not.toContain("hardwareFingerprint");
+  expect(bodyText).not.toContain("authenticationState");
+  expect(bodyText).not.toContain("runtime");
+  expect(bodyText).not.toContain("rawPayload");
+  expect(bodyText).not.toContain("raw page HTML");
 }
 
 interface CreateProfileOptions {
@@ -978,6 +1461,28 @@ function createRuntimeProfileConfiguration(): RuntimeProfileConfiguration {
     temporalRoutine: createTemporalRoutine(),
     safetyThresholds: createSafetyThresholds(),
     contentAffinities: createContentAffinities(),
+  };
+}
+
+function createProfileSourceAccess(
+  options: Partial<ProfileSourceAccessDto> = {},
+): ProfileSourceAccessDto {
+  return {
+    id: options.id ?? "profile-source-access-1",
+    profileId: options.profileId ?? "profile-1",
+    sourceGroupId: options.sourceGroupId ?? "source-group-1",
+    accessState: options.accessState ?? "JOIN_REQUIRED",
+    lastCheckedAt: options.lastCheckedAt ?? now,
+    lastSuccessfulAt: options.lastSuccessfulAt ?? null,
+    lastFailureReason:
+      options.lastFailureReason ?? {
+        code: "JOIN_REQUIRED",
+        message: "Group membership is required.",
+      },
+    joinRequestedAt: options.joinRequestedAt ?? null,
+    ...(options.notes !== undefined ? { notes: options.notes } : {}),
+    createdAt: options.createdAt ?? now,
+    updatedAt: options.updatedAt ?? now,
   };
 }
 

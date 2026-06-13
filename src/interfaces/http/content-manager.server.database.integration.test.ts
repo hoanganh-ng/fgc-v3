@@ -21,6 +21,7 @@ import {
 import {
   createUnusedCollectorRuntimeHttpService,
 } from "./test-support/collector-runtime-http-service";
+import { FakeSourceGroupReferencePort } from "./test-support/source-group-reference-port";
 
 const shouldRunHttpDbTests = process.env.RUN_HTTP_DB_TESTS === "true";
 const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -58,6 +59,7 @@ if (!shouldRunHttpDbTests) {
       service = createContentManagerFromDatabaseClient(databaseClient);
       server = createHttpServer({
         collectorProfileManager: createUnusedCollectorProfileManagerHttpService(),
+        sourceGroupReferences: new FakeSourceGroupReferencePort(),
         collectorRuntime: createUnusedCollectorRuntimeHttpService(),
         contentManager: service,
       });

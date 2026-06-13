@@ -21,6 +21,7 @@ import {
   createSourceGroup,
   createTopComment,
 } from "./test-support/content-manager-http-service";
+import { FakeSourceGroupReferencePort } from "./test-support/source-group-reference-port";
 
 describe("Content Manager HTTP routes", () => {
   it("creates content categories", async () => {
@@ -861,6 +862,7 @@ function createTestServer(): {
   return {
     server: createHttpServer({
       collectorProfileManager: createUnusedCollectorProfileManagerHttpService(),
+      sourceGroupReferences: new FakeSourceGroupReferencePort(),
       collectorRuntime: createUnusedCollectorRuntimeHttpService(),
       contentManager: service,
     }),

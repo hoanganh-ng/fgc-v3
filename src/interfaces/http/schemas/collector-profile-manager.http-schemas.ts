@@ -10,14 +10,23 @@ import {
   ProfileAccountStageSchema,
   ProfileIdSchema,
   ProfileLeaseIdSchema,
+  ProfileSourceAccessSourceGroupIdSchema,
+  ProfileSourceAccessStateSchema,
   ProfileStatusSchema,
   SafetyThresholdsSchema,
   TemporalRoutineSchema,
 } from "../../../collector-profile-manager/domain";
 import {
+  PROFILE_SOURCE_ACCESS_STATES,
+} from "../../../collector-profile-manager/domain";
+import {
   MAX_PROFILE_LIST_LIMIT,
 } from "../../../collector-profile-manager/application";
 export { HttpRequestValidationError, parseHttpInput } from "./http-validation";
+
+export const MAX_PROFILE_SOURCE_ACCESS_FAILURE_CODE_LENGTH = 64;
+export const MAX_PROFILE_SOURCE_ACCESS_FAILURE_MESSAGE_LENGTH = 500;
+export const MAX_PROFILE_SOURCE_ACCESS_NOTES_LENGTH = 2000;
 
 export const CreateProfileHttpBodySchema = z
   .object({
@@ -29,6 +38,19 @@ export const CreateProfileHttpBodySchema = z
 export const ProfileIdHttpParamsSchema = z
   .object({
     profileId: ProfileIdSchema,
+  })
+  .strict();
+
+export const ProfileSourceAccessHttpParamsSchema = z
+  .object({
+    profileId: ProfileIdSchema,
+    sourceGroupId: ProfileSourceAccessSourceGroupIdSchema,
+  })
+  .strict();
+
+export const ProfileSourceAccessSourceGroupHttpParamsSchema = z
+  .object({
+    sourceGroupId: ProfileSourceAccessSourceGroupIdSchema,
   })
   .strict();
 
@@ -106,10 +128,55 @@ export const ReleaseProfileLeaseHttpBodySchema = z
   })
   .strict();
 
+const SourceAccessFailureCodeHttpSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_PROFILE_SOURCE_ACCESS_FAILURE_CODE_LENGTH)
+  .regex(/^[A-Z0-9_:-]+$/, "Expected sanitized failure reason code.");
+
+const ProfileSourceAccessFailureMessageHttpSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_PROFILE_SOURCE_ACCESS_FAILURE_MESSAGE_LENGTH)
+  .refine((value) => !containsUnsafeProfileSourceAccessText(value), {
+    message: "Expected sanitized profile-source access text.",
+  });
+
+const ProfileSourceAccessNotesHttpSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_PROFILE_SOURCE_ACCESS_NOTES_LENGTH)
+  .refine((value) => !containsUnsafeProfileSourceAccessText(value), {
+    message: "Expected sanitized profile-source access text.",
+  });
+
+export const UpsertProfileSourceAccessHttpBodySchema = z
+  .object({
+    accessState: ProfileSourceAccessStateSchema,
+    lastFailureReason: z
+      .object({
+        code: SourceAccessFailureCodeHttpSchema,
+        message: ProfileSourceAccessFailureMessageHttpSchema,
+      })
+      .strict()
+      .optional(),
+    notes: ProfileSourceAccessNotesHttpSchema.optional(),
+  })
+  .strict();
+
 export type CreateProfileHttpBody = z.infer<
   typeof CreateProfileHttpBodySchema
 >;
 export type ProfileIdHttpParams = z.infer<typeof ProfileIdHttpParamsSchema>;
+export type ProfileSourceAccessHttpParams = z.infer<
+  typeof ProfileSourceAccessHttpParamsSchema
+>;
+export type ProfileSourceAccessSourceGroupHttpParams = z.infer<
+  typeof ProfileSourceAccessSourceGroupHttpParamsSchema
+>;
 export type ProvisioningTokenHttpParams = z.infer<
   typeof ProvisioningTokenHttpParamsSchema
 >;
@@ -134,11 +201,34 @@ export type CheckoutProfileHttpBody = z.infer<
 export type ReleaseProfileLeaseHttpBody = z.infer<
   typeof ReleaseProfileLeaseHttpBodySchema
 >;
+export type UpsertProfileSourceAccessHttpBody = z.infer<
+  typeof UpsertProfileSourceAccessHttpBodySchema
+>;
 
 const nonEmptyStringJsonSchema = { type: "string", minLength: 1 } as const;
 const stringJsonSchema = { type: "string" } as const;
 const nullableIsoDateTimeJsonSchema = {
   anyOf: [{ type: "string" }, { type: "null" }],
+} as const;
+const nullableProfileSourceAccessFailureReasonJsonSchema = {
+  anyOf: [
+    {
+      type: "object",
+      required: ["code", "message"],
+      additionalProperties: false,
+      properties: {
+        code: {
+          ...nonEmptyStringJsonSchema,
+          maxLength: MAX_PROFILE_SOURCE_ACCESS_FAILURE_CODE_LENGTH,
+        },
+        message: {
+          ...nonEmptyStringJsonSchema,
+          maxLength: MAX_PROFILE_SOURCE_ACCESS_FAILURE_MESSAGE_LENGTH,
+        },
+      },
+    },
+    { type: "null" },
+  ],
 } as const;
 const looseObjectJsonSchema = {
   type: "object",
@@ -380,12 +470,99 @@ const profileLeaseJsonSchema = {
   },
 } as const;
 
+const profileSourceAccessJsonSchema = {
+  type: "object",
+  required: [
+    "id",
+    "profileId",
+    "sourceGroupId",
+    "accessState",
+    "lastCheckedAt",
+    "lastSuccessfulAt",
+    "lastFailureReason",
+    "joinRequestedAt",
+    "createdAt",
+    "updatedAt",
+  ],
+  additionalProperties: false,
+  properties: {
+    id: nonEmptyStringJsonSchema,
+    profileId: nonEmptyStringJsonSchema,
+    sourceGroupId: nonEmptyStringJsonSchema,
+    accessState: {
+      type: "string",
+      enum: PROFILE_SOURCE_ACCESS_STATES,
+    },
+    lastCheckedAt: nullableIsoDateTimeJsonSchema,
+    lastSuccessfulAt: nullableIsoDateTimeJsonSchema,
+    lastFailureReason: nullableProfileSourceAccessFailureReasonJsonSchema,
+    joinRequestedAt: nullableIsoDateTimeJsonSchema,
+    notes: {
+      ...nonEmptyStringJsonSchema,
+      maxLength: MAX_PROFILE_SOURCE_ACCESS_NOTES_LENGTH,
+    },
+    createdAt: nonEmptyStringJsonSchema,
+    updatedAt: nonEmptyStringJsonSchema,
+  },
+} as const;
+
 const profileIdParamsJsonSchema = {
   type: "object",
   required: ["profileId"],
   additionalProperties: false,
   properties: {
     profileId: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+const profileSourceAccessParamsJsonSchema = {
+  type: "object",
+  required: ["profileId", "sourceGroupId"],
+  additionalProperties: false,
+  properties: {
+    profileId: nonEmptyStringJsonSchema,
+    sourceGroupId: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+const profileSourceAccessSourceGroupParamsJsonSchema = {
+  type: "object",
+  required: ["sourceGroupId"],
+  additionalProperties: false,
+  properties: {
+    sourceGroupId: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+const profileSourceAccessUpsertBodyJsonSchema = {
+  type: "object",
+  required: ["accessState"],
+  additionalProperties: false,
+  properties: {
+    accessState: {
+      type: "string",
+      enum: PROFILE_SOURCE_ACCESS_STATES,
+    },
+    lastFailureReason: {
+      type: "object",
+      required: ["code", "message"],
+      additionalProperties: false,
+      properties: {
+        code: {
+          ...nonEmptyStringJsonSchema,
+          maxLength: MAX_PROFILE_SOURCE_ACCESS_FAILURE_CODE_LENGTH,
+          pattern: "^[A-Z0-9_:-]+$",
+        },
+        message: {
+          ...nonEmptyStringJsonSchema,
+          maxLength: MAX_PROFILE_SOURCE_ACCESS_FAILURE_MESSAGE_LENGTH,
+        },
+      },
+    },
+    notes: {
+      ...nonEmptyStringJsonSchema,
+      maxLength: MAX_PROFILE_SOURCE_ACCESS_NOTES_LENGTH,
+    },
   },
 } as const;
 
@@ -719,3 +896,107 @@ export const getRuntimeProfileConfigurationHttpRouteSchema = {
     "5xx": errorResponseJsonSchema,
   },
 } as const;
+
+export const upsertProfileSourceAccessHttpRouteSchema = {
+  params: profileSourceAccessParamsJsonSchema,
+  body: profileSourceAccessUpsertBodyJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["profileSourceAccess"],
+      additionalProperties: false,
+      properties: {
+        profileSourceAccess: profileSourceAccessJsonSchema,
+      },
+    },
+    201: {
+      type: "object",
+      required: ["profileSourceAccess"],
+      additionalProperties: false,
+      properties: {
+        profileSourceAccess: profileSourceAccessJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const listProfileSourceAccessForProfileHttpRouteSchema = {
+  params: profileIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["items"],
+      additionalProperties: false,
+      properties: {
+        items: {
+          type: "array",
+          items: profileSourceAccessJsonSchema,
+        },
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const getProfileSourceAccessHttpRouteSchema = {
+  params: profileSourceAccessParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["profileSourceAccess"],
+      additionalProperties: false,
+      properties: {
+        profileSourceAccess: profileSourceAccessJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const listProfileSourceAccessForSourceGroupHttpRouteSchema = {
+  params: profileSourceAccessSourceGroupParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["items"],
+      additionalProperties: false,
+      properties: {
+        items: {
+          type: "array",
+          items: profileSourceAccessJsonSchema,
+        },
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+function containsUnsafeProfileSourceAccessText(value: string): boolean {
+  const normalized = value.toLowerCase();
+  const unsafeTerms = [
+    "cookie",
+    "localstorage",
+    "local storage",
+    "authorization",
+    "bearer",
+    "proxy credential",
+    "proxy password",
+    "session header",
+    "provisioning token",
+    "token hash",
+    "fingerprint secret",
+    "raw page html",
+    "screenshot",
+    "raw facebook payload",
+    "raw payload",
+    "runtime config",
+    "localstorage",
+  ];
+
+  return unsafeTerms.some((term) => normalized.includes(term));
+}

@@ -1,4 +1,7 @@
-import { createCollectorProfileManagerFromEnv } from "./composition/collector-profile-manager";
+import {
+  ContentManagerSourceGroupReferenceAdapter,
+  createCollectorProfileManagerFromEnv,
+} from "./composition/collector-profile-manager";
 import { createCollectorRuntimeFromEnv } from "./composition/collector-runtime";
 import { createContentManagerFromEnv } from "./composition/content-manager";
 import { createHttpServer } from "./interfaces/http";
@@ -30,8 +33,12 @@ async function main(): Promise<void> {
   const collectorProfileManager = createCollectorProfileManagerFromEnv();
   const collectorRuntime = createCollectorRuntimeFromEnv();
   const contentManager = createContentManagerFromEnv();
+  const sourceGroupReferences = new ContentManagerSourceGroupReferenceAdapter(
+    contentManager.getSourceGroup,
+  );
   const server = createHttpServer({
     collectorProfileManager,
+    sourceGroupReferences,
     collectorRuntime,
     contentManager,
   });

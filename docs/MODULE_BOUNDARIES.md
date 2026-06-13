@@ -15,13 +15,14 @@ Owns:
 - Profile lease purpose rules for `COLLECTION` and `AMBIENT_EXERCISE`.
 - Specified-profile ambient exercise checkout eligibility for `READY` profiles, including allowed account stages and rejected review/retired stages.
 - Profile-source access state for `profileId + sourceGroupId` pairs, stored with `sourceGroupId` as an external module reference string.
+- Profile-source access HTTP workflows, including validating source group references through an explicit Content Manager-facing port or adapter.
 
 Does not own:
 
 - Browser automation execution.
 - Collection task orchestration.
 - Content Manager source group records or source group entry route metadata.
-- Source group existence validation through Content Manager until an explicit port/API adapter is introduced.
+- Direct Content Manager repository access or database foreign keys from profile-source access records to Content Manager source group tables.
 - Web UI rendering.
 - Database technology selection.
 - HTTP framework implementation.

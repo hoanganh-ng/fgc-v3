@@ -1,5 +1,6 @@
 import fastify from "fastify";
 import type { FastifyInstance, FastifyServerOptions } from "fastify";
+import type { SourceGroupReferencePort } from "../../collector-profile-manager/application";
 import { mapErrorToHttpResponse } from "./errors/http-error-mapper";
 import {
   registerCollectorProfileManagerRoutes,
@@ -17,6 +18,7 @@ import { registerHealthRoutes } from "./routes/health.routes";
 
 export interface CreateHttpServerOptions {
   readonly collectorProfileManager: CollectorProfileManagerHttpService;
+  readonly sourceGroupReferences: SourceGroupReferencePort;
   readonly collectorRuntime: CollectorRuntimeHttpService;
   readonly contentManager: ContentManagerHttpService;
   readonly logger?: FastifyServerOptions["logger"];
@@ -43,6 +45,7 @@ export function createHttpServer(
   registerHealthRoutes(server);
   registerCollectorProfileManagerRoutes(server, {
     collectorProfileManager: options.collectorProfileManager,
+    sourceGroupReferences: options.sourceGroupReferences,
   });
   registerCollectorRuntimeRoutes(server, {
     collectorRuntime: options.collectorRuntime,
