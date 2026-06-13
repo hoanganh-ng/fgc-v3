@@ -552,6 +552,49 @@ describe("collector profile checkout use cases", () => {
       ).rejects.toThrow(ProfileNotCheckoutEligibleError);
     });
 
+    it("reports ordinary eligibility before source access for explicit profile checkout", async () => {
+      const context = createTestContext();
+      const profile = await createReadyProfile(context, {
+        accountStage: "WARMING",
+        sourceAccess: "ACCESS_DENIED",
+      });
+
+      try {
+        await new CheckoutProfileUseCase(
+          context.profiles,
+          context.leases,
+          context.leaseIds,
+          context.clock,
+          context.sourceGroupReference,
+          context.profileSourceAccess,
+        ).execute({
+          profileId: profile.identity.id,
+          sourceGroupId: "source-group-1",
+        });
+        throw new Error("Expected checkout to fail.");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ProfileNotCheckoutEligibleError);
+
+        if (error instanceof ProfileNotCheckoutEligibleError) {
+          expect(error.profileId).toBe(profile.identity.id);
+          expect(error.reasons).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                code: "ACCOUNT_STAGE_NOT_COLLECTION_READY",
+              }),
+            ]),
+          );
+          expect(error.reasons).not.toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                code: "SOURCE_ACCESS_UNSUCCESSFUL",
+              }),
+            ]),
+          );
+        }
+      }
+    });
+
     it("does not mutate access records during successful checkout", async () => {
       const context = createTestContext();
       const readyProfile = await createReadyProfile(context);

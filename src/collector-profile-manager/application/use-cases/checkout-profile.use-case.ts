@@ -113,31 +113,6 @@ export class CheckoutProfileUseCase {
     const rejectedReasons: CheckoutIneligibilityReason[] = [];
 
     for (const candidate of candidates) {
-      // Check source access for explicit profile checkout
-      if (
-        input.profileId !== undefined &&
-        !eligibleProfileIdSet.has(candidate.identity.id)
-      ) {
-        throw new ProfileNotCheckoutEligibleError(candidate.identity.id, [
-          {
-            code: "SOURCE_ACCESS_UNSUCCESSFUL",
-            message: `Profile does not have successful source access for source group ${input.sourceGroupId}.`,
-          },
-        ]);
-      }
-
-      // Skip profiles without successful source access for automatic selection
-      if (
-        input.profileId === undefined &&
-        !eligibleProfileIdSet.has(candidate.identity.id)
-      ) {
-        rejectedReasons.push({
-          code: "SOURCE_ACCESS_UNSUCCESSFUL",
-          message: `Profile does not have successful source access for source group ${input.sourceGroupId}.`,
-        });
-        continue;
-      }
-
       const eligibility = evaluateCheckoutEligibility(candidate, now);
 
       if (!eligibility.eligible) {
@@ -150,6 +125,22 @@ export class CheckoutProfileUseCase {
           );
         }
 
+        continue;
+      }
+
+      if (!eligibleProfileIdSet.has(candidate.identity.id)) {
+        const sourceAccessReason = {
+          code: "SOURCE_ACCESS_UNSUCCESSFUL" as const,
+          message: `Profile does not have successful source access for source group ${input.sourceGroupId}.`,
+        };
+
+        if (input.profileId !== undefined) {
+          throw new ProfileNotCheckoutEligibleError(candidate.identity.id, [
+            sourceAccessReason,
+          ]);
+        }
+
+        rejectedReasons.push(sourceAccessReason);
         continue;
       }
 
