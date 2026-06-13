@@ -153,15 +153,17 @@ const ProfileSourceAccessNotesHttpSchema = z
     message: "Expected sanitized profile-source access text.",
   });
 
+const ProfileSourceAccessFailureReasonHttpSchema = z
+  .object({
+    code: SourceAccessFailureCodeHttpSchema,
+    message: ProfileSourceAccessFailureMessageHttpSchema,
+  })
+  .strict();
+
 export const UpsertProfileSourceAccessHttpBodySchema = z
   .object({
     accessState: ProfileSourceAccessStateSchema,
-    lastFailureReason: z
-      .object({
-        code: SourceAccessFailureCodeHttpSchema,
-        message: ProfileSourceAccessFailureMessageHttpSchema,
-      })
-      .strict()
+    lastFailureReason: ProfileSourceAccessFailureReasonHttpSchema.nullable()
       .optional(),
     notes: ProfileSourceAccessNotesHttpSchema.optional(),
   })
@@ -544,20 +546,25 @@ const profileSourceAccessUpsertBodyJsonSchema = {
       enum: PROFILE_SOURCE_ACCESS_STATES,
     },
     lastFailureReason: {
-      type: "object",
-      required: ["code", "message"],
-      additionalProperties: false,
-      properties: {
-        code: {
-          ...nonEmptyStringJsonSchema,
-          maxLength: MAX_PROFILE_SOURCE_ACCESS_FAILURE_CODE_LENGTH,
-          pattern: "^[A-Z0-9_:-]+$",
+      anyOf: [
+        {
+          type: "object",
+          required: ["code", "message"],
+          additionalProperties: false,
+          properties: {
+            code: {
+              ...nonEmptyStringJsonSchema,
+              maxLength: MAX_PROFILE_SOURCE_ACCESS_FAILURE_CODE_LENGTH,
+              pattern: "^[A-Z0-9_:-]+$",
+            },
+            message: {
+              ...nonEmptyStringJsonSchema,
+              maxLength: MAX_PROFILE_SOURCE_ACCESS_FAILURE_MESSAGE_LENGTH,
+            },
+          },
         },
-        message: {
-          ...nonEmptyStringJsonSchema,
-          maxLength: MAX_PROFILE_SOURCE_ACCESS_FAILURE_MESSAGE_LENGTH,
-        },
-      },
+        { type: "null" },
+      ],
     },
     notes: {
       ...nonEmptyStringJsonSchema,

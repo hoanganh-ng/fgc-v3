@@ -576,6 +576,7 @@ if (!shouldRunHttpDbTests) {
           readonly accessState: string;
           readonly lastCheckedAt: string | null;
           readonly lastSuccessfulAt: string | null;
+          readonly lastFailureReason: unknown;
           readonly joinRequestedAt: string | null;
           readonly createdAt: string;
           readonly updatedAt: string;
@@ -588,6 +589,10 @@ if (!shouldRunHttpDbTests) {
           sourceGroupId,
           accessState: "JOIN_REQUIRED",
           lastSuccessfulAt: null,
+          lastFailureReason: {
+            code: "JOIN_REQUIRED",
+            message: "Group membership is required.",
+          },
           joinRequestedAt: null,
         },
       });
@@ -605,6 +610,10 @@ if (!shouldRunHttpDbTests) {
           profileId,
           sourceGroupId,
           accessState: "JOIN_REQUIRED",
+          lastFailureReason: {
+            code: "JOIN_REQUIRED",
+            message: "Group membership is required.",
+          },
         },
       });
 
@@ -614,12 +623,9 @@ if (!shouldRunHttpDbTests) {
         method: "PUT",
         url: `/collector/profiles/${profileId}/source-access/${sourceGroupId}`,
         payload: {
-          accessState: "JOIN_REQUESTED",
-          lastFailureReason: {
-            code: "JOIN_REQUESTED",
-            message: "Join request was submitted by operator.",
-          },
-          notes: "Operator requested access.",
+          accessState: "JOINED_ACCESSIBLE",
+          lastFailureReason: null,
+          notes: "Operator confirmed access.",
         },
       });
       const updateAccessBody = updateAccessResponse.json() as {
@@ -628,6 +634,7 @@ if (!shouldRunHttpDbTests) {
           readonly accessState: string;
           readonly lastCheckedAt: string | null;
           readonly lastSuccessfulAt: string | null;
+          readonly lastFailureReason: unknown;
           readonly joinRequestedAt: string | null;
           readonly createdAt: string;
           readonly updatedAt: string;
@@ -637,20 +644,36 @@ if (!shouldRunHttpDbTests) {
       expect(updateAccessBody).toMatchObject({
         profileSourceAccess: {
           id: createAccessBody.profileSourceAccess.id,
-          accessState: "JOIN_REQUESTED",
-          lastSuccessfulAt: null,
+          accessState: "JOINED_ACCESSIBLE",
+          lastFailureReason: null,
           createdAt: createAccessBody.profileSourceAccess.createdAt,
         },
       });
       expect(updateAccessBody.profileSourceAccess.lastCheckedAt).not.toBeNull();
-      expect(updateAccessBody.profileSourceAccess.joinRequestedAt).toBe(
+      expect(updateAccessBody.profileSourceAccess.lastSuccessfulAt).toBe(
         updateAccessBody.profileSourceAccess.lastCheckedAt,
       );
+      expect(updateAccessBody.profileSourceAccess.joinRequestedAt).toBeNull();
       expect(
         Date.parse(updateAccessBody.profileSourceAccess.updatedAt),
       ).toBeGreaterThanOrEqual(
         Date.parse(createAccessBody.profileSourceAccess.updatedAt),
       );
+
+      const getUpdatedResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/profiles/${profileId}/source-access/${sourceGroupId}`,
+      });
+      expect(getUpdatedResponse.statusCode).toBe(200);
+      expect(getUpdatedResponse.json()).toMatchObject({
+        profileSourceAccess: {
+          id: createAccessBody.profileSourceAccess.id,
+          profileId,
+          sourceGroupId,
+          accessState: "JOINED_ACCESSIBLE",
+          lastFailureReason: null,
+        },
+      });
 
       const listByProfileResponse = await getServer().inject({
         method: "GET",
@@ -663,7 +686,8 @@ if (!shouldRunHttpDbTests) {
             id: createAccessBody.profileSourceAccess.id,
             profileId,
             sourceGroupId,
-            accessState: "JOIN_REQUESTED",
+            accessState: "JOINED_ACCESSIBLE",
+            lastFailureReason: null,
           },
         ],
       });
@@ -679,7 +703,8 @@ if (!shouldRunHttpDbTests) {
             id: createAccessBody.profileSourceAccess.id,
             profileId,
             sourceGroupId,
-            accessState: "JOIN_REQUESTED",
+            accessState: "JOINED_ACCESSIBLE",
+            lastFailureReason: null,
           },
         ],
       });
@@ -698,7 +723,8 @@ if (!shouldRunHttpDbTests) {
         id: createAccessBody.profileSourceAccess.id,
         profileId,
         sourceGroupId,
-        accessState: "JOIN_REQUESTED",
+        accessState: "JOINED_ACCESSIBLE",
+        lastFailureReason: null,
       });
     });
 

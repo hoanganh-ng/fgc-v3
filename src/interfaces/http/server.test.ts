@@ -468,6 +468,49 @@ describe("HTTP server", () => {
     }
   });
 
+  it("accepts explicit null for profile-source access failure reasons", async () => {
+    const { server, service } = createTestServer();
+
+    service.upsertProfileSourceAccess.setOutput(
+      createProfileSourceAccess({
+        accessState: "JOINED_ACCESSIBLE",
+        lastSuccessfulAt: "2026-01-05T18:05:00.000Z",
+        lastFailureReason: null,
+        updatedAt: "2026-01-05T18:05:00.000Z",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/profiles/profile-1/source-access/source-group-1",
+        payload: {
+          accessState: "JOINED_ACCESSIBLE",
+          lastFailureReason: null,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.upsertProfileSourceAccess.calls).toEqual([
+        {
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+          accessState: "JOINED_ACCESSIBLE",
+          lastFailureReason: null,
+        },
+      ]);
+      expect(response.json()).toMatchObject({
+        profileSourceAccess: {
+          accessState: "JOINED_ACCESSIBLE",
+          lastSuccessfulAt: "2026-01-05T18:05:00.000Z",
+          lastFailureReason: null,
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("updates an existing profile-source access record instead of creating a duplicate response", async () => {
     const { server, service } = createTestServer();
 
@@ -694,7 +737,7 @@ describe("HTTP server", () => {
   });
 
   it("gets one profile-source access record", async () => {
-    const { server, service } = createTestServer();
+    const { server, service, sourceGroupReferences } = createTestServer();
 
     try {
       const response = await server.inject({
@@ -704,6 +747,7 @@ describe("HTTP server", () => {
 
       expect(response.statusCode).toBe(200);
       expect(service.getProfile.calls).toEqual([{ profileId: "profile-1" }]);
+      expect(sourceGroupReferences.calls).toEqual(["source-group-1"]);
       expect(service.getProfileSourceAccess.calls).toEqual([
         {
           profileId: "profile-1",
@@ -717,6 +761,31 @@ describe("HTTP server", () => {
           sourceGroupId: "source-group-1",
         },
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 404 when getting one profile-source access record for an unknown source group", async () => {
+    const { server, service, sourceGroupReferences } = createTestServer();
+
+    sourceGroupReferences.setExists("missing-source-group", false);
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles/profile-1/source-access/missing-source-group",
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "SOURCE_GROUP_NOT_FOUND",
+        },
+      });
+      expect(service.getProfile.calls).toEqual([{ profileId: "profile-1" }]);
+      expect(sourceGroupReferences.calls).toEqual(["missing-source-group"]);
+      expect(service.getProfileSourceAccess.calls).toEqual([]);
     } finally {
       await server.close();
     }
@@ -1475,10 +1544,12 @@ function createProfileSourceAccess(
     lastCheckedAt: options.lastCheckedAt ?? now,
     lastSuccessfulAt: options.lastSuccessfulAt ?? null,
     lastFailureReason:
-      options.lastFailureReason ?? {
-        code: "JOIN_REQUIRED",
-        message: "Group membership is required.",
-      },
+      options.lastFailureReason !== undefined
+        ? options.lastFailureReason
+        : {
+            code: "JOIN_REQUIRED",
+            message: "Group membership is required.",
+          },
     joinRequestedAt: options.joinRequestedAt ?? null,
     ...(options.notes !== undefined ? { notes: options.notes } : {}),
     createdAt: options.createdAt ?? now,

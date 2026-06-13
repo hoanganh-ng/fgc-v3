@@ -505,6 +505,10 @@ export function registerCollectorProfileManagerRoutes(
       );
 
       await ensureProfileExists(collectorProfileManager, params.profileId);
+      await ensureSourceGroupExists(
+        sourceGroupReferences,
+        params.sourceGroupId,
+      );
       const profileSourceAccess =
         await collectorProfileManager.getProfileSourceAccess.execute({
           profileId: params.profileId,
