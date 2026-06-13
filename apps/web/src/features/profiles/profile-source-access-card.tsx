@@ -182,6 +182,8 @@ export function ProfileSourceAccessCard({
     useWatch({ control: form.control, name: "accessState" }) ?? "UNKNOWN";
   const selectedAccessRecord = accessBySourceGroupId.get(selectedSourceGroupId);
   const editorDisabled =
+    accessQuery.isPending ||
+    accessQuery.isError ||
     sourceGroupsQuery.isPending ||
     sourceGroupsQuery.isError ||
     sortedSourceGroups.length === 0;
@@ -657,7 +659,7 @@ function ProfileSourceAccessErrorState({
       <div className="flex items-start gap-2">
         <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         <div className="min-w-0">
-          <p className="font-semibold">Source access could not load.</p>
+          <p className="font-semibold">Source access could not load. Editing is disabled until access records can be loaded.</p>
           <p className="mt-1 break-words">{formatApiError(error)}</p>
           <Button className="mt-3" size="sm" variant="secondary" onClick={onRetry}>
             <RefreshCw aria-hidden="true" className="size-4" />
