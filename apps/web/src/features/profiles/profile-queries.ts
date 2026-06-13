@@ -24,6 +24,8 @@ export const profileQueryKeys = {
     [...profileQueryKeys.all, "detail", profileId] as const,
   sourceAccess: (profileId: string) =>
     [...profileQueryKeys.all, "source-access", profileId] as const,
+  sourceGroupAccess: (sourceGroupId: string) =>
+    [...profileQueryKeys.all, "source-group-access", sourceGroupId] as const,
 };
 
 export function useProfilesQuery(
@@ -54,5 +56,16 @@ export function useProfileSourceAccessQuery(
     enabled: profileId.trim().length > 0,
     queryFn: async () =>
       unwrapApiResult(await profileManagerClient.listProfileSourceAccess(profileId)),
+  });
+}
+
+export function useSourceGroupProfileAccessQuery(
+  sourceGroupId: string,
+): UseQueryResult<ProfileSourceAccessListResponse, ApiResultError> {
+  return useQuery<ProfileSourceAccessListResponse, ApiResultError>({
+    queryKey: profileQueryKeys.sourceGroupAccess(sourceGroupId),
+    enabled: sourceGroupId.trim().length > 0,
+    queryFn: async () =>
+      unwrapApiResult(await profileManagerClient.listProfileSourceAccessForSourceGroup(sourceGroupId)),
   });
 }

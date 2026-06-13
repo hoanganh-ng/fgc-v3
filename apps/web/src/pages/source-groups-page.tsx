@@ -12,6 +12,7 @@ import {
   Tags,
   Trash2,
   X,
+  Eye,
 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ import {
   useContentCategoriesQuery,
   useSourceGroupsQuery,
 } from "@/features/content-manager/content-manager-queries";
+import { SourceGroupProfileAccessPanel } from "@/features/content-manager/source-group-profile-access-panel";
 import { isApiResultError } from "@/lib/api/http-client";
 import {
   ContentPlatformSchema,
@@ -592,6 +594,7 @@ function SourceGroupsList({
       }
     | null
   >(null);
+  const [expandedSourceGroupId, setExpandedSourceGroupId] = useState<string | null>(null);
   const categoryById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
     [categories],
@@ -686,6 +689,21 @@ function SourceGroupsList({
                           <Clipboard aria-hidden="true" className="size-4" />
                           {rowCopyState === "copied" ? "Copied" : "Copy"}
                         </Button>
+                        <Button
+                          aria-label={`View profile access for ${sourceGroup.name}`}
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setExpandedSourceGroupId(
+                              expandedSourceGroupId === sourceGroup.id
+                                ? null
+                                : sourceGroup.id
+                            );
+                          }}
+                        >
+                          <Eye aria-hidden="true" className="size-4" />
+                          {expandedSourceGroupId === sourceGroup.id ? "Hide" : "View"} Profile Access
+                        </Button>
                         {rowCopyState === "failed" ? (
                           <span className="text-xs font-medium text-[#7f1d1d]">
                             Clipboard unavailable
@@ -739,6 +757,10 @@ function SourceGroupsList({
                     </Select>
                   </div>
                 </div>
+
+                {expandedSourceGroupId === sourceGroup.id && (
+                  <SourceGroupProfileAccessPanel sourceGroupId={sourceGroup.id} />
+                )}
 
                 <dl className="grid min-w-0 gap-x-5 gap-y-3 text-sm sm:grid-cols-2">
                   <div className="min-w-0">

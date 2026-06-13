@@ -462,6 +462,9 @@ export interface ProfileManagerClient {
     sourceGroupId: string,
     request: UpsertProfileSourceAccessRequest,
   ) => Promise<ApiResult<ProfileSourceAccessResponse>>;
+  readonly listProfileSourceAccessForSourceGroup: (
+    sourceGroupId: string,
+  ) => Promise<ApiResult<ProfileSourceAccessListResponse>>;
 }
 
 export function createProfileManagerClient(
@@ -526,6 +529,12 @@ export function createProfileManagerClient(
         method: "PUT",
         body: request,
         responseSchema: ProfileSourceAccessResponseSchema,
+      });
+    },
+    listProfileSourceAccessForSourceGroup(sourceGroupId) {
+      return httpClient.request({
+        path: `/collector/source-groups/${encodeURIComponent(sourceGroupId)}/profile-access`,
+        responseSchema: ProfileSourceAccessListResponseSchema,
       });
     },
   };
