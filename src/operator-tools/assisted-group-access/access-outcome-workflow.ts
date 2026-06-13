@@ -16,11 +16,16 @@ export type AssistedAccessOutcomeSelection =
   | ProfileSourceAccessReportableState
   | "SKIP";
 
+export type AssistedAccessOutcomePromptResult =
+  | AssistedAccessOutcomeSelection
+  | "ABORTED";
+
 export interface AssistedAccessOutcomePromptPort {
   promptOutcome(input: {
     readonly profileId: string;
     readonly sourceGroupId: string;
-  }): Promise<AssistedAccessOutcomeSelection>;
+    readonly abortSignal?: AbortSignal;
+  }): Promise<AssistedAccessOutcomePromptResult>;
 }
 
 export interface ProfileSourceAccessOutcomeReporterPort {
@@ -54,6 +59,9 @@ export interface AssistedAccessWorkflowResult {
       }
     | {
         readonly status: "SKIPPED";
+      }
+    | {
+        readonly status: "ABORTED";
       }
     | {
         readonly status: "SUCCEEDED";
@@ -108,7 +116,20 @@ export async function runAssistedAccessWorkflow(
   const selection = await outcomePrompt.promptOutcome({
     profileId: session.profileId,
     sourceGroupId: session.sourceGroupId,
+    ...(input.abortSignal !== undefined ? { abortSignal: input.abortSignal } : {}),
   });
+
+  if (selection === "ABORTED") {
+    logger.info("Profile-source access outcome reporting aborted.");
+    return {
+      ok: false,
+      session,
+      reporting: {
+        status: "ABORTED",
+      },
+      errors,
+    };
+  }
 
   if (selection === "SKIP") {
     logger.info("Profile-source access outcome reporting skipped.");

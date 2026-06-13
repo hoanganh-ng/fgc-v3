@@ -30,6 +30,7 @@ import {
   promptForAssistedAccessOutcome,
   runAssistedAccessWorkflow,
   type AssistedAccessOutcomePromptPort,
+  type AssistedAccessOutcomePromptResult,
   type AssistedAccessOutcomeSelection,
   type ProfileSourceAccessOutcomeReporterPort,
 } from "./access-outcome-workflow";
@@ -212,6 +213,113 @@ describe("assisted access outcome workflow", () => {
     expect(context.reporter.calls).toEqual([]);
   });
 
+  it("aborts outcome prompting when the signal is already aborted", async () => {
+    const context = createWorkflowContext();
+    const abortController = new AbortController();
+    abortController.abort();
+
+    const result = await runAssistedAccessWorkflow({
+      args: createArgs(),
+      abortSignal: abortController.signal,
+      dependencies: context.dependencies,
+      now: () => new Date(now),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.reporting.status).toBe("ABORTED");
+    expect(context.prompt.calls).toEqual([
+      {
+        profileId: "profile-1",
+        sourceGroupId: "source-group-1",
+        abortSignal: abortController.signal,
+      },
+    ]);
+    expect(context.reporter.calls).toEqual([]);
+  });
+
+  it("aborts outcome prompting while waiting for operator input", async () => {
+    const context = createWorkflowContext({
+      promptWaitsForAbort: true,
+    });
+    const abortController = new AbortController();
+    const resultPromise = runAssistedAccessWorkflow({
+      args: createArgs(),
+      abortSignal: abortController.signal,
+      dependencies: context.dependencies,
+      now: () => new Date(now),
+    });
+
+    await context.prompt.waitForPendingPrompt();
+    abortController.abort();
+
+    const result = await resultPromise;
+
+    expect(result.ok).toBe(false);
+    expect(result.reporting.status).toBe("ABORTED");
+    expect(context.reporter.calls).toEqual([]);
+  });
+
+  it("keeps prompt abortion distinct from explicit skip", async () => {
+    const skipped = createWorkflowContext({
+      promptSelection: "SKIP",
+    });
+    const aborted = createWorkflowContext({
+      promptSelection: "ABORTED",
+    });
+
+    const skippedResult = await runAssistedAccessWorkflow({
+      args: createArgs(),
+      dependencies: skipped.dependencies,
+      now: () => new Date(now),
+    });
+    const abortedResult = await runAssistedAccessWorkflow({
+      args: createArgs(),
+      dependencies: aborted.dependencies,
+      now: () => new Date(now),
+    });
+
+    expect(skippedResult).toMatchObject({
+      ok: true,
+      reporting: {
+        status: "SKIPPED",
+      },
+    });
+    expect(abortedResult).toMatchObject({
+      ok: false,
+      reporting: {
+        status: "ABORTED",
+      },
+    });
+    expect(skipped.reporter.calls).toEqual([]);
+    expect(aborted.reporter.calls).toEqual([]);
+  });
+
+  it("preserves session errors when outcome prompting is aborted", async () => {
+    const context = createWorkflowContext({
+      releaseFails: true,
+      promptSelection: "ABORTED",
+    });
+
+    const result = await runAssistedAccessWorkflow({
+      args: createArgs(),
+      dependencies: context.dependencies,
+      now: () => new Date(now),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      reporting: {
+        status: "ABORTED",
+      },
+      errors: [
+        {
+          code: "PROFILE_LEASE_RELEASE_FAILED",
+        },
+      ],
+    });
+    expect(context.reporter.calls).toEqual([]);
+  });
+
   it("reports persistence failure as a workflow failure", async () => {
     const context = createWorkflowContext({
       promptSelection: "CHECKPOINT_REQUIRED",
@@ -271,7 +379,8 @@ function createWorkflowContext(
     readonly completionReason?: "OPERATOR_COMPLETED" | "TIMEOUT" | "ABORTED";
     readonly navigationFails?: boolean;
     readonly releaseFails?: boolean;
-    readonly promptSelection?: AssistedAccessOutcomeSelection;
+    readonly promptSelection?: AssistedAccessOutcomePromptResult;
+    readonly promptWaitsForAbort?: boolean;
     readonly reportResult?: UpsertProfileSourceAccessResult;
     readonly order?: string[];
   } = {},
@@ -285,7 +394,11 @@ function createWorkflowContext(
   };
 } {
   const order = options.order;
-  const prompt = new FakeOutcomePrompt(options.promptSelection ?? "ACCESS_DENIED", order);
+  const prompt = new FakeOutcomePrompt({
+    selection: options.promptSelection ?? "ACCESS_DENIED",
+    order,
+    waitsForAbort: options.promptWaitsForAbort === true,
+  });
   const reporter = new FakeOutcomeReporter(options.reportResult, order);
   const profileManager = new FakeProfileManager(options.releaseFails === true, order);
   const page = new FakeBrowserPage(options.navigationFails === true);
@@ -328,21 +441,60 @@ class FakeOutcomePrompt implements AssistedAccessOutcomePromptPort {
   public readonly calls: Array<{
     readonly profileId: string;
     readonly sourceGroupId: string;
+    readonly abortSignal?: AbortSignal;
   }> = [];
+  private readonly pendingPrompt: Promise<void>;
+  private resolvePendingPrompt: () => void = () => {};
 
   public constructor(
-    private readonly selection: AssistedAccessOutcomeSelection,
-    private readonly order: string[] | undefined,
-  ) {}
+    private readonly options: {
+      readonly selection: AssistedAccessOutcomePromptResult;
+      readonly order: string[] | undefined;
+      readonly waitsForAbort: boolean;
+    },
+  ) {
+    this.pendingPrompt = new Promise((resolve) => {
+      this.resolvePendingPrompt = resolve;
+    });
+  }
 
   public async promptOutcome(input: {
     readonly profileId: string;
     readonly sourceGroupId: string;
-  }): Promise<AssistedAccessOutcomeSelection> {
-    this.order?.push("prompt");
+    readonly abortSignal?: AbortSignal;
+  }): Promise<AssistedAccessOutcomePromptResult> {
+    this.options.order?.push("prompt");
     this.calls.push(input);
 
-    return this.selection;
+    if (input.abortSignal?.aborted) {
+      return "ABORTED";
+    }
+
+    if (this.options.waitsForAbort) {
+      return await this.waitUntilAborted(input.abortSignal);
+    }
+
+    return this.options.selection;
+  }
+
+  public async waitForPendingPrompt(): Promise<void> {
+    await this.pendingPrompt;
+  }
+
+  private async waitUntilAborted(
+    abortSignal: AbortSignal | undefined,
+  ): Promise<"ABORTED"> {
+    this.resolvePendingPrompt();
+
+    if (abortSignal === undefined) {
+      return await new Promise<"ABORTED">(() => {});
+    }
+
+    return await new Promise((resolve) => {
+      abortSignal.addEventListener("abort", () => resolve("ABORTED"), {
+        once: true,
+      });
+    });
   }
 }
 

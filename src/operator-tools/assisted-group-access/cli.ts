@@ -128,7 +128,11 @@ class StdinAssistedAccessSessionControl
 class StdinAssistedAccessOutcomePrompt
   implements AssistedAccessOutcomePromptPort
 {
-  public async promptOutcome(): Promise<
+  public async promptOutcome(input: {
+    readonly profileId: string;
+    readonly sourceGroupId: string;
+    readonly abortSignal?: AbortSignal;
+  }): Promise<
     | "PUBLIC_ACCESSIBLE"
     | "JOIN_REQUIRED"
     | "JOINED_ACCESSIBLE"
@@ -136,27 +140,50 @@ class StdinAssistedAccessOutcomePrompt
     | "LOGIN_REQUIRED"
     | "CHECKPOINT_REQUIRED"
     | "SKIP"
+    | "ABORTED"
   > {
+    const abortSignal = input.abortSignal;
+
+    if (abortSignal?.aborted) {
+      return "ABORTED";
+    }
+
     const readline = createInterface({
       input: process.stdin,
       output: process.stdout,
     });
 
     try {
-      return await promptForAssistedAccessOutcome({
-        writeLine: (message) => console.log(message),
-        readLine: async () => {
-          try {
-            return await readline.question("> ");
-          } catch {
-            return undefined;
-          }
-        },
-      });
+      try {
+        return await promptForAssistedAccessOutcome({
+          writeLine: (message) => console.log(message),
+          readLine: async () => {
+            try {
+              return await readline.question("> ", { signal: abortSignal });
+            } catch (error) {
+              if (isAbortError(error)) {
+                throw error;
+              }
+
+              return undefined;
+            }
+          },
+        });
+      } catch (error) {
+        if (isAbortError(error)) {
+          return "ABORTED";
+        }
+
+        throw error;
+      }
     } finally {
       readline.close();
     }
   }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 function applyProcessExitCode(
