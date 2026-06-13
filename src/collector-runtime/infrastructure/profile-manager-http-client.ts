@@ -108,6 +108,8 @@ export type ProfileExerciseCheckoutResult =
       readonly errorMessage: string;
     };
 
+export type ProfileAssistedGroupAccessCheckoutResult = ProfileExerciseCheckoutResult;
+
 interface HttpFailure {
   readonly statusCode: number;
   readonly errorCode: string;
@@ -196,6 +198,47 @@ export class ProfileManagerHttpClient
         statusCode: response.status,
         errorCode: PROFILE_MANAGER_RESPONSE_ERROR,
         errorMessage: "Profile Manager exercise checkout response is invalid.",
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        errorCode: PROFILE_MANAGER_NETWORK_ERROR,
+        errorMessage: errorToProfileManagerMessage(error),
+      };
+    }
+  }
+
+  public async checkoutProfileForAssistedGroupAccess(
+    profileId: string,
+    sourceGroupId: string,
+  ): Promise<ProfileAssistedGroupAccessCheckoutResult> {
+    try {
+      const response = await this.fetchImplementation(
+        buildCheckoutProfileForAssistedGroupAccessUrl(this.baseUrl, profileId),
+        {
+          method: "POST",
+          headers: jsonHeaders(),
+          body: JSON.stringify({ sourceGroupId }),
+        },
+      );
+
+      if (!isSuccessStatusCode(response.status)) {
+        return toAssistedGroupAccessCheckoutFailure(await readHttpFailure(response));
+      }
+
+      const body = await readJsonBody(response);
+      const result = toExerciseCheckoutSuccessResult(body);
+
+      if (result !== undefined) {
+        return result;
+      }
+
+      return {
+        ok: false,
+        statusCode: response.status,
+        errorCode: PROFILE_MANAGER_RESPONSE_ERROR,
+        errorMessage:
+          "Profile Manager assisted group access checkout response is invalid.",
       };
     } catch (error) {
       return {
@@ -480,6 +523,16 @@ function buildCheckoutProfileForExerciseUrl(
   );
 }
 
+function buildCheckoutProfileForAssistedGroupAccessUrl(
+  baseUrl: string,
+  profileId: string,
+): string {
+  return buildUrl(
+    baseUrl,
+    `collector/profiles/${encodeURIComponent(profileId)}/assisted-group-access/checkout`,
+  );
+}
+
 function buildRuntimeProfileConfigurationUrl(
   baseUrl: string,
   leaseId: string,
@@ -710,6 +763,17 @@ function toSafeProfileAccountStageFailure(
 function toExerciseCheckoutFailure(
   failure: HttpFailure,
 ): Extract<ProfileExerciseCheckoutResult, { readonly ok: false }> {
+  return {
+    ok: false,
+    statusCode: failure.statusCode,
+    errorCode: failure.errorCode,
+    errorMessage: failure.errorMessage,
+  };
+}
+
+function toAssistedGroupAccessCheckoutFailure(
+  failure: HttpFailure,
+): Extract<ProfileAssistedGroupAccessCheckoutResult, { readonly ok: false }> {
   return {
     ok: false,
     statusCode: failure.statusCode,

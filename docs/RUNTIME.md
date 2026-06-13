@@ -43,6 +43,7 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | --- | --- | --- |
 | `pnpm operator:profile:provision` | Complete manual profile provisioning in a headed browser. | `pnpm profile:provision` |
 | `pnpm operator:profile:exercise` | Run one read-only ambient account exercise attempt for a specified profile. | `pnpm profile:exercise:run` |
+| `pnpm operator:profile:assisted-access` | Open one assisted group access browser session for manual operator inspection. | `pnpm profile:assisted-access:run` |
 | `pnpm operator:collector:facebook` | Run one manual Facebook collection for a source group. | `pnpm collector:facebook:run` |
 | `pnpm operator:collector:worker` | Claim and execute queued collection runs. | `pnpm collector:worker:run` |
 | `pnpm operator:browser:probe` | Probe a browser provider without backend or Facebook login. | `pnpm collector:browser:probe` |
@@ -278,6 +279,59 @@ Exercise checkout eligibility:
 - Normal collection checkout still requires `accountStage = COLLECTION_READY`.
 - Ambient exercise checkout allows `NEW_ACCOUNT`, `WARMING`, `LIMITED`, and `COLLECTION_READY`.
 - Ambient exercise checkout rejects `NEEDS_REVIEW` and `RETIRED`.
+
+## Assisted Group Access Browser Command
+
+Sprint 043A adds an operator-only command for manually inspecting access to one
+Facebook source group using an `ASSISTED_GROUP_ACCESS` lease.
+
+Prerequisites:
+
+1. Start the dev or preview stack.
+2. Complete profile provisioning so the target profile is operational `READY`.
+3. Set the target profile `accountStage` to `WARMING` or `COLLECTION_READY`.
+4. Copy the profile id and source group id from safe operator surfaces.
+
+Run against the preview gateway:
+
+```bash
+pnpm operator:profile:assisted-access -- --profile-id <profile-id> --source-group-id <source-group-id> --base-url http://localhost:8081 --browser-provider playwright
+```
+
+Run against the direct local API:
+
+```bash
+pnpm operator:profile:assisted-access -- --profile-id <profile-id> --source-group-id <source-group-id> --base-url http://localhost:3000
+```
+
+If `--browser-provider` is omitted, the command uses `BROWSER_PROVIDER`, then
+`playwright`. Supported operator values are `playwright` and `cloakbrowser`.
+`--max-duration-ms` defaults to `600000` and accepts `30000-1800000`.
+
+Expected operator flow:
+
+1. The command reads the source group and safe entry-route metadata from Content
+   Manager.
+2. It selects an explicit route by `--entry-route-id`, or the single default
+   route, or a derived `DIRECT_GROUP_URL` route from the source group URL.
+3. It rejects inactive/non-Facebook groups, multiple defaults, malformed or
+   non-HTTP(S) routes, and `HIGH` risk routes unless
+   `--allow-high-risk-route` is present.
+4. It checks out the specified profile through
+   `POST /collector/profiles/:profileId/assisted-group-access/checkout`.
+5. It fetches trusted runtime configuration through the returned lease id.
+6. It opens only the selected route URL in a headed browser configured from the
+   profile runtime configuration.
+7. The operator manually inspects the browser and presses Enter in the terminal
+   to finish, or the command times out.
+8. The command closes the browser and releases the lease.
+
+The command does not join groups, send join requests, click, search, submit
+forms, like, comment, post, share, message, capture or submit content, detect or
+mutate access state, create run records, update `accountStage`, or update
+profile-source access. Safe output is limited to profile/source ids, selected
+route id/type/risk, page-loaded status, completion reason, lease-release status,
+duration, and sanitized errors.
 - Exercise does not automatically promote or demote `accountStage`.
 
 Safety boundaries:

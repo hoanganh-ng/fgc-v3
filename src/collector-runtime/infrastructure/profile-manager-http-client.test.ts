@@ -172,6 +172,41 @@ describe("ProfileManagerHttpClient", () => {
     expect(JSON.stringify(result)).not.toContain("proxy");
   });
 
+  it("posts assisted group access checkout requests for a specific profile and source group", async () => {
+    const fetch = new FakeFetch(createAssistedGroupAccessCheckoutResponse());
+    const client = createClient(fetch.fetch);
+
+    const result = await client.checkoutProfileForAssistedGroupAccess(
+      "profile-1",
+      "source-group-1",
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      profileId: "profile-1",
+      accountStage: "WARMING",
+      leaseId: "lease-1",
+      leaseExpiresAt: "2026-01-05T18:45:00.000Z",
+    });
+    expect(fetch.calls[0]).toMatchObject({
+      input:
+        "https://profile-manager.test/collector/profiles/profile-1/assisted-group-access/checkout",
+      init: {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+        },
+      },
+    });
+    expect(parseRequestBody(fetch)).toEqual({
+      sourceGroupId: "source-group-1",
+    });
+    expect(JSON.stringify(result)).not.toContain("cookie");
+    expect(JSON.stringify(result)).not.toContain("localStorage");
+    expect(JSON.stringify(result)).not.toContain("proxy");
+  });
+
   it("gets safe profile account stage from profile detail", async () => {
     const fetch = new FakeFetch(createProfileDetailResponse());
     const client = createClient(fetch.fetch);
@@ -739,6 +774,31 @@ function createExerciseCheckoutResponse(): FetchLikeResponse {
     profile: {
       profileId: "profile-1",
       accountStage: "NEW_ACCOUNT",
+    },
+  });
+}
+
+function createAssistedGroupAccessCheckoutResponse(): FetchLikeResponse {
+  return createResponse(200, {
+    lease: {
+      id: "lease-1",
+      profileId: "profile-1",
+      purpose: "ASSISTED_GROUP_ACCESS",
+      leasedAt: "2026-01-05T18:00:00.000Z",
+      expiresAt: "2026-01-05T18:45:00.000Z",
+      releasedAt: null,
+      status: "ACTIVE",
+    },
+    profile: {
+      profileId: "profile-1",
+      accountStage: "WARMING",
+      networkContext: {
+        proxy: {
+          credentials: {
+            password: "secret",
+          },
+        },
+      },
     },
   });
 }

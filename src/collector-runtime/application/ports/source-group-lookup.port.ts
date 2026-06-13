@@ -3,6 +3,15 @@ export interface SourceGroupLookupSourceGroup {
   readonly platform: string;
   readonly status: string;
   readonly url: string;
+  readonly entryRoutes?: readonly SourceGroupLookupEntryRoute[];
+}
+
+export interface SourceGroupLookupEntryRoute {
+  readonly id: string;
+  readonly type: string;
+  readonly url: string;
+  readonly riskLevel: string;
+  readonly isDefault: boolean;
 }
 
 export type SourceGroupLookupResult =

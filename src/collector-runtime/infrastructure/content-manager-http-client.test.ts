@@ -142,6 +142,17 @@ describe("ContentManagerHttpClient", () => {
           categoryId: "category-1",
           status: "ACTIVE",
           collectionPriority: 80,
+          entryRoutes: [
+            {
+              id: "route-1",
+              type: "DIRECT_GROUP_URL",
+              url: "https://www.facebook.com/groups/fb-group-1",
+              riskLevel: "MEDIUM",
+              isDefault: true,
+              createdAt: "2026-02-01T10:00:00.000Z",
+              updatedAt: "2026-02-01T10:00:00.000Z",
+            },
+          ],
           createdAt: "2026-02-01T10:00:00.000Z",
           updatedAt: "2026-02-01T10:00:00.000Z",
         },
@@ -157,6 +168,15 @@ describe("ContentManagerHttpClient", () => {
         platform: "FACEBOOK",
         status: "ACTIVE",
         url: "https://www.facebook.com/groups/fb-group-1",
+        entryRoutes: [
+          {
+            id: "route-1",
+            type: "DIRECT_GROUP_URL",
+            url: "https://www.facebook.com/groups/fb-group-1",
+            riskLevel: "MEDIUM",
+            isDefault: true,
+          },
+        ],
       },
     });
     expect(fetch.calls).toEqual([
@@ -172,6 +192,40 @@ describe("ContentManagerHttpClient", () => {
         },
       },
     ]);
+  });
+
+  it("preserves source group reads when entry routes are absent or malformed", async () => {
+    const fetch = new FakeFetch(
+      createResponse(200, {
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/fb-group-1",
+          entryRoutes: [
+            {
+              id: "route-1",
+              type: "DIRECT_GROUP_URL",
+              url: "https://www.facebook.com/groups/fb-group-1",
+              riskLevel: "MEDIUM",
+            },
+          ],
+        },
+      }),
+    );
+    const client = createClient(fetch.fetch);
+
+    await expect(client.getSourceGroup("source-group-1")).resolves.toEqual({
+      ok: true,
+      statusCode: 200,
+      sourceGroup: {
+        id: "source-group-1",
+        platform: "FACEBOOK",
+        status: "ACTIVE",
+        url: "https://www.facebook.com/groups/fb-group-1",
+        entryRoutes: [],
+      },
+    });
   });
 
   it("maps missing source group reads to structured failures", async () => {

@@ -5,6 +5,7 @@ import type {
   ContentManagerContentSubmissionPort,
   ContentSubmissionResult,
   SourceGroupLookupPort,
+  SourceGroupLookupEntryRoute,
   SourceGroupLookupResult,
   SourceGroupLookupSourceGroup,
 } from "../application";
@@ -390,6 +391,7 @@ function toSourceGroupLookupResult(
   const platform = body.sourceGroup.platform;
   const status = body.sourceGroup.status;
   const url = body.sourceGroup.url;
+  const entryRoutes = toSourceGroupEntryRoutes(body.sourceGroup.entryRoutes);
 
   if (
     typeof id !== "string" ||
@@ -409,7 +411,54 @@ function toSourceGroupLookupResult(
     platform,
     status,
     url,
+    entryRoutes,
   };
+}
+
+function toSourceGroupEntryRoutes(
+  value: unknown,
+): readonly SourceGroupLookupEntryRoute[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const entryRoutes: SourceGroupLookupEntryRoute[] = [];
+
+  for (const entryRoute of value) {
+    if (!isRecord(entryRoute)) {
+      return [];
+    }
+
+    const id = entryRoute.id;
+    const type = entryRoute.type;
+    const url = entryRoute.url;
+    const riskLevel = entryRoute.riskLevel;
+    const isDefault = entryRoute.isDefault;
+
+    if (
+      typeof id !== "string" ||
+      id.trim().length === 0 ||
+      typeof type !== "string" ||
+      type.trim().length === 0 ||
+      typeof url !== "string" ||
+      url.trim().length === 0 ||
+      typeof riskLevel !== "string" ||
+      riskLevel.trim().length === 0 ||
+      typeof isDefault !== "boolean"
+    ) {
+      return [];
+    }
+
+    entryRoutes.push({
+      id,
+      type,
+      url,
+      riskLevel,
+      isDefault,
+    });
+  }
+
+  return entryRoutes;
 }
 
 function toSourceGroupLookupFailure(
