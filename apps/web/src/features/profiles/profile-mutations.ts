@@ -8,9 +8,11 @@ import {
   type CreateProfileRequest,
   type ProfileDetailResponse,
   type ProfileMutationResponse,
+  type ProfileSourceAccessResponse,
   type StartProfileProvisioningResponse,
   type UpdateProfileAccountStageRequest,
   type UpdateProfileConfigurationRequest,
+  type UpsertProfileSourceAccessRequest,
 } from "@/lib/api/profile-manager-client";
 import {
   unwrapApiResult,
@@ -30,6 +32,12 @@ export interface StartProfileProvisioningVariables {
 export interface UpdateProfileAccountStageVariables {
   readonly profileId: string;
   readonly request: UpdateProfileAccountStageRequest;
+}
+
+export interface UpsertProfileSourceAccessVariables {
+  readonly profileId: string;
+  readonly sourceGroupId: string;
+  readonly request: UpsertProfileSourceAccessRequest;
 }
 
 export function useCreateProfileMutation(): UseMutationResult<
@@ -140,6 +148,34 @@ export function useUpdateProfileAccountStageMutation(): UseMutationResult<
           queryKey: profileQueryKeys.detail(variables.profileId),
         }),
       ]);
+    },
+  });
+}
+
+export function useUpsertProfileSourceAccessMutation(): UseMutationResult<
+  ProfileSourceAccessResponse,
+  ApiResultError,
+  UpsertProfileSourceAccessVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    ProfileSourceAccessResponse,
+    ApiResultError,
+    UpsertProfileSourceAccessVariables
+  >({
+    mutationFn: async ({ profileId, sourceGroupId, request }) =>
+      unwrapApiResult(
+        await profileManagerClient.upsertProfileSourceAccess(
+          profileId,
+          sourceGroupId,
+          request,
+        ),
+      ),
+    onSuccess: async (_response, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: profileQueryKeys.sourceAccess(variables.profileId),
+      });
     },
   });
 }

@@ -3,6 +3,7 @@ import {
   profileManagerClient,
   type ListProfilesQuery,
   type ProfileDetailResponse,
+  type ProfileSourceAccessListResponse,
   type ProfilesListResponse,
 } from "@/lib/api/profile-manager-client";
 import {
@@ -21,6 +22,8 @@ export const profileQueryKeys = {
     [...profileQueryKeys.all, "list", query] as const,
   detail: (profileId: string) =>
     [...profileQueryKeys.all, "detail", profileId] as const,
+  sourceAccess: (profileId: string) =>
+    [...profileQueryKeys.all, "source-access", profileId] as const,
 };
 
 export function useProfilesQuery(
@@ -40,5 +43,16 @@ export function useProfileQuery(
     enabled: profileId.trim().length > 0,
     queryFn: async () =>
       unwrapApiResult(await profileManagerClient.getProfile(profileId)),
+  });
+}
+
+export function useProfileSourceAccessQuery(
+  profileId: string,
+): UseQueryResult<ProfileSourceAccessListResponse, ApiResultError> {
+  return useQuery<ProfileSourceAccessListResponse, ApiResultError>({
+    queryKey: profileQueryKeys.sourceAccess(profileId),
+    enabled: profileId.trim().length > 0,
+    queryFn: async () =>
+      unwrapApiResult(await profileManagerClient.listProfileSourceAccess(profileId)),
   });
 }

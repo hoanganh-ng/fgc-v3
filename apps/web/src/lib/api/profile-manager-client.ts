@@ -47,6 +47,18 @@ export const ProvisioningTokenStatusSchema = z.enum([
   "EXPIRED",
 ]);
 
+export const ProfileSourceAccessStateSchema = z.enum([
+  "UNKNOWN",
+  "PUBLIC_ACCESSIBLE",
+  "JOIN_REQUIRED",
+  "JOIN_REQUESTED",
+  "JOINED_ACCESSIBLE",
+  "ACCESS_DENIED",
+  "LOGIN_REQUIRED",
+  "CHECKPOINT_REQUIRED",
+  "NEEDS_MANUAL_REVIEW",
+]);
+
 export const ProxyProtocolSchema = z.enum(["HTTP", "HTTPS", "SOCKS5"]);
 export const ScrollStyleSchema = z.enum(["STEADY", "SKIMMING", "DEEP_READ"]);
 export const ChronotypeSchema = z.enum([
@@ -57,6 +69,13 @@ export const ChronotypeSchema = z.enum([
 ]);
 
 const NonEmptyStringSchema = z.string().min(1);
+
+export const ProfileSourceAccessFailureReasonSchema = z
+  .object({
+    code: NonEmptyStringSchema,
+    message: NonEmptyStringSchema,
+  })
+  .strict();
 
 const DailyUsageSchema = z
   .object({
@@ -317,8 +336,50 @@ export const StartProfileProvisioningResponseSchema = z
   })
   .strict();
 
+export const ProfileSourceAccessSchema = z
+  .object({
+    id: NonEmptyStringSchema,
+    profileId: NonEmptyStringSchema,
+    sourceGroupId: NonEmptyStringSchema,
+    accessState: ProfileSourceAccessStateSchema,
+    lastCheckedAt: z.string().nullable(),
+    lastSuccessfulAt: z.string().nullable(),
+    lastFailureReason: ProfileSourceAccessFailureReasonSchema.nullable(),
+    joinRequestedAt: z.string().nullable(),
+    notes: z.string().optional(),
+    createdAt: NonEmptyStringSchema,
+    updatedAt: NonEmptyStringSchema,
+  })
+  .strict();
+
+export const ProfileSourceAccessListResponseSchema = z
+  .object({
+    items: z.array(ProfileSourceAccessSchema),
+  })
+  .strict();
+
+export const ProfileSourceAccessResponseSchema = z
+  .object({
+    profileSourceAccess: ProfileSourceAccessSchema,
+  })
+  .strict();
+
+export const UpsertProfileSourceAccessRequestSchema = z
+  .object({
+    accessState: ProfileSourceAccessStateSchema,
+    lastFailureReason: ProfileSourceAccessFailureReasonSchema.nullable().optional(),
+    notes: z.string().optional(),
+  })
+  .strict();
+
 export type ProvisioningTokenStatus = z.infer<
   typeof ProvisioningTokenStatusSchema
+>;
+export type ProfileSourceAccessState = z.infer<
+  typeof ProfileSourceAccessStateSchema
+>;
+export type ProfileSourceAccessFailureReason = z.infer<
+  typeof ProfileSourceAccessFailureReasonSchema
 >;
 export type ProxyProtocol = z.infer<typeof ProxyProtocolSchema>;
 export type ScrollStyle = z.infer<typeof ScrollStyleSchema>;
@@ -355,6 +416,16 @@ export type ProfileMutationResponse = z.infer<
 export type StartProfileProvisioningResponse = z.infer<
   typeof StartProfileProvisioningResponseSchema
 >;
+export type ProfileSourceAccess = z.infer<typeof ProfileSourceAccessSchema>;
+export type ProfileSourceAccessListResponse = z.infer<
+  typeof ProfileSourceAccessListResponseSchema
+>;
+export type ProfileSourceAccessResponse = z.infer<
+  typeof ProfileSourceAccessResponseSchema
+>;
+export type UpsertProfileSourceAccessRequest = z.infer<
+  typeof UpsertProfileSourceAccessRequestSchema
+>;
 
 export interface ListProfilesQuery {
   readonly status?: KnownProfileStatus;
@@ -383,6 +454,14 @@ export interface ProfileManagerClient {
   readonly startProfileProvisioning: (
     profileId: string,
   ) => Promise<ApiResult<StartProfileProvisioningResponse>>;
+  readonly listProfileSourceAccess: (
+    profileId: string,
+  ) => Promise<ApiResult<ProfileSourceAccessListResponse>>;
+  readonly upsertProfileSourceAccess: (
+    profileId: string,
+    sourceGroupId: string,
+    request: UpsertProfileSourceAccessRequest,
+  ) => Promise<ApiResult<ProfileSourceAccessResponse>>;
 }
 
 export function createProfileManagerClient(
@@ -431,6 +510,22 @@ export function createProfileManagerClient(
         path: `/collector/profiles/${encodeURIComponent(profileId)}/provisioning/start`,
         method: "POST",
         responseSchema: StartProfileProvisioningResponseSchema,
+      });
+    },
+    listProfileSourceAccess(profileId) {
+      return httpClient.request({
+        path: `/collector/profiles/${encodeURIComponent(profileId)}/source-access`,
+        responseSchema: ProfileSourceAccessListResponseSchema,
+      });
+    },
+    upsertProfileSourceAccess(profileId, sourceGroupId, request) {
+      return httpClient.request({
+        path: `/collector/profiles/${encodeURIComponent(
+          profileId,
+        )}/source-access/${encodeURIComponent(sourceGroupId)}`,
+        method: "PUT",
+        body: request,
+        responseSchema: ProfileSourceAccessResponseSchema,
       });
     },
   };

@@ -27,6 +27,7 @@ import {
   useStartProfileProvisioningMutation,
   useUpdateProfileAccountStageMutation,
 } from "@/features/profiles/profile-mutations";
+import { ProfileSourceAccessCard } from "@/features/profiles/profile-source-access-card";
 import { ProfileStatusBadge } from "@/features/profiles/profile-status-badge";
 import { useProfileQuery } from "@/features/profiles/profile-queries";
 import { isApiResultError } from "@/lib/api/http-client";
@@ -107,6 +108,7 @@ function ProfileDetailView({
       <div className="grid gap-5">
         <IdentitySummaryCard profile={profile} />
         <ConfigurationSummaryCard profile={profile} />
+        <ProfileSourceAccessCard profileId={profile.id} />
       </div>
       <div className="grid content-start gap-5">
         <StatusSummaryCard profile={profile} />
