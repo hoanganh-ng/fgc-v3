@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { RefreshCw, Copy, ExternalLink, AlertTriangle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { RefreshCw, Copy, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,10 +11,8 @@ import {
 } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
-  useSourceGroupProfileAccessQuery,
-} from "@/features/profiles/profile-queries";
-import {
   useProfilesQuery,
+  useSourceGroupProfileAccessQuery,
 } from "@/features/profiles/profile-queries";
 import {
   type ProfileSourceAccess,
@@ -27,10 +26,6 @@ const SUCCESSFUL_STATES: ProfileSourceAccessState[] = [
   "PUBLIC_ACCESSIBLE",
   "JOINED_ACCESSIBLE",
 ];
-
-function formatCount(count: number, singularLabel: string): string {
-  return count === 1 ? `1 ${singularLabel}` : `${count} ${singularLabel}s`;
-}
 
 function formatDateTime(value: string | null): string {
   if (!value) {
@@ -52,7 +47,7 @@ export function SourceGroupProfileAccessPanel({
   readonly sourceGroupId: string;
 }): JSX.Element {
   const accessQuery = useSourceGroupProfileAccessQuery(sourceGroupId);
-  const profilesQuery = useProfilesQuery({ limit: 1000, offset: 0 });
+  const profilesQuery = useProfilesQuery();
 
   const {
     recordedOutcomes,
@@ -262,13 +257,13 @@ function ProfileAccessRow({
           </p>
           <div className="mt-1 flex min-w-0 items-center gap-2">
             {profile ? (
-              <a
-                href={`/profiles/${encodeURIComponent(profile.id)}`}
+              <Link
+                to={`/profiles/${encodeURIComponent(profile.id)}`}
                 className="truncate font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary"
                 title={profile.displayName}
               >
                 {profile.displayName}
-              </a>
+              </Link>
             ) : (
               <span className="truncate font-mono text-sm text-muted-foreground">
                 {record.profileId}
