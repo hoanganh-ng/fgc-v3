@@ -92,7 +92,9 @@ describe("ProfileManagerHttpClient", () => {
     );
     const client = createClient(fetch.fetch);
 
-    await expect(client.checkoutProfile({})).resolves.toEqual({
+    await expect(
+      client.checkoutProfile({ sourceGroupId: "source-group-1" }),
+    ).resolves.toEqual({
       ok: false,
       statusCode: 404,
       errorCode: "NO_ELIGIBLE_PROFILE_AVAILABLE",
@@ -118,7 +120,9 @@ describe("ProfileManagerHttpClient", () => {
       );
       const client = createClient(fetch.fetch);
 
-      await expect(client.checkoutProfile({})).resolves.toEqual({
+      await expect(
+        client.checkoutProfile({ sourceGroupId: "source-group-1" }),
+      ).resolves.toEqual({
         ok: false,
         statusCode,
         errorCode,
@@ -134,7 +138,9 @@ describe("ProfileManagerHttpClient", () => {
 
     const client = createClient(fetch.fetch);
 
-    await expect(client.checkoutProfile({})).resolves.toEqual({
+    await expect(
+      client.checkoutProfile({ sourceGroupId: "source-group-1" }),
+    ).resolves.toEqual({
       ok: false,
       errorCode: "PROFILE_MANAGER_NETWORK_ERROR",
       errorMessage: "connect ECONNREFUSED",

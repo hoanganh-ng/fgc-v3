@@ -13,6 +13,11 @@ export const PROFILE_SOURCE_ACCESS_STATES = [
   "NEEDS_MANUAL_REVIEW",
 ] as const;
 
+export const SUCCESSFUL_PROFILE_SOURCE_ACCESS_STATES = [
+  "PUBLIC_ACCESSIBLE",
+  "JOINED_ACCESSIBLE",
+] as const;
+
 export type ProfileSourceAccessState = zInfer<
   typeof ProfileSourceAccessStateSchema
 >;
@@ -29,5 +34,7 @@ export function isProfileSourceAccessState(
 export function isSuccessfulProfileSourceAccessState(
   state: ProfileSourceAccessState,
 ): boolean {
-  return state === "PUBLIC_ACCESSIBLE" || state === "JOINED_ACCESSIBLE";
+  return (
+    SUCCESSFUL_PROFILE_SOURCE_ACCESS_STATES as readonly ProfileSourceAccessState[]
+  ).indexOf(state) !== -1;
 }

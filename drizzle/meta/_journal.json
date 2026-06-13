@@ -50,6 +50,13 @@
       "when": 1781259645431,
       "tag": "0006_safe_sleepwalker",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781376941490,
+      "tag": "0007_mixed_blindfold",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ import {
   ProfileSourceAccessNotFoundError,
   ProfileLeaseAlreadyClosedError,
   ProfileNotFoundError,
+  SourceGroupNotFoundError,
   type ProfileSourceAccessDto,
   toProfileDetailDto,
   toProfileSummaryDto,
@@ -1042,6 +1043,115 @@ describe("HTTP server", () => {
         {
           sourceGroupId: "source-group-1",
           profileId: "profile-1",
+        },
+      ]);
+      expect(response.json()).toEqual(checkoutOutput);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 when sourceGroupId is missing from checkout request", async () => {
+    const { server } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/checkout",
+        payload: {
+          profileId: "profile-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 when sourceGroupId is empty string", async () => {
+    const { server } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/checkout",
+        payload: {
+          sourceGroupId: "",
+          profileId: "profile-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 when sourceGroupId is whitespace only", async () => {
+    const { server } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/checkout",
+        payload: {
+          sourceGroupId: "   ",
+          profileId: "profile-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 404 when source group does not exist", async () => {
+    const { server, service } = createTestServer();
+    service.checkoutProfile.setError(new SourceGroupNotFoundError("nonexistent-group"));
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/checkout",
+        payload: {
+          sourceGroupId: "nonexistent-group",
+          profileId: "profile-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({
+        error: {
+          code: "SOURCE_GROUP_NOT_FOUND",
+          message: "Source group not found: nonexistent-group.",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("checks out profile with automatic selection when profileId is omitted", async () => {
+    const { server, service } = createTestServer();
+    const checkoutOutput = createCheckoutOutput();
+
+    service.checkoutProfile.setOutput(checkoutOutput);
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/checkout",
+        payload: {
+          sourceGroupId: "source-group-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.checkoutProfile.calls).toEqual([
+        {
+          sourceGroupId: "source-group-1",
         },
       ]);
       expect(response.json()).toEqual(checkoutOutput);

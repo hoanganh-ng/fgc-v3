@@ -207,5 +207,9 @@ export const collectorProfileSourceAccess = pgTable(
     ),
     index("collector_profile_source_access_state_idx").on(table.accessState),
     index("collector_profile_source_access_updated_at_idx").on(table.updatedAt),
+    index("collector_profile_source_access_source_group_state_idx").on(
+      table.sourceGroupId,
+      table.accessState,
+    ),
   ],
 );

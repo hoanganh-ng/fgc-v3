@@ -4,7 +4,7 @@ import type {
 } from "./collector-runtime.types";
 
 export interface ProfileCheckoutInput {
-  readonly sourceGroupId?: string;
+  readonly sourceGroupId: string;
   readonly purpose?: string;
 }
 

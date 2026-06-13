@@ -1,0 +1,1 @@
+CREATE INDEX "collector_profile_source_access_source_group_state_idx" ON "collector_profile_source_access" USING btree ("source_group_id","access_state");

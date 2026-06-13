@@ -18,10 +18,10 @@ import {
   validateProfileForApplication,
 } from "../profile-validation";
 import {
+  SUCCESSFUL_PROFILE_SOURCE_ACCESS_STATES,
   calculateLeaseExpiresAt,
   createActiveProfileLease,
   evaluateCheckoutEligibility,
-  isSuccessfulProfileSourceAccessState,
   markProfileCheckedOut,
 } from "../../domain";
 import type {
@@ -34,7 +34,6 @@ import type {
   NetworkContext,
   ProfileId,
   ProfileLease,
-  ProfileSourceAccessState,
   SafetyThresholds,
   TemporalRoutine,
 } from "../../domain";
@@ -74,6 +73,8 @@ export class CheckoutProfileUseCase {
   public async execute(
     input: CheckoutProfileInput,
   ): Promise<CheckoutProfileOutput> {
+    await this.ensureSourceGroupExists(input.sourceGroupId);
+
     if (this.transactionManager !== undefined) {
       return this.transactionManager.runInTransaction((repositories) =>
         this.executeWithRepositories(
@@ -99,23 +100,11 @@ export class CheckoutProfileUseCase {
     leases: ProfileLeaseRepository,
     profileSourceAccess: ProfileSourceAccessRepository,
   ): Promise<CheckoutProfileOutput> {
-    // Validate source group exists
-    const sourceGroupExists = await this.sourceGroupReference.exists(
-      input.sourceGroupId,
-    );
-    if (!sourceGroupExists) {
-      throw new SourceGroupNotFoundError(input.sourceGroupId);
-    }
-
     // Get profile IDs with successful source access
-    const successfulStates: ProfileSourceAccessState[] = [
-      "PUBLIC_ACCESSIBLE",
-      "JOINED_ACCESSIBLE",
-    ];
     const eligibleProfileIds =
       await profileSourceAccess.findProfileIdsBySourceGroupAndStates(
         input.sourceGroupId,
-        successfulStates,
+        SUCCESSFUL_PROFILE_SOURCE_ACCESS_STATES,
       );
     const eligibleProfileIdSet = new Set(eligibleProfileIds);
 
@@ -194,6 +183,15 @@ export class CheckoutProfileUseCase {
     }
 
     throw new NoEligibleProfileAvailableError(rejectedReasons);
+  }
+
+  private async ensureSourceGroupExists(sourceGroupId: string): Promise<void> {
+    const sourceGroupExists = await this.sourceGroupReference.exists(
+      sourceGroupId,
+    );
+    if (!sourceGroupExists) {
+      throw new SourceGroupNotFoundError(sourceGroupId);
+    }
   }
 
   private async loadCandidates(

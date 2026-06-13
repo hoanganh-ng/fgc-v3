@@ -400,6 +400,94 @@ if (!shouldRunDbTests) {
       ).resolves.toEqual([updatedFirstAccess, thirdAccess]);
     });
 
+    it("finds profile ids by source group and access states", async () => {
+      const sourceGroupId = nextTestId("query-source-group");
+      const otherSourceGroupId = nextTestId("query-other-source-group");
+      const publicProfile = trackProfile(
+        createReadyProfile(nextTestId("query-public-profile")),
+      );
+      const joinedProfile = trackProfile(
+        createReadyProfile(nextTestId("query-joined-profile")),
+      );
+      const deniedProfile = trackProfile(
+        createReadyProfile(nextTestId("query-denied-profile")),
+      );
+      const otherSourceProfile = trackProfile(
+        createReadyProfile(nextTestId("query-other-source-profile")),
+      );
+      const publicAccess = trackProfileSourceAccess(
+        createAccess(
+          nextTestId("query-public-access"),
+          publicProfile.identity.id,
+          {
+            sourceGroupId,
+            accessState: "PUBLIC_ACCESSIBLE",
+          },
+        ),
+      );
+      const joinedAccess = trackProfileSourceAccess(
+        createAccess(
+          nextTestId("query-joined-access"),
+          joinedProfile.identity.id,
+          {
+            sourceGroupId,
+            accessState: "JOINED_ACCESSIBLE",
+          },
+        ),
+      );
+      const deniedAccess = trackProfileSourceAccess(
+        createAccess(
+          nextTestId("query-denied-access"),
+          deniedProfile.identity.id,
+          {
+            sourceGroupId,
+            accessState: "ACCESS_DENIED",
+          },
+        ),
+      );
+      const otherSourceAccess = trackProfileSourceAccess(
+        createAccess(
+          nextTestId("query-other-source-access"),
+          otherSourceProfile.identity.id,
+          {
+            sourceGroupId: otherSourceGroupId,
+            accessState: "PUBLIC_ACCESSIBLE",
+          },
+        ),
+      );
+
+      await profiles.save(publicProfile);
+      await profiles.save(joinedProfile);
+      await profiles.save(deniedProfile);
+      await profiles.save(otherSourceProfile);
+      await profileSourceAccess.upsert(publicAccess);
+      await profileSourceAccess.upsert(joinedAccess);
+      await profileSourceAccess.upsert(deniedAccess);
+      await profileSourceAccess.upsert(otherSourceAccess);
+
+      const matchingProfileIds =
+        await profileSourceAccess.findProfileIdsBySourceGroupAndStates(
+          sourceGroupId,
+          ["PUBLIC_ACCESSIBLE", "JOINED_ACCESSIBLE"],
+        );
+
+      expect(matchingProfileIds).toEqual(
+        expect.arrayContaining([
+          publicProfile.identity.id,
+          joinedProfile.identity.id,
+        ]),
+      );
+      expect(matchingProfileIds).toHaveLength(2);
+      expect(matchingProfileIds).not.toContain(deniedProfile.identity.id);
+      expect(matchingProfileIds).not.toContain(otherSourceProfile.identity.id);
+      await expect(
+        profileSourceAccess.findProfileIdsBySourceGroupAndStates(
+          sourceGroupId,
+          [],
+        ),
+      ).resolves.toEqual([]);
+    });
+
     it("commits profile and lease writes inside a transaction", async () => {
       const profile = trackProfile(
         createReadyProfile(nextTestId("tx-commit-profile")),

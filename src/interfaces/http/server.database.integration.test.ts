@@ -149,6 +149,7 @@ if (!shouldRunHttpDbTests) {
     it("persists the profile lifecycle through HTTP, composition, use cases, repositories, and PostgreSQL", async () => {
       const profileId = trackProfileId(nextTestId("profile"));
       const displayName = `HTTP DB Integration ${profileId}`;
+      const categorySlug = nextTestId("profile-lifecycle-category");
 
       const createResponse = await getServer().inject({
         method: "POST",
@@ -330,11 +331,56 @@ if (!shouldRunHttpDbTests) {
       });
       expectReadPayloadIsSafe(readyReadBody, provisioningToken);
 
+      const createCategoryResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/content-categories",
+        payload: {
+          name: `Profile Lifecycle ${categorySlug}`,
+          slug: categorySlug,
+        },
+      });
+      const createCategoryBody = createCategoryResponse.json() as {
+        readonly category: { readonly id: string };
+      };
+      expect(createCategoryResponse.statusCode).toBe(201);
+      const categoryId = trackCategoryId(createCategoryBody.category.id);
+
+      const createSourceGroupResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/source-groups",
+        payload: {
+          platform: "FACEBOOK",
+          externalGroupId: nextTestId("fb-lifecycle-group"),
+          name: "Profile Lifecycle Source Group",
+          url: "https://facebook.test/groups/profile-lifecycle",
+          categoryId,
+          collectionPriority: 50,
+        },
+      });
+      const createSourceGroupBody = createSourceGroupResponse.json() as {
+        readonly sourceGroup: { readonly id: string };
+      };
+      expect(createSourceGroupResponse.statusCode).toBe(201);
+      const sourceGroupId = trackSourceGroupId(
+        createSourceGroupBody.sourceGroup.id,
+      );
+
+      const createAccessResponse = await getServer().inject({
+        method: "PUT",
+        url: `/collector/profiles/${profileId}/source-access/${sourceGroupId}`,
+        payload: {
+          accessState: "PUBLIC_ACCESSIBLE",
+          lastFailureReason: null,
+        },
+      });
+      expect(createAccessResponse.statusCode).toBe(201);
+
       const newAccountCheckoutResponse = await getServer().inject({
         method: "POST",
         url: "/collector/profiles/checkout",
         payload: {
           profileId,
+          sourceGroupId,
         },
       });
       expect(newAccountCheckoutResponse.statusCode).toBe(409);
@@ -371,6 +417,7 @@ if (!shouldRunHttpDbTests) {
         url: "/collector/profiles/checkout",
         payload: {
           profileId,
+          sourceGroupId,
         },
       });
       expect(warmingCheckoutResponse.statusCode).toBe(409);
@@ -434,6 +481,7 @@ if (!shouldRunHttpDbTests) {
         url: "/collector/profiles/checkout",
         payload: {
           profileId,
+          sourceGroupId,
         },
       });
       const checkoutBody = checkoutResponse.json();

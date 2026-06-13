@@ -362,16 +362,12 @@ describe("collector profile checkout use cases", () => {
 
     it("rejects explicit profile with missing access record", async () => {
       const context = createTestContext();
-      await createReadyProfile(context);
-      // Delete the auto-created access record to simulate missing record
-      const allRecords = await context.profileSourceAccess.listByProfile(
-        "profile-1",
-      );
-      // InMemory repository doesn't have delete, so we rely on finding a source group
-      // without a record. We'll use a different source group.
+      const readyProfile = await createReadyProfile(context);
+      // Don't create a source access record for "source-group-2"
+      context.sourceGroupReference.existingIds.add("source-group-2");
 
-      await expect(
-        new CheckoutProfileUseCase(
+      try {
+        await new CheckoutProfileUseCase(
           context.profiles,
           context.leases,
           context.leaseIds,
@@ -380,9 +376,34 @@ describe("collector profile checkout use cases", () => {
           context.profileSourceAccess,
         ).execute({
           profileId: "profile-1",
-          sourceGroupId: "source-group-missing",
-        }),
-      ).rejects.toThrow(SourceGroupNotFoundError);
+          sourceGroupId: "source-group-2",
+        });
+        throw new Error("Expected checkout to fail.");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ProfileNotCheckoutEligibleError);
+        if (error instanceof ProfileNotCheckoutEligibleError) {
+          expect(error.profileId).toBe(readyProfile.identity.id);
+          expect(error.reasons).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                code: "SOURCE_ACCESS_UNSUCCESSFUL",
+              }),
+            ]),
+          );
+        }
+      }
+
+      // Verify no lease was created
+      const activeLease = await context.leases.findActiveByProfileId(
+        readyProfile.identity.id,
+      );
+      expect(activeLease).toBeNull();
+
+      // Verify profile remains READY
+      const savedProfile = await context.profiles.findById(
+        readyProfile.identity.id,
+      );
+      expect(savedProfile?.identity.status).toBe("READY");
     });
 
     it("rejects unknown source group with 404", async () => {
@@ -401,6 +422,84 @@ describe("collector profile checkout use cases", () => {
           sourceGroupId: "unknown-group",
         }),
       ).rejects.toThrow(SourceGroupNotFoundError);
+    });
+
+    it("skips inaccessible profiles and leases accessible profile during automatic selection", async () => {
+      const context = createTestContext();
+
+      // First profile: READY but with unsuccessful access state
+      const profile1 = await createReadyProfile(context, {
+        sourceAccess: "ACCESS_DENIED",
+      });
+
+      // Second profile: READY with successful access state
+      await new CreateProfileUseCase(context.profiles, context.clock).execute({
+        id: "profile-2",
+        displayName: "Profile 2",
+      });
+      await new UpdateProfileConfigurationUseCase(
+        context.profiles,
+        context.clock,
+      ).execute({
+        profileId: "profile-2",
+        networkContext: createNetworkContext(),
+        hardwareFingerprint: createHardwareFingerprint(),
+        behavioralPersona: createBehavioralPersona(),
+        temporalRoutine: createTemporalRoutine(),
+        safetyThresholds: createSafetyThresholds(),
+        contentAffinities: createContentAffinities(),
+      });
+      const started2 = await new StartProfileProvisioningUseCase(
+        context.profiles,
+        context.tokens,
+        context.clock,
+      ).execute({ profileId: "profile-2" });
+      const readyProfile2 = await new IngestProfileSessionUseCase(
+        context.profiles,
+        context.clock,
+      ).execute({
+        provisioningToken: started2.provisioningToken,
+        cookies: createCookies(),
+        localStorage: createLocalStorage(),
+        sessionExpiresAt: "2026-01-06T18:00:00.000Z",
+      });
+      await context.profileSourceAccess.upsert({
+        id: "access-2",
+        profileId: readyProfile2.identity.id,
+        sourceGroupId: "source-group-1",
+        accessState: "PUBLIC_ACCESSIBLE",
+        lastCheckedAt: checkoutNow,
+        lastSuccessfulAt: checkoutNow,
+        lastFailureReason: null,
+        joinRequestedAt: null,
+        notes: undefined,
+        createdAt: checkoutNow,
+        updatedAt: checkoutNow,
+      });
+      await setProfileAccountStage(
+        context,
+        readyProfile2.identity.id,
+        "COLLECTION_READY",
+      );
+
+      // Automatic checkout should skip profile-1 and lease profile-2
+      const output = await new CheckoutProfileUseCase(
+        context.profiles,
+        context.leases,
+        context.leaseIds,
+        context.clock,
+        context.sourceGroupReference,
+        context.profileSourceAccess,
+      ).execute({ sourceGroupId: "source-group-1" });
+
+      expect(output.profile.profileId).toBe("profile-2");
+      expect(output.lease.status).toBe("ACTIVE");
+
+      // Verify first profile remains READY (unchanged)
+      const savedProfile1 = await context.profiles.findById(
+        profile1.identity.id,
+      );
+      expect(savedProfile1?.identity.status).toBe("READY");
     });
 
     it("skips profiles with unsuccessful access states during automatic selection", async () => {
@@ -451,6 +550,313 @@ describe("collector profile checkout use cases", () => {
           sourceGroupId: "source-group-1",
         }),
       ).rejects.toThrow(ProfileNotCheckoutEligibleError);
+    });
+
+    it("does not mutate access records during successful checkout", async () => {
+      const context = createTestContext();
+      const readyProfile = await createReadyProfile(context);
+
+      // Capture access record before checkout
+      const accessRecordBefore =
+        await context.profileSourceAccess.getByProfileAndSourceGroup(
+          readyProfile.identity.id,
+          "source-group-1",
+        );
+      expect(accessRecordBefore).not.toBeNull();
+
+      // Execute successful checkout
+      await new CheckoutProfileUseCase(
+        context.profiles,
+        context.leases,
+        context.leaseIds,
+        context.clock,
+        context.sourceGroupReference,
+        context.profileSourceAccess,
+      ).execute({ sourceGroupId: "source-group-1" });
+
+      // Verify access record is unchanged
+      const accessRecordAfter =
+        await context.profileSourceAccess.getByProfileAndSourceGroup(
+          readyProfile.identity.id,
+          "source-group-1",
+        );
+      expect(accessRecordAfter).toEqual(accessRecordBefore);
+      expect(accessRecordAfter?.lastCheckedAt).toBe(
+        accessRecordBefore?.lastCheckedAt,
+      );
+      expect(accessRecordAfter?.lastSuccessfulAt).toBe(
+        accessRecordBefore?.lastSuccessfulAt,
+      );
+      expect(accessRecordAfter?.updatedAt).toBe(
+        accessRecordBefore?.updatedAt,
+      );
+      expect(accessRecordAfter?.notes).toBe(accessRecordBefore?.notes);
+      expect(accessRecordAfter?.lastFailureReason).toBe(
+        accessRecordBefore?.lastFailureReason,
+      );
+    });
+
+    it("does not mutate access records during rejected checkout", async () => {
+      const context = createTestContext();
+      const readyProfile = await createReadyProfile(context, {
+        sourceAccess: "ACCESS_DENIED",
+      });
+
+      // Capture access record before checkout
+      const accessRecordBefore =
+        await context.profileSourceAccess.getByProfileAndSourceGroup(
+          readyProfile.identity.id,
+          "source-group-1",
+        );
+      expect(accessRecordBefore).not.toBeNull();
+
+      // Execute rejected checkout
+      try {
+        await new CheckoutProfileUseCase(
+          context.profiles,
+          context.leases,
+          context.leaseIds,
+          context.clock,
+          context.sourceGroupReference,
+          context.profileSourceAccess,
+        ).execute({
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+        });
+      } catch (error) {
+        // Expected to fail
+      }
+
+      // Verify access record is unchanged
+      const accessRecordAfter =
+        await context.profileSourceAccess.getByProfileAndSourceGroup(
+          readyProfile.identity.id,
+          "source-group-1",
+        );
+      expect(accessRecordAfter).toEqual(accessRecordBefore);
+      expect(accessRecordAfter?.lastCheckedAt).toBe(
+        accessRecordBefore?.lastCheckedAt,
+      );
+      expect(accessRecordAfter?.lastSuccessfulAt).toBe(
+        accessRecordBefore?.lastSuccessfulAt,
+      );
+      expect(accessRecordAfter?.updatedAt).toBe(
+        accessRecordBefore?.updatedAt,
+      );
+      expect(accessRecordAfter?.notes).toBe(accessRecordBefore?.notes);
+      expect(accessRecordAfter?.lastFailureReason).toBe(
+        accessRecordBefore?.lastFailureReason,
+      );
+    });
+
+    it("finds profile IDs by source group and successful states", async () => {
+      const context = createTestContext();
+
+      // Create three profiles with different access states
+      await context.profileSourceAccess.upsert({
+        id: "access-1",
+        profileId: "profile-1",
+        sourceGroupId: "source-group-1",
+        accessState: "PUBLIC_ACCESSIBLE",
+        lastCheckedAt: checkoutNow,
+        lastSuccessfulAt: checkoutNow,
+        lastFailureReason: null,
+        joinRequestedAt: null,
+        notes: undefined,
+        createdAt: checkoutNow,
+        updatedAt: checkoutNow,
+      });
+      await context.profileSourceAccess.upsert({
+        id: "access-2",
+        profileId: "profile-2",
+        sourceGroupId: "source-group-1",
+        accessState: "JOINED_ACCESSIBLE",
+        lastCheckedAt: checkoutNow,
+        lastSuccessfulAt: checkoutNow,
+        lastFailureReason: null,
+        joinRequestedAt: null,
+        notes: undefined,
+        createdAt: checkoutNow,
+        updatedAt: checkoutNow,
+      });
+      await context.profileSourceAccess.upsert({
+        id: "access-3",
+        profileId: "profile-3",
+        sourceGroupId: "source-group-1",
+        accessState: "ACCESS_DENIED",
+        lastCheckedAt: checkoutNow,
+        lastSuccessfulAt: null,
+        lastFailureReason: null,
+        joinRequestedAt: null,
+        notes: undefined,
+        createdAt: checkoutNow,
+        updatedAt: checkoutNow,
+      });
+      await context.profileSourceAccess.upsert({
+        id: "access-4",
+        profileId: "profile-4",
+        sourceGroupId: "source-group-2",
+        accessState: "PUBLIC_ACCESSIBLE",
+        lastCheckedAt: checkoutNow,
+        lastSuccessfulAt: checkoutNow,
+        lastFailureReason: null,
+        joinRequestedAt: null,
+        notes: undefined,
+        createdAt: checkoutNow,
+        updatedAt: checkoutNow,
+      });
+
+      const profileIds =
+        await context.profileSourceAccess.findProfileIdsBySourceGroupAndStates(
+          "source-group-1",
+          ["PUBLIC_ACCESSIBLE", "JOINED_ACCESSIBLE"],
+        );
+
+      expect(profileIds).toEqual(
+        expect.arrayContaining(["profile-1", "profile-2"]),
+      );
+      expect(profileIds).not.toContain("profile-3");
+      expect(profileIds).not.toContain("profile-4");
+    });
+
+    it("returns empty array when no matching source group", async () => {
+      const context = createTestContext();
+      await context.profileSourceAccess.upsert({
+        id: "access-1",
+        profileId: "profile-1",
+        sourceGroupId: "source-group-1",
+        accessState: "PUBLIC_ACCESSIBLE",
+        lastCheckedAt: checkoutNow,
+        lastSuccessfulAt: checkoutNow,
+        lastFailureReason: null,
+        joinRequestedAt: null,
+        notes: undefined,
+        createdAt: checkoutNow,
+        updatedAt: checkoutNow,
+      });
+
+      const profileIds =
+        await context.profileSourceAccess.findProfileIdsBySourceGroupAndStates(
+          "nonexistent-group",
+          ["PUBLIC_ACCESSIBLE"],
+        );
+
+      expect(profileIds).toEqual([]);
+    });
+
+    it("excludes unsuccessful states from query results", async () => {
+      const context = createTestContext();
+      await context.profileSourceAccess.upsert({
+        id: "access-1",
+        profileId: "profile-1",
+        sourceGroupId: "source-group-1",
+        accessState: "UNKNOWN",
+        lastCheckedAt: checkoutNow,
+        lastSuccessfulAt: null,
+        lastFailureReason: null,
+        joinRequestedAt: null,
+        notes: undefined,
+        createdAt: checkoutNow,
+        updatedAt: checkoutNow,
+      });
+      await context.profileSourceAccess.upsert({
+        id: "access-2",
+        profileId: "profile-2",
+        sourceGroupId: "source-group-1",
+        accessState: "JOIN_REQUIRED",
+        lastCheckedAt: checkoutNow,
+        lastSuccessfulAt: null,
+        lastFailureReason: null,
+        joinRequestedAt: null,
+        notes: undefined,
+        createdAt: checkoutNow,
+        updatedAt: checkoutNow,
+      });
+
+      const profileIds =
+        await context.profileSourceAccess.findProfileIdsBySourceGroupAndStates(
+          "source-group-1",
+          ["PUBLIC_ACCESSIBLE", "JOINED_ACCESSIBLE"],
+        );
+
+      expect(profileIds).toEqual([]);
+    });
+
+    it("uses transaction-scoped repositories when transaction manager is configured", async () => {
+      const context = createTestContext();
+      const readyProfile = await createReadyProfile(context);
+
+      // Create separate repositories for transaction scope
+      const transactionProfiles = new InMemoryProfileRepository();
+      const transactionLeases = new InMemoryProfileLeaseRepository();
+      const transactionProfileSourceAccess =
+        new InMemoryProfileSourceAccessRepository();
+
+      // Copy profile to transaction scope
+      const profileInTx = await context.profiles.findById(
+        readyProfile.identity.id,
+      );
+      if (profileInTx) {
+        await transactionProfiles.save(profileInTx);
+      }
+
+      // Copy access record to transaction scope
+      const accessRecord =
+        await context.profileSourceAccess.getByProfileAndSourceGroup(
+          readyProfile.identity.id,
+          "source-group-1",
+        );
+      if (accessRecord) {
+        await transactionProfileSourceAccess.upsert(accessRecord);
+      }
+
+      // Create mock transaction manager
+      const transactionManager = {
+        runInTransaction: async <T>(
+          work: (repositories: {
+            profiles: InMemoryProfileRepository;
+            leases: InMemoryProfileLeaseRepository;
+            profileSourceAccess: InMemoryProfileSourceAccessRepository;
+          }) => Promise<T>,
+        ): Promise<T> => {
+          return work({
+            profiles: transactionProfiles,
+            leases: transactionLeases,
+            profileSourceAccess: transactionProfileSourceAccess,
+          });
+        },
+      };
+
+      // Execute checkout with transaction manager
+      const output = await new CheckoutProfileUseCase(
+        context.profiles,
+        context.leases,
+        context.leaseIds,
+        context.clock,
+        context.sourceGroupReference,
+        context.profileSourceAccess,
+        transactionManager,
+      ).execute({ sourceGroupId: "source-group-1" });
+
+      // Verify lease was created in transaction scope
+      const leaseInTx = await transactionLeases.findById(output.lease.id);
+      expect(leaseInTx).not.toBeNull();
+      expect(leaseInTx?.status).toBe("ACTIVE");
+
+      // Verify profile was updated in transaction scope
+      const profileInTxAfter = await transactionProfiles.findById(
+        readyProfile.identity.id,
+      );
+      expect(profileInTxAfter?.identity.status).toBe("BUSY");
+
+      // Verify non-transaction repositories were NOT modified
+      const leaseInMain = await context.leases.findById(output.lease.id);
+      expect(leaseInMain).toBeNull();
+
+      const profileInMainAfter = await context.profiles.findById(
+        readyProfile.identity.id,
+      );
+      expect(profileInMainAfter?.identity.status).toBe("READY");
     });
   });
 });
