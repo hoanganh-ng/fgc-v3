@@ -58,14 +58,18 @@ describe("ProfileManagerHttpClient", () => {
         },
       },
     });
-    expect(parseRequestBody(fetch)).toEqual({});
+    expect(parseRequestBody(fetch)).toEqual({
+      sourceGroupId: "source-group-1",
+    });
   });
 
   it("maps checkout success without exposing broad Profile Manager runtime configuration", async () => {
     const fetch = new FakeFetch(createCheckoutResponse());
     const client = createClient(fetch.fetch);
 
-    const result = await client.checkoutProfile({});
+    const result = await client.checkoutProfile({
+      sourceGroupId: "source-group-1",
+    });
 
     expect(result).toEqual({
       ok: true,

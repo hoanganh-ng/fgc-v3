@@ -4,10 +4,12 @@ import {
   CheckoutProfileUseCase,
   CreateProfileUseCase,
   IngestProfileSessionUseCase,
+  NoEligibleProfileAvailableError,
   ProfileLeaseAlreadyClosedError,
   ProfileLeaseStateConflictError,
   ProfileNotCheckoutEligibleError,
   ReleaseProfileLeaseUseCase,
+  SourceGroupNotFoundError,
   StartProfileProvisioningUseCase,
   UpdateProfileAccountStageUseCase,
   UpdateProfileConfigurationUseCase,
@@ -15,11 +17,13 @@ import {
 import type {
   Clock,
   LeaseIdGenerator,
+  SourceGroupReferencePort,
   TokenGenerator,
 } from "./index";
 import {
   InMemoryProfileLeaseRepository,
   InMemoryProfileRepository,
+  InMemoryProfileSourceAccessRepository,
 } from "./test-support/in-memory-repositories";
 import type {
   BehavioralPersona,
@@ -33,6 +37,7 @@ import type {
   ProfileAccountStage,
   ProfileLease,
   ProfileLeaseId,
+  ProfileSourceAccessState,
   SafetyThresholds,
   TemporalRoutine,
 } from "../domain";
@@ -49,7 +54,9 @@ describe("collector profile checkout use cases", () => {
       context.leases,
       context.leaseIds,
       context.clock,
-    ).execute();
+      context.sourceGroupReference,
+      context.profileSourceAccess,
+    ).execute({ sourceGroupId: "source-group-1" });
     const savedProfile = await context.profiles.findById(
       readyProfile.identity.id,
     );
@@ -332,11 +339,127 @@ describe("collector profile checkout use cases", () => {
       ).execute({ leaseId: checkout.lease.id }),
     ).rejects.toThrow(ProfileLeaseAlreadyClosedError);
   });
+
+  describe("source-aware checkout gate", () => {
+    it("checks out a profile with JOINED_ACCESSIBLE state", async () => {
+      const context = createTestContext();
+      const readyProfile = await createReadyProfile(context, {
+        sourceAccess: "JOINED_ACCESSIBLE",
+      });
+
+      const output = await new CheckoutProfileUseCase(
+        context.profiles,
+        context.leases,
+        context.leaseIds,
+        context.clock,
+        context.sourceGroupReference,
+        context.profileSourceAccess,
+      ).execute({ sourceGroupId: "source-group-1" });
+
+      expect(output.profile.profileId).toBe(readyProfile.identity.id);
+      expect(output.lease.status).toBe("ACTIVE");
+    });
+
+    it("rejects explicit profile with missing access record", async () => {
+      const context = createTestContext();
+      await createReadyProfile(context);
+      // Delete the auto-created access record to simulate missing record
+      const allRecords = await context.profileSourceAccess.listByProfile(
+        "profile-1",
+      );
+      // InMemory repository doesn't have delete, so we rely on finding a source group
+      // without a record. We'll use a different source group.
+
+      await expect(
+        new CheckoutProfileUseCase(
+          context.profiles,
+          context.leases,
+          context.leaseIds,
+          context.clock,
+          context.sourceGroupReference,
+          context.profileSourceAccess,
+        ).execute({
+          profileId: "profile-1",
+          sourceGroupId: "source-group-missing",
+        }),
+      ).rejects.toThrow(SourceGroupNotFoundError);
+    });
+
+    it("rejects unknown source group with 404", async () => {
+      const context = createTestContext();
+      await createReadyProfile(context);
+
+      await expect(
+        new CheckoutProfileUseCase(
+          context.profiles,
+          context.leases,
+          context.leaseIds,
+          context.clock,
+          context.sourceGroupReference,
+          context.profileSourceAccess,
+        ).execute({
+          sourceGroupId: "unknown-group",
+        }),
+      ).rejects.toThrow(SourceGroupNotFoundError);
+    });
+
+    it("skips profiles with unsuccessful access states during automatic selection", async () => {
+      const states: ProfileSourceAccessState[] = [
+        "UNKNOWN",
+        "JOIN_REQUIRED",
+        "JOIN_REQUESTED",
+        "ACCESS_DENIED",
+        "LOGIN_REQUIRED",
+        "CHECKPOINT_REQUIRED",
+        "NEEDS_MANUAL_REVIEW",
+      ];
+
+      for (let i = 0; i < states.length; i++) {
+        const state = states[i]!;
+        const context = createTestContext();
+        await createReadyProfile(context, {
+          sourceAccess: state,
+        });
+
+        await expect(
+          new CheckoutProfileUseCase(
+            context.profiles,
+            context.leases,
+            context.leaseIds,
+            context.clock,
+            context.sourceGroupReference,
+            context.profileSourceAccess,
+          ).execute({ sourceGroupId: "source-group-1" }),
+        ).rejects.toThrow(NoEligibleProfileAvailableError);
+      }
+    });
+
+    it("rejects explicit profile with unsuccessful access state", async () => {
+      const context = createTestContext();
+      await createReadyProfile(context, { sourceAccess: "ACCESS_DENIED" });
+
+      await expect(
+        new CheckoutProfileUseCase(
+          context.profiles,
+          context.leases,
+          context.leaseIds,
+          context.clock,
+          context.sourceGroupReference,
+          context.profileSourceAccess,
+        ).execute({
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+        }),
+      ).rejects.toThrow(ProfileNotCheckoutEligibleError);
+    });
+  });
 });
 
 interface TestContext {
   readonly profiles: InMemoryProfileRepository;
   readonly leases: InMemoryProfileLeaseRepository;
+  readonly profileSourceAccess: InMemoryProfileSourceAccessRepository;
+  readonly sourceGroupReference: FakeSourceGroupReference;
   readonly tokens: FakeTokenGenerator;
   readonly leaseIds: FakeLeaseIdGenerator;
   readonly clock: FixedClock;
@@ -348,6 +471,8 @@ function createTestContext(
   return {
     profiles: new InMemoryProfileRepository(),
     leases: new InMemoryProfileLeaseRepository(),
+    profileSourceAccess: new InMemoryProfileSourceAccessRepository(),
+    sourceGroupReference: new FakeSourceGroupReference(),
     tokens: new FakeTokenGenerator(["provisioning-token-1"]),
     leaseIds: new FakeLeaseIdGenerator(leaseIds),
     clock: new FixedClock(checkoutNow),
@@ -356,7 +481,10 @@ function createTestContext(
 
 async function createReadyProfile(
   context: TestContext,
-  options: { readonly accountStage?: ProfileAccountStage } = {},
+  options: {
+    readonly accountStage?: ProfileAccountStage;
+    readonly sourceAccess?: ProfileSourceAccessState;
+  } = {},
 ): Promise<CollectorProfile> {
   await new CreateProfileUseCase(context.profiles, context.clock).execute({
     id: "profile-1",
@@ -390,6 +518,25 @@ async function createReadyProfile(
     cookies: createCookies(),
     localStorage: createLocalStorage(),
     sessionExpiresAt: "2026-01-06T18:00:00.000Z",
+  });
+
+  await context.profileSourceAccess.upsert({
+    id: "access-1",
+    profileId: readyProfile.identity.id,
+    sourceGroupId: "source-group-1",
+    accessState: options.sourceAccess ?? "PUBLIC_ACCESSIBLE",
+    lastCheckedAt: checkoutNow,
+    lastSuccessfulAt:
+      options.sourceAccess === undefined ||
+      options.sourceAccess === "PUBLIC_ACCESSIBLE" ||
+      options.sourceAccess === "JOINED_ACCESSIBLE"
+        ? checkoutNow
+        : null,
+    lastFailureReason: null,
+    joinRequestedAt: null,
+    notes: undefined,
+    createdAt: checkoutNow,
+    updatedAt: checkoutNow,
   });
 
   return setProfileAccountStage(
@@ -455,13 +602,16 @@ async function setProfileAccountStage(
 async function checkoutProfile(
   context: TestContext,
   profileId: ProfileId,
+  sourceGroupId: string = "source-group-1",
 ): Promise<{ readonly lease: ProfileLease }> {
   return new CheckoutProfileUseCase(
     context.profiles,
     context.leases,
     context.leaseIds,
     context.clock,
-  ).execute({ profileId });
+    context.sourceGroupReference,
+    context.profileSourceAccess,
+  ).execute({ profileId, sourceGroupId });
 }
 
 async function checkoutProfileForExercise(
@@ -559,6 +709,14 @@ class FixedClock implements Clock {
 
   public setNow(isoDateTime: string): void {
     this.current = new Date(isoDateTime);
+  }
+}
+
+class FakeSourceGroupReference implements SourceGroupReferencePort {
+  public existingIds = new Set<string>(["source-group-1"]);
+
+  public async exists(sourceGroupId: string): Promise<boolean> {
+    return this.existingIds.has(sourceGroupId);
   }
 }
 

@@ -63,13 +63,17 @@ if (!shouldRunHttpDbTests) {
         },
       });
       client = databaseClient;
-      service = createCollectorProfileManagerFromDatabaseClient(databaseClient);
       contentManager = createContentManagerFromDatabaseClient(databaseClient);
+      const sourceGroupReferences = new ContentManagerSourceGroupReferenceAdapter(
+        contentManager.getSourceGroup,
+      );
+      service = createCollectorProfileManagerFromDatabaseClient(
+        databaseClient,
+        sourceGroupReferences,
+      );
       server = createHttpServer({
         collectorProfileManager: service,
-        sourceGroupReferences: new ContentManagerSourceGroupReferenceAdapter(
-          contentManager.getSourceGroup,
-        ),
+        sourceGroupReferences,
         collectorRuntime: createUnusedCollectorRuntimeHttpService(),
         contentManager,
       });

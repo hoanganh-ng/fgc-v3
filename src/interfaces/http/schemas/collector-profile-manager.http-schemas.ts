@@ -118,6 +118,7 @@ export const IngestProfileSessionHttpBodySchema = z
 
 export const CheckoutProfileHttpBodySchema = z
   .object({
+    sourceGroupId: z.string().trim().min(1),
     profileId: ProfileIdSchema.optional(),
   })
   .strict();
@@ -775,8 +776,10 @@ export const ingestProfileSessionHttpRouteSchema = {
 export const checkoutProfileHttpRouteSchema = {
   body: {
     type: "object",
+    required: ["sourceGroupId"],
     additionalProperties: false,
     properties: {
+      sourceGroupId: nonEmptyStringJsonSchema,
       profileId: nonEmptyStringJsonSchema,
     },
   },

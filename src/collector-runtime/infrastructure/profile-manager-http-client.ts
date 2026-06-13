@@ -129,7 +129,7 @@ export class ProfileManagerHttpClient
   }
 
   public async checkoutProfile(
-    _input: ProfileCheckoutInput,
+    input: ProfileCheckoutInput,
   ): Promise<ProfileCheckoutResult> {
     try {
       const response = await this.fetchImplementation(
@@ -137,7 +137,7 @@ export class ProfileManagerHttpClient
         {
           method: "POST",
           headers: jsonHeaders(),
-          body: JSON.stringify({}),
+          body: JSON.stringify({ sourceGroupId: input.sourceGroupId }),
         },
       );
 

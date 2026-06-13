@@ -30,12 +30,14 @@ function loadHttpRuntimeConfig(
 
 async function main(): Promise<void> {
   const config = loadHttpRuntimeConfig();
-  const collectorProfileManager = createCollectorProfileManagerFromEnv();
-  const collectorRuntime = createCollectorRuntimeFromEnv();
   const contentManager = createContentManagerFromEnv();
   const sourceGroupReferences = new ContentManagerSourceGroupReferenceAdapter(
     contentManager.getSourceGroup,
   );
+  const collectorProfileManager = createCollectorProfileManagerFromEnv({
+    sourceGroupReference: sourceGroupReferences,
+  });
+  const collectorRuntime = createCollectorRuntimeFromEnv();
   const server = createHttpServer({
     collectorProfileManager,
     sourceGroupReferences,

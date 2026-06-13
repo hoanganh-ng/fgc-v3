@@ -2,6 +2,7 @@ import type {
   Clock,
   IdGenerator,
   LeaseIdGenerator,
+  SourceGroupReferencePort,
   TokenGenerator,
 } from "../../collector-profile-manager/application";
 import { loadCompositionConfig } from "../config";
@@ -32,6 +33,7 @@ import type {
 
 export interface CreateCollectorProfileManagerOptions {
   readonly databaseUrl: string;
+  readonly sourceGroupReference: SourceGroupReferencePort;
   readonly poolConfig?: CreateDatabaseClientOptions["poolConfig"];
   readonly clock?: Clock;
   readonly tokenGenerator?: TokenGenerator;
@@ -40,6 +42,7 @@ export interface CreateCollectorProfileManagerOptions {
 }
 
 export interface CreateCollectorProfileManagerFromEnvOptions {
+  readonly sourceGroupReference: SourceGroupReferencePort;
   readonly environment?: CompositionEnvironment;
   readonly poolConfig?: CreateDatabaseClientOptions["poolConfig"];
   readonly clock?: Clock;
@@ -51,12 +54,13 @@ export interface CreateCollectorProfileManagerFromEnvOptions {
 export type CollectorProfileManagerService = CollectorProfileManagerContainer;
 
 export function createCollectorProfileManagerFromEnv(
-  options: CreateCollectorProfileManagerFromEnvOptions = {},
+  options: CreateCollectorProfileManagerFromEnvOptions,
 ): CollectorProfileManagerService {
   const config = loadCompositionConfig(options.environment);
 
   return createCollectorProfileManagerFromDatabase({
     databaseUrl: config.databaseUrl,
+    sourceGroupReference: options.sourceGroupReference,
     ...(options.poolConfig !== undefined
       ? { poolConfig: options.poolConfig }
       : {}),
@@ -85,12 +89,14 @@ export function createCollectorProfileManagerFromDatabase(
 
   return createCollectorProfileManagerFromDatabaseClient(
     createDatabaseClient(clientOptions),
+    options.sourceGroupReference,
     options,
   );
 }
 
 export function createCollectorProfileManagerFromDatabaseClient(
   databaseClient: DatabaseClient,
+  sourceGroupReference: SourceGroupReferencePort,
   overrides: Partial<
     Pick<
       CreateCollectorProfileManagerOptions,
@@ -109,6 +115,7 @@ export function createCollectorProfileManagerFromDatabaseClient(
     profiles,
     leases,
     profileSourceAccess,
+    sourceGroupReference,
     transactionManager,
     clock: overrides.clock ?? new SystemClock(),
     tokenGenerator: overrides.tokenGenerator ?? new CryptoTokenGenerator(),

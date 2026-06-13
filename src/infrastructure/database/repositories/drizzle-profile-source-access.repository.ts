@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type {
   ProfileSourceAccessRepository,
 } from "../../../collector-profile-manager/application";
@@ -6,6 +6,7 @@ import type {
   ProfileId,
   ProfileSourceAccess,
   ProfileSourceAccessSourceGroupId,
+  ProfileSourceAccessState,
 } from "../../../collector-profile-manager/domain";
 import type { CollectorProfileDatabaseSession } from "../client";
 import {
@@ -92,5 +93,29 @@ export class DrizzleProfileSourceAccessRepository
       );
 
     return rows.map((row) => toProfileSourceAccessDomain(row));
+  }
+
+  public async findProfileIdsBySourceGroupAndStates(
+    sourceGroupId: ProfileSourceAccessSourceGroupId,
+    accessStates: readonly ProfileSourceAccessState[],
+  ): Promise<readonly ProfileId[]> {
+    if (accessStates.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db
+      .select({ profileId: collectorProfileSourceAccess.profileId })
+      .from(collectorProfileSourceAccess)
+      .where(
+        and(
+          eq(collectorProfileSourceAccess.sourceGroupId, sourceGroupId),
+          inArray(
+            collectorProfileSourceAccess.accessState,
+            accessStates as ProfileSourceAccessState[],
+          ),
+        ),
+      );
+
+    return rows.map((row) => row.profileId);
   }
 }

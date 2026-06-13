@@ -365,12 +365,10 @@ export function registerCollectorProfileManagerRoutes(
         CheckoutProfileHttpBodySchema,
         request.body ?? {},
       );
-      const input =
-        body.profileId === undefined
-          ? {}
-          : ({
-              profileId: body.profileId,
-            } satisfies CheckoutProfileInput);
+      const input: CheckoutProfileInput = {
+        sourceGroupId: body.sourceGroupId,
+        ...(body.profileId !== undefined ? { profileId: body.profileId } : {}),
+      };
 
       return collectorProfileManager.checkoutProfile.execute(input);
     },

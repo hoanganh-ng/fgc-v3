@@ -21,6 +21,7 @@ import type {
   Clock,
   IdGenerator,
   LeaseIdGenerator,
+  SourceGroupReferencePort,
   TokenGenerator,
 } from "../../collector-profile-manager/application";
 import {
@@ -38,6 +39,7 @@ describe("collector profile manager composition container", () => {
       profiles: new InMemoryProfileRepository(),
       leases: new InMemoryProfileLeaseRepository(),
       profileSourceAccess: new InMemoryProfileSourceAccessRepository(),
+      sourceGroupReference: new FakeSourceGroupReference(),
       clock: new FixedClock(),
       tokenGenerator: new FakeTokenGenerator(),
       leaseIdGenerator: new FakeLeaseIdGenerator(),
@@ -115,5 +117,11 @@ class FakeLeaseIdGenerator implements LeaseIdGenerator {
 class FakeIdGenerator implements IdGenerator {
   public async generateId(): Promise<string> {
     return "profile-source-access-1";
+  }
+}
+
+class FakeSourceGroupReference implements SourceGroupReferencePort {
+  public async exists(_sourceGroupId: string): Promise<boolean> {
+    return true;
   }
 }

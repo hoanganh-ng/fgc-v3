@@ -247,6 +247,7 @@ const applicationErrorStatus: Record<CollectorProfileApplicationErrorCode, numbe
   PROFILE_LEASE_STATE_CONFLICT: 409,
   PROFILE_SOURCE_ACCESS_NOT_FOUND: 404,
   INVALID_PROFILE_SOURCE_ACCESS: 400,
+  SOURCE_GROUP_NOT_FOUND: 404,
 };
 
 const domainErrorStatus: Record<CollectorProfileDomainErrorCode, number> = {

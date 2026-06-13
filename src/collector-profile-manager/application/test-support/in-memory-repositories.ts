@@ -5,6 +5,7 @@ import type {
   ProfileLeaseId,
   ProfileSourceAccess,
   ProfileSourceAccessSourceGroupId,
+  ProfileSourceAccessState,
 } from "../../domain";
 import type {
   ProfileCheckoutCandidateQuery,
@@ -181,6 +182,20 @@ export class InMemoryProfileSourceAccessRepository
     return [...this.records.values()]
       .filter((record) => record.sourceGroupId === sourceGroupId)
       .sort(compareProfileSourceAccess);
+  }
+
+  public async findProfileIdsBySourceGroupAndStates(
+    sourceGroupId: ProfileSourceAccessSourceGroupId,
+    accessStates: readonly ProfileSourceAccessState[],
+  ): Promise<readonly ProfileId[]> {
+    const stateSet = new Set(accessStates);
+    return [...this.records.values()]
+      .filter(
+        (record) =>
+          record.sourceGroupId === sourceGroupId &&
+          stateSet.has(record.accessState),
+      )
+      .map((record) => record.profileId);
   }
 }
 

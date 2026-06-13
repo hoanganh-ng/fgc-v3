@@ -23,7 +23,8 @@ export type CheckoutIneligibilityReasonCode =
   | "INVALID_SAFETY_THRESHOLDS"
   | "DAILY_SESSION_LIMIT_REACHED"
   | "DAILY_ACTIVE_DURATION_LIMIT_REACHED"
-  | "DAILY_MACRO_ACTION_LIMIT_REACHED";
+  | "DAILY_MACRO_ACTION_LIMIT_REACHED"
+  | "SOURCE_ACCESS_UNSUCCESSFUL";
 
 export interface CheckoutIneligibilityReason {
   readonly code: CheckoutIneligibilityReasonCode;

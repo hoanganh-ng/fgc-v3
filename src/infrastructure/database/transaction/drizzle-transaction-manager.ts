@@ -5,6 +5,7 @@ import type {
 import type { CollectorProfileDatabase } from "../client";
 import { DrizzleProfileLeaseRepository } from "../repositories/drizzle-profile-lease.repository";
 import { DrizzleProfileRepository } from "../repositories/drizzle-profile.repository";
+import { DrizzleProfileSourceAccessRepository } from "../repositories/drizzle-profile-source-access.repository";
 
 export class DrizzleTransactionManager implements TransactionManager {
   public constructor(private readonly db: CollectorProfileDatabase) {}
@@ -16,6 +17,7 @@ export class DrizzleTransactionManager implements TransactionManager {
       work({
         profiles: new DrizzleProfileRepository(tx),
         leases: new DrizzleProfileLeaseRepository(tx),
+        profileSourceAccess: new DrizzleProfileSourceAccessRepository(tx),
       }),
     );
   }

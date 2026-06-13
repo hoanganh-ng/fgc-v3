@@ -22,7 +22,8 @@ export type CollectorProfileApplicationErrorCode =
   | "PROFILE_LEASE_ALREADY_CLOSED"
   | "PROFILE_LEASE_STATE_CONFLICT"
   | "PROFILE_SOURCE_ACCESS_NOT_FOUND"
-  | "INVALID_PROFILE_SOURCE_ACCESS";
+  | "INVALID_PROFILE_SOURCE_ACCESS"
+  | "SOURCE_GROUP_NOT_FOUND";
 
 export abstract class CollectorProfileApplicationError extends Error {
   public readonly code: CollectorProfileApplicationErrorCode;
@@ -204,5 +205,17 @@ export class InvalidProfileSourceAccessError extends CollectorProfileApplication
       "Profile-source access record is invalid.",
     );
     this.issues = issues;
+  }
+}
+
+export class SourceGroupNotFoundError extends CollectorProfileApplicationError {
+  public readonly sourceGroupId: ProfileSourceAccessSourceGroupId;
+
+  public constructor(sourceGroupId: ProfileSourceAccessSourceGroupId) {
+    super(
+      "SOURCE_GROUP_NOT_FOUND",
+      `Source group not found: ${sourceGroupId}.`,
+    );
+    this.sourceGroupId = sourceGroupId;
   }
 }

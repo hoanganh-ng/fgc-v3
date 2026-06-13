@@ -2,6 +2,7 @@ import type {
   ProfileId,
   ProfileSourceAccess,
   ProfileSourceAccessSourceGroupId,
+  ProfileSourceAccessState,
 } from "../../domain";
 
 export interface ProfileSourceAccessRepository {
@@ -14,4 +15,8 @@ export interface ProfileSourceAccessRepository {
   listBySourceGroup(
     sourceGroupId: ProfileSourceAccessSourceGroupId,
   ): Promise<readonly ProfileSourceAccess[]>;
+  findProfileIdsBySourceGroupAndStates(
+    sourceGroupId: ProfileSourceAccessSourceGroupId,
+    accessStates: readonly ProfileSourceAccessState[],
+  ): Promise<readonly ProfileId[]>;
 }

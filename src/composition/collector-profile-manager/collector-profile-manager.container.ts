@@ -23,6 +23,7 @@ import type {
   ProfileLeaseRepository,
   ProfileRepository,
   ProfileSourceAccessRepository,
+  SourceGroupReferencePort,
   TokenGenerator,
   TransactionManager,
 } from "../../collector-profile-manager/application";
@@ -31,6 +32,7 @@ export interface CollectorProfileManagerDependencies {
   readonly profiles: ProfileRepository;
   readonly leases: ProfileLeaseRepository;
   readonly profileSourceAccess: ProfileSourceAccessRepository;
+  readonly sourceGroupReference: SourceGroupReferencePort;
   readonly clock: Clock;
   readonly tokenGenerator: TokenGenerator;
   readonly leaseIdGenerator: LeaseIdGenerator;
@@ -66,6 +68,7 @@ export function createCollectorProfileManager(
     profiles,
     leases,
     profileSourceAccess,
+    sourceGroupReference,
     clock,
     tokenGenerator,
     leaseIdGenerator,
@@ -105,6 +108,8 @@ export function createCollectorProfileManager(
       leases,
       leaseIdGenerator,
       clock,
+      sourceGroupReference,
+      profileSourceAccess,
       transactionManager,
     ),
     checkoutProfileForExercise: new CheckoutProfileForExerciseUseCase(

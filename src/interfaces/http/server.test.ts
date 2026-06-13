@@ -1032,6 +1032,7 @@ describe("HTTP server", () => {
         method: "POST",
         url: "/collector/profiles/checkout",
         payload: {
+          sourceGroupId: "source-group-1",
           profileId: "profile-1",
         },
       });
@@ -1039,6 +1040,7 @@ describe("HTTP server", () => {
       expect(response.statusCode).toBe(200);
       expect(service.checkoutProfile.calls).toEqual([
         {
+          sourceGroupId: "source-group-1",
           profileId: "profile-1",
         },
       ]);
@@ -1319,7 +1321,7 @@ interface FakeCollectorProfileManager extends CollectorProfileManagerHttpService
     CollectorProfile
   >;
   readonly checkoutProfile: StubUseCase<
-    CheckoutProfileInput | undefined,
+    CheckoutProfileInput,
     CheckoutProfileOutput
   >;
   readonly checkoutProfileForExercise: StubUseCase<
