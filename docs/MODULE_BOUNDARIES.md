@@ -12,8 +12,9 @@ Owns:
 - Checkout eligibility rules.
 - Domain-level validation for profile readiness, busy state, cooldowns, temporal windows, and safety thresholds.
 - Checkout eligibility gating for normal collection, including the requirement that `accountStage = COLLECTION_READY`.
-- Profile lease purpose rules for `COLLECTION` and `AMBIENT_EXERCISE`.
+- Profile lease purpose rules for `COLLECTION`, `AMBIENT_EXERCISE`, and `ASSISTED_GROUP_ACCESS`.
 - Specified-profile ambient exercise checkout eligibility for `READY` profiles, including allowed account stages and rejected review/retired stages.
+- Specified-profile assisted group access checkout eligibility for `READY` profiles in `WARMING` or `COLLECTION_READY`, with source-group reference validation and no profile-source access mutation.
 - Profile-source access state for `profileId + sourceGroupId` pairs, stored with `sourceGroupId` as an external module reference string.
 - Profile-source access HTTP workflows, including validating source group references through an explicit Content Manager-facing port or adapter.
 
@@ -68,6 +69,7 @@ Owns:
 - Durable Collector Runtime run records for collection runs and ambient account exercise runs.
 - Checking out eligible profiles from Collector Profile Manager.
 - Calling specified-profile ambient exercise checkout for read-only account exercise attempts.
+- Future consumption of assisted group access leases after Profile Manager checkout, when explicitly added by a later sprint.
 - Visiting Facebook groups and posts.
 - Future consumption of Content Manager source group entry route metadata through explicit contracts.
 - Visiting safe Facebook home/feed surfaces for read-only account exercise.

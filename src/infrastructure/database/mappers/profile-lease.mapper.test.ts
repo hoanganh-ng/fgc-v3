@@ -25,6 +25,20 @@ describe("profile lease database mapper", () => {
     expect(row.purpose).toBe("COLLECTION");
   });
 
+  it("maps assisted group access lease purpose to rows and back", () => {
+    const lease = createActiveProfileLease({
+      id: "lease-1",
+      profileId: "profile-1",
+      purpose: "ASSISTED_GROUP_ACCESS",
+      leasedAt,
+      expiresAt,
+    });
+    const row = toProfileLeaseRow(lease);
+
+    expect(row.purpose).toBe("ASSISTED_GROUP_ACCESS");
+    expect(toProfileLeaseDomain(row)).toEqual(lease);
+  });
+
   it("rejects invalid persisted lease data on read", () => {
     const lease = createActiveProfileLease({
       id: "lease-1",

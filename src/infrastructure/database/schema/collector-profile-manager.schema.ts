@@ -61,7 +61,7 @@ export const collectorProfileLeaseStatusEnum = pgEnum(
 
 export const collectorProfileLeasePurposeEnum = pgEnum(
   "collector_profile_lease_purpose",
-  ["COLLECTION", "AMBIENT_EXERCISE"],
+  ["COLLECTION", "AMBIENT_EXERCISE", "ASSISTED_GROUP_ACCESS"],
 );
 
 export const collectorProfileSourceAccessStateEnum = pgEnum(

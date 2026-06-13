@@ -5,6 +5,8 @@ import {
 import type {
   CheckoutProfileInput,
   CheckoutProfileOutput,
+  CheckoutProfileForAssistedGroupAccessInput,
+  CheckoutProfileForAssistedGroupAccessOutput,
   CheckoutProfileForExerciseInput,
   CheckoutProfileForExerciseOutput,
   CreateProfileInput,
@@ -45,6 +47,7 @@ import type {
 import { SourceGroupNotFoundError } from "../../../content-manager/application";
 import {
   CheckoutProfileHttpBodySchema,
+  CheckoutProfileForAssistedGroupAccessHttpBodySchema,
   CreateProfileHttpBodySchema,
   ListProfilesHttpQuerySchema,
   IngestProfileSessionHttpBodySchema,
@@ -58,6 +61,7 @@ import {
   UpdateProfileAccountStageHttpBodySchema,
   UpdateProfileConfigurationHttpBodySchema,
   checkoutProfileHttpRouteSchema,
+  checkoutProfileForAssistedGroupAccessHttpRouteSchema,
   checkoutProfileForExerciseHttpRouteSchema,
   createProfileHttpRouteSchema,
   getProfileSourceAccessHttpRouteSchema,
@@ -121,6 +125,10 @@ export interface CollectorProfileManagerHttpService {
   readonly checkoutProfileForExercise: ExecutableUseCase<
     CheckoutProfileForExerciseInput,
     CheckoutProfileForExerciseOutput
+  >;
+  readonly checkoutProfileForAssistedGroupAccess: ExecutableUseCase<
+    CheckoutProfileForAssistedGroupAccessInput,
+    CheckoutProfileForAssistedGroupAccessOutput
   >;
   readonly releaseProfileLease: ExecutableUseCase<
     ReleaseProfileLeaseInput,
@@ -386,6 +394,28 @@ export function registerCollectorProfileManagerRoutes(
       return collectorProfileManager.checkoutProfileForExercise.execute({
         profileId: params.profileId,
       });
+    },
+  );
+
+  server.post(
+    "/collector/profiles/:profileId/assisted-group-access/checkout",
+    { schema: checkoutProfileForAssistedGroupAccessHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileIdHttpParamsSchema,
+        request.params,
+      );
+      const body = parseHttpInput(
+        CheckoutProfileForAssistedGroupAccessHttpBodySchema,
+        request.body,
+      );
+
+      return collectorProfileManager.checkoutProfileForAssistedGroupAccess.execute(
+        {
+          profileId: params.profileId,
+          sourceGroupId: body.sourceGroupId,
+        },
+      );
     },
   );
 

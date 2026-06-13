@@ -72,6 +72,7 @@ describe("collector profile manager database schema", () => {
     expect(collectorProfileLeasePurposeEnum.enumValues).toEqual([
       "COLLECTION",
       "AMBIENT_EXERCISE",
+      "ASSISTED_GROUP_ACCESS",
     ]);
     expect(collectorProfileSourceAccessStateEnum.enumValues).toEqual([
       "UNKNOWN",

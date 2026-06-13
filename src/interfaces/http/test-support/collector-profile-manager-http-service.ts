@@ -21,6 +21,7 @@ export function createUnusedCollectorProfileManagerHttpService(): CollectorProfi
     ingestProfileSession: useCase,
     checkoutProfile: useCase,
     checkoutProfileForExercise: useCase,
+    checkoutProfileForAssistedGroupAccess: useCase,
     releaseProfileLease: useCase,
     upsertProfileSourceAccess: useCase,
     getProfileSourceAccess: useCase,

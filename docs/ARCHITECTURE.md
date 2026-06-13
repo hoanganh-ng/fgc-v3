@@ -76,6 +76,8 @@ Provisioning and session ingestion may move a profile to operational `READY` wit
 
 Ambient account exercise uses lease purpose `AMBIENT_EXERCISE` for a specified profile. It may exercise `READY` profiles in `NEW_ACCOUNT`, `WARMING`, `LIMITED`, or `COLLECTION_READY`, while `NEEDS_REVIEW` and `RETIRED` remain ineligible. This purpose is only for read-only stability exercise; it must not collect or submit content, and it must not automatically change `accountStage`.
 
+Assisted group access checkout uses lease purpose `ASSISTED_GROUP_ACCESS` for a specified profile and source group. It may check out `READY` profiles in `WARMING` or `COLLECTION_READY` when the ordinary authentication, runtime configuration, temporal routine, cooldown, daily safety, and active-lease gates pass. It does not require successful profile-source access because future operator-assisted workflows use it to establish or inspect access. It must not mutate profile-source access records or store `sourceGroupId` on the generic profile lease.
+
 Account stage transition rules and lease-purpose eligibility remain Collector Profile Manager domain logic. Collector Runtime and browser providers consume the resulting lease and trusted runtime configuration, record exercise outcomes, and release leases, but they do not bypass or reinterpret Profile Manager readiness rules.
 
 ## Profile-Source Access

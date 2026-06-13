@@ -12,6 +12,8 @@ import {
 import type {
   CheckoutProfileInput,
   CheckoutProfileOutput,
+  CheckoutProfileForAssistedGroupAccessInput,
+  CheckoutProfileForAssistedGroupAccessOutput,
   CheckoutProfileForExerciseInput,
   CheckoutProfileForExerciseOutput,
   CreateProfileInput,
@@ -1189,6 +1191,90 @@ describe("HTTP server", () => {
     }
   });
 
+  it("checks out a profile for assisted group access with a source group", async () => {
+    const { server, service } = createTestServer();
+    const checkoutOutput = createAssistedGroupAccessCheckoutOutput();
+
+    service.checkoutProfileForAssistedGroupAccess.setOutput(checkoutOutput);
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/profile-1/assisted-group-access/checkout",
+        payload: {
+          sourceGroupId: "source-group-1",
+        },
+      });
+      const body = response.json();
+      const bodyText = JSON.stringify(body);
+
+      expect(response.statusCode).toBe(200);
+      expect(service.checkoutProfileForAssistedGroupAccess.calls).toEqual([
+        {
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+        },
+      ]);
+      expect(body).toEqual(checkoutOutput);
+      expect(bodyText).not.toContain("cookie");
+      expect(bodyText).not.toContain("localStorage");
+      expect(bodyText).not.toContain("proxy");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it.each([
+    { name: "missing sourceGroupId", payload: {} },
+    { name: "empty sourceGroupId", payload: { sourceGroupId: "" } },
+    { name: "unexpected field", payload: { sourceGroupId: "source-group-1", extra: true } },
+  ])(
+    "returns 400 for assisted group access checkout with $name",
+    async ({ payload }) => {
+      const { server, service } = createTestServer();
+
+      try {
+        const response = await server.inject({
+          method: "POST",
+          url: "/collector/profiles/profile-1/assisted-group-access/checkout",
+          payload,
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect(service.checkoutProfileForAssistedGroupAccess.calls).toEqual([]);
+      } finally {
+        await server.close();
+      }
+    },
+  );
+
+  it("returns 404 for assisted group access checkout when source group does not exist", async () => {
+    const { server, service } = createTestServer();
+    service.checkoutProfileForAssistedGroupAccess.setError(
+      new SourceGroupNotFoundError("unknown-source-group"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/profile-1/assisted-group-access/checkout",
+        payload: {
+          sourceGroupId: "unknown-source-group",
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({
+        error: {
+          code: "SOURCE_GROUP_NOT_FOUND",
+          message: "Source group not found: unknown-source-group.",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("releases a profile lease", async () => {
     const { server, service } = createTestServer();
     const lease = createReleasedLease();
@@ -1438,6 +1524,10 @@ interface FakeCollectorProfileManager extends CollectorProfileManagerHttpService
     CheckoutProfileForExerciseInput,
     CheckoutProfileForExerciseOutput
   >;
+  readonly checkoutProfileForAssistedGroupAccess: StubUseCase<
+    CheckoutProfileForAssistedGroupAccessInput,
+    CheckoutProfileForAssistedGroupAccessOutput
+  >;
   readonly releaseProfileLease: StubUseCase<
     ReleaseProfileLeaseInput,
     ReleaseProfileLeaseOutput
@@ -1505,6 +1595,9 @@ function createTestServer(): {
     ),
     checkoutProfile: new StubUseCase(createCheckoutOutput()),
     checkoutProfileForExercise: new StubUseCase(createExerciseCheckoutOutput()),
+    checkoutProfileForAssistedGroupAccess: new StubUseCase(
+      createAssistedGroupAccessCheckoutOutput(),
+    ),
     releaseProfileLease: new StubUseCase({
       lease: createReleasedLease(),
       profile: createProfile({
@@ -1627,6 +1720,19 @@ function createExerciseCheckoutOutput(): CheckoutProfileForExerciseOutput {
     profile: {
       profileId: "profile-1",
       accountStage: "NEW_ACCOUNT",
+    },
+  };
+}
+
+function createAssistedGroupAccessCheckoutOutput(): CheckoutProfileForAssistedGroupAccessOutput {
+  return {
+    lease: {
+      ...createActiveLease(),
+      purpose: "ASSISTED_GROUP_ACCESS",
+    },
+    profile: {
+      profileId: "profile-1",
+      accountStage: "WARMING",
     },
   };
 }

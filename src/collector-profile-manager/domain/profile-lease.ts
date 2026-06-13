@@ -16,6 +16,7 @@ export const PROFILE_LEASE_STATUSES = [
 export const PROFILE_LEASE_PURPOSES = [
   "COLLECTION",
   "AMBIENT_EXERCISE",
+  "ASSISTED_GROUP_ACCESS",
 ] as const;
 
 export type ProfileLeaseStatus = zInfer<typeof ProfileLeaseStatusSchema>;

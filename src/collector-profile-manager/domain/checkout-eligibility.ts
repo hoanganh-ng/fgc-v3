@@ -13,6 +13,7 @@ export type CheckoutIneligibilityReasonCode =
   | "PROFILE_NOT_READY"
   | "ACCOUNT_STAGE_NOT_COLLECTION_READY"
   | "ACCOUNT_STAGE_NOT_EXERCISE_ELIGIBLE"
+  | "ACCOUNT_STAGE_NOT_ASSISTED_GROUP_ACCESS_ELIGIBLE"
   | "AUTHENTICATION_MISSING"
   | "AUTHENTICATION_EXPIRED"
   | "NETWORK_CONTEXT_MISSING"
@@ -87,6 +88,19 @@ export function evaluateCheckoutEligibility(
       code: "ACCOUNT_STAGE_NOT_EXERCISE_ELIGIBLE",
       message:
         "Profile account stage must allow ambient exercise before exercise checkout.",
+    });
+  }
+
+  if (
+    purpose === "ASSISTED_GROUP_ACCESS" &&
+    !isAccountStageEligibleForAssistedGroupAccess(
+      profile.identity.accountStage,
+    )
+  ) {
+    reasons.push({
+      code: "ACCOUNT_STAGE_NOT_ASSISTED_GROUP_ACCESS_ELIGIBLE",
+      message:
+        "Profile account stage must allow assisted group access before checkout.",
     });
   }
 
@@ -234,6 +248,12 @@ function isAccountStageEligibleForAmbientExercise(
     accountStage === "LIMITED" ||
     accountStage === "COLLECTION_READY"
   );
+}
+
+function isAccountStageEligibleForAssistedGroupAccess(
+  accountStage: CollectorProfile["identity"]["accountStage"],
+): boolean {
+  return accountStage === "WARMING" || accountStage === "COLLECTION_READY";
 }
 
 export function markProfileCheckedOut(

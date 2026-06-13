@@ -123,6 +123,12 @@ export const CheckoutProfileHttpBodySchema = z
   })
   .strict();
 
+export const CheckoutProfileForAssistedGroupAccessHttpBodySchema = z
+  .object({
+    sourceGroupId: ProfileSourceAccessSourceGroupIdSchema,
+  })
+  .strict();
+
 export const ReleaseProfileLeaseHttpBodySchema = z
   .object({
     macroActionsPerformed: z.number().int().min(0).optional(),
@@ -200,6 +206,9 @@ export type IngestProfileSessionHttpBody = z.infer<
 >;
 export type CheckoutProfileHttpBody = z.infer<
   typeof CheckoutProfileHttpBodySchema
+>;
+export type CheckoutProfileForAssistedGroupAccessHttpBody = z.infer<
+  typeof CheckoutProfileForAssistedGroupAccessHttpBodySchema
 >;
 export type ReleaseProfileLeaseHttpBody = z.infer<
   typeof ReleaseProfileLeaseHttpBodySchema
@@ -461,7 +470,7 @@ const profileLeaseJsonSchema = {
     profileId: nonEmptyStringJsonSchema,
     purpose: {
       type: "string",
-      enum: ["COLLECTION", "AMBIENT_EXERCISE"],
+      enum: ["COLLECTION", "AMBIENT_EXERCISE", "ASSISTED_GROUP_ACCESS"],
     },
     leasedAt: nonEmptyStringJsonSchema,
     expiresAt: nonEmptyStringJsonSchema,
@@ -823,6 +832,39 @@ export const checkoutProfileHttpRouteSchema = {
 
 export const checkoutProfileForExerciseHttpRouteSchema = {
   params: profileIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["lease", "profile"],
+      additionalProperties: false,
+      properties: {
+        lease: profileLeaseJsonSchema,
+        profile: {
+          type: "object",
+          required: ["profileId", "accountStage"],
+          additionalProperties: false,
+          properties: {
+            profileId: nonEmptyStringJsonSchema,
+            accountStage: profileSummaryJsonSchema.properties.accountStage,
+          },
+        },
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const checkoutProfileForAssistedGroupAccessHttpRouteSchema = {
+  params: profileIdParamsJsonSchema,
+  body: {
+    type: "object",
+    required: ["sourceGroupId"],
+    additionalProperties: false,
+    properties: {
+      sourceGroupId: nonEmptyStringJsonSchema,
+    },
+  },
   response: {
     200: {
       type: "object",

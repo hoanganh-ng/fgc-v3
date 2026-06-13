@@ -780,6 +780,171 @@ if (!shouldRunHttpDbTests) {
       });
     });
 
+    it("checks out assisted group access through HTTP and persists the assisted lease purpose", async () => {
+      const profileId = trackProfileId(nextTestId("assisted-profile"));
+      const displayName = `HTTP DB Assisted ${profileId}`;
+      const categorySlug = nextTestId("assisted-category");
+      const sessionPayload = createSessionPayload();
+
+      const createProfileResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/profiles",
+        payload: {
+          id: profileId,
+          displayName,
+        },
+      });
+      expect(createProfileResponse.statusCode).toBe(201);
+
+      const configureResponse = await getServer().inject({
+        method: "PATCH",
+        url: `/collector/profiles/${profileId}/configuration`,
+        payload: createConfiguration(),
+      });
+      expect(configureResponse.statusCode).toBe(200);
+
+      const provisioningStartResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/profiles/${profileId}/provisioning/start`,
+      });
+      const provisioningStartBody = provisioningStartResponse.json() as {
+        readonly provisioningToken: string;
+      };
+      expect(provisioningStartResponse.statusCode).toBe(200);
+
+      const sessionResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/provisioning/${encodeURIComponent(
+          provisioningStartBody.provisioningToken,
+        )}/session`,
+        payload: sessionPayload,
+      });
+      expect(sessionResponse.statusCode).toBe(200);
+
+      const warmingResponse = await getServer().inject({
+        method: "PATCH",
+        url: `/collector/profiles/${profileId}/account-stage`,
+        payload: {
+          accountStage: "WARMING",
+        },
+      });
+      expect(warmingResponse.statusCode).toBe(200);
+
+      const createCategoryResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/content-categories",
+        payload: {
+          name: `Assisted Category ${categorySlug}`,
+          slug: categorySlug,
+        },
+      });
+      const createCategoryBody = createCategoryResponse.json() as {
+        readonly category: { readonly id: string };
+      };
+      expect(createCategoryResponse.statusCode).toBe(201);
+      const categoryId = trackCategoryId(createCategoryBody.category.id);
+
+      const createSourceGroupResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/source-groups",
+        payload: {
+          platform: "FACEBOOK",
+          externalGroupId: nextTestId("assisted-fb-group"),
+          name: "Assisted Group Access Source Group",
+          url: "https://facebook.test/groups/assisted-group-access",
+          categoryId,
+          collectionPriority: 50,
+        },
+      });
+      const createSourceGroupBody = createSourceGroupResponse.json() as {
+        readonly sourceGroup: { readonly id: string };
+      };
+      expect(createSourceGroupResponse.statusCode).toBe(201);
+      const sourceGroupId = trackSourceGroupId(
+        createSourceGroupBody.sourceGroup.id,
+      );
+
+      const checkoutResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/profiles/${profileId}/assisted-group-access/checkout`,
+        payload: {
+          sourceGroupId,
+        },
+      });
+      const checkoutBody = checkoutResponse.json();
+      const leaseId =
+        typeof checkoutBody.lease?.id === "string"
+          ? trackLeaseId(checkoutBody.lease.id)
+          : undefined;
+      expect(checkoutResponse.statusCode).toBe(200);
+      expect(leaseId).toBeDefined();
+      const activeLeaseId = leaseId ?? "missing-assisted-lease-id";
+      expect(checkoutBody).toMatchObject({
+        lease: {
+          id: activeLeaseId,
+          profileId,
+          purpose: "ASSISTED_GROUP_ACCESS",
+          status: "ACTIVE",
+        },
+        profile: {
+          profileId,
+          accountStage: "WARMING",
+        },
+      });
+      expect(JSON.stringify(checkoutBody)).not.toContain("sourceGroupId");
+
+      const accessRows = await getClient()
+        .db.select()
+        .from(collectorProfileSourceAccess)
+        .where(eq(collectorProfileSourceAccess.profileId, profileId));
+      expect(accessRows).toEqual([]);
+
+      const [leaseRow] = await getClient()
+        .db.select()
+        .from(collectorProfileLeases)
+        .where(eq(collectorProfileLeases.id, activeLeaseId));
+      expect(leaseRow).toMatchObject({
+        id: activeLeaseId,
+        profileId,
+        purpose: "ASSISTED_GROUP_ACCESS",
+        status: "ACTIVE",
+      });
+
+      const runtimeConfigurationResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/profile-leases/${activeLeaseId}/runtime-configuration`,
+      });
+      expect(runtimeConfigurationResponse.statusCode).toBe(200);
+      expect(runtimeConfigurationResponse.json()).toMatchObject({
+        profileId,
+        leaseId: activeLeaseId,
+      });
+
+      const releaseResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/profile-leases/${activeLeaseId}/release`,
+        payload: {},
+      });
+      expect(releaseResponse.statusCode).toBe(200);
+      expect(releaseResponse.json()).toMatchObject({
+        lease: {
+          id: activeLeaseId,
+          purpose: "ASSISTED_GROUP_ACCESS",
+          status: "RELEASED",
+        },
+        profile: {
+          id: profileId,
+          status: "READY",
+        },
+      });
+
+      const releasedRuntimeConfigurationResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/profile-leases/${activeLeaseId}/runtime-configuration`,
+      });
+      expect(releasedRuntimeConfigurationResponse.statusCode).toBe(409);
+    });
+
     function nextTestId(label: string): string {
       nextId += 1;
 

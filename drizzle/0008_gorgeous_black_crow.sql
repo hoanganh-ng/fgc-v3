@@ -1,0 +1,1 @@
+ALTER TYPE "public"."collector_profile_lease_purpose" ADD VALUE 'ASSISTED_GROUP_ACCESS';

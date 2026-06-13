@@ -338,6 +338,21 @@ if (!shouldRunDbTests) {
       await expect(leases.save(secondLease)).rejects.toThrow();
     });
 
+    it("persists assisted group access lease purpose", async () => {
+      const profile = trackProfile(
+        createReadyProfile(nextTestId("assisted-lease-profile")),
+      );
+      const lease = trackLease({
+        ...createLease(nextTestId("assisted-lease"), profile.identity.id),
+        purpose: "ASSISTED_GROUP_ACCESS",
+      });
+
+      await profiles.save(profile);
+      await leases.save(lease);
+
+      await expect(leases.findById(lease.id)).resolves.toEqual(lease);
+    });
+
     it("upserts and lists profile-source access records by profile and source group", async () => {
       const firstProfile = trackProfile(
         createReadyProfile(nextTestId("access-profile-one")),

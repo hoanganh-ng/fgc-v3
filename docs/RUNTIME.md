@@ -288,6 +288,28 @@ Safety boundaries:
 
 ## Manual Facebook Collector Command
 
+## Assisted Group Access Checkout Foundation
+
+Sprint 043 adds a Profile Manager checkout contract for future
+operator-assisted Facebook group access sessions:
+
+```text
+POST /collector/profiles/:profileId/assisted-group-access/checkout
+```
+
+The request body must contain only a non-empty `sourceGroupId`. The route
+validates that the source group exists before entering the Profile Manager
+transaction, then checks out the specified profile with lease purpose
+`ASSISTED_GROUP_ACCESS` when the profile is `READY`, the account stage is
+`WARMING` or `COLLECTION_READY`, and the ordinary session, configuration,
+temporal, cooldown, daily safety, and active-lease gates pass.
+
+This checkout does not launch a browser, consume entry routes, create run
+records, require successful profile-source access, store `sourceGroupId` on the
+generic lease, or create/update profile-source access records. Existing lease
+release and trusted runtime profile configuration routes work for active
+assisted leases and reject released or expired leases.
+
 Sprint 032 added a manual/dev operator command for one Facebook group run using one existing `READY` profile. Sprint 034A makes `sourceGroupId` the normal source of truth for the group URL. Sprint 034B adds page-context `fetch`/XHR capture while keeping the Playwright network listener as secondary diagnostics.
 
 Prerequisites:

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  CheckoutProfileForAssistedGroupAccessUseCase,
   CheckoutProfileForExerciseUseCase,
   CheckoutProfileUseCase,
   CreateProfileUseCase,
   IngestProfileSessionUseCase,
+  GetRuntimeProfileConfigurationUseCase,
   NoEligibleProfileAvailableError,
   ProfileLeaseAlreadyClosedError,
   ProfileLeaseStateConflictError,
@@ -282,6 +284,396 @@ describe("collector profile checkout use cases", () => {
     await expect(
       checkoutProfileForExercise(context, readyProfile.identity.id),
     ).rejects.toThrow(ProfileLeaseStateConflictError);
+  });
+
+  it.each(["WARMING", "COLLECTION_READY"] as const)(
+    "checks out a READY profile in %s for assisted group access",
+    async (accountStage) => {
+      const context = createTestContext();
+      const readyProfile = await createReadyProfile(context, {
+        accountStage,
+        sourceAccess: null,
+      });
+
+      const output = await checkoutProfileForAssistedGroupAccess(
+        context,
+        readyProfile.identity.id,
+      );
+      const savedProfile = await context.profiles.findById(
+        readyProfile.identity.id,
+      );
+
+      expect(output.lease).toMatchObject({
+        id: "lease-1",
+        profileId: readyProfile.identity.id,
+        purpose: "ASSISTED_GROUP_ACCESS",
+        status: "ACTIVE",
+      });
+      expect(output.profile).toEqual({
+        profileId: readyProfile.identity.id,
+        accountStage,
+      });
+      expect(savedProfile?.identity.status).toBe("BUSY");
+      await expect(
+        context.profileSourceAccess.getByProfileAndSourceGroup(
+          readyProfile.identity.id,
+          "source-group-1",
+        ),
+      ).resolves.toBeNull();
+    },
+  );
+
+  it.each(["NEW_ACCOUNT", "LIMITED", "NEEDS_REVIEW", "RETIRED"] as const)(
+    "rejects assisted group access checkout for %s profiles",
+    async (accountStage) => {
+      const context = createTestContext();
+
+      await createReadyProfile(context, {
+        accountStage,
+        sourceAccess: null,
+      });
+
+      await expectAssistedGroupAccessCheckoutRejection(
+        context,
+        "ACCOUNT_STAGE_NOT_ASSISTED_GROUP_ACCESS_ELIGIBLE",
+      );
+    },
+  );
+
+  it.each([
+    {
+      name: "non-READY profile",
+      updateProfile: (profile: CollectorProfile) => ({
+        ...profile,
+        identity: {
+          ...profile.identity,
+          status: "PENDING_LOGIN" as const,
+        },
+      }),
+      code: "PROFILE_NOT_READY",
+    },
+    {
+      name: "missing authentication",
+      updateProfile: (profile: CollectorProfile) => ({
+        ...profile,
+        authenticationState: {
+          cookies: [],
+          localStorage: [],
+          sessionCapturedAt: null,
+          sessionExpiresAt: null,
+        },
+      }),
+      code: "AUTHENTICATION_MISSING",
+    },
+    {
+      name: "missing network context",
+      updateProfile: (profile: CollectorProfile) => ({
+        ...profile,
+        networkContext: {
+          ...profile.networkContext,
+          proxy: null,
+        },
+      }),
+      code: "NETWORK_CONTEXT_MISSING",
+    },
+    {
+      name: "missing hardware fingerprint",
+      updateProfile: (profile: CollectorProfile) => ({
+        ...profile,
+        hardwareFingerprint: null,
+      }),
+      code: "HARDWARE_FINGERPRINT_MISSING",
+    },
+    {
+      name: "cooldown",
+      updateProfile: (profile: CollectorProfile) => ({
+        ...profile,
+        identity: {
+          ...profile.identity,
+          nextAvailableAt: "2026-01-05T18:30:00.000Z",
+        },
+      }),
+      code: "COOLDOWN_ACTIVE",
+    },
+    {
+      name: "daily safety limit",
+      updateProfile: (profile: CollectorProfile) => ({
+        ...profile,
+        identity: {
+          ...profile.identity,
+          dailyUsage: {
+            localDate: "2026-01-05",
+            sessionsStarted: 3,
+            activeDurationMinutes: 0,
+            macroActions: 0,
+          },
+        },
+      }),
+      code: "DAILY_SESSION_LIMIT_REACHED",
+    },
+  ])("rejects assisted group access checkout for $name", async (testCase) => {
+    const context = createTestContext();
+    const readyProfile = await createReadyProfile(context, {
+      accountStage: "WARMING",
+      sourceAccess: null,
+    });
+
+    await context.profiles.save(testCase.updateProfile(readyProfile));
+
+    await expectAssistedGroupAccessCheckoutRejection(context, testCase.code);
+  });
+
+  it("rejects assisted group access checkout outside the active window", async () => {
+    const context = createTestContext();
+
+    await createReadyProfile(context, {
+      accountStage: "WARMING",
+      sourceAccess: null,
+    });
+    context.clock.setNow("2026-01-06T03:00:00.000Z");
+
+    await expectAssistedGroupAccessCheckoutRejection(
+      context,
+      "OUTSIDE_ACTIVE_WINDOW",
+    );
+  });
+
+  it("rejects assisted group access checkout when the profile already has an active lease", async () => {
+    const context = createTestContext();
+    const readyProfile = await createReadyProfile(context, {
+      accountStage: "WARMING",
+      sourceAccess: null,
+    });
+
+    await context.leases.save({
+      id: "lease-1",
+      profileId: readyProfile.identity.id,
+      purpose: "COLLECTION",
+      leasedAt: checkoutNow,
+      expiresAt: "2026-01-05T18:45:00.000Z",
+      releasedAt: null,
+      status: "ACTIVE",
+    });
+
+    await expect(
+      checkoutProfileForAssistedGroupAccess(context, readyProfile.identity.id),
+    ).rejects.toThrow(ProfileLeaseStateConflictError);
+  });
+
+  it("validates assisted group access source group before entering the transaction", async () => {
+    const context = createTestContext();
+    const readyProfile = await createReadyProfile(context, {
+      accountStage: "WARMING",
+      sourceAccess: null,
+    });
+    const transactionManager = {
+      runInTransaction: async <T>(): Promise<T> => {
+        throw new Error("Transaction should not be opened.");
+      },
+    };
+
+    await expect(
+      new CheckoutProfileForAssistedGroupAccessUseCase(
+        context.profiles,
+        context.leases,
+        context.leaseIds,
+        context.clock,
+        context.sourceGroupReference,
+        transactionManager,
+      ).execute({
+        profileId: readyProfile.identity.id,
+        sourceGroupId: "unknown-group",
+      }),
+    ).rejects.toThrow(SourceGroupNotFoundError);
+    expect(context.sourceGroupReference.calls).toEqual(["unknown-group"]);
+  });
+
+  it("does not mutate existing profile-source access records during assisted group access checkout", async () => {
+    const context = createTestContext();
+    const readyProfile = await createReadyProfile(context, {
+      accountStage: "WARMING",
+      sourceAccess: "JOIN_REQUESTED",
+    });
+    const accessRecordBefore =
+      await context.profileSourceAccess.getByProfileAndSourceGroup(
+        readyProfile.identity.id,
+        "source-group-1",
+      );
+
+    await checkoutProfileForAssistedGroupAccess(
+      context,
+      readyProfile.identity.id,
+    );
+
+    await expect(
+      context.profileSourceAccess.getByProfileAndSourceGroup(
+        readyProfile.identity.id,
+        "source-group-1",
+      ),
+    ).resolves.toEqual(accessRecordBefore);
+  });
+
+  it("uses transaction-scoped repositories during assisted group access checkout", async () => {
+    const context = createTestContext();
+    const readyProfile = await createReadyProfile(context, {
+      accountStage: "WARMING",
+      sourceAccess: null,
+    });
+    const transactionProfiles = new InMemoryProfileRepository();
+    const transactionLeases = new InMemoryProfileLeaseRepository();
+    const transactionProfileSourceAccess =
+      new InMemoryProfileSourceAccessRepository();
+    const profileInTx = await context.profiles.findById(
+      readyProfile.identity.id,
+    );
+
+    if (profileInTx === null) {
+      throw new Error("Expected profile to exist.");
+    }
+
+    await transactionProfiles.save(profileInTx);
+
+    const transactionManager = {
+      runInTransaction: async <T>(
+        work: (repositories: {
+          profiles: InMemoryProfileRepository;
+          leases: InMemoryProfileLeaseRepository;
+          profileSourceAccess: InMemoryProfileSourceAccessRepository;
+        }) => Promise<T>,
+      ): Promise<T> =>
+        work({
+          profiles: transactionProfiles,
+          leases: transactionLeases,
+          profileSourceAccess: transactionProfileSourceAccess,
+        }),
+    };
+
+    const output = await new CheckoutProfileForAssistedGroupAccessUseCase(
+      context.profiles,
+      context.leases,
+      context.leaseIds,
+      context.clock,
+      context.sourceGroupReference,
+      transactionManager,
+    ).execute({
+      profileId: readyProfile.identity.id,
+      sourceGroupId: "source-group-1",
+    });
+
+    await expect(transactionLeases.findById(output.lease.id)).resolves.toEqual(
+      output.lease,
+    );
+    await expect(context.leases.findById(output.lease.id)).resolves.toBeNull();
+    await expect(
+      transactionProfiles.findById(readyProfile.identity.id),
+    ).resolves.toMatchObject({
+      identity: expect.objectContaining({ status: "BUSY" }),
+    });
+    await expect(
+      context.profiles.findById(readyProfile.identity.id),
+    ).resolves.toMatchObject({
+      identity: expect.objectContaining({ status: "READY" }),
+    });
+  });
+
+  it("releases assisted group access leases back to READY", async () => {
+    const context = createTestContext();
+    const readyProfile = await createReadyProfile(context, {
+      accountStage: "WARMING",
+      sourceAccess: null,
+    });
+    const checkout = await checkoutProfileForAssistedGroupAccess(
+      context,
+      readyProfile.identity.id,
+    );
+
+    context.clock.setNow(releaseNow);
+
+    const output = await new ReleaseProfileLeaseUseCase(
+      context.profiles,
+      context.leases,
+      context.clock,
+    ).execute({
+      leaseId: checkout.lease.id,
+    });
+
+    expect(output.lease).toEqual({
+      ...checkout.lease,
+      releasedAt: releaseNow,
+      status: "RELEASED",
+    });
+    expect(output.profile.identity.status).toBe("READY");
+  });
+
+  it("allows runtime configuration for active assisted group access lease and rejects it after release or expiry", async () => {
+    const context = createTestContext(["lease-active", "lease-released", "lease-expired"]);
+    const activeProfile = await createReadyProfile(context, {
+      accountStage: "WARMING",
+      sourceAccess: null,
+    });
+    const activeCheckout = await checkoutProfileForAssistedGroupAccess(
+      context,
+      activeProfile.identity.id,
+    );
+
+    await expect(
+      new GetRuntimeProfileConfigurationUseCase(
+        context.profiles,
+        context.leases,
+        context.clock,
+      ).execute({ leaseId: activeCheckout.lease.id }),
+    ).resolves.toMatchObject({
+      profileId: activeProfile.identity.id,
+      leaseId: activeCheckout.lease.id,
+    });
+
+    const releasedProfile = await createAdditionalReadyProfile(
+      context,
+      "profile-released",
+      "Profile Released",
+      "provisioning-token-released",
+      "WARMING",
+    );
+    const releasedCheckout = await checkoutProfileForAssistedGroupAccess(
+      context,
+      releasedProfile.identity.id,
+    );
+    context.clock.setNow(releaseNow);
+    await new ReleaseProfileLeaseUseCase(
+      context.profiles,
+      context.leases,
+      context.clock,
+    ).execute({ leaseId: releasedCheckout.lease.id });
+
+    await expect(
+      new GetRuntimeProfileConfigurationUseCase(
+        context.profiles,
+        context.leases,
+        context.clock,
+      ).execute({ leaseId: releasedCheckout.lease.id }),
+    ).rejects.toThrow(ProfileLeaseAlreadyClosedError);
+
+    context.clock.setNow(checkoutNow);
+    const expiredProfile = await createAdditionalReadyProfile(
+      context,
+      "profile-expired",
+      "Profile Expired",
+      "provisioning-token-expired",
+      "WARMING",
+    );
+    const expiredCheckout = await checkoutProfileForAssistedGroupAccess(
+      context,
+      expiredProfile.identity.id,
+    );
+    context.clock.setNow("2026-01-05T18:46:00.000Z");
+
+    await expect(
+      new GetRuntimeProfileConfigurationUseCase(
+        context.profiles,
+        context.leases,
+        context.clock,
+      ).execute({ leaseId: expiredCheckout.lease.id }),
+    ).rejects.toThrow(ProfileLeaseAlreadyClosedError);
   });
 
   it("releases a BUSY profile back to READY", async () => {
@@ -932,7 +1324,7 @@ async function createReadyProfile(
   context: TestContext,
   options: {
     readonly accountStage?: ProfileAccountStage;
-    readonly sourceAccess?: ProfileSourceAccessState;
+    readonly sourceAccess?: ProfileSourceAccessState | null;
   } = {},
 ): Promise<CollectorProfile> {
   await new CreateProfileUseCase(context.profiles, context.clock).execute({
@@ -969,30 +1361,77 @@ async function createReadyProfile(
     sessionExpiresAt: "2026-01-06T18:00:00.000Z",
   });
 
-  await context.profileSourceAccess.upsert({
-    id: "access-1",
-    profileId: readyProfile.identity.id,
-    sourceGroupId: "source-group-1",
-    accessState: options.sourceAccess ?? "PUBLIC_ACCESSIBLE",
-    lastCheckedAt: checkoutNow,
-    lastSuccessfulAt:
-      options.sourceAccess === undefined ||
-      options.sourceAccess === "PUBLIC_ACCESSIBLE" ||
-      options.sourceAccess === "JOINED_ACCESSIBLE"
-        ? checkoutNow
-        : null,
-    lastFailureReason: null,
-    joinRequestedAt: null,
-    notes: undefined,
-    createdAt: checkoutNow,
-    updatedAt: checkoutNow,
-  });
+  if (options.sourceAccess !== null) {
+    await context.profileSourceAccess.upsert({
+      id: "access-1",
+      profileId: readyProfile.identity.id,
+      sourceGroupId: "source-group-1",
+      accessState: options.sourceAccess ?? "PUBLIC_ACCESSIBLE",
+      lastCheckedAt: checkoutNow,
+      lastSuccessfulAt:
+        options.sourceAccess === undefined ||
+        options.sourceAccess === "PUBLIC_ACCESSIBLE" ||
+        options.sourceAccess === "JOINED_ACCESSIBLE"
+          ? checkoutNow
+          : null,
+      lastFailureReason: null,
+      joinRequestedAt: null,
+      notes: undefined,
+      createdAt: checkoutNow,
+      updatedAt: checkoutNow,
+    });
+  }
 
   return setProfileAccountStage(
     context,
     readyProfile.identity.id,
     options.accountStage ?? "COLLECTION_READY",
   );
+}
+
+async function createAdditionalReadyProfile(
+  context: TestContext,
+  profileId: ProfileId,
+  displayName: string,
+  provisioningToken: string,
+  accountStage: ProfileAccountStage,
+): Promise<CollectorProfile> {
+  await new CreateProfileUseCase(context.profiles, context.clock).execute({
+    id: profileId,
+    displayName,
+  });
+
+  await new UpdateProfileConfigurationUseCase(
+    context.profiles,
+    context.clock,
+  ).execute({
+    profileId,
+    networkContext: createNetworkContext(),
+    hardwareFingerprint: createHardwareFingerprint(),
+    behavioralPersona: createBehavioralPersona(),
+    temporalRoutine: createTemporalRoutine(),
+    safetyThresholds: createSafetyThresholds(),
+    contentAffinities: createContentAffinities(),
+  });
+
+  const tokenGenerator = new FakeTokenGenerator([provisioningToken]);
+  const started = await new StartProfileProvisioningUseCase(
+    context.profiles,
+    tokenGenerator,
+    context.clock,
+  ).execute({ profileId });
+
+  const readyProfile = await new IngestProfileSessionUseCase(
+    context.profiles,
+    context.clock,
+  ).execute({
+    provisioningToken: started.provisioningToken,
+    cookies: createCookies(),
+    localStorage: createLocalStorage(),
+    sessionExpiresAt: "2026-01-06T18:00:00.000Z",
+  });
+
+  return setProfileAccountStage(context, readyProfile.identity.id, accountStage);
 }
 
 async function setProfileAccountStage(
@@ -1075,6 +1514,22 @@ async function checkoutProfileForExercise(
   ).execute({ profileId });
 }
 
+async function checkoutProfileForAssistedGroupAccess(
+  context: TestContext,
+  profileId: ProfileId,
+): Promise<{ readonly lease: ProfileLease; readonly profile: unknown }> {
+  return new CheckoutProfileForAssistedGroupAccessUseCase(
+    context.profiles,
+    context.leases,
+    context.leaseIds,
+    context.clock,
+    context.sourceGroupReference,
+  ).execute({
+    profileId,
+    sourceGroupId: "source-group-1",
+  });
+}
+
 async function expectCheckoutRejection(
   context: TestContext,
   expectedCode: string,
@@ -1104,6 +1559,28 @@ async function expectExerciseCheckoutRejection(
   try {
     await checkoutProfileForExercise(context, "profile-1");
     throw new Error("Expected exercise checkout to fail.");
+  } catch (error) {
+    expect(error).toBeInstanceOf(ProfileNotCheckoutEligibleError);
+
+    if (error instanceof ProfileNotCheckoutEligibleError) {
+      expect(error.reasons).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: expectedCode,
+          }),
+        ]),
+      );
+    }
+  }
+}
+
+async function expectAssistedGroupAccessCheckoutRejection(
+  context: TestContext,
+  expectedCode: string,
+): Promise<void> {
+  try {
+    await checkoutProfileForAssistedGroupAccess(context, "profile-1");
+    throw new Error("Expected assisted group access checkout to fail.");
   } catch (error) {
     expect(error).toBeInstanceOf(ProfileNotCheckoutEligibleError);
 
@@ -1163,8 +1640,10 @@ class FixedClock implements Clock {
 
 class FakeSourceGroupReference implements SourceGroupReferencePort {
   public existingIds = new Set<string>(["source-group-1"]);
+  public calls: string[] = [];
 
   public async exists(sourceGroupId: string): Promise<boolean> {
+    this.calls.push(sourceGroupId);
     return this.existingIds.has(sourceGroupId);
   }
 }
