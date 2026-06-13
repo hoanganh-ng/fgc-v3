@@ -235,6 +235,121 @@ describe("assisted access runner", () => {
     ]);
   });
 
+  it("deducts browser launch and navigation time from operator wait", async () => {
+    const clock = new MutableClock(now);
+    const context = createTestContext({
+      clock,
+      leaseExpiresAt: "2026-05-01T10:01:00.000Z",
+      launchDurationMs: 10_000,
+      navigationDurationMs: 15_000,
+    });
+
+    const result = await runAssistedAccessCommand({
+      args: createArgs({ maxDurationMs: 600_000 }),
+      dependencies: context.dependencies,
+      now: () => clock.now(),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(context.page.gotoCalls).toEqual([
+      {
+        url: "https://www.facebook.com/groups/group-1",
+        waitUntil: "domcontentloaded",
+        timeoutMs: 30_000,
+      },
+    ]);
+    expect(context.sessionControl.calls).toEqual([
+      {
+        maxDurationMs: 30_000,
+      },
+    ]);
+  });
+
+  it("does not wait for operator completion when navigation consumes all remaining time", async () => {
+    const clock = new MutableClock(now);
+    const context = createTestContext({
+      clock,
+      leaseExpiresAt: "2026-05-01T10:00:30.000Z",
+      launchDurationMs: 10_000,
+      navigationDurationMs: 15_000,
+    });
+
+    const result = await runAssistedAccessCommand({
+      args: createArgs({ maxDurationMs: 600_000 }),
+      dependencies: context.dependencies,
+      now: () => clock.now(),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      pageLoaded: true,
+      leaseReleased: true,
+      errors: [
+        {
+          code: "LEASE_EXPIRY_TOO_CLOSE",
+        },
+      ],
+    });
+    expect(context.page.gotoCalls).toEqual([
+      {
+        url: "https://www.facebook.com/groups/group-1",
+        waitUntil: "domcontentloaded",
+        timeoutMs: 15_000,
+      },
+    ]);
+    expect(context.sessionControl.calls).toEqual([]);
+  });
+
+  it("uses requested duration when it is shorter than the lease duration", async () => {
+    const clock = new MutableClock(now);
+    const context = createTestContext({
+      clock,
+      leaseExpiresAt: "2026-05-01T10:45:00.000Z",
+      launchDurationMs: 5_000,
+      navigationDurationMs: 5_000,
+    });
+
+    await runAssistedAccessCommand({
+      args: createArgs({ maxDurationMs: 40_000 }),
+      dependencies: context.dependencies,
+      now: () => clock.now(),
+    });
+
+    expect(context.sessionControl.calls).toEqual([
+      {
+        maxDurationMs: 30_000,
+      },
+    ]);
+  });
+
+  it.each([
+    { name: "missing", leaseExpiresAt: undefined },
+    { name: "invalid", leaseExpiresAt: "not-a-date" },
+  ])(
+    "uses requested duration when lease expiry is $name",
+    async ({ leaseExpiresAt }) => {
+      const clock = new MutableClock(now);
+      const context = createTestContext({
+        clock,
+        leaseExpiresAt,
+        launchDurationMs: 5_000,
+        navigationDurationMs: 5_000,
+      });
+
+      await runAssistedAccessCommand({
+        args: createArgs({ maxDurationMs: 40_000 }),
+        dependencies: context.dependencies,
+        now: () => clock.now(),
+      });
+
+      expect(context.sessionControl.calls).toEqual([
+        {
+          maxDurationMs: 30_000,
+        },
+      ]);
+    },
+  );
+
   it("attempts lease release when browser close fails", async () => {
     const context = createTestContext({ closeFails: true });
 
@@ -244,6 +359,15 @@ describe("assisted access runner", () => {
       now: () => new Date(now),
     });
 
+    expect(result).toMatchObject({
+      ok: false,
+      errors: [
+        {
+          code: "BROWSER_SESSION_CLOSE_FAILED",
+          message: "Browser session close failed after assisted access.",
+        },
+      ],
+    });
     expect(result.leaseReleased).toBe(true);
     expect(context.session.closed).toBe(true);
     expect(context.profileManager.releaseCalls).toHaveLength(1);
@@ -283,18 +407,30 @@ interface TestContext {
 
 function createTestContext(
   options: {
-    readonly leaseExpiresAt?: string;
+    readonly leaseExpiresAt?: string | undefined;
     readonly closeFails?: boolean;
     readonly completionReason?: "OPERATOR_COMPLETED" | "TIMEOUT" | "ABORTED";
+    readonly clock?: MutableClock;
+    readonly launchDurationMs?: number;
+    readonly navigationDurationMs?: number;
   } = {},
 ): TestContext {
   const contentManager = new FakeContentManager();
   const profileManager = new FakeProfileManager(
-    options.leaseExpiresAt ?? "2026-05-01T10:45:00.000Z",
+    "leaseExpiresAt" in options
+      ? options.leaseExpiresAt
+      : "2026-05-01T10:45:00.000Z",
   );
-  const page = new FakeBrowserPage();
+  const page = new FakeBrowserPage(
+    options.clock,
+    options.navigationDurationMs ?? 0,
+  );
   const session = new FakeBrowserSession(page, options.closeFails === true);
-  const browserProvider = new FakeBrowserProvider(session);
+  const browserProvider = new FakeBrowserProvider(
+    session,
+    options.clock,
+    options.launchDurationMs ?? 0,
+  );
   const sessionControl = new FakeSessionControl(
     options.completionReason ?? "OPERATOR_COMPLETED",
   );
@@ -365,7 +501,7 @@ class FakeProfileManager implements AssistedAccessProfileManagerPort {
   public readonly runtimeConfigurationLeaseIds: string[] = [];
   public readonly releaseCalls: ProfileLeaseReleaseInput[] = [];
 
-  public constructor(private readonly leaseExpiresAt: string) {}
+  public constructor(private readonly leaseExpiresAt: string | undefined) {}
 
   public async checkoutProfileForAssistedGroupAccess(
     profileId: string,
@@ -378,7 +514,9 @@ class FakeProfileManager implements AssistedAccessProfileManagerPort {
       profileId,
       accountStage: "WARMING",
       leaseId: "lease-1",
-      leaseExpiresAt: this.leaseExpiresAt,
+      ...(this.leaseExpiresAt !== undefined
+        ? { leaseExpiresAt: this.leaseExpiresAt }
+        : {}),
     };
   }
 
@@ -392,7 +530,7 @@ class FakeProfileManager implements AssistedAccessProfileManagerPort {
       configuration: {
         profileId: "profile-1",
         leaseId,
-        leaseExpiresAt: this.leaseExpiresAt,
+        leaseExpiresAt: this.leaseExpiresAt ?? "2026-05-01T10:45:00.000Z",
         hardwareFingerprint: {
           userAgent: "Mozilla/5.0 Test",
           viewport: {
@@ -435,12 +573,17 @@ class FakeBrowserProvider implements BrowserProviderPort {
   public readonly providerName = "PLAYWRIGHT_CHROMIUM" as const;
   public readonly launchCalls: BrowserProviderLaunchConfig[] = [];
 
-  public constructor(private readonly session: FakeBrowserSession) {}
+  public constructor(
+    private readonly session: FakeBrowserSession,
+    private readonly clock: MutableClock | undefined,
+    private readonly launchDurationMs: number,
+  ) {}
 
   public async launch(
     config: BrowserProviderLaunchConfig,
   ): Promise<BrowserProviderSession> {
     this.launchCalls.push(config);
+    this.clock?.advance(this.launchDurationMs);
 
     return this.session;
   }
@@ -472,6 +615,11 @@ class FakeBrowserPage implements BrowserProviderPage {
   public readonly gotoCalls: BrowserProviderNavigationInput[] = [];
   private currentUrl = "about:blank";
 
+  public constructor(
+    private readonly clock: MutableClock | undefined,
+    private readonly navigationDurationMs: number,
+  ) {}
+
   public url(): string {
     return this.currentUrl;
   }
@@ -481,6 +629,7 @@ class FakeBrowserPage implements BrowserProviderPage {
   ): Promise<BrowserProviderNavigationResult | null> {
     this.gotoCalls.push(input);
     this.currentUrl = input.url;
+    this.clock?.advance(this.navigationDurationMs);
 
     return { status: 200 };
   }
@@ -521,5 +670,21 @@ class FakeSessionControl implements AssistedAccessSessionControlPort {
     });
 
     return this.completionReason;
+  }
+}
+
+class MutableClock {
+  private valueMs: number;
+
+  public constructor(value: string) {
+    this.valueMs = new Date(value).getTime();
+  }
+
+  public now(): Date {
+    return new Date(this.valueMs);
+  }
+
+  public advance(durationMs: number): void {
+    this.valueMs += durationMs;
   }
 }

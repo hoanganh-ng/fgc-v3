@@ -127,7 +127,9 @@ export async function runAssistedAccessCommand(
   let pageLoaded = false;
   let completionReason: AssistedAccessCompletionReason | undefined;
   let shouldLaunchBrowser = true;
+  let navigationBudgetMs = 0;
   const errors: AssistedAccessCommandError[] = [];
+  const now = input.now ?? (() => new Date());
 
   logger.info("Starting assisted group access browser session.");
   logger.info(`Using profile id ${input.args.profileId}.`);
@@ -186,13 +188,13 @@ export async function runAssistedAccessCommand(
       shouldLaunchBrowser = false;
     }
 
-    const sessionBudgetMs = clampSessionDurationMs({
+    const safeDeadlineMs = calculateSafeDeadlineMs({
+      commandStartedAt: startedAt,
       requestedDurationMs: input.args.maxDurationMs,
       ...(leaseExpiresAt !== undefined ? { leaseExpiresAt } : {}),
-      now: input.now ?? (() => new Date()),
     });
 
-    if (sessionBudgetMs <= 0) {
+    if (getRemainingTimeMs(safeDeadlineMs, now) <= 0) {
       errors.push({
         code: "LEASE_EXPIRY_TOO_CLOSE",
         message: "Lease expiry is too close to start an assisted access session.",
@@ -209,31 +211,56 @@ export async function runAssistedAccessCommand(
         }),
       );
 
+      navigationBudgetMs = getRemainingTimeMs(safeDeadlineMs, now);
+
+      if (navigationBudgetMs <= 0) {
+        errors.push({
+          code: "LEASE_EXPIRY_TOO_CLOSE",
+          message: "Lease expiry is too close to start an assisted access session.",
+        });
+        shouldLaunchBrowser = false;
+      }
+    }
+
+    if (shouldLaunchBrowser && runtimeConfigurationResult.ok && session !== undefined) {
       const page = await session.newPage();
       pageLoaded = await navigateToSelectedRoute(
         page,
         selectedRoute.url,
-        sessionBudgetMs,
+        navigationBudgetMs,
       );
-      completionReason = await dependencies.sessionControl.waitForCompletion({
-        maxDurationMs: sessionBudgetMs,
-        ...(input.abortSignal !== undefined
-          ? { abortSignal: input.abortSignal }
-          : {}),
-      });
 
-      if (completionReason === "ABORTED") {
+      const operatorBudgetMs = getRemainingTimeMs(safeDeadlineMs, now);
+
+      if (operatorBudgetMs <= 0) {
         errors.push({
-          code: "OPERATOR_SESSION_ABORTED",
-          message: "Assisted access session was aborted.",
+          code: "LEASE_EXPIRY_TOO_CLOSE",
+          message: "Lease expiry is too close to start an assisted access session.",
         });
+      } else {
+        completionReason = await dependencies.sessionControl.waitForCompletion({
+          maxDurationMs: operatorBudgetMs,
+          ...(input.abortSignal !== undefined
+            ? { abortSignal: input.abortSignal }
+            : {}),
+        });
+
+        if (completionReason === "ABORTED") {
+          errors.push({
+            code: "OPERATOR_SESSION_ABORTED",
+            message: "Assisted access session was aborted.",
+          });
+        }
       }
     }
   } catch (error) {
     errors.push(toUnknownFailure(error));
   } finally {
     if (session !== undefined) {
-      await closeBrowserSession(session, logger);
+      const closeResult = await closeBrowserSession(session, logger);
+      if (!closeResult.ok) {
+        errors.push(closeResult.error);
+      }
       session = undefined;
     }
 
@@ -265,7 +292,7 @@ export async function runAssistedAccessCommand(
       pageLoaded,
       ...(completionReason !== undefined ? { completionReason } : {}),
       leaseReleased,
-      durationMs: getDurationMs(startedAt),
+      durationMs: getDurationMs(startedAt, now),
       errors,
     };
 
@@ -440,25 +467,29 @@ async function navigateToSelectedRoute(
   return true;
 }
 
-function clampSessionDurationMs(input: {
+function calculateSafeDeadlineMs(input: {
+  readonly commandStartedAt: Date;
   readonly requestedDurationMs: number;
   readonly leaseExpiresAt?: string;
-  readonly now: () => Date;
 }): number {
+  const requestedDeadlineMs =
+    input.commandStartedAt.getTime() + input.requestedDurationMs;
+
   if (input.leaseExpiresAt === undefined) {
-    return input.requestedDurationMs;
+    return requestedDeadlineMs;
   }
 
   const leaseExpiresAtMs = Date.parse(input.leaseExpiresAt);
 
   if (!Number.isFinite(leaseExpiresAtMs)) {
-    return input.requestedDurationMs;
+    return requestedDeadlineMs;
   }
 
-  return Math.min(
-    input.requestedDurationMs,
-    leaseExpiresAtMs - input.now().getTime() - SHUTDOWN_MARGIN_MS,
-  );
+  return Math.min(requestedDeadlineMs, leaseExpiresAtMs - SHUTDOWN_MARGIN_MS);
+}
+
+function getRemainingTimeMs(safeDeadlineMs: number, now: () => Date): number {
+  return safeDeadlineMs - now().getTime();
 }
 
 async function releaseLease(
@@ -484,11 +515,22 @@ async function releaseLease(
 async function closeBrowserSession(
   session: BrowserProviderSession,
   logger: AssistedAccessLogger,
-): Promise<void> {
+): Promise<
+  | { readonly ok: true }
+  | { readonly ok: false; readonly error: AssistedAccessCommandError }
+> {
   try {
     await session.close();
+    return { ok: true };
   } catch {
     logWarning(logger, "Browser session close failed before lease release.");
+    return {
+      ok: false,
+      error: {
+        code: "BROWSER_SESSION_CLOSE_FAILED",
+        message: getSafeFailureMessage("BROWSER_SESSION_CLOSE_FAILED"),
+      },
+    };
   }
 }
 
@@ -567,6 +609,8 @@ function getSafeFailureMessage(code: string): string {
       return "Profile lease release failed after assisted access.";
     case "BROWSER_PROVIDER_FAILED":
       return "Browser provider failed during assisted access.";
+    case "BROWSER_SESSION_CLOSE_FAILED":
+      return "Browser session close failed after assisted access.";
     default:
       return "Assisted group access failed.";
   }
@@ -610,8 +654,8 @@ function logWarning(logger: AssistedAccessLogger, message: string): void {
   logger.info(message);
 }
 
-function getDurationMs(startedAt: Date): number {
-  return Math.max(0, Date.now() - startedAt.getTime());
+function getDurationMs(startedAt: Date, now: () => Date): number {
+  return Math.max(0, now().getTime() - startedAt.getTime());
 }
 
 function errorToMessage(error: unknown): string {
