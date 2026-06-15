@@ -117,8 +117,17 @@ export class RequestAccountExerciseRunUseCase {
 
     validateCategoryBrowseSourceGroup(sourceGroupId, sourceGroup);
 
+    const canonicalSourceUrl = canonicalizeFacebookUrl(sourceGroup.url);
+    if (canonicalSourceUrl === undefined) {
+      throw new SourceGroupLookupFailedError(
+        sourceGroupId,
+        "Source group URL is not a valid HTTPS Facebook URL.",
+      );
+    }
+
     const selectedRoute = selectCategoryBrowseEntryRoute({
       sourceGroup,
+      canonicalSourceUrl,
       ...(input.entryRouteId !== undefined
         ? { entryRouteId: input.entryRouteId }
         : {}),
@@ -198,6 +207,7 @@ function validateCategoryBrowseSourceGroup(
 
 function selectCategoryBrowseEntryRoute(input: {
   readonly sourceGroup: SourceGroupLookupSourceGroup;
+  readonly canonicalSourceUrl: string;
   readonly entryRouteId?: string;
 }): SourceGroupLookupEntryRoute & {
   readonly type: "CATEGORY_ENTRY_URL";
@@ -218,12 +228,17 @@ function selectCategoryBrowseEntryRoute(input: {
     return validateEligibleCategoryBrowseEntryRoute(
       input.sourceGroup,
       explicitRoute,
+      input.canonicalSourceUrl,
     );
   }
 
   const selectedRoute = [...(input.sourceGroup.entryRoutes ?? [])]
     .map((route) =>
-      tryValidateEligibleCategoryBrowseEntryRoute(input.sourceGroup, route),
+      tryValidateEligibleCategoryBrowseEntryRoute(
+        input.sourceGroup,
+        route,
+        input.canonicalSourceUrl,
+      ),
     )
     .filter(
       (
@@ -248,6 +263,7 @@ function selectCategoryBrowseEntryRoute(input: {
 function validateEligibleCategoryBrowseEntryRoute(
   sourceGroup: SourceGroupLookupSourceGroup,
   route: SourceGroupLookupEntryRoute,
+  canonicalSourceUrl: string,
 ): SourceGroupLookupEntryRoute & {
   readonly type: "CATEGORY_ENTRY_URL";
   readonly riskLevel: "LOW" | "MEDIUM";
@@ -255,6 +271,7 @@ function validateEligibleCategoryBrowseEntryRoute(
   const eligibleRoute = tryValidateEligibleCategoryBrowseEntryRoute(
     sourceGroup,
     route,
+    canonicalSourceUrl,
   );
 
   if (eligibleRoute === undefined) {
@@ -270,6 +287,7 @@ function validateEligibleCategoryBrowseEntryRoute(
 function tryValidateEligibleCategoryBrowseEntryRoute(
   sourceGroup: SourceGroupLookupSourceGroup,
   route: SourceGroupLookupEntryRoute,
+  canonicalSourceUrl: string,
 ):
   | (SourceGroupLookupEntryRoute & {
       readonly type: "CATEGORY_ENTRY_URL";
@@ -280,11 +298,19 @@ function tryValidateEligibleCategoryBrowseEntryRoute(
     return undefined;
   }
 
+  const canonicalRouteUrl = canonicalizeFacebookUrl(route.url);
+  if (canonicalRouteUrl === undefined) {
+    throw new SourceGroupLookupFailedError(
+      sourceGroup.id,
+      "Candidate route URL is not a valid HTTPS Facebook URL.",
+    );
+  }
+
   if (route.riskLevel !== "LOW" && route.riskLevel !== "MEDIUM") {
     return undefined;
   }
 
-  if (sameNormalizedUrl(route.url, sourceGroup.url)) {
+  if (canonicalRouteUrl === canonicalSourceUrl) {
     return undefined;
   }
 

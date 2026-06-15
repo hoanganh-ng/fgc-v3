@@ -723,6 +723,326 @@ describe("collector runtime account exercise run application use cases", () => {
         }),
       ).rejects.toThrowError("does not have an eligible CATEGORY_ENTRY_URL route");
     });
+
+    it("rejects HTTP source URL versus HTTPS candidate with the same path", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "http://www.facebook.com/groups/source-group-1",
+          categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "route-1",
+              type: "CATEGORY_ENTRY_URL",
+              url: "https://www.facebook.com/groups/source-group-1/category-1",
+              riskLevel: "LOW",
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("Source group URL is not a valid HTTPS Facebook URL.");
+    });
+
+    it("rejects malformed sourceGroup.url", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "not-a-url",
+          categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "route-1",
+              type: "CATEGORY_ENTRY_URL",
+              url: "https://www.facebook.com/groups/source-group-1/category-1",
+              riskLevel: "LOW",
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("Source group URL is not a valid HTTPS Facebook URL.");
+    });
+
+    it("rejects non-Facebook sourceGroup.url", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.google.com",
+          categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "route-1",
+              type: "CATEGORY_ENTRY_URL",
+              url: "https://www.facebook.com/groups/source-group-1/category-1",
+              riskLevel: "LOW",
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("Source group URL is not a valid HTTPS Facebook URL.");
+    });
+
+    it("rejects credential-bearing sourceGroup.url", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://user:pass@www.facebook.com/groups/source-group-1",
+          categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "route-1",
+              type: "CATEGORY_ENTRY_URL",
+              url: "https://www.facebook.com/groups/source-group-1/category-1",
+              riskLevel: "LOW",
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("Source group URL is not a valid HTTPS Facebook URL.");
+    });
+
+    it("rejects malformed candidate route URL", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/source-group-1",
+          categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "route-1",
+              type: "CATEGORY_ENTRY_URL",
+              url: "not-a-url",
+              riskLevel: "LOW",
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("Candidate route URL is not a valid HTTPS Facebook URL.");
+    });
+
+    it("rejects non-HTTPS candidate route URL", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/source-group-1",
+          categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "route-1",
+              type: "CATEGORY_ENTRY_URL",
+              url: "http://www.facebook.com/groups/source-group-1/category-1",
+              riskLevel: "LOW",
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("Candidate route URL is not a valid HTTPS Facebook URL.");
+    });
+
+    it("accepts valid distinct CATEGORY_ENTRY_URL", async () => {
+      const context = createTestContext(["exercise-run-created"]);
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/source-group-1",
+          categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "route-1",
+              type: "CATEGORY_ENTRY_URL",
+              url: "https://www.facebook.com/groups/source-group-1/category-1",
+              riskLevel: "LOW",
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      const run = await new RequestAccountExerciseRunUseCase(
+        context.accountExerciseRuns,
+        context.sourceGroups,
+        context.ids,
+        context.clock,
+      ).execute({
+        profileId: "profile-1",
+        stageAtStart: "WARMING",
+        exerciseType: "CATEGORY_BROWSE",
+        sourceGroupId: "source-group-1",
+        maxDurationMs: 120_000,
+        maxScrolls: 2,
+      });
+
+      expect(run.target?.url).toBe("https://www.facebook.com/groups/source-group-1/category-1");
+    });
+
+    it("rejects direct URL variants with 409 ineligible route", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/source-group-1",
+          categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "route-1",
+              type: "CATEGORY_ENTRY_URL",
+              url: "https://m.facebook.com/groups/source-group-1/",
+              riskLevel: "LOW",
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("does not have an eligible CATEGORY_ENTRY_URL route for Category Browse exercise.");
+    });
   });
 
   it("moves queued runs through running and succeeded transitions", async () => {

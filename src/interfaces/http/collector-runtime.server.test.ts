@@ -321,6 +321,67 @@ describe("Collector Runtime HTTP routes", () => {
     }
   });
 
+  it("sanitizes and validates causeCode in SourceGroupLookupFailedError to prevent exposing arbitrary codes", async () => {
+    const { server, service } = createTestServer();
+    const testCases = [
+      { causeCode: "CONTENT_MANAGER_RESPONSE_ERROR", expectPreserved: true },
+      { causeCode: "content_manager_response_error", expectPreserved: false },
+      { causeCode: "CONTENT MANAGER RESPONSE ERROR", expectPreserved: false },
+      { causeCode: "/api/v1/error", expectPreserved: false },
+      { causeCode: "user:pass", expectPreserved: false },
+      { causeCode: "A" + "B".repeat(64), expectPreserved: false },
+    ];
+
+    try {
+      for (const testCase of testCases) {
+        const sensitiveError = new SourceGroupLookupFailedError(
+          "group-1",
+          "Some sensitive internal message.",
+          {
+            causeCode: testCase.causeCode,
+            statusCode: 504,
+          },
+        );
+        service.requestAccountExerciseRun.setError(sensitiveError);
+
+        const response = await server.inject({
+          method: "POST",
+          url: "/collector/account-exercise-runs",
+          payload: {
+            profileId: "profile-1",
+            stageAtStart: "WARMING",
+            exerciseType: "CATEGORY_BROWSE",
+            sourceGroupId: "group-1",
+            maxDurationMs: 90_000,
+            maxScrolls: 3,
+          },
+        });
+
+        expect(response.statusCode).toBe(502);
+
+        const body = response.json();
+        expect(body.error.code).toBe("SOURCE_GROUP_LOOKUP_FAILED");
+        expect(body.error.message).toBe("Content Manager source group lookup failed.");
+
+        const bodyString = JSON.stringify(body);
+        expect(bodyString).not.toContain("Some sensitive internal message.");
+
+        if (testCase.expectPreserved) {
+          expect(body.error.reasons).toEqual([
+            { causeCode: testCase.causeCode },
+            { statusCode: 504 },
+          ]);
+        } else {
+          expect(body.error.reasons).toEqual([
+            { statusCode: 504 },
+          ]);
+        }
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
   it("lists and gets account exercise runs with safe DTOs", async () => {
     const { server, service } = createTestServer();
     const target = {

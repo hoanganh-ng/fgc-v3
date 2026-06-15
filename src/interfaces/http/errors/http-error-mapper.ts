@@ -191,6 +191,12 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
 
   if (error instanceof CollectorRuntimeApplicationError) {
     if (error instanceof SourceGroupLookupFailedError) {
+      const causeCodeRegex = /^[A-Z][A-Z0-9_]{0,63}$/;
+      const validCauseCode =
+        error.causeCode !== undefined && causeCodeRegex.test(error.causeCode)
+          ? error.causeCode
+          : undefined;
+
       return {
         statusCode: 502,
         body: {
@@ -198,7 +204,7 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
             code: "SOURCE_GROUP_LOOKUP_FAILED",
             message: "Content Manager source group lookup failed.",
             reasons: [
-              ...(error.causeCode !== undefined ? [{ causeCode: error.causeCode }] : []),
+              ...(validCauseCode !== undefined ? [{ causeCode: validCauseCode }] : []),
               ...(error.statusCode !== undefined ? [{ statusCode: error.statusCode }] : []),
             ],
           },
