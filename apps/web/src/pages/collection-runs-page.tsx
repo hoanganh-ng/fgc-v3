@@ -24,6 +24,7 @@ import {
   filterRequestableSourceGroups,
   getPaginationModel,
   hasActiveCollectionRuns,
+  shouldShowPaginationControls,
   toRequestCollectionRunRequest,
   type RequestCollectionRunFormValues,
 } from "@/features/collector-runtime/collection-run-view-model";
@@ -164,22 +165,34 @@ export function CollectionRunsPage(): JSX.Element {
             <RunsEmptyState />
           ) : null}
           {effectiveQuery.isSuccess && effectiveQuery.data.items.length > 0 ? (
-            <>
-              <CollectionRunsList
-                runs={effectiveQuery.data.items}
-                page={effectiveQuery.data.page}
-                sourceGroupById={sourceGroupById}
-                onCancel={refresh}
-              />
-              <PaginationControls
-                offset={offset}
-                limit={DEFAULT_COLLECTION_RUN_LIST_LIMIT}
-                itemCount={effectiveQuery.data.items.length}
-                total={effectiveQuery.data.page.total}
-                onPrev={() => setOffset((o) => Math.max(0, o - DEFAULT_COLLECTION_RUN_LIST_LIMIT))}
-                onNext={() => setOffset((o) => o + DEFAULT_COLLECTION_RUN_LIST_LIMIT)}
-              />
-            </>
+            <CollectionRunsList
+              runs={effectiveQuery.data.items}
+              page={effectiveQuery.data.page}
+              sourceGroupById={sourceGroupById}
+              onCancel={refresh}
+            />
+          ) : null}
+          {effectiveQuery.isSuccess &&
+          shouldShowPaginationControls({
+            offset,
+            limit: DEFAULT_COLLECTION_RUN_LIST_LIMIT,
+            itemCount: effectiveQuery.data.items.length,
+            total: effectiveQuery.data.page.total,
+          }) ? (
+            <PaginationControls
+              offset={offset}
+              limit={DEFAULT_COLLECTION_RUN_LIST_LIMIT}
+              itemCount={effectiveQuery.data.items.length}
+              total={effectiveQuery.data.page.total}
+              onPrev={() =>
+                setOffset((o) =>
+                  Math.max(0, o - DEFAULT_COLLECTION_RUN_LIST_LIMIT),
+                )
+              }
+              onNext={() =>
+                setOffset((o) => o + DEFAULT_COLLECTION_RUN_LIST_LIMIT)
+              }
+            />
           ) : null}
         </div>
 
@@ -187,13 +200,20 @@ export function CollectionRunsPage(): JSX.Element {
           <RequestCollectionRunCard
             sourceGroups={requestableSourceGroups}
             sourceGroupsLoading={sourceGroupsQuery.isPending}
+            sourceGroupsError={sourceGroupsQuery.error}
             hasPaginationWarning={hasPaginationWarning}
+            onRetrySourceGroups={() => {
+              void sourceGroupsQuery.refetch();
+            }}
           />
 
           <FilterCard
             filter={filter}
             onFilterChange={setFilter}
             sourceGroups={sourceGroups}
+            sourceGroupsUnavailable={
+              sourceGroupsQuery.isPending || sourceGroupsQuery.isError
+            }
             onReset={resetFilters}
           />
         </aside>
@@ -476,15 +496,21 @@ function CancelRunButton({
 function RequestCollectionRunCard({
   sourceGroups,
   sourceGroupsLoading,
+  sourceGroupsError,
   hasPaginationWarning,
+  onRetrySourceGroups,
 }: {
   readonly sourceGroups: readonly SourceGroup[];
   readonly sourceGroupsLoading: boolean;
+  readonly sourceGroupsError: unknown;
   readonly hasPaginationWarning: boolean;
+  readonly onRetrySourceGroups: () => void;
 }): JSX.Element {
   const requestMutation = useRequestCollectionRunMutation();
   const [validationSummary, setValidationSummary] = useState<string>();
   const [createdRunId, setCreatedRunId] = useState<string>();
+  const hasSourceGroupsError =
+    sourceGroupsError !== null && sourceGroupsError !== undefined;
   const form = useForm<RequestCollectionRunFormValues>({
     defaultValues: {
       sourceGroupId: "",
@@ -554,6 +580,24 @@ function RequestCollectionRunCard({
             fallbackMessage="Collection run request failed."
           />
 
+          <BackendErrorPanel
+            error={sourceGroupsError}
+            fallbackMessage="Source groups could not load. Collection runs remain visible by source group ID."
+          />
+
+          {hasSourceGroupsError ? (
+            <div className="flex justify-end">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onRetrySourceGroups}
+              >
+                <RefreshCw aria-hidden="true" className="size-4" />
+                Retry Source Groups
+              </Button>
+            </div>
+          ) : null}
+
           {createdRunId !== undefined ? (
             <SuccessPanel
               message={`Collection run ${createdRunId} was queued.`}
@@ -573,7 +617,7 @@ function RequestCollectionRunCard({
           >
             <Select
               id="run-source-group"
-              disabled={sourceGroupsLoading}
+              disabled={sourceGroupsLoading || hasSourceGroupsError}
               {...form.register("sourceGroupId")}
             >
               <option value="">Select source group</option>
@@ -623,6 +667,7 @@ function RequestCollectionRunCard({
             <Button
               disabled={
                 sourceGroupsLoading ||
+                hasSourceGroupsError ||
                 sourceGroups.length === 0 ||
                 requestMutation.isPending
               }
@@ -642,11 +687,13 @@ function FilterCard({
   filter,
   onFilterChange,
   sourceGroups,
+  sourceGroupsUnavailable,
   onReset,
 }: {
   readonly filter: ListCollectionRunsFilter;
   readonly onFilterChange: (f: ListCollectionRunsFilter) => void;
   readonly sourceGroups: readonly SourceGroup[];
+  readonly sourceGroupsUnavailable: boolean;
   readonly onReset: () => void;
 }): JSX.Element {
   const hasActiveFilters =
@@ -692,6 +739,7 @@ function FilterCard({
         >
           <Select
             id="filter-source-group"
+            disabled={sourceGroupsUnavailable}
             value={filter.sourceGroupId}
             onChange={(event) => {
               onFilterChange({

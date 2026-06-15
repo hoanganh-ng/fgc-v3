@@ -7,6 +7,7 @@ import {
   getPaginationModel,
   getVisibleRange,
   hasActiveCollectionRuns,
+  shouldShowPaginationControls,
   toRequestCollectionRunRequest,
 } from "@/features/collector-runtime/collection-run-view-model";
 
@@ -64,6 +65,53 @@ describe("collection-run view model", () => {
         itemCount: 49,
       }).canGoNext,
     ).toBe(false);
+  });
+
+  it("shows pagination on an empty nonzero offset page", () => {
+    const model = getPaginationModel({
+      offset: 50,
+      limit: 50,
+      itemCount: 0,
+    });
+
+    expect(shouldShowPaginationControls({
+      offset: 50,
+      limit: 50,
+      itemCount: 0,
+    })).toBe(true);
+    expect(model.canGoBack).toBe(true);
+    expect(model.canGoNext).toBe(false);
+    expect(model.visibleRange).toBeUndefined();
+  });
+
+  it("allows pagination to stay hidden for an empty first page", () => {
+    expect(shouldShowPaginationControls({
+      offset: 0,
+      limit: 50,
+      itemCount: 0,
+    })).toBe(false);
+  });
+
+  it("shows pagination and enables next for an exact full page without total", () => {
+    const input = {
+      offset: 0,
+      limit: 50,
+      itemCount: 50,
+    };
+
+    expect(shouldShowPaginationControls(input)).toBe(true);
+    expect(getPaginationModel(input).canGoNext).toBe(true);
+  });
+
+  it("shows pagination but disables next for a short page without total", () => {
+    const input = {
+      offset: 0,
+      limit: 50,
+      itemCount: 49,
+    };
+
+    expect(shouldShowPaginationControls(input)).toBe(true);
+    expect(getPaginationModel(input).canGoNext).toBe(false);
   });
 
   it("keeps previous disabled at offset zero", () => {

@@ -84,6 +84,14 @@ export function getPaginationModel(input: PaginationInput): PaginationModel {
   };
 }
 
+export function shouldShowPaginationControls(input: PaginationInput): boolean {
+  if (input.offset > 0 || input.itemCount > 0) {
+    return true;
+  }
+
+  return getPaginationModel(input).canGoNext;
+}
+
 export function toRequestCollectionRunRequest(
   values: ParsedRequestCollectionRunFormValues,
 ): RequestCollectionRunRequest {
