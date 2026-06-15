@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
-import { z } from "zod";
 import {
   useCollectionRunsQuery,
   collectionRunQueryKeys,
@@ -19,6 +18,15 @@ import {
   useRequestCollectionRunMutation,
   useCancelCollectionRunMutation,
 } from "@/features/collector-runtime/collection-run-mutations";
+import {
+  RequestCollectionRunFormSchema,
+  canCancelCollectionRun,
+  filterRequestableSourceGroups,
+  getPaginationModel,
+  hasActiveCollectionRuns,
+  toRequestCollectionRunRequest,
+  type RequestCollectionRunFormValues,
+} from "@/features/collector-runtime/collection-run-view-model";
 import { useSourceGroupsQuery } from "@/features/content-manager/content-manager-queries";
 import {
   applyZodFieldErrors,
@@ -56,26 +64,6 @@ const collectionRunStatuses = [
   "CANCELED",
 ] as const;
 
-const RequestCollectionRunFormSchema = z
-  .object({
-    sourceGroupId: z.string().trim().min(1, "Source group is required."),
-    maxScrolls: z
-      .string()
-      .trim()
-      .transform((v) => (v.length === 0 ? undefined : Number(v)))
-      .pipe(z.number().int().min(0).optional()),
-    maxDurationMs: z
-      .string()
-      .trim()
-      .transform((v) => (v.length === 0 ? undefined : Number(v)))
-      .pipe(z.number().int().min(1).optional()),
-  })
-  .strict();
-
-type RequestCollectionRunFormValues = z.infer<
-  typeof RequestCollectionRunFormSchema
->;
-
 interface ListCollectionRunsFilter {
   status: CollectionRunStatus | "";
   sourceGroupId: string;
@@ -107,11 +95,9 @@ export function CollectionRunsPage(): JSX.Element {
     refetchInterval: false,
   });
   const runs = runsQuery.data?.items ?? [];
-  const page = runsQuery.data?.page;
-  const total = page?.total;
 
   const hasActiveRuns = useMemo(
-    () => runs.some((r) => r.status === "QUEUED" || r.status === "RUNNING"),
+    () => hasActiveCollectionRuns(runs),
     [runs],
   );
 
@@ -123,6 +109,10 @@ export function CollectionRunsPage(): JSX.Element {
 
   const sourceGroupsQuery = useSourceGroupsQuery();
   const sourceGroups = sourceGroupsQuery.data?.items ?? [];
+  const requestableSourceGroups = useMemo(
+    () => filterRequestableSourceGroups(sourceGroups),
+    [sourceGroups],
+  );
   const sourceGroupById = useMemo(
     () => new Map(sourceGroups.map((sg) => [sg.id, sg])),
     [sourceGroups],
@@ -184,7 +174,8 @@ export function CollectionRunsPage(): JSX.Element {
               <PaginationControls
                 offset={offset}
                 limit={DEFAULT_COLLECTION_RUN_LIST_LIMIT}
-                total={total}
+                itemCount={effectiveQuery.data.items.length}
+                total={effectiveQuery.data.page.total}
                 onPrev={() => setOffset((o) => Math.max(0, o - DEFAULT_COLLECTION_RUN_LIST_LIMIT))}
                 onNext={() => setOffset((o) => o + DEFAULT_COLLECTION_RUN_LIST_LIMIT)}
               />
@@ -194,7 +185,7 @@ export function CollectionRunsPage(): JSX.Element {
 
         <aside className="grid min-w-0 gap-5 content-start">
           <RequestCollectionRunCard
-            sourceGroups={sourceGroups}
+            sourceGroups={requestableSourceGroups}
             sourceGroupsLoading={sourceGroupsQuery.isPending}
             hasPaginationWarning={hasPaginationWarning}
           />
@@ -262,7 +253,7 @@ function CollectionRunsList({
                       label={run.status}
                       tone={getRunStatusTone(run.status)}
                     />
-                    {run.status === "QUEUED" ? (
+                    {canCancelCollectionRun(run.status) ? (
                       <CancelRunButton
                         collectionRunId={run.id}
                         onCancel={onCancel}
@@ -461,18 +452,24 @@ function CancelRunButton({
   }
 
   return (
-    <Button
-      aria-label={`Cancel collection run ${collectionRunId}`}
-      disabled={cancelMutation.isPending}
-      size="sm"
-      variant="danger"
-      onClick={() => {
-        void cancel();
-      }}
-    >
-      <Ban aria-hidden="true" className="size-4" />
-      {cancelMutation.isPending ? "Canceling" : "Cancel"}
-    </Button>
+    <div className="grid max-w-sm justify-items-end gap-2">
+      <Button
+        aria-label={`Cancel collection run ${collectionRunId}`}
+        disabled={cancelMutation.isPending}
+        size="sm"
+        variant="danger"
+        onClick={() => {
+          void cancel();
+        }}
+      >
+        <Ban aria-hidden="true" className="size-4" />
+        {cancelMutation.isPending ? "Canceling" : "Cancel"}
+      </Button>
+      <BackendErrorPanel
+        error={cancelMutation.error}
+        fallbackMessage="Collection run cancellation failed."
+      />
+    </div>
   );
 }
 
@@ -491,8 +488,8 @@ function RequestCollectionRunCard({
   const form = useForm<RequestCollectionRunFormValues>({
     defaultValues: {
       sourceGroupId: "",
-      maxScrolls: undefined,
-      maxDurationMs: undefined,
+      maxScrolls: "",
+      maxDurationMs: "",
     },
   });
   const { reset } = form;
@@ -513,22 +510,14 @@ function RequestCollectionRunCard({
     }
 
     try {
-      const body = {
-        sourceGroupId: parsed.data.sourceGroupId,
-        ...(parsed.data.maxScrolls !== undefined
-          ? { maxScrolls: parsed.data.maxScrolls }
-          : {}),
-        ...(parsed.data.maxDurationMs !== undefined
-          ? { maxDurationMs: parsed.data.maxDurationMs }
-          : {}),
-      };
+      const body = toRequestCollectionRunRequest(parsed.data);
 
       const response = await requestMutation.mutateAsync(body);
 
       reset({
         sourceGroupId: "",
-        maxScrolls: undefined,
-        maxDurationMs: undefined,
+        maxScrolls: "",
+        maxDurationMs: "",
       });
       setCreatedRunId(response.collectionRun.id);
     } catch {
@@ -740,20 +729,26 @@ function FilterCard({
 function PaginationControls({
   offset,
   limit,
+  itemCount,
   total,
   onPrev,
   onNext,
 }: {
   readonly offset: number;
   readonly limit: number;
+  readonly itemCount: number;
   readonly total: number | undefined;
   readonly onPrev: () => void;
   readonly onNext: () => void;
 }): JSX.Element | null {
-  const hasMore = total !== undefined && offset + limit < total;
-  const canGoBack = offset > 0;
+  const { canGoBack, canGoNext, visibleRange } = getPaginationModel({
+    offset,
+    limit,
+    itemCount,
+    total,
+  });
 
-  if (!canGoBack && !hasMore) {
+  if (!canGoBack && !canGoNext && visibleRange === undefined) {
     return null;
   }
 
@@ -769,12 +764,13 @@ function PaginationControls({
       </Button>
 
       <p className="text-sm text-muted-foreground">
-        Showing {offset + 1}–{offset + limit}
-        {total !== undefined ? ` of ${total}` : ""}
+        {visibleRange !== undefined
+          ? `Showing ${visibleRange.start}-${visibleRange.end}${total !== undefined ? ` of ${total}` : ""}`
+          : "No results"}
       </p>
 
       <Button
-        disabled={!hasMore}
+        disabled={!canGoNext}
         variant="secondary"
         size="sm"
         onClick={onNext}

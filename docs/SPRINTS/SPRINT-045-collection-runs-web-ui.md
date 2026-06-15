@@ -75,14 +75,20 @@ Never expose or request:
 
 ## Files Changed
 
-- `apps/web/src/lib/api/collector-runtime-client.ts` (new)
-- `apps/web/src/features/collector-runtime/collection-run-queries.ts` (new)
-- `apps/web/src/features/collector-runtime/collection-run-mutations.ts` (new)
-- `apps/web/src/pages/collection-runs-page.tsx` (replaced)
-- `src/collector-runtime/web-ui/collection-run-client.test.ts` (new)
-- `src/collector-runtime/web-ui/collection-run-query-keys.test.ts` (new)
-- `docs/SPRINTS/active.md` (updated)
+- `apps/web/src/lib/api/collector-runtime-client.ts`
+- `apps/web/src/features/collector-runtime/collection-run-queries.ts`
+- `apps/web/src/features/collector-runtime/collection-run-mutations.ts`
+- `apps/web/src/features/collector-runtime/collection-run-view-model.ts`
+- `apps/web/src/features/collector-runtime/collection-run-client.test.ts`
+- `apps/web/src/features/collector-runtime/collection-run-view-model.test.ts`
+- `apps/web/src/pages/collection-runs-page.tsx`
+- `apps/web/vitest.config.ts`
+- `vitest.workspace.ts`
+- `src/collector-runtime/web-ui/collection-run-client.test.ts` (removed)
+- `src/collector-runtime/web-ui/collection-run-query-keys.test.ts` (removed)
+- `src/collector-runtime/web-ui/collection-run-hooks.test.ts` (removed)
 - `docs/PROJECT_STATE.md` (updated)
+- `docs/SPRINTS/SPRINT-045-collection-runs-web-ui.md` (updated)
 
 ## Verification
 

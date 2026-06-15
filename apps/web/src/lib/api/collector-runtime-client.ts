@@ -164,7 +164,7 @@ export function createCollectorRuntimeClient(
 
 export const collectorRuntimeClient = createCollectorRuntimeClient();
 
-function toListCollectionRunsQueryParams(
+export function toListCollectionRunsQueryParams(
   query: ListCollectionRunsQuery | undefined,
 ): Readonly<Record<string, string | number>> | undefined {
   if (query === undefined) {
