@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   Activity,
@@ -28,6 +28,13 @@ import {
   toRequestAccountExerciseRunRequest,
   type RequestAccountExerciseRunFormValues,
 } from "@/features/collector-runtime/account-exercise-run-view-model";
+import {
+  getAccountExerciseRunDetailContentState,
+  getAccountExerciseRunRowSelectionState,
+  getNextAccountExerciseRunDetailDrawerState,
+  shouldRestoreAccountExerciseRunDetailFocus,
+  type AccountExerciseRunDetailCloseSource,
+} from "@/features/collector-runtime/account-exercise-run-detail-drawer-state";
 import { useProfilesQuery } from "@/features/profiles/profile-queries";
 import {
   applyZodFieldErrors,
@@ -51,6 +58,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge, type StatusBadgeTone } from "@/components/ui/status-badge";
@@ -78,10 +86,23 @@ export function AccountExerciseRunsPage(): JSX.Element {
   });
   const [offset, setOffset] = useState(0);
   const [selectedRunId, setSelectedRunId] = useState<string>();
+  const selectedRunDetailsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const shouldRestoreRunDetailsFocusRef = useRef(false);
 
   useEffect(() => {
     setOffset(0);
   }, [filter.status, filter.profileId]);
+
+  useEffect(() => {
+    if (selectedRunId !== undefined || !shouldRestoreRunDetailsFocusRef.current) {
+      return;
+    }
+
+    shouldRestoreRunDetailsFocusRef.current = false;
+    window.requestAnimationFrame(() => {
+      selectedRunDetailsButtonRef.current?.focus();
+    });
+  }, [selectedRunId]);
 
   const query = {
     ...(filter.status !== "" ? { status: filter.status } : {}),
@@ -134,6 +155,36 @@ export function AccountExerciseRunsPage(): JSX.Element {
     setOffset(0);
   }
 
+  function selectRunDetail(
+    accountExerciseRunId: string,
+    opener: HTMLButtonElement,
+  ): void {
+    selectedRunDetailsButtonRef.current = opener;
+    setSelectedRunId(
+      getNextAccountExerciseRunDetailDrawerState(
+        { selectedRunId },
+        { type: "select", accountExerciseRunId },
+      ).selectedRunId,
+    );
+  }
+
+  function closeRunDetail(source: AccountExerciseRunDetailCloseSource): void {
+    const nextState = getNextAccountExerciseRunDetailDrawerState(
+      { selectedRunId },
+      { type: "close", source },
+    );
+    const shouldRestoreFocus = shouldRestoreAccountExerciseRunDetailFocus({
+      previousSelectedRunId: selectedRunId,
+      nextSelectedRunId: nextState.selectedRunId,
+    });
+
+    setSelectedRunId(nextState.selectedRunId);
+
+    if (shouldRestoreFocus) {
+      shouldRestoreRunDetailsFocusRef.current = true;
+    }
+  }
+
   return (
     <PageShell
       eyebrow="Collector Runtime"
@@ -162,7 +213,7 @@ export function AccountExerciseRunsPage(): JSX.Element {
               profileById={profileById}
               selectedRunId={selectedRunId}
               onCancel={refresh}
-              onSelectRun={setSelectedRunId}
+              onSelectRun={selectRunDetail}
             />
           ) : null}
           {effectiveQuery.isSuccess &&
@@ -211,16 +262,13 @@ export function AccountExerciseRunsPage(): JSX.Element {
             onFilterChange={setFilter}
             onReset={resetFilters}
           />
-
-          <AccountExerciseRunDetailPanel
-            accountExerciseRunId={selectedRunId}
-            profileById={profileById}
-            onClose={() => {
-              setSelectedRunId(undefined);
-            }}
-          />
         </aside>
       </div>
+      <AccountExerciseRunDetailDrawer
+        accountExerciseRunId={selectedRunId}
+        profileById={profileById}
+        onClose={closeRunDetail}
+      />
     </PageShell>
   );
 }
@@ -238,7 +286,10 @@ function AccountExerciseRunsList({
   readonly profileById: ReadonlyMap<string, ProfileSummary>;
   readonly selectedRunId: string | undefined;
   readonly onCancel: () => void;
-  readonly onSelectRun: (accountExerciseRunId: string) => void;
+  readonly onSelectRun: (
+    accountExerciseRunId: string,
+    opener: HTMLButtonElement,
+  ) => void;
 }): JSX.Element {
   return (
     <Card>
@@ -282,12 +333,19 @@ function AccountExerciseRunRow({
   readonly profileById: ReadonlyMap<string, ProfileSummary>;
   readonly selected: boolean;
   readonly onCancel: () => void;
-  readonly onSelectRun: (accountExerciseRunId: string) => void;
+  readonly onSelectRun: (
+    accountExerciseRunId: string,
+    opener: HTMLButtonElement,
+  ) => void;
 }): JSX.Element {
   const profileDisplay = getProfileDisplay(run.profileId, profileById);
+  const selectionState = getAccountExerciseRunRowSelectionState({
+    runId: run.id,
+    selectedRunId: selected ? run.id : undefined,
+  });
 
   return (
-    <article className="grid min-w-0 gap-3 px-4 py-4">
+    <article className={selectionState.articleClassName}>
       <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -305,9 +363,9 @@ function AccountExerciseRunRow({
           <Button
             aria-pressed={selected}
             size="sm"
-            variant={selected ? "primary" : "secondary"}
-            onClick={() => {
-              onSelectRun(run.id);
+            variant={selectionState.detailsButtonVariant}
+            onClick={(event: MouseEvent<HTMLButtonElement>) => {
+              onSelectRun(run.id, event.currentTarget);
             }}
           >
             <Eye aria-hidden="true" className="size-4" />
@@ -846,45 +904,36 @@ function FilterCard({
   );
 }
 
-function AccountExerciseRunDetailPanel({
+function AccountExerciseRunDetailDrawer({
   accountExerciseRunId,
   profileById,
   onClose,
 }: {
   readonly accountExerciseRunId: string | undefined;
   readonly profileById: ReadonlyMap<string, ProfileSummary>;
-  readonly onClose: () => void;
+  readonly onClose: (source: AccountExerciseRunDetailCloseSource) => void;
 }): JSX.Element {
   const detailQuery = useAccountExerciseRunQuery(accountExerciseRunId);
+  const contentState = getAccountExerciseRunDetailContentState({
+    accountExerciseRunId,
+    isPending: detailQuery.isPending,
+    isError: detailQuery.isError,
+    isSuccess: detailQuery.isSuccess,
+  });
 
   return (
-    <Card className="min-w-0">
-      <CardHeader className="flex flex-row items-center justify-between gap-3">
-        <div className="min-w-0">
-          <CardTitle>Run Detail</CardTitle>
-          <CardDescription>
-            {accountExerciseRunId === undefined
-              ? "Select a run to inspect its safe detail."
-              : accountExerciseRunId}
-          </CardDescription>
-        </div>
-        {accountExerciseRunId !== undefined ? (
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X aria-hidden="true" className="size-4" />
-            Close
-          </Button>
-        ) : null}
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        {accountExerciseRunId === undefined ? (
-          <p className="text-sm text-muted-foreground">
-            Detail data is loaded from the dedicated run endpoint.
-          </p>
-        ) : null}
-        {detailQuery.isPending && accountExerciseRunId !== undefined ? (
+    <Drawer
+      open={accountExerciseRunId !== undefined}
+      title="Run Detail"
+      description={accountExerciseRunId}
+      closeLabel="Close run detail drawer"
+      onClose={onClose}
+    >
+      <div className="grid gap-4">
+        {contentState.showLoading ? (
           <div className="min-h-24 animate-pulse rounded border border-border bg-muted" />
         ) : null}
-        {detailQuery.isError ? (
+        {contentState.showError ? (
           <div className="grid gap-3">
             <p className="text-sm text-[#7f1d1d]">
               {formatApiError(detailQuery.error)}
@@ -901,14 +950,14 @@ function AccountExerciseRunDetailPanel({
             </Button>
           </div>
         ) : null}
-        {detailQuery.isSuccess ? (
+        {contentState.showContent && detailQuery.isSuccess ? (
           <RunDetailContent
             run={detailQuery.data.accountExerciseRun}
             profileById={profileById}
           />
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </Drawer>
   );
 }
 

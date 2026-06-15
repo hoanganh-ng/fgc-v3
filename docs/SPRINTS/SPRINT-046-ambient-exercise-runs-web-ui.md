@@ -80,6 +80,52 @@ The UI may display only safe profile identifiers/display names, safe account sta
 - Authentication/authorization
 - Commits or pushes
 
+## Sprint 046A: Exercise Run Detail Drawer Polish
+
+Sprint 046A addressed the Run Detail visibility issue found after the initial
+Ambient Exercise Runs Web UI implementation. The original detail view rendered as
+a third document-flow card under Request Exercise Run and Filters in the right
+sidebar, which could place the panel below the viewport and make Details clicks
+look ineffective.
+
+The detail view now opens in a fixed right-side drawer. The drawer uses full
+viewport height, scrolls its content independently, uses full viewport width on
+small screens, and uses an approximately 448px desktop width. The permanent
+right sidebar keeps only Request Exercise Run and Filters. Detail loading and
+detail errors remain inside the drawer, backed by the existing account exercise
+run detail query and safe DTO.
+
+Accessibility behavior:
+
+- Opening the drawer moves focus into the drawer, preferring the Close button.
+- Tab and Shift+Tab are contained inside the drawer and wrap at the ends.
+- The single-focusable-element case keeps focus on that element.
+- Background app content is marked inert while the portaled drawer is open.
+- Escape, backdrop click, and the Close button close the drawer.
+- Closing restores focus to the exact Details button that opened the drawer.
+- Updating the selected run reuses the existing drawer instead of stacking
+  drawers.
+
+Files changed:
+
+- `apps/web/src/components/ui/button.tsx`
+- `apps/web/src/components/ui/drawer.tsx`
+- `apps/web/src/components/ui/drawer.test.tsx`
+- `apps/web/src/components/ui/drawer-interaction-fixture.html`
+- `apps/web/src/components/ui/drawer-interaction-fixture.tsx`
+- `apps/web/src/components/ui/drawer.interaction.test.ts`
+- `apps/web/src/features/collector-runtime/account-exercise-run-detail-drawer-state.ts`
+- `apps/web/src/features/collector-runtime/account-exercise-run-detail-drawer-state.test.ts`
+- `apps/web/src/pages/account-exercise-runs-page.tsx`
+
+Verification completed for Sprint 046A:
+
+- `pnpm web:typecheck` passed.
+- `pnpm web:build` passed with the existing Vite large chunk warning.
+- `pnpm typecheck` passed.
+- `pnpm test` passed.
+- `git diff --check` passed.
+
 ## Verification
 
 Run:
