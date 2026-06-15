@@ -62,6 +62,14 @@ export class RequestAccountExerciseRunUseCase {
       toActionBudget(input),
     );
     const exerciseType = input.exerciseType ?? "AMBIENT_ACCOUNT";
+    if (exerciseType === "AMBIENT_ACCOUNT" && (input as any).target !== undefined) {
+      throw new AccountExerciseRunValidationError([
+        {
+          path: "target",
+          message: "Ambient account exercise runs must not include a target.",
+        },
+      ]);
+    }
     const target =
       input.exerciseType === "CATEGORY_BROWSE"
         ? await this.resolveCategoryBrowseTarget(input)
@@ -308,22 +316,47 @@ function riskSortValue(riskLevel: string): number {
   return riskLevel === "LOW" ? 0 : 1;
 }
 
-function sameNormalizedUrl(left: string, right: string): boolean {
-  const leftUrl = parseComparableUrl(left);
-  const rightUrl = parseComparableUrl(right);
-
-  return leftUrl !== undefined && rightUrl !== undefined && leftUrl === rightUrl;
-}
-
-function parseComparableUrl(value: string): string | undefined {
+export function canonicalizeFacebookUrl(urlString: string): string | undefined {
   try {
-    const url = new URL(value);
+    const url = new URL(urlString);
+    if (url.protocol !== "https:") {
+      return undefined;
+    }
+    if (url.username || url.password) {
+      return undefined;
+    }
+    const hostname = url.hostname.toLowerCase();
+    const isFacebook = hostname === "facebook.com" || hostname.endsWith(".facebook.com");
+    if (!isFacebook) {
+      return undefined;
+    }
+    let normalizedHost = hostname;
+    if (normalizedHost.startsWith("www.")) {
+      normalizedHost = normalizedHost.slice(4);
+    }
+    if (normalizedHost.startsWith("m.")) {
+      normalizedHost = normalizedHost.slice(2);
+    }
+    if (normalizedHost.startsWith("web.")) {
+      normalizedHost = normalizedHost.slice(4);
+    }
 
-    url.hash = "";
-    return url.toString();
+    let pathname = url.pathname;
+    while (pathname.endsWith("/")) {
+      pathname = pathname.slice(0, -1);
+    }
+
+    return `${normalizedHost}${pathname}`;
   } catch {
     return undefined;
   }
+}
+
+export function sameNormalizedUrl(left: string, right: string): boolean {
+  const leftCanon = canonicalizeFacebookUrl(left);
+  const rightCanon = canonicalizeFacebookUrl(right);
+
+  return leftCanon !== undefined && rightCanon !== undefined && leftCanon === rightCanon;
 }
 
 function toSourceGroupLookupError(

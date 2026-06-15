@@ -5,6 +5,12 @@ import {
   CollectionRunNotFoundError,
   InvalidAccountExerciseRunStatusTransitionError,
   InvalidCollectionRunStatusTransitionError,
+  AccountExerciseSourceGroupNotFoundError,
+  AccountExerciseSourceGroupNotActiveError,
+  AccountExerciseSourceGroupPlatformUnsupportedError,
+  CategoryBrowseEntryRouteNotEligibleError,
+  CategoryBrowseEntryRouteNotFoundError,
+  SourceGroupLookupFailedError,
 } from "../../collector-runtime/application";
 import { createHttpServer } from "./server";
 import {
@@ -105,17 +111,237 @@ describe("Collector Runtime HTTP routes", () => {
     }
   });
 
+  it("requests a queued category browse exercise run happy path", async () => {
+    const { server, service } = createTestServer();
+    const target = {
+      categoryId: "category-1",
+      sourceGroupId: "source-group-1",
+      entryRouteId: "route-1",
+      entryRouteType: "CATEGORY_ENTRY_URL" as const,
+      url: "https://www.facebook.com/groups/source-group-1/categories",
+      riskLevel: "LOW" as const,
+    };
+    service.requestAccountExerciseRun.setOutput(
+      createAccountExerciseRun({
+        id: "account-exercise-run-created",
+        exerciseType: "CATEGORY_BROWSE",
+        actionBudget: {
+          maxDurationMs: 90_000,
+          maxScrolls: 3,
+        },
+        target,
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/account-exercise-runs",
+        payload: {
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 90_000,
+          maxScrolls: 3,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({
+        accountExerciseRun: {
+          id: "account-exercise-run-created",
+          profileId: "profile-1",
+          exerciseType: "CATEGORY_BROWSE",
+          target,
+        },
+      });
+      expectAccountExerciseRunPayloadIsSafe(response.json());
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 for Category Browse requests missing sourceGroupId", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/account-exercise-runs",
+        payload: {
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          maxDurationMs: 90_000,
+          maxScrolls: 3,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.code).toBe("VALIDATION_ERROR");
+      expect(service.requestAccountExerciseRun.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps AccountExerciseSourceGroupNotFoundError to 404", async () => {
+    const { server, service } = createTestServer();
+    service.requestAccountExerciseRun.setError(
+      new AccountExerciseSourceGroupNotFoundError("missing-group"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/account-exercise-runs",
+        payload: {
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "missing-group",
+          maxDurationMs: 90_000,
+          maxScrolls: 3,
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json().error.code).toBe("ACCOUNT_EXERCISE_SOURCE_GROUP_NOT_FOUND");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps inactive, unsupported platform, or no eligible route to 409", async () => {
+    const errors = [
+      new AccountExerciseSourceGroupNotActiveError("group-1", "PAUSED"),
+      new AccountExerciseSourceGroupPlatformUnsupportedError("group-1", "TWITTER"),
+      new CategoryBrowseEntryRouteNotEligibleError("group-1", "No eligible route"),
+    ];
+
+    for (const error of errors) {
+      const { server, service } = createTestServer();
+      service.requestAccountExerciseRun.setError(error);
+
+      try {
+        const response = await server.inject({
+          method: "POST",
+          url: "/collector/account-exercise-runs",
+          payload: {
+            profileId: "profile-1",
+            stageAtStart: "WARMING",
+            exerciseType: "CATEGORY_BROWSE",
+            sourceGroupId: "group-1",
+            maxDurationMs: 90_000,
+            maxScrolls: 3,
+          },
+        });
+
+        expect(response.statusCode).toBe(409);
+        expect(response.json().error.code).toBe(error.code);
+      } finally {
+        await server.close();
+      }
+    }
+  });
+
+  it("maps unknown explicit entry route to 404", async () => {
+    const { server, service } = createTestServer();
+    service.requestAccountExerciseRun.setError(
+      new CategoryBrowseEntryRouteNotFoundError("group-1", "missing-route"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/account-exercise-runs",
+        payload: {
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "group-1",
+          entryRouteId: "missing-route",
+          maxDurationMs: 90_000,
+          maxScrolls: 3,
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json().error.code).toBe("CATEGORY_BROWSE_ENTRY_ROUTE_NOT_FOUND");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("sanitizes SourceGroupLookupFailedError response to 502 with a safe public message and metadata", async () => {
+    const { server, service } = createTestServer();
+    const sensitiveError = new SourceGroupLookupFailedError(
+      "group-1",
+      "Internal HTTP client error: Connection failed to http://credentials:secret@internal-server:1234/some/raw/html/endpoint",
+      {
+        causeCode: "RAW_NETWORK_TIMEOUT",
+        statusCode: 504,
+      },
+    );
+    service.requestAccountExerciseRun.setError(sensitiveError);
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/account-exercise-runs",
+        payload: {
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "group-1",
+          maxDurationMs: 90_000,
+          maxScrolls: 3,
+        },
+      });
+
+      expect(response.statusCode).toBe(502);
+
+      const body = response.json();
+      expect(body.error.code).toBe("SOURCE_GROUP_LOOKUP_FAILED");
+      expect(body.error.message).toBe("Content Manager source group lookup failed.");
+
+      const bodyString = JSON.stringify(body);
+      expect(bodyString).not.toContain("credentials");
+      expect(bodyString).not.toContain("secret");
+      expect(bodyString).not.toContain("internal-server");
+      expect(bodyString).not.toContain("Connection failed");
+
+      expect(body.error.reasons).toEqual([
+        { causeCode: "RAW_NETWORK_TIMEOUT" },
+        { statusCode: 504 },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("lists and gets account exercise runs with safe DTOs", async () => {
     const { server, service } = createTestServer();
+    const target = {
+      categoryId: "category-1",
+      sourceGroupId: "group-2",
+      entryRouteId: "route-2",
+      entryRouteType: "CATEGORY_ENTRY_URL" as const,
+      url: "https://www.facebook.com/groups/group-2/categories",
+      riskLevel: "LOW" as const,
+    };
 
     service.listAccountExerciseRuns.setOutput({
       items: [
         createAccountExerciseRun({
           id: "account-exercise-run-2",
+          exerciseType: "CATEGORY_BROWSE",
           status: "RUNNING",
           profileId: "profile-2",
           leaseId: "lease-2",
           startedAt: "2026-04-01T10:30:00.000Z",
+          target,
         }),
       ],
       page: {
@@ -127,10 +353,12 @@ describe("Collector Runtime HTTP routes", () => {
     service.getAccountExerciseRun.setOutput(
       createAccountExerciseRun({
         id: "account-exercise-run-2",
+        exerciseType: "CATEGORY_BROWSE",
         status: "RUNNING",
         profileId: "profile-2",
         leaseId: "lease-2",
         startedAt: "2026-04-01T10:30:00.000Z",
+        target,
       }),
     );
 
@@ -157,8 +385,10 @@ describe("Collector Runtime HTTP routes", () => {
         items: [
           {
             id: "account-exercise-run-2",
+            exerciseType: "CATEGORY_BROWSE",
             status: "RUNNING",
             leaseId: "lease-2",
+            target,
           },
         ],
         page: {
@@ -176,8 +406,10 @@ describe("Collector Runtime HTTP routes", () => {
       expect(getResponse.json()).toMatchObject({
         accountExerciseRun: {
           id: "account-exercise-run-2",
+          exerciseType: "CATEGORY_BROWSE",
           status: "RUNNING",
           leaseId: "lease-2",
+          target,
         },
       });
       expectAccountExerciseRunPayloadIsSafe(listResponse.json());

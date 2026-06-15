@@ -598,11 +598,11 @@ function CancelRunButton({
         aria-label={`Cancel account exercise run ${accountExerciseRunId}`}
         disabled={cancelMutation.isPending}
         size="sm"
-        variant="secondary"
+        variant="danger"
         onClick={cancel}
       >
         <Ban aria-hidden="true" className="size-4" />
-        Cancel
+        {cancelMutation.isPending ? "Canceling" : "Cancel"}
       </Button>
       <BackendErrorPanel
         error={cancelMutation.error}
@@ -687,7 +687,7 @@ function RequestAccountExerciseRunCard({
         <div className="min-w-0">
           <CardTitle>Request Exercise Run</CardTitle>
           <CardDescription>
-            Queue a read-only account exercise run for one profile.
+            Queue an Ambient Account Exercise run for one profile.
           </CardDescription>
         </div>
         <div className="grid size-11 place-items-center rounded border border-border bg-muted text-primary">

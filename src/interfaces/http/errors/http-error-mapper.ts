@@ -24,6 +24,7 @@ import {
   CollectionRunValidationError,
   AccountExerciseRunValidationError,
   CollectorRuntimeApplicationError,
+  SourceGroupLookupFailedError,
   type CollectorRuntimeApplicationErrorCode,
 } from "../../../collector-runtime/application";
 import {
@@ -189,6 +190,22 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
   }
 
   if (error instanceof CollectorRuntimeApplicationError) {
+    if (error instanceof SourceGroupLookupFailedError) {
+      return {
+        statusCode: 502,
+        body: {
+          error: {
+            code: "SOURCE_GROUP_LOOKUP_FAILED",
+            message: "Content Manager source group lookup failed.",
+            reasons: [
+              ...(error.causeCode !== undefined ? [{ causeCode: error.causeCode }] : []),
+              ...(error.statusCode !== undefined ? [{ statusCode: error.statusCode }] : []),
+            ],
+          },
+        },
+      };
+    }
+
     return mapKnownError(
       error.code,
       collectorRuntimeApplicationErrorStatus[error.code],

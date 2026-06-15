@@ -63,6 +63,75 @@ describe("account exercise run database mapper", () => {
       toAccountExerciseRunDomain(toSelectRow(row, createAccountExerciseRun())),
     ).toEqual(createAccountExerciseRun());
   });
+
+  it("mapper round-trips a CATEGORY_BROWSE run with target", () => {
+    const target = {
+      categoryId: "category-1",
+      sourceGroupId: "group-1",
+      entryRouteId: "route-1",
+      entryRouteType: "CATEGORY_ENTRY_URL" as const,
+      url: "https://www.facebook.com/groups/group-1/categories",
+      riskLevel: "LOW" as const,
+    };
+    const run = createAccountExerciseRun({
+      exerciseType: "CATEGORY_BROWSE",
+      target,
+    });
+
+    const row = toAccountExerciseRunRow(run);
+    expect(row.target).toEqual(target);
+
+    const domain = toAccountExerciseRunDomain(toSelectRow(row, run));
+    expect(domain).toEqual(run);
+  });
+
+  it("null target remains valid for AMBIENT_ACCOUNT", () => {
+    const run = createAccountExerciseRun({
+      exerciseType: "AMBIENT_ACCOUNT",
+    });
+
+    const row = toAccountExerciseRunRow(run);
+    expect(row.target).toBeNull();
+
+    const domain = toAccountExerciseRunDomain(toSelectRow(row, run));
+    expect(domain.target).toBeUndefined();
+    expect(domain).toEqual(run);
+  });
+
+  it("malformed persisted target is rejected", () => {
+    const baseRow = toAccountExerciseRunRow(
+      createAccountExerciseRun({
+        exerciseType: "CATEGORY_BROWSE",
+        target: {
+          categoryId: "category-1",
+          sourceGroupId: "group-1",
+          entryRouteId: "route-1",
+          entryRouteType: "CATEGORY_ENTRY_URL",
+          url: "https://www.facebook.com/groups/group-1/categories",
+          riskLevel: "LOW",
+        },
+      }),
+    );
+
+    const malformedRow1 = {
+      ...toSelectRow(baseRow, createAccountExerciseRun({ exerciseType: "CATEGORY_BROWSE" })),
+      target: null,
+    };
+    expect(() => toAccountExerciseRunDomain(malformedRow1)).toThrow();
+
+    const malformedRow2 = {
+      ...toSelectRow(baseRow, createAccountExerciseRun({ exerciseType: "CATEGORY_BROWSE" })),
+      target: {
+        categoryId: "category-1",
+        sourceGroupId: "group-1",
+        entryRouteId: "route-1",
+        entryRouteType: "CATEGORY_ENTRY_URL" as const,
+        url: "http://non-facebook-url.com",
+        riskLevel: "LOW" as const,
+      },
+    };
+    expect(() => toAccountExerciseRunDomain(malformedRow2)).toThrow();
+  });
 });
 
 function toSelectRow(
@@ -103,6 +172,7 @@ function createAccountExerciseRun(
       maxScrolls: 2,
       minDwellMs: 2_000,
     },
+    ...(options.target !== undefined ? { target: options.target } : {}),
     ...(options.safeSummary !== undefined
       ? { safeSummary: options.safeSummary }
       : {}),

@@ -13,6 +13,8 @@ import {
   MarkAccountExerciseRunSucceededUseCase,
   RequestAccountExerciseRunUseCase,
   AccountExerciseRunValidationError,
+  sameNormalizedUrl,
+  validateAccountExerciseRunForApplication,
 } from "./index";
 import type { Clock, IdGenerator, SourceGroupLookupPort, SourceGroupLookupResult } from "./index";
 import { InMemoryAccountExerciseRunRepository } from "./test-support/in-memory-account-exercise-run-repository";
@@ -177,6 +179,550 @@ describe("collector runtime account exercise run application use cases", () => {
         maxScrolls: 2,
       }),
     ).rejects.toThrow();
+  });
+
+  describe("sameNormalizedUrl Facebook canonicalization", () => {
+    it("matches exact direct URL", () => {
+      expect(
+        sameNormalizedUrl(
+          "https://www.facebook.com/groups/mygroup",
+          "https://www.facebook.com/groups/mygroup",
+        ),
+      ).toBe(true);
+    });
+
+    it("matches direct URL with trailing slash versus without", () => {
+      expect(
+        sameNormalizedUrl(
+          "https://www.facebook.com/groups/mygroup/",
+          "https://www.facebook.com/groups/mygroup",
+        ),
+      ).toBe(true);
+    });
+
+    it("matches direct URL regardless of trailing slashes variations", () => {
+      expect(
+        sameNormalizedUrl(
+          "https://www.facebook.com/groups/mygroup",
+          "https://www.facebook.com/groups/mygroup///",
+        ),
+      ).toBe(true);
+    });
+
+    it("matches direct URL ignoring query string", () => {
+      expect(
+        sameNormalizedUrl(
+          "https://www.facebook.com/groups/mygroup?ref=bookmarks&foo=bar",
+          "https://www.facebook.com/groups/mygroup",
+        ),
+      ).toBe(true);
+    });
+
+    it("matches direct URL ignoring fragment", () => {
+      expect(
+        sameNormalizedUrl(
+          "https://www.facebook.com/groups/mygroup#section1",
+          "https://www.facebook.com/groups/mygroup",
+        ),
+      ).toBe(true);
+    });
+
+    it("matches direct URL regardless of host casing", () => {
+      expect(
+        sameNormalizedUrl(
+          "https://WWW.FACEBOOK.COM/groups/mygroup",
+          "https://www.facebook.com/groups/mygroup",
+        ),
+      ).toBe(true);
+    });
+
+    it("matches direct URL across different host prefixes (www, m, web, raw)", () => {
+      expect(
+        sameNormalizedUrl(
+          "https://m.facebook.com/groups/mygroup",
+          "https://www.facebook.com/groups/mygroup",
+        ),
+      ).toBe(true);
+      expect(
+        sameNormalizedUrl(
+          "https://web.facebook.com/groups/mygroup",
+          "https://facebook.com/groups/mygroup",
+        ),
+      ).toBe(true);
+    });
+
+    it("rejects embedded credentials in either URL", () => {
+      expect(
+        sameNormalizedUrl(
+          "https://user:pass@www.facebook.com/groups/mygroup",
+          "https://www.facebook.com/groups/mygroup",
+        ),
+      ).toBe(false);
+      expect(
+        sameNormalizedUrl(
+          "https://www.facebook.com/groups/mygroup",
+          "https://user:pass@www.facebook.com/groups/mygroup",
+        ),
+      ).toBe(false);
+    });
+
+    it("accepts genuinely distinct CATEGORY_ENTRY_URL (i.e. not canonicalized to the same group URL)", () => {
+      expect(
+        sameNormalizedUrl(
+          "https://www.facebook.com/groups/mygroup/categories",
+          "https://www.facebook.com/groups/mygroup",
+        ),
+      ).toBe(false);
+    });
+
+    it("handles invalid or non-https or non-Facebook URLs as non-equivalent", () => {
+      expect(
+        sameNormalizedUrl(
+          "http://www.facebook.com/groups/mygroup",
+          "https://www.facebook.com/groups/mygroup",
+        ),
+      ).toBe(false);
+      expect(
+        sameNormalizedUrl(
+          "https://www.google.com",
+          "https://www.google.com",
+        ),
+      ).toBe(false);
+    });
+  });
+
+  describe("AccountExerciseRun domain schema validation", () => {
+    const validRunBase = {
+      id: "exercise-run-1",
+      profileId: "profile-1",
+      status: "QUEUED",
+      stageAtStart: "WARMING",
+      actionBudget: {
+        maxDurationMs: 120_000,
+        maxScrolls: 2,
+      },
+      requestedAt: "2026-05-01T10:00:00.000Z",
+      createdAt: "2026-05-01T10:00:00.000Z",
+      updatedAt: "2026-05-01T10:00:00.000Z",
+    };
+
+    it("Category Browse requires target", () => {
+      let error: any;
+      try {
+        validateAccountExerciseRunForApplication({
+          ...validRunBase,
+          exerciseType: "CATEGORY_BROWSE",
+        } as any);
+      } catch (err) {
+        error = err;
+      }
+      expect(error).toBeInstanceOf(AccountExerciseRunValidationError);
+      expect(error.issues).toContainEqual(
+        expect.objectContaining({
+          path: "target",
+          message: "Category Browse exercise runs require a target.",
+        }),
+      );
+    });
+
+    it("invalid target type/risk/URL is rejected", () => {
+      // Invalid entryRouteType
+      expect(() =>
+        validateAccountExerciseRunForApplication({
+          ...validRunBase,
+          exerciseType: "CATEGORY_BROWSE",
+          target: {
+            categoryId: "category-1",
+            sourceGroupId: "source-group-1",
+            entryRouteId: "route-1",
+            entryRouteType: "INVALID_TYPE",
+            url: "https://www.facebook.com/groups/source-group-1/categories",
+            riskLevel: "LOW",
+          },
+        } as any),
+      ).toThrow();
+
+      // Invalid riskLevel
+      expect(() =>
+        validateAccountExerciseRunForApplication({
+          ...validRunBase,
+          exerciseType: "CATEGORY_BROWSE",
+          target: {
+            categoryId: "category-1",
+            sourceGroupId: "source-group-1",
+            entryRouteId: "route-1",
+            entryRouteType: "CATEGORY_ENTRY_URL",
+            url: "https://www.facebook.com/groups/source-group-1/categories",
+            riskLevel: "HIGH",
+          },
+        } as any),
+      ).toThrow();
+
+      // Invalid URL (not Facebook/non-HTTPS)
+      expect(() =>
+        validateAccountExerciseRunForApplication({
+          ...validRunBase,
+          exerciseType: "CATEGORY_BROWSE",
+          target: {
+            categoryId: "category-1",
+            sourceGroupId: "source-group-1",
+            entryRouteId: "route-1",
+            entryRouteType: "CATEGORY_ENTRY_URL",
+            url: "http://www.facebook.com/groups/source-group-1/categories",
+            riskLevel: "LOW",
+          },
+        } as any),
+      ).toThrow();
+
+      expect(() =>
+        validateAccountExerciseRunForApplication({
+          ...validRunBase,
+          exerciseType: "CATEGORY_BROWSE",
+          target: {
+            categoryId: "category-1",
+            sourceGroupId: "source-group-1",
+            entryRouteId: "route-1",
+            entryRouteType: "CATEGORY_ENTRY_URL",
+            url: "https://www.google.com",
+            riskLevel: "LOW",
+          },
+        } as any),
+      ).toThrow();
+
+      // URL containing credentials
+      expect(() =>
+        validateAccountExerciseRunForApplication({
+          ...validRunBase,
+          exerciseType: "CATEGORY_BROWSE",
+          target: {
+            categoryId: "category-1",
+            sourceGroupId: "source-group-1",
+            entryRouteId: "route-1",
+            entryRouteType: "CATEGORY_ENTRY_URL",
+            url: "https://user:pass@www.facebook.com/groups/source-group-1/categories",
+            riskLevel: "LOW",
+          },
+        } as any),
+      ).toThrow();
+    });
+  });
+
+  describe("Category Browse exercise request domain rules", () => {
+    it("Ambient run rejects target", async () => {
+      const context = createTestContext();
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "AMBIENT_ACCOUNT",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+          target: {
+            categoryId: "category-1",
+            sourceGroupId: "source-group-1",
+            entryRouteId: "route-1",
+            entryRouteType: "CATEGORY_ENTRY_URL",
+            url: "https://www.facebook.com/groups/source-group-1/categories",
+            riskLevel: "LOW",
+          },
+        } as any),
+      ).rejects.toThrow();
+    });
+
+    it("Category Browse requires sourceGroupId", async () => {
+      const context = createTestContext();
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        } as any),
+      ).rejects.toThrow();
+    });
+
+    it("rejects unsupported platform", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "TWITTER" as any,
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/source-group-1",
+          categoryId: "category-1",
+          entryRoutes: [],
+        },
+      };
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("must use platform FACEBOOK");
+    });
+
+    it("rejects inactive source group", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "PAUSED",
+          url: "https://www.facebook.com/groups/source-group-1",
+          categoryId: "category-1",
+          entryRoutes: [],
+        },
+      };
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("must be ACTIVE");
+    });
+
+    it("rejects when no eligible route exists", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/source-group-1",
+          categoryId: "category-1",
+          entryRoutes: [],
+        },
+      };
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("does not have an eligible CATEGORY_ENTRY_URL route");
+    });
+
+    it("performs explicit route selection and throws if not found or not eligible", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/source-group-1",
+          categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "route-1",
+              type: "CATEGORY_ENTRY_URL",
+              url: "https://www.facebook.com/groups/source-group-1/categories",
+              riskLevel: "LOW",
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      const run = await new RequestAccountExerciseRunUseCase(
+        context.accountExerciseRuns,
+        context.sourceGroups,
+        context.ids,
+        context.clock,
+      ).execute({
+        profileId: "profile-1",
+        stageAtStart: "WARMING",
+        exerciseType: "CATEGORY_BROWSE",
+        sourceGroupId: "source-group-1",
+        entryRouteId: "route-1",
+        maxDurationMs: 120_000,
+        maxScrolls: 2,
+      });
+      expect(run.target?.entryRouteId).toBe("route-1");
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          entryRouteId: "missing-route",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("Category Browse entry route not found for source group source-group-1: missing-route.");
+
+      (context.sourceGroups.result.sourceGroup.entryRoutes as any).push({
+        id: "high-risk-route",
+        type: "CATEGORY_ENTRY_URL",
+        url: "https://www.facebook.com/groups/source-group-1/high",
+        riskLevel: "HIGH",
+        isDefault: false,
+      });
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          entryRouteId: "high-risk-route",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("is not eligible");
+    });
+
+    it("performs deterministic route selection: LOW before MEDIUM, default before non-default, and id ascending as tie breaker", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/source-group-1",
+          categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "route-medium-default",
+              type: "CATEGORY_ENTRY_URL",
+              url: "https://www.facebook.com/groups/source-group-1/m-def",
+              riskLevel: "MEDIUM",
+              isDefault: true,
+            },
+            {
+              id: "route-low-non-default-z",
+              type: "CATEGORY_ENTRY_URL",
+              url: "https://www.facebook.com/groups/source-group-1/l-non-z",
+              riskLevel: "LOW",
+              isDefault: false,
+            },
+            {
+              id: "route-low-non-default-a",
+              type: "CATEGORY_ENTRY_URL",
+              url: "https://www.facebook.com/groups/source-group-1/l-non-a",
+              riskLevel: "LOW",
+              isDefault: false,
+            },
+          ],
+        },
+      };
+
+      const run = await new RequestAccountExerciseRunUseCase(
+        context.accountExerciseRuns,
+        context.sourceGroups,
+        context.ids,
+        context.clock,
+      ).execute({
+        profileId: "profile-1",
+        stageAtStart: "WARMING",
+        exerciseType: "CATEGORY_BROWSE",
+        sourceGroupId: "source-group-1",
+        maxDurationMs: 120_000,
+        maxScrolls: 2,
+      });
+
+      expect(run.target?.entryRouteId).toBe("route-low-non-default-a");
+    });
+
+    it("rejects routes that canonicalize to the direct group URL", async () => {
+      const context = createTestContext();
+      context.sourceGroups.result = {
+        ok: true,
+        statusCode: 200,
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/source-group-1/",
+          categoryId: "category-1",
+          entryRoutes: [
+            {
+              id: "route-direct-equivalent",
+              type: "CATEGORY_ENTRY_URL",
+              url: "https://m.facebook.com/groups/source-group-1?ref=bookmarks",
+              riskLevel: "LOW",
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      await expect(
+        new RequestAccountExerciseRunUseCase(
+          context.accountExerciseRuns,
+          context.sourceGroups,
+          context.ids,
+          context.clock,
+        ).execute({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-group-1",
+          maxDurationMs: 120_000,
+          maxScrolls: 2,
+        }),
+      ).rejects.toThrowError("does not have an eligible CATEGORY_ENTRY_URL route");
+    });
   });
 
   it("moves queued runs through running and succeeded transitions", async () => {

@@ -160,6 +160,47 @@ if (!shouldRunDbTests) {
       );
     });
 
+    it("saves, reloads, lists, and claims a CATEGORY_BROWSE run while preserving its target", async () => {
+      const target = {
+        categoryId: "category-1",
+        sourceGroupId: "group-1",
+        entryRouteId: "route-1",
+        entryRouteType: "CATEGORY_ENTRY_URL" as const,
+        url: "https://www.facebook.com/groups/group-1/categories",
+        riskLevel: "LOW" as const,
+      };
+      const run = trackAccountExerciseRun(
+        createAccountExerciseRun({
+          id: nextTestId("category-browse"),
+          exerciseType: "CATEGORY_BROWSE",
+          target,
+          status: "QUEUED",
+          requestedAt: "2020-01-01T00:00:00.000Z",
+        }),
+      );
+
+      await accountExerciseRuns.save(run);
+
+      const reloaded = await accountExerciseRuns.findById(run.id);
+      expect(reloaded).not.toBeNull();
+      expect(reloaded?.exerciseType).toBe("CATEGORY_BROWSE");
+      expect(reloaded?.target).toEqual(target);
+
+      const listed = await accountExerciseRuns.list({
+        profileId: run.profileId,
+        limit: 10,
+        offset: 0,
+      });
+      const found = listed.items.find((item) => item.id === run.id);
+      expect(found).not.toBeUndefined();
+      expect(found?.target).toEqual(target);
+
+      const claimed = await accountExerciseRuns.claimNextQueued("2026-05-01T11:00:00.000Z");
+      expect(claimed).not.toBeNull();
+      expect(claimed?.id).toBe(run.id);
+      expect(claimed?.target).toEqual(target);
+    });
+
     function nextTestId(label: string): string {
       nextId += 1;
 
@@ -191,6 +232,7 @@ function createAccountExerciseRun(
       maxScrolls: 2,
       minDwellMs: 2_000,
     },
+    ...(options.target !== undefined ? { target: options.target } : {}),
     ...(options.safeSummary !== undefined
       ? { safeSummary: options.safeSummary }
       : {}),

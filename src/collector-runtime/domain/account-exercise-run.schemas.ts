@@ -69,6 +69,15 @@ export const CategoryBrowseExerciseTargetSchema = z
         path: ["url"],
         message: "Category Browse target URL must be an https Facebook URL.",
       });
+      return;
+    }
+
+    if (parsedUrl.username || parsedUrl.password) {
+      context.addIssue({
+        code: "custom",
+        path: ["url"],
+        message: "Category Browse target URL must not contain credentials.",
+      });
     }
   });
 

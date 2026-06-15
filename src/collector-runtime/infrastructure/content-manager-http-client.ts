@@ -392,7 +392,14 @@ function toSourceGroupLookupResult(
   const status = body.sourceGroup.status;
   const url = body.sourceGroup.url;
   const categoryId = body.sourceGroup.categoryId;
+
+  if (body.sourceGroup.entryRoutes === undefined) {
+    return undefined;
+  }
   const entryRoutes = toSourceGroupEntryRoutes(body.sourceGroup.entryRoutes);
+  if (entryRoutes === undefined) {
+    return undefined;
+  }
 
   if (
     typeof id !== "string" ||
@@ -421,16 +428,16 @@ function toSourceGroupLookupResult(
 
 function toSourceGroupEntryRoutes(
   value: unknown,
-): readonly SourceGroupLookupEntryRoute[] {
+): readonly SourceGroupLookupEntryRoute[] | undefined {
   if (!Array.isArray(value)) {
-    return [];
+    return undefined;
   }
 
   const entryRoutes: SourceGroupLookupEntryRoute[] = [];
 
   for (const entryRoute of value) {
     if (!isRecord(entryRoute)) {
-      return [];
+      return undefined;
     }
 
     const id = entryRoute.id;
@@ -450,7 +457,7 @@ function toSourceGroupEntryRoutes(
       riskLevel.trim().length === 0 ||
       typeof isDefault !== "boolean"
     ) {
-      return [];
+      return undefined;
     }
 
     entryRoutes.push({

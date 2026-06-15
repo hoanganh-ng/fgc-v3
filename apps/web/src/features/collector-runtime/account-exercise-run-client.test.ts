@@ -160,4 +160,48 @@ describe("collector runtime account-exercise-run client", () => {
       minDwellMs: 0,
     });
   });
+
+  it("parses both exercise types and rejects malformed targets in client schema", () => {
+    const validTarget = {
+      categoryId: "category-1",
+      sourceGroupId: "group-1",
+      entryRouteId: "route-1",
+      entryRouteType: "CATEGORY_ENTRY_URL" as const,
+      url: "https://www.facebook.com/groups/group-1/categories",
+      riskLevel: "LOW" as const,
+    };
+
+    const parseAmbient = AccountExerciseRunResponseSchema.safeParse({
+      accountExerciseRun: createAccountExerciseRun({
+        exerciseType: "AMBIENT_ACCOUNT",
+      }),
+    });
+    expect(parseAmbient.success).toBe(true);
+
+    const parseCategoryBrowse = AccountExerciseRunResponseSchema.safeParse({
+      accountExerciseRun: createAccountExerciseRun({
+        exerciseType: "CATEGORY_BROWSE",
+        target: validTarget,
+      }),
+    });
+    expect(parseCategoryBrowse.success).toBe(true);
+
+    const parseMissingTarget = AccountExerciseRunResponseSchema.safeParse({
+      accountExerciseRun: createAccountExerciseRun({
+        exerciseType: "CATEGORY_BROWSE",
+      }),
+    });
+    expect(parseMissingTarget.success).toBe(false);
+
+    const parseMalformedTarget = AccountExerciseRunResponseSchema.safeParse({
+      accountExerciseRun: createAccountExerciseRun({
+        exerciseType: "CATEGORY_BROWSE",
+        target: {
+          ...validTarget,
+          url: "http://non-facebook.com",
+        },
+      }),
+    });
+    expect(parseMalformedTarget.success).toBe(false);
+  });
 });

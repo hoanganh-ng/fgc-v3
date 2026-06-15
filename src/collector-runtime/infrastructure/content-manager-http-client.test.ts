@@ -195,8 +195,9 @@ describe("ContentManagerHttpClient", () => {
     ]);
   });
 
-  it("preserves source group reads when entry routes are absent or malformed", async () => {
-    const fetch = new FakeFetch(
+  it("rejects source group reads when entry routes are absent or malformed", async () => {
+    // Case 1: Malformed entryRoute (missing isDefault)
+    const fetchMalformed = new FakeFetch(
       createResponse(200, {
         sourceGroup: {
           id: "source-group-1",
@@ -215,9 +216,49 @@ describe("ContentManagerHttpClient", () => {
         },
       }),
     );
-    const client = createClient(fetch.fetch);
+    const clientMalformed = createClient(fetchMalformed.fetch);
+    await expect(clientMalformed.getSourceGroup("source-group-1")).resolves.toEqual({
+      ok: false,
+      statusCode: 200,
+      errorCode: "CONTENT_MANAGER_RESPONSE_ERROR",
+      errorMessage: "Content Manager source group response is invalid.",
+    });
 
-    await expect(client.getSourceGroup("source-group-1")).resolves.toEqual({
+    // Case 2: Absent entryRoutes
+    const fetchAbsent = new FakeFetch(
+      createResponse(200, {
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/fb-group-1",
+          categoryId: "category-1",
+        },
+      }),
+    );
+    const clientAbsent = createClient(fetchAbsent.fetch);
+    await expect(clientAbsent.getSourceGroup("source-group-1")).resolves.toEqual({
+      ok: false,
+      statusCode: 200,
+      errorCode: "CONTENT_MANAGER_RESPONSE_ERROR",
+      errorMessage: "Content Manager source group response is invalid.",
+    });
+
+    // Case 3: Valid empty entryRoutes array should succeed
+    const fetchEmpty = new FakeFetch(
+      createResponse(200, {
+        sourceGroup: {
+          id: "source-group-1",
+          platform: "FACEBOOK",
+          status: "ACTIVE",
+          url: "https://www.facebook.com/groups/fb-group-1",
+          categoryId: "category-1",
+          entryRoutes: [],
+        },
+      }),
+    );
+    const clientEmpty = createClient(fetchEmpty.fetch);
+    await expect(clientEmpty.getSourceGroup("source-group-1")).resolves.toEqual({
       ok: true,
       statusCode: 200,
       sourceGroup: {

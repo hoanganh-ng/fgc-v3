@@ -329,6 +329,114 @@ describe("account exercise worker runner", () => {
     });
     expect(context.profileManager.releaseCalls).toHaveLength(1);
   });
+
+  it("CATEGORY_BROWSE navigates exactly to run.target.url", async () => {
+    const context = createTestContext();
+    const target = {
+      categoryId: "category-1",
+      sourceGroupId: "group-1",
+      entryRouteId: "route-1",
+      entryRouteType: "CATEGORY_ENTRY_URL" as const,
+      url: "https://www.facebook.com/groups/group-1/categories",
+      riskLevel: "LOW" as const,
+    };
+
+    await context.accountExerciseRuns.save(
+      createAccountExerciseRun({
+        exerciseType: "CATEGORY_BROWSE",
+        target,
+      }),
+    );
+
+    const result = await runAccountExerciseWorkerCommand({
+      args: createArgs({ once: true }),
+      logger: context.logger,
+      dependencies: context.dependencies,
+    });
+
+    expect(result.succeededRuns).toBe(1);
+    expect(context.browserProvider.lastSession?.page.navigatedUrls).toEqual([
+      "https://www.facebook.com/groups/group-1/categories",
+    ]);
+  });
+
+  it("AMBIENT_ACCOUNT still navigates to the existing Facebook home URL", async () => {
+    const context = createTestContext();
+
+    await context.accountExerciseRuns.save(
+      createAccountExerciseRun({
+        exerciseType: "AMBIENT_ACCOUNT",
+      }),
+    );
+
+    const result = await runAccountExerciseWorkerCommand({
+      args: createArgs({ once: true }),
+      logger: context.logger,
+      dependencies: context.dependencies,
+    });
+
+    expect(result.succeededRuns).toBe(1);
+    expect(context.browserProvider.lastSession?.page.navigatedUrls).toEqual([
+      "https://www.facebook.com/",
+    ]);
+  });
+
+  it("polling continues after a Category Browse failure", async () => {
+    const context = createTestContext({
+      releaseResult: {
+        ok: false,
+        statusCode: 502,
+        errorCode: "LEASE_RELEASE_FAILED",
+        errorMessage: "Release failed.",
+      },
+    });
+
+    const target = {
+      categoryId: "category-1",
+      sourceGroupId: "group-1",
+      entryRouteId: "route-1",
+      entryRouteType: "CATEGORY_ENTRY_URL" as const,
+      url: "https://www.facebook.com/groups/group-1/categories",
+      riskLevel: "LOW" as const,
+    };
+
+    await context.accountExerciseRuns.save(
+      createAccountExerciseRun({
+        id: "failed-run",
+        exerciseType: "CATEGORY_BROWSE",
+        target,
+        requestedAt: "2026-05-01T09:00:00.000Z",
+      }),
+    );
+
+    await context.accountExerciseRuns.save(
+      createAccountExerciseRun({
+        id: "succeeding-run",
+        exerciseType: "CATEGORY_BROWSE",
+        target,
+        requestedAt: "2026-05-01T09:05:00.000Z",
+      }),
+    );
+
+    const abortController = new AbortController();
+    context.logger.onMessage = (message) => {
+      if (message.includes("Claimed account exercise run succeeding-run.")) {
+        abortController.abort();
+      }
+    };
+
+    const result = await runAccountExerciseWorkerCommand({
+      args: createArgs({ once: false, pollIntervalMs: 1 }),
+      logger: context.logger,
+      abortSignal: abortController.signal,
+      dependencies: context.dependencies,
+    });
+
+    expect(result.claimedRuns).toBe(2);
+    expect(result.failedRuns).toBe(2);
+    expect(context.logger.messages.join("\n")).toContain("Claimed account exercise run failed-run.");
+    expect(context.logger.messages.join("\n")).toContain("Claimed account exercise run succeeding-run.");
+  });
 });
 
 interface TestContext {
@@ -586,6 +694,7 @@ class FakeBrowserProvider implements BrowserProviderPort {
   public readonly providerName = "PLAYWRIGHT_CHROMIUM" as const;
   public readonly launchCalls: BrowserProviderLaunchConfig[] = [];
   public closeCalls = 0;
+  public lastSession?: FakeBrowserSession;
 
   public constructor(
     private readonly options: {
@@ -603,15 +712,18 @@ class FakeBrowserProvider implements BrowserProviderPort {
       throw this.options.launchError;
     }
 
-    return new FakeBrowserSession(this.options.navigationError, () => {
+    const session = new FakeBrowserSession(this.options.navigationError, () => {
       this.closeCalls += 1;
     });
+    this.lastSession = session;
+    return session;
   }
 }
 
 class FakeBrowserSession implements BrowserProviderSession {
   public readonly providerName = "PLAYWRIGHT_CHROMIUM" as const;
-  private readonly page: FakeBrowserPage;
+  public readonly page: FakeBrowserPage;
+  public closed = false;
 
   public constructor(
     navigationError: Error | undefined,
@@ -625,12 +737,14 @@ class FakeBrowserSession implements BrowserProviderSession {
   }
 
   public async close(): Promise<void> {
+    this.closed = true;
     this.onClose();
   }
 }
 
 class FakeBrowserPage implements BrowserProviderPage {
   private currentUrl = "about:blank";
+  public readonly navigatedUrls: string[] = [];
 
   public constructor(private readonly navigationError: Error | undefined) {}
 
@@ -642,6 +756,7 @@ class FakeBrowserPage implements BrowserProviderPage {
     input: BrowserProviderNavigationInput,
   ): Promise<BrowserProviderNavigationResult | null> {
     this.currentUrl = input.url;
+    this.navigatedUrls.push(input.url);
 
     if (this.navigationError !== undefined) {
       throw this.navigationError;
@@ -685,6 +800,7 @@ function createAccountExerciseRun(
   return {
     id: options.id ?? "exercise-run-1",
     profileId: options.profileId ?? "profile-1",
+    ...(options.leaseId !== undefined ? { leaseId: options.leaseId } : {}),
     exerciseType: options.exerciseType ?? "AMBIENT_ACCOUNT",
     status: options.status ?? "QUEUED",
     stageAtStart: options.stageAtStart ?? "NEW_ACCOUNT",
@@ -693,6 +809,13 @@ function createAccountExerciseRun(
       maxScrolls: 2,
       minDwellMs: 0,
     },
+    ...(options.target !== undefined ? { target: options.target } : {}),
+    ...(options.safeSummary !== undefined
+      ? { safeSummary: options.safeSummary }
+      : {}),
+    ...(options.failureReason !== undefined
+      ? { failureReason: options.failureReason }
+      : {}),
     requestedAt: options.requestedAt ?? createdAt,
     createdAt: options.createdAt ?? createdAt,
     updatedAt: options.updatedAt ?? createdAt,

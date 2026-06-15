@@ -203,6 +203,7 @@ export function createAccountExerciseRun(
       maxScrolls: 2,
       minDwellMs: 2_000,
     },
+    ...(options.target !== undefined ? { target: options.target } : {}),
     ...(options.safeSummary !== undefined
       ? { safeSummary: options.safeSummary }
       : {}),

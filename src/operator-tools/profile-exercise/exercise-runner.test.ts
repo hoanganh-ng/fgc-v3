@@ -261,6 +261,7 @@ interface FakePageState {
 class FakeBrowserProvider implements BrowserProviderPort {
   public readonly providerName = "PLAYWRIGHT_CHROMIUM" as const;
   public readonly launchCalls: BrowserProviderLaunchConfig[] = [];
+  public lastSession?: FakeBrowserSession;
 
   public constructor(private readonly pageState: FakePageState) {}
 
@@ -268,14 +269,16 @@ class FakeBrowserProvider implements BrowserProviderPort {
     config: BrowserProviderLaunchConfig,
   ): Promise<BrowserProviderSession> {
     this.launchCalls.push(config);
-
-    return new FakeBrowserSession(this.pageState);
+    const session = new FakeBrowserSession(this.pageState);
+    this.lastSession = session;
+    return session;
   }
 }
 
 class FakeBrowserSession implements BrowserProviderSession {
   public readonly providerName = "PLAYWRIGHT_CHROMIUM" as const;
-  private readonly page: FakeBrowserPage;
+  public readonly page: FakeBrowserPage;
+  public closed = false;
 
   public constructor(pageState: FakePageState) {
     this.page = new FakeBrowserPage(pageState);
@@ -285,11 +288,14 @@ class FakeBrowserSession implements BrowserProviderSession {
     return this.page;
   }
 
-  public async close(): Promise<void> {}
+  public async close(): Promise<void> {
+    this.closed = true;
+  }
 }
 
 class FakeBrowserPage implements BrowserProviderPage {
   private currentUrl = "about:blank";
+  public readonly navigatedUrls: string[] = [];
 
   public constructor(private readonly pageState: FakePageState) {}
 
@@ -301,6 +307,7 @@ class FakeBrowserPage implements BrowserProviderPage {
     input: BrowserProviderNavigationInput,
   ): Promise<BrowserProviderNavigationResult | null> {
     this.currentUrl = input.url;
+    this.navigatedUrls.push(input.url);
 
     return {
       status: 200,

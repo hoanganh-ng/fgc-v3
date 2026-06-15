@@ -107,7 +107,39 @@ export const CategoryBrowseExerciseTargetSchema = z
     url: NonEmptyStringSchema,
     riskLevel: z.enum(["LOW", "MEDIUM"]),
   })
-  .strict();
+  .strict()
+  .superRefine((target, context) => {
+    let parsedUrl: URL | undefined;
+    try {
+      parsedUrl = new URL(target.url);
+    } catch {
+      parsedUrl = undefined;
+    }
+
+    if (
+      parsedUrl === undefined ||
+      parsedUrl.protocol !== "https:" ||
+      !(
+        parsedUrl.hostname.toLowerCase() === "facebook.com" ||
+        parsedUrl.hostname.toLowerCase().endsWith(".facebook.com")
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["url"],
+        message: "Category Browse target URL must be an https Facebook URL.",
+      });
+      return;
+    }
+
+    if (parsedUrl.username || parsedUrl.password) {
+      context.addIssue({
+        code: "custom",
+        path: ["url"],
+        message: "Category Browse target URL must not contain credentials.",
+      });
+    }
+  });
 
 export const CollectionRunSchema = z
   .object({
@@ -157,7 +189,24 @@ export const AccountExerciseRunSchema = z
     createdAt: z.string().datetime({ offset: true }),
     updatedAt: z.string().datetime({ offset: true }),
   })
-  .strict();
+  .strict()
+  .superRefine((run, context) => {
+    if (run.exerciseType === "AMBIENT_ACCOUNT" && run.target !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["target"],
+        message: "Ambient account exercise runs must not include a target.",
+      });
+    }
+
+    if (run.exerciseType === "CATEGORY_BROWSE" && run.target === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["target"],
+        message: "Category Browse exercise runs require a target.",
+      });
+    }
+  });
 
 export const AccountExerciseRunsListResponseSchema = z
   .object({
