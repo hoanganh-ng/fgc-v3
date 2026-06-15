@@ -7,6 +7,7 @@ import type {
 export type CollectorRuntimeApplicationErrorCode =
   | "COLLECTION_RUN_NOT_FOUND"
   | "ACCOUNT_EXERCISE_RUN_NOT_FOUND"
+  | "ACCOUNT_EXERCISE_RUN_LEASE_CONFLICT"
   | "INVALID_COLLECTION_RUN_STATUS_TRANSITION"
   | "INVALID_ACCOUNT_EXERCISE_RUN_STATUS_TRANSITION"
   | "COLLECTION_RUN_VALIDATION_ERROR"
@@ -82,6 +83,18 @@ export class InvalidAccountExerciseRunStatusTransitionError extends CollectorRun
     );
     this.from = from;
     this.to = to;
+  }
+}
+
+export class AccountExerciseRunLeaseConflictError extends CollectorRuntimeApplicationError {
+  public readonly accountExerciseRunId: string;
+
+  public constructor(accountExerciseRunId: string) {
+    super(
+      "ACCOUNT_EXERCISE_RUN_LEASE_CONFLICT",
+      `Account exercise run already has a different lease: ${accountExerciseRunId}.`,
+    );
+    this.accountExerciseRunId = accountExerciseRunId;
   }
 }
 

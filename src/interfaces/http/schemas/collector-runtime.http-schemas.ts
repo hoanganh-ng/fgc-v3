@@ -57,6 +57,12 @@ export const StartAccountExerciseRunHttpBodySchema = z
   })
   .strict();
 
+export const AttachAccountExerciseRunLeaseHttpBodySchema = z
+  .object({
+    leaseId: NonEmptyStringHttpSchema,
+  })
+  .strict();
+
 export const SucceedAccountExerciseRunHttpBodySchema = z
   .object({
     safeSummary: AccountExerciseRunSafeSummarySchema,
@@ -112,6 +118,9 @@ export type RequestAccountExerciseRunHttpBody = z.infer<
 >;
 export type StartAccountExerciseRunHttpBody = z.infer<
   typeof StartAccountExerciseRunHttpBodySchema
+>;
+export type AttachAccountExerciseRunLeaseHttpBody = z.infer<
+  typeof AttachAccountExerciseRunLeaseHttpBodySchema
 >;
 export type SucceedAccountExerciseRunHttpBody = z.infer<
   typeof SucceedAccountExerciseRunHttpBodySchema
@@ -399,6 +408,15 @@ const startAccountExerciseRunBodyJsonSchema = {
   },
 } as const;
 
+const attachAccountExerciseRunLeaseBodyJsonSchema = {
+  type: "object",
+  required: ["leaseId"],
+  additionalProperties: false,
+  properties: {
+    leaseId: nonEmptyStringJsonSchema,
+  },
+} as const;
+
 const succeedAccountExerciseRunBodyJsonSchema = {
   type: "object",
   required: ["safeSummary"],
@@ -592,6 +610,23 @@ export const getAccountExerciseRunHttpRouteSchema = {
 export const startAccountExerciseRunHttpRouteSchema = {
   params: accountExerciseRunIdParamsJsonSchema,
   body: startAccountExerciseRunBodyJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["accountExerciseRun"],
+      additionalProperties: false,
+      properties: {
+        accountExerciseRun: accountExerciseRunJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const attachAccountExerciseRunLeaseHttpRouteSchema = {
+  params: accountExerciseRunIdParamsJsonSchema,
+  body: attachAccountExerciseRunLeaseBodyJsonSchema,
   response: {
     200: {
       type: "object",

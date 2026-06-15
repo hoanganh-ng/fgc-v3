@@ -1,8 +1,10 @@
 import {
+  AttachAccountExerciseRunLeaseUseCase,
   MarkAccountExerciseRunFailedUseCase,
   MarkAccountExerciseRunRunningUseCase,
   MarkAccountExerciseRunSucceededUseCase,
   RequestAccountExerciseRunUseCase,
+  type AttachAccountExerciseRunLeaseInput,
   type MarkAccountExerciseRunFailedInput,
   type MarkAccountExerciseRunRunningInput,
   type MarkAccountExerciseRunSucceededInput,
@@ -81,6 +83,16 @@ export interface RunProfileExerciseCommandInput {
   readonly now?: () => Date;
 }
 
+export interface ExecuteRunningProfileExerciseRunInput {
+  readonly accountExerciseRun: AccountExerciseRun;
+  readonly baseUrl: string;
+  readonly browserProvider: ProfileExerciseCliArgs["browserProvider"];
+  readonly logger?: ProfileExerciseLogger;
+  readonly abortSignal?: AbortSignal;
+  readonly dependencies?: ProfileExerciseDependencies;
+  readonly now?: () => Date;
+}
+
 export interface ProfileExerciseCommandResult {
   readonly ok: boolean;
   readonly profileId: string;
@@ -120,6 +132,9 @@ export interface ProfileExerciseRunRecordPort {
   markRunRunning(
     input: MarkAccountExerciseRunRunningInput,
   ): Promise<ProfileExerciseRunRecordResult>;
+  attachRunLease(
+    input: AttachAccountExerciseRunLeaseInput,
+  ): Promise<ProfileExerciseRunRecordResult>;
   markRunSucceeded(
     input: MarkAccountExerciseRunSucceededInput,
   ): Promise<ProfileExerciseRunRecordResult>;
@@ -158,9 +173,7 @@ export async function runProfileExerciseCommand(
   const startedAt = (input.now ?? (() => new Date()))();
   const dependencies = buildDependencies(input);
   let run: AccountExerciseRun | undefined;
-  let leaseId: string | undefined;
   let leaseReleased = false;
-  let session: BrowserProviderSession | undefined;
 
   logger.info("Starting ambient profile exercise run.");
   logger.info(`Using Collector Profile Manager profile id ${input.args.profileId}.`);
@@ -211,38 +224,52 @@ export async function runProfileExerciseCommand(
 
     logger.info(`Created ambient exercise run ${run.id}.`);
 
-    const checkoutResult =
-      await dependencies.profileManager.checkoutProfileForExercise(
-        input.args.profileId,
-      );
+    const startedRunResult = await dependencies.runRecords.markRunRunning({
+      accountExerciseRunId: run.id,
+    });
 
-    if (!checkoutResult.ok) {
-      const runningRunResult = await markRunRunningWithoutLease(
+    if (!startedRunResult.ok) {
+      const result = toCommandResult({
         run,
-        dependencies,
-      );
+        profileId: input.args.profileId,
+        durationMs: getDurationMs(startedAt),
+        leaseReleased,
+        errors: [
+          toCommandError(
+            "ACCOUNT_EXERCISE_RUN_RECORD_FAILED",
+            startedRunResult,
+          ),
+        ],
+      });
 
-      if (!runningRunResult.ok) {
-        const result = toCommandResult({
-          run,
-          profileId: input.args.profileId,
-          durationMs: getDurationMs(startedAt),
-          leaseReleased,
-          errors: [
-            toCommandError(
-              "ACCOUNT_EXERCISE_RUN_RECORD_FAILED",
-              runningRunResult,
-            ),
-          ],
-        });
+      logSafeSummary(logger, result);
 
-        logSafeSummary(logger, result);
+      return result;
+    }
 
-        return result;
-      }
+    return await executeRunningProfileExerciseRun({
+      accountExerciseRun: startedRunResult.accountExerciseRun,
+      baseUrl: input.args.baseUrl,
+      browserProvider: input.args.browserProvider,
+      logger,
+      ...(input.abortSignal !== undefined
+        ? { abortSignal: input.abortSignal }
+        : {}),
+      dependencies: {
+        runRecords: dependencies.runRecords,
+        profileManager: dependencies.profileManager,
+        browserProvider: dependencies.browserProvider,
+        clock: dependencies.clock,
+        idGenerator: dependencies.idGenerator,
+        close: async () => {},
+      },
+      now: () => startedAt,
+    });
 
-      run = runningRunResult.accountExerciseRun;
+  } catch (error) {
+    const commandError = toUnknownFailure(error);
 
+    if (run !== undefined) {
       return await failRunAndReturn({
         run,
         dependencies,
@@ -258,54 +285,101 @@ export async function runProfileExerciseCommand(
           durationMs: getDurationMs(startedAt),
           leaseReleased,
         }),
+        error: commandError,
+      });
+    }
+
+    const result = createFailureCommandResult({
+      profileId: input.args.profileId,
+      durationMs: getDurationMs(startedAt),
+      leaseReleased,
+      error: commandError,
+    });
+
+    logSafeSummary(logger, result);
+
+    return result;
+  } finally {
+    await dependencies.close();
+  }
+}
+
+export async function executeRunningProfileExerciseRun(
+  input: ExecuteRunningProfileExerciseRunInput,
+): Promise<ProfileExerciseCommandResult> {
+  const logger = input.logger ?? NOOP_LOGGER;
+  const startedAt = (input.now ?? (() => new Date()))();
+  const dependencies = buildDependencies(input);
+  let run = input.accountExerciseRun;
+  let leaseId: string | undefined = run.leaseId;
+  let leaseReleased = false;
+  let session: BrowserProviderSession | undefined;
+  const args = toProfileExerciseArgsFromRun(input);
+
+  logger.info(`Executing ambient exercise run ${run.id}.`);
+  logger.info(`Using Collector Profile Manager profile id ${run.profileId}.`);
+
+  try {
+    if (run.status !== "RUNNING") {
+      return await failRunAndReturn({
+        run,
+        dependencies,
+        logger,
+        profileId: run.profileId,
+        startedAt,
+        leaseReleased,
+        safeSummary: createSafeSummary({
+          pageLoaded: false,
+          loginRequired: false,
+          checkpointDetected: false,
+          scrollsPerformed: 0,
+          durationMs: getDurationMs(startedAt),
+          leaseReleased,
+        }),
+        error: {
+          code: "ACCOUNT_EXERCISE_RUN_RECORD_FAILED",
+          message: getSafeFailureMessage(
+            "ACCOUNT_EXERCISE_RUN_RECORD_FAILED",
+          ),
+        },
+      });
+    }
+
+    const checkoutResult =
+      await dependencies.profileManager.checkoutProfileForExercise(
+        run.profileId,
+      );
+
+    if (!checkoutResult.ok) {
+      return await failRunAndReturn({
+        run,
+        dependencies,
+        logger,
+        profileId: run.profileId,
+        startedAt,
+        leaseReleased,
+        safeSummary: createSafeSummary({
+          pageLoaded: false,
+          loginRequired: false,
+          checkpointDetected: false,
+          scrollsPerformed: 0,
+          durationMs: getDurationMs(startedAt),
+          leaseReleased,
+        }),
         error: toCommandError("PROFILE_EXERCISE_CHECKOUT_FAILED", checkoutResult),
       });
     }
 
     leaseId = checkoutResult.leaseId;
-    const runningRunResult = await dependencies.runRecords.markRunRunning({
+    const attachedRunResult = await dependencies.runRecords.attachRunLease({
       accountExerciseRunId: run.id,
       leaseId,
     });
 
-    if (!runningRunResult.ok) {
+    if (!attachedRunResult.ok) {
       const releaseResult = await releaseLease(
         dependencies.profileManager,
-        input.args.profileId,
-        leaseId,
-      );
-      leaseReleased = releaseResult.ok;
-
-      const result = toCommandResult({
-        run,
-        profileId: input.args.profileId,
-        durationMs: getDurationMs(startedAt),
-        leaseId,
-        leaseReleased,
-        errors: [
-          toCommandError(
-            "ACCOUNT_EXERCISE_RUN_RECORD_FAILED",
-            runningRunResult,
-          ),
-        ],
-      });
-
-      logSafeSummary(logger, result);
-
-      return result;
-    }
-
-    run = runningRunResult.accountExerciseRun;
-
-    logger.info(`Checked out profile ${input.args.profileId} for exercise.`);
-
-    const runtimeConfigurationResult =
-      await dependencies.profileManager.getRuntimeProfileConfiguration(leaseId);
-
-    if (!runtimeConfigurationResult.ok) {
-      const releaseResult = await releaseLease(
-        dependencies.profileManager,
-        input.args.profileId,
+        run.profileId,
         leaseId,
       );
       leaseReleased = releaseResult.ok;
@@ -314,7 +388,45 @@ export async function runProfileExerciseCommand(
         run,
         dependencies,
         logger,
-        profileId: input.args.profileId,
+        profileId: run.profileId,
+        startedAt,
+        leaseId,
+        leaseReleased,
+        safeSummary: createSafeSummary({
+          pageLoaded: false,
+          loginRequired: false,
+          checkpointDetected: false,
+          scrollsPerformed: 0,
+          durationMs: getDurationMs(startedAt),
+          leaseReleased,
+        }),
+        error: toCommandError(
+          "ACCOUNT_EXERCISE_RUN_RECORD_FAILED",
+          attachedRunResult,
+        ),
+      });
+    }
+
+    run = attachedRunResult.accountExerciseRun;
+
+    logger.info(`Checked out profile ${run.profileId} for exercise.`);
+
+    const runtimeConfigurationResult =
+      await dependencies.profileManager.getRuntimeProfileConfiguration(leaseId);
+
+    if (!runtimeConfigurationResult.ok) {
+      const releaseResult = await releaseLease(
+        dependencies.profileManager,
+        run.profileId,
+        leaseId,
+      );
+      leaseReleased = releaseResult.ok;
+
+      return await failRunAndReturn({
+        run,
+        dependencies,
+        logger,
+        profileId: run.profileId,
         startedAt,
         leaseId,
         leaseReleased,
@@ -343,7 +455,7 @@ export async function runProfileExerciseCommand(
     const page = await session.newPage();
     const browserOutcome = await exerciseFacebookHome({
       page,
-      args: input.args,
+      args,
       startedAt,
       ...(input.abortSignal !== undefined
         ? { abortSignal: input.abortSignal }
@@ -355,7 +467,7 @@ export async function runProfileExerciseCommand(
 
     const releaseResult = await releaseLease(
       dependencies.profileManager,
-      input.args.profileId,
+      run.profileId,
       leaseId,
     );
     leaseReleased = releaseResult.ok;
@@ -377,7 +489,7 @@ export async function runProfileExerciseCommand(
         run,
         dependencies,
         logger,
-        profileId: input.args.profileId,
+        profileId: run.profileId,
         startedAt,
         leaseId,
         leaseReleased,
@@ -394,10 +506,10 @@ export async function runProfileExerciseCommand(
     if (!completedRunResult.ok) {
       const result = toCommandResult({
         run,
-        profileId: input.args.profileId,
+        profileId: run.profileId,
         durationMs: getDurationMs(startedAt),
         leaseReleased,
-        ...(leaseId !== undefined ? { leaseId } : {}),
+        leaseId,
         errors: [
           toCommandError(
             "ACCOUNT_EXERCISE_RUN_RECORD_FAILED",
@@ -411,10 +523,9 @@ export async function runProfileExerciseCommand(
       return result;
     }
 
-    const completedRun = completedRunResult.accountExerciseRun;
     const result = toCommandResult({
-      run: completedRun,
-      profileId: input.args.profileId,
+      run: completedRunResult.accountExerciseRun,
+      profileId: run.profileId,
       durationMs: getDurationMs(startedAt),
       leaseReleased,
       errors: [],
@@ -431,52 +542,38 @@ export async function runProfileExerciseCommand(
     if (leaseId !== undefined && !leaseReleased) {
       const releaseResult = await releaseLease(
         dependencies.profileManager,
-        input.args.profileId,
+        run.profileId,
         leaseId,
       );
       leaseReleased = releaseResult.ok;
     }
 
-    const commandError = toUnknownFailure(error);
-
-    if (run !== undefined) {
-      return await failRunAndReturn({
-        run,
-        dependencies,
-        logger,
-        profileId: input.args.profileId,
-        startedAt,
-        ...(leaseId !== undefined ? { leaseId } : {}),
-        leaseReleased,
-        safeSummary: createSafeSummary({
-          pageLoaded: false,
-          loginRequired: false,
-          checkpointDetected: false,
-          scrollsPerformed: 0,
-          durationMs: getDurationMs(startedAt),
-          leaseReleased,
-        }),
-        error: commandError,
-      });
-    }
-
-    const result = createFailureCommandResult({
-      profileId: input.args.profileId,
-      durationMs: getDurationMs(startedAt),
-      leaseReleased,
+    return await failRunAndReturn({
+      run,
+      dependencies,
+      logger,
+      profileId: run.profileId,
+      startedAt,
       ...(leaseId !== undefined ? { leaseId } : {}),
-      error: commandError,
+      leaseReleased,
+      safeSummary: createSafeSummary({
+        pageLoaded: false,
+        loginRequired: false,
+        checkpointDetected: false,
+        scrollsPerformed: 0,
+        durationMs: getDurationMs(startedAt),
+        leaseReleased,
+      }),
+      error: toUnknownFailure(error),
     });
-
-    logSafeSummary(logger, result);
-
-    return result;
   } finally {
     await dependencies.close();
   }
 }
 
-function buildDependencies(input: RunProfileExerciseCommandInput): BuiltDependencies {
+function buildDependencies(
+  input: RunProfileExerciseCommandInput | ExecuteRunningProfileExerciseRunInput,
+): BuiltDependencies {
   const clock = input.dependencies?.clock ?? new SystemClock();
   const idGenerator = input.dependencies?.idGenerator ?? new CryptoIdGenerator();
   const runRecords =
@@ -488,18 +585,20 @@ function buildDependencies(input: RunProfileExerciseCommandInput): BuiltDependen
           clock,
         )
       : new HttpProfileExerciseRunRecordClient({
-          baseUrl: input.args.baseUrl,
+          baseUrl: "args" in input ? input.args.baseUrl : input.baseUrl,
         }));
   const browserProvider =
     input.dependencies?.browserProvider ??
-    resolveBrowserProviderForCommand(input.args.browserProvider);
+    resolveBrowserProviderForCommand(
+      "args" in input ? input.args.browserProvider : input.browserProvider,
+    );
 
   return {
     runRecords,
     profileManager:
       input.dependencies?.profileManager ??
       new ProfileManagerHttpClient({
-        baseUrl: input.args.baseUrl,
+        baseUrl: "args" in input ? input.args.baseUrl : input.baseUrl,
       }),
     browserProvider,
     clock,
@@ -507,6 +606,19 @@ function buildDependencies(input: RunProfileExerciseCommandInput): BuiltDependen
     close:
       input.dependencies?.close ??
       (async () => {}),
+  };
+}
+
+function toProfileExerciseArgsFromRun(
+  input: ExecuteRunningProfileExerciseRunInput,
+): ProfileExerciseCliArgs {
+  return {
+    profileId: input.accountExerciseRun.profileId,
+    baseUrl: input.baseUrl,
+    maxDurationMs: input.accountExerciseRun.actionBudget.maxDurationMs,
+    maxScrolls: input.accountExerciseRun.actionBudget.maxScrolls,
+    minDwellMs: input.accountExerciseRun.actionBudget.minDwellMs ?? 0,
+    browserProvider: input.browserProvider,
   };
 }
 
@@ -536,6 +648,17 @@ class RepositoryProfileExerciseRunRecordPort
   ): Promise<ProfileExerciseRunRecordResult> {
     return this.executeRepositoryOperation(async () =>
       new MarkAccountExerciseRunRunningUseCase(
+        this.accountExerciseRuns,
+        this.clock,
+      ).execute(input),
+    );
+  }
+
+  public async attachRunLease(
+    input: AttachAccountExerciseRunLeaseInput,
+  ): Promise<ProfileExerciseRunRecordResult> {
+    return this.executeRepositoryOperation(async () =>
+      new AttachAccountExerciseRunLeaseUseCase(
         this.accountExerciseRuns,
         this.clock,
       ).execute(input),
@@ -628,6 +751,19 @@ class HttpProfileExerciseRunRecordClient
       )}/start`,
       {
         ...(input.leaseId !== undefined ? { leaseId: input.leaseId } : {}),
+      },
+    );
+  }
+
+  public async attachRunLease(
+    input: AttachAccountExerciseRunLeaseInput,
+  ): Promise<ProfileExerciseRunRecordResult> {
+    return this.sendJsonRequest(
+      `${ACCOUNT_EXERCISE_RUNS_PATH}/${encodeURIComponent(
+        input.accountExerciseRunId,
+      )}/lease`,
+      {
+        leaseId: input.leaseId,
       },
     );
   }

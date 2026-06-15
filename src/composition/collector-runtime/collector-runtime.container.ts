@@ -1,6 +1,8 @@
 import {
   CancelAccountExerciseRunUseCase,
   CancelCollectionRunUseCase,
+  AttachAccountExerciseRunLeaseUseCase,
+  ClaimNextAccountExerciseRunUseCase,
   ClaimNextCollectionRunUseCase,
   GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
@@ -39,6 +41,7 @@ export interface CollectorRuntimeContainer {
   readonly markAccountExerciseRunRunning: MarkAccountExerciseRunRunningUseCase;
   readonly markAccountExerciseRunSucceeded: MarkAccountExerciseRunSucceededUseCase;
   readonly markAccountExerciseRunFailed: MarkAccountExerciseRunFailedUseCase;
+  readonly attachAccountExerciseRunLease: AttachAccountExerciseRunLeaseUseCase;
   readonly cancelAccountExerciseRun: CancelAccountExerciseRunUseCase;
   readonly requestCollectionRun: RequestCollectionRunUseCase;
   readonly getCollectionRun: GetCollectionRunUseCase;
@@ -47,6 +50,7 @@ export interface CollectorRuntimeContainer {
   readonly markCollectionRunSucceeded: MarkCollectionRunSucceededUseCase;
   readonly markCollectionRunFailed: MarkCollectionRunFailedUseCase;
   readonly cancelCollectionRun: CancelCollectionRunUseCase;
+  readonly claimNextAccountExerciseRun: ClaimNextAccountExerciseRunUseCase;
   readonly claimNextCollectionRun: ClaimNextCollectionRunUseCase;
   close(): Promise<void>;
 }
@@ -86,6 +90,10 @@ export function createCollectorRuntime(
       accountExerciseRuns,
       clock,
     ),
+    attachAccountExerciseRunLease: new AttachAccountExerciseRunLeaseUseCase(
+      accountExerciseRuns,
+      clock,
+    ),
     cancelAccountExerciseRun: new CancelAccountExerciseRunUseCase(
       accountExerciseRuns,
       clock,
@@ -112,6 +120,10 @@ export function createCollectorRuntime(
     ),
     cancelCollectionRun: new CancelCollectionRunUseCase(
       collectionRuns,
+      clock,
+    ),
+    claimNextAccountExerciseRun: new ClaimNextAccountExerciseRunUseCase(
+      accountExerciseRuns,
       clock,
     ),
     claimNextCollectionRun: new ClaimNextCollectionRunUseCase(

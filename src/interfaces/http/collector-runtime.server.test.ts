@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AccountExerciseRunLeaseConflictError,
   AccountExerciseRunNotFoundError,
   CollectionRunNotFoundError,
   InvalidAccountExerciseRunStatusTransitionError,
@@ -241,6 +242,11 @@ describe("Collector Runtime HTTP routes", () => {
       expect(service.markAccountExerciseRunRunning.calls).toEqual([
         {
           accountExerciseRunId: "account-exercise-run-1",
+        },
+      ]);
+      expect(service.attachAccountExerciseRunLease.calls).toEqual([
+        {
+          accountExerciseRunId: "account-exercise-run-1",
           leaseId: "lease-1",
         },
       ]);
@@ -310,6 +316,57 @@ describe("Collector Runtime HTTP routes", () => {
       expectAccountExerciseRunPayloadIsSafe(succeedResponse.json());
       expectAccountExerciseRunPayloadIsSafe(failResponse.json());
       expectAccountExerciseRunPayloadIsSafe(cancelResponse.json());
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects empty account exercise run lease attachment requests", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/account-exercise-runs/account-exercise-run-1/lease",
+        payload: {
+          leaseId: " ",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "VALIDATION_ERROR",
+        },
+      });
+      expect(service.attachAccountExerciseRunLease.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps account exercise run lease conflicts to 409", async () => {
+    const { server, service } = createTestServer();
+
+    service.attachAccountExerciseRunLease.setError(
+      new AccountExerciseRunLeaseConflictError("account-exercise-run-1"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/account-exercise-runs/account-exercise-run-1/lease",
+        payload: {
+          leaseId: "lease-2",
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "ACCOUNT_EXERCISE_RUN_LEASE_CONFLICT",
+        },
+      });
     } finally {
       await server.close();
     }

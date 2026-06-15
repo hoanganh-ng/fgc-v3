@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type {
   CancelAccountExerciseRunInput,
   CancelCollectionRunInput,
+  AttachAccountExerciseRunLeaseInput,
   GetAccountExerciseRunInput,
   GetCollectionRunInput,
   ListAccountExerciseRunsInput,
@@ -34,6 +35,7 @@ import type {
 } from "../../../collector-runtime/domain";
 import {
   AccountExerciseRunIdHttpParamsSchema,
+  AttachAccountExerciseRunLeaseHttpBodySchema,
   FailAccountExerciseRunHttpBodySchema,
   ListAccountExerciseRunsHttpQuerySchema,
   CollectionRunIdHttpParamsSchema,
@@ -41,6 +43,7 @@ import {
   RequestCollectionRunHttpBodySchema,
   RequestAccountExerciseRunHttpBodySchema,
   StartAccountExerciseRunHttpBodySchema,
+  attachAccountExerciseRunLeaseHttpRouteSchema,
   SucceedAccountExerciseRunHttpBodySchema,
   cancelAccountExerciseRunHttpRouteSchema,
   cancelCollectionRunHttpRouteSchema,
@@ -83,6 +86,10 @@ export interface CollectorRuntimeHttpService {
   >;
   readonly markAccountExerciseRunFailed: ExecutableUseCase<
     MarkAccountExerciseRunFailedInput,
+    AccountExerciseRun
+  >;
+  readonly attachAccountExerciseRunLease: ExecutableUseCase<
+    AttachAccountExerciseRunLeaseInput,
     AccountExerciseRun
   >;
   readonly cancelAccountExerciseRun: ExecutableUseCase<
@@ -233,7 +240,42 @@ export function registerCollectorRuntimeRoutes(
       const accountExerciseRun =
         await collectorRuntime.markAccountExerciseRunRunning.execute({
           accountExerciseRunId: params.accountExerciseRunId,
-          ...(body.leaseId !== undefined ? { leaseId: body.leaseId } : {}),
+        });
+
+      if (body.leaseId !== undefined) {
+        const attachedAccountExerciseRun =
+          await collectorRuntime.attachAccountExerciseRunLease.execute({
+            accountExerciseRunId: accountExerciseRun.id,
+            leaseId: body.leaseId,
+          });
+
+        return {
+          accountExerciseRun: toAccountExerciseRunDto(attachedAccountExerciseRun),
+        };
+      }
+
+      return {
+        accountExerciseRun: toAccountExerciseRunDto(accountExerciseRun),
+      };
+    },
+  );
+
+  server.post(
+    "/collector/account-exercise-runs/:accountExerciseRunId/lease",
+    { schema: attachAccountExerciseRunLeaseHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        AccountExerciseRunIdHttpParamsSchema,
+        request.params,
+      );
+      const body = parseHttpInput(
+        AttachAccountExerciseRunLeaseHttpBodySchema,
+        request.body,
+      );
+      const accountExerciseRun =
+        await collectorRuntime.attachAccountExerciseRunLease.execute({
+          accountExerciseRunId: params.accountExerciseRunId,
+          leaseId: body.leaseId,
         });
 
       return {

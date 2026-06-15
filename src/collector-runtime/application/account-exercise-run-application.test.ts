@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   AccountExerciseRunNotFoundError,
+  AccountExerciseRunLeaseConflictError,
+  AttachAccountExerciseRunLeaseUseCase,
   CancelAccountExerciseRunUseCase,
+  ClaimNextAccountExerciseRunUseCase,
   GetAccountExerciseRunUseCase,
   InvalidAccountExerciseRunStatusTransitionError,
   ListAccountExerciseRunsUseCase,
@@ -9,6 +12,7 @@ import {
   MarkAccountExerciseRunRunningUseCase,
   MarkAccountExerciseRunSucceededUseCase,
   RequestAccountExerciseRunUseCase,
+  AccountExerciseRunValidationError,
 } from "./index";
 import type { Clock, IdGenerator } from "./index";
 import { InMemoryAccountExerciseRunRepository } from "./test-support/in-memory-account-exercise-run-repository";
@@ -111,6 +115,210 @@ describe("collector runtime account exercise run application use cases", () => {
       finishedAt: updatedAt,
       updatedAt,
     });
+  });
+
+  it("claims the oldest queued account exercise run and transitions it to running", async () => {
+    const context = createTestContext();
+
+    await seedAccountExerciseRun(context, {
+      id: "exercise-run-newer",
+      status: "QUEUED",
+      requestedAt: "2026-05-01T10:05:00.000Z",
+      createdAt: "2026-05-01T10:05:00.000Z",
+    });
+    await seedAccountExerciseRun(context, {
+      id: "exercise-run-older",
+      status: "QUEUED",
+      requestedAt: "2026-05-01T10:00:00.000Z",
+      createdAt: "2026-05-01T10:00:00.000Z",
+    });
+    context.clock.setNow(updatedAt);
+
+    const claimedRun = await new ClaimNextAccountExerciseRunUseCase(
+      context.accountExerciseRuns,
+      context.clock,
+    ).execute();
+
+    expect(claimedRun).toMatchObject({
+      id: "exercise-run-older",
+      status: "RUNNING",
+      startedAt: updatedAt,
+      updatedAt,
+    });
+    await expect(
+      context.accountExerciseRuns.findById("exercise-run-older"),
+    ).resolves.toMatchObject({
+      status: "RUNNING",
+      startedAt: updatedAt,
+    });
+    await expect(
+      context.accountExerciseRuns.findById("exercise-run-newer"),
+    ).resolves.toMatchObject({
+      status: "QUEUED",
+    });
+  });
+
+  it("does not claim canceled, running, succeeded, or failed account exercise runs", async () => {
+    const context = createTestContext();
+
+    await seedAccountExerciseRun(context, {
+      id: "exercise-run-canceled",
+      status: "CANCELED",
+      finishedAt: updatedAt,
+    });
+    await seedAccountExerciseRun(context, {
+      id: "exercise-run-running",
+      status: "RUNNING",
+      startedAt: createdAt,
+    });
+    await seedAccountExerciseRun(context, {
+      id: "exercise-run-succeeded",
+      status: "SUCCEEDED",
+      startedAt: createdAt,
+      finishedAt: updatedAt,
+      safeSummary: createSafeSummary(),
+    });
+    await seedAccountExerciseRun(context, {
+      id: "exercise-run-failed",
+      status: "FAILED",
+      startedAt: createdAt,
+      finishedAt: updatedAt,
+      failureReason: {
+        code: "EXERCISE_FAILED",
+        message: "Exercise failed.",
+      },
+    });
+
+    await expect(
+      new ClaimNextAccountExerciseRunUseCase(
+        context.accountExerciseRuns,
+        context.clock,
+      ).execute(),
+    ).resolves.toBeNull();
+  });
+
+  it("does not claim the same queued account exercise run twice", async () => {
+    const context = createTestContext();
+
+    await seedAccountExerciseRun(context, { status: "QUEUED" });
+
+    const useCase = new ClaimNextAccountExerciseRunUseCase(
+      context.accountExerciseRuns,
+      context.clock,
+    );
+
+    await expect(useCase.execute()).resolves.toMatchObject({
+      id: "exercise-run-1",
+      status: "RUNNING",
+    });
+    await expect(useCase.execute()).resolves.toBeNull();
+  });
+
+  it("attaches a lease id to a running account exercise run", async () => {
+    const context = createTestContext();
+
+    await seedAccountExerciseRun(context, {
+      status: "RUNNING",
+      startedAt: createdAt,
+    });
+    context.clock.setNow(updatedAt);
+
+    const updatedRun = await new AttachAccountExerciseRunLeaseUseCase(
+      context.accountExerciseRuns,
+      context.clock,
+    ).execute({
+      accountExerciseRunId: "exercise-run-1",
+      leaseId: "lease-1",
+    });
+
+    expect(updatedRun).toMatchObject({
+      status: "RUNNING",
+      leaseId: "lease-1",
+      updatedAt,
+    });
+  });
+
+  it("allows reattaching the same lease id without replacing it", async () => {
+    const context = createTestContext();
+
+    await seedAccountExerciseRun(context, {
+      status: "RUNNING",
+      startedAt: createdAt,
+      leaseId: "lease-1",
+    });
+
+    const updatedRun = await new AttachAccountExerciseRunLeaseUseCase(
+      context.accountExerciseRuns,
+      context.clock,
+    ).execute({
+      accountExerciseRunId: "exercise-run-1",
+      leaseId: "lease-1",
+    });
+
+    expect(updatedRun).toMatchObject({
+      leaseId: "lease-1",
+      updatedAt: createdAt,
+    });
+  });
+
+  it("rejects empty lease ids when attaching a lease", async () => {
+    const context = createTestContext();
+
+    await seedAccountExerciseRun(context, {
+      status: "RUNNING",
+      startedAt: createdAt,
+    });
+
+    await expect(
+      new AttachAccountExerciseRunLeaseUseCase(
+        context.accountExerciseRuns,
+        context.clock,
+      ).execute({
+        accountExerciseRunId: "exercise-run-1",
+        leaseId: " ",
+      }),
+    ).rejects.toThrow(AccountExerciseRunValidationError);
+    await expect(
+      context.accountExerciseRuns.findById("exercise-run-1"),
+    ).resolves.not.toHaveProperty("leaseId");
+  });
+
+  it("rejects attaching a lease to non-running account exercise runs", async () => {
+    const context = createTestContext();
+
+    await seedAccountExerciseRun(context, {
+      status: "QUEUED",
+    });
+
+    await expect(
+      new AttachAccountExerciseRunLeaseUseCase(
+        context.accountExerciseRuns,
+        context.clock,
+      ).execute({
+        accountExerciseRunId: "exercise-run-1",
+        leaseId: "lease-1",
+      }),
+    ).rejects.toThrow(InvalidAccountExerciseRunStatusTransitionError);
+  });
+
+  it("rejects replacing an existing different lease id", async () => {
+    const context = createTestContext();
+
+    await seedAccountExerciseRun(context, {
+      status: "RUNNING",
+      startedAt: createdAt,
+      leaseId: "lease-1",
+    });
+
+    await expect(
+      new AttachAccountExerciseRunLeaseUseCase(
+        context.accountExerciseRuns,
+        context.clock,
+      ).execute({
+        accountExerciseRunId: "exercise-run-1",
+        leaseId: "lease-2",
+      }),
+    ).rejects.toThrow(AccountExerciseRunLeaseConflictError);
   });
 
   it("marks running account exercise runs failed with sanitized failure reason", async () => {

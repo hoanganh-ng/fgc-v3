@@ -61,6 +61,10 @@ export interface FakeCollectorRuntimeHttpService
     unknown,
     AccountExerciseRun
   >;
+  readonly attachAccountExerciseRunLease: StubUseCase<
+    unknown,
+    AccountExerciseRun
+  >;
   readonly cancelAccountExerciseRun: StubUseCase<unknown, AccountExerciseRun>;
   readonly getCollectionRun: StubUseCase<unknown, CollectionRun>;
   readonly listCollectionRuns: StubUseCase<
@@ -126,6 +130,14 @@ export function createFakeCollectorRuntimeHttpService(): FakeCollectorRuntimeHtt
         },
       }),
     ),
+    attachAccountExerciseRunLease: new StubUseCase(
+      createAccountExerciseRun({
+        status: "RUNNING",
+        leaseId: "lease-1",
+        startedAt: collectorRuntimeHttpTestNow,
+        updatedAt: collectorRuntimeHttpTestNow,
+      }),
+    ),
     cancelAccountExerciseRun: new StubUseCase(
       createAccountExerciseRun({
         status: "CANCELED",
@@ -167,6 +179,7 @@ export function createUnusedCollectorRuntimeHttpService(): CollectorRuntimeHttpS
     markAccountExerciseRunRunning: useCase,
     markAccountExerciseRunSucceeded: useCase,
     markAccountExerciseRunFailed: useCase,
+    attachAccountExerciseRunLease: useCase,
     cancelAccountExerciseRun: useCase,
     requestCollectionRun: useCase,
     getCollectionRun: useCase,

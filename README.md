@@ -17,6 +17,7 @@ The current focus is the Content Collector: collecting normalized content from c
 - Profile provisioning works through the Web UI plus operator browser CLI.
 - Manual Facebook collection works against configured source groups with provisioned `READY` profiles.
 - A collector worker exists for claiming and executing queued collection runs.
+- An account exercise worker exists for claiming and executing queued Ambient Account Exercise runs.
 - The collector worker is available as an opt-in Docker Compose service for dev and preview stacks.
 - A Collector Runtime browser provider boundary exists.
 - CloakBrowser support is experimental and not yet production-proven; Playwright Chromium remains the default provider.
@@ -94,8 +95,9 @@ pnpm stack:dev:worker:logs
 - `pnpm operator:profile:assisted-access -- --profile-id <profile-id> --source-group-id <source-group-id> --base-url http://localhost:8081`
 - `pnpm operator:collector:facebook -- --source-group-id <source-group-id> --base-url http://localhost:8081`
 - `pnpm operator:collector:worker -- --base-url http://localhost:8081 --once`
+- `pnpm operator:profile:exercise-worker -- --base-url http://localhost:8081 --once`
 - `pnpm operator:browser:probe -- --browser-provider playwright`
-- Backward-compatible aliases: `pnpm profile:provision`, `pnpm profile:assisted-access:run`, `pnpm collector:facebook:run`, `pnpm collector:worker:run`, `pnpm collector:browser:probe`.
+- Backward-compatible aliases: `pnpm profile:provision`, `pnpm profile:assisted-access:run`, `pnpm collector:facebook:run`, `pnpm collector:worker:run`, `pnpm profile:exercise-worker:run`, `pnpm collector:browser:probe`.
 
 ### Docker Stacks
 

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   CancelAccountExerciseRunUseCase,
   CancelCollectionRunUseCase,
+  AttachAccountExerciseRunLeaseUseCase,
+  ClaimNextAccountExerciseRunUseCase,
   ClaimNextCollectionRunUseCase,
   GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
@@ -58,6 +60,9 @@ describe("collector runtime composition container", () => {
     expect(services.markAccountExerciseRunFailed).toBeInstanceOf(
       MarkAccountExerciseRunFailedUseCase,
     );
+    expect(services.attachAccountExerciseRunLease).toBeInstanceOf(
+      AttachAccountExerciseRunLeaseUseCase,
+    );
     expect(services.cancelAccountExerciseRun).toBeInstanceOf(
       CancelAccountExerciseRunUseCase,
     );
@@ -79,6 +84,9 @@ describe("collector runtime composition container", () => {
     );
     expect(services.cancelCollectionRun).toBeInstanceOf(
       CancelCollectionRunUseCase,
+    );
+    expect(services.claimNextAccountExerciseRun).toBeInstanceOf(
+      ClaimNextAccountExerciseRunUseCase,
     );
     expect(services.claimNextCollectionRun).toBeInstanceOf(
       ClaimNextCollectionRunUseCase,

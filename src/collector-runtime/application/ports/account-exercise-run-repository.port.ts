@@ -1,6 +1,7 @@
 import type {
   AccountExerciseRun,
   AccountExerciseRunId,
+  AccountExerciseRunIsoDateTime,
   AccountExerciseRunStatus,
 } from "../../domain";
 
@@ -19,6 +20,9 @@ export interface AccountExerciseRunListResult {
 export interface AccountExerciseRunRepository {
   save(accountExerciseRun: AccountExerciseRun): Promise<void>;
   findById(id: AccountExerciseRunId): Promise<AccountExerciseRun | null>;
+  claimNextQueued(
+    startedAt: AccountExerciseRunIsoDateTime,
+  ): Promise<AccountExerciseRun | null>;
   list(
     query: AccountExerciseRunListQuery,
   ): Promise<AccountExerciseRunListResult>;

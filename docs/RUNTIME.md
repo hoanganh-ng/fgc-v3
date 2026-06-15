@@ -43,6 +43,7 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | --- | --- | --- |
 | `pnpm operator:profile:provision` | Complete manual profile provisioning in a headed browser. | `pnpm profile:provision` |
 | `pnpm operator:profile:exercise` | Run one read-only ambient account exercise attempt for a specified profile. | `pnpm profile:exercise:run` |
+| `pnpm operator:profile:exercise-worker` | Claim and execute queued Ambient Account Exercise runs. | `pnpm profile:exercise-worker:run` |
 | `pnpm operator:profile:assisted-access` | Open one assisted group access browser session for manual operator inspection. | `pnpm profile:assisted-access:run` |
 | `pnpm operator:collector:facebook` | Run one manual Facebook collection for a source group. | `pnpm collector:facebook:run` |
 | `pnpm operator:collector:worker` | Claim and execute queued collection runs. | `pnpm collector:worker:run` |
@@ -265,20 +266,77 @@ Expected operator flow:
 
 1. The command reads the profile's safe `accountStage`.
 2. It creates an Ambient Exercise Run record through `POST /collector/account-exercise-runs`.
-3. It checks out the specified profile through `POST /collector/profiles/:profileId/exercise-checkout`, which creates an `AMBIENT_EXERCISE` lease.
-4. It fetches trusted runtime configuration from `GET /collector/profile-leases/:leaseId/runtime-configuration`.
-5. The selected browser provider opens a headed browser with the profile runtime configuration it can honor.
-6. The browser visits `https://www.facebook.com/`.
-7. The command performs only read-only dwell and light scroll actions within the action budget.
-8. It records only safe booleans/counts such as page loaded, login required, checkpoint detected, scroll count, duration, and lease released.
-9. It marks the exercise run `SUCCEEDED` or `FAILED` with sanitized failure data.
-10. The profile lease is released even when browser launch, navigation, or safe-state detection fails.
+3. It starts that single run and delegates to the shared Ambient Exercise executor.
+4. It checks out the specified profile through `POST /collector/profiles/:profileId/exercise-checkout`, which creates an `AMBIENT_EXERCISE` lease.
+5. It attaches the lease id to the running exercise run.
+6. It fetches trusted runtime configuration from `GET /collector/profile-leases/:leaseId/runtime-configuration`.
+7. The selected browser provider opens a headed browser with the profile runtime configuration it can honor.
+8. The browser visits `https://www.facebook.com/`.
+9. The command performs only read-only dwell and light scroll actions within the run's action budget.
+10. It records only safe booleans/counts such as page loaded, login required, checkpoint detected, scroll count, duration, and lease released.
+11. It marks the exercise run `SUCCEEDED` or `FAILED` with sanitized failure data.
+12. The profile lease is released even when browser launch, navigation, or safe-state detection fails.
 
 Exercise checkout eligibility:
 
 - Normal collection checkout still requires `accountStage = COLLECTION_READY`.
 - Ambient exercise checkout allows `NEW_ACCOUNT`, `WARMING`, `LIMITED`, and `COLLECTION_READY`.
 - Ambient exercise checkout rejects `NEEDS_REVIEW` and `RETIRED`.
+
+## Account Exercise Worker Command
+
+Sprint 047 adds a separate operator command for consuming queued Ambient Account
+Exercise runs created by the Web UI or API.
+
+Run once against the preview gateway:
+
+```bash
+pnpm operator:profile:exercise-worker -- --base-url http://localhost:8081 --once --browser-provider playwright
+```
+
+Run in polling mode against the direct local API:
+
+```bash
+pnpm operator:profile:exercise-worker -- --base-url http://localhost:3000 --poll-interval-ms 5000
+```
+
+Alias:
+
+```bash
+pnpm profile:exercise-worker:run -- --base-url http://localhost:8081 --once
+```
+
+If `--base-url` is omitted, the worker uses
+`ACCOUNT_EXERCISE_WORKER_BASE_URL`, then `PROFILE_EXERCISE_BASE_URL`, then
+`PROFILE_MANAGER_BASE_URL`, then `http://localhost:3000`.
+
+If `--browser-provider` is omitted, the worker uses `BROWSER_PROVIDER`, then
+`playwright`. Supported operator values are `playwright` and `cloakbrowser`.
+`cloakbrowser` remains experimental.
+
+Expected worker flow:
+
+1. It atomically claims the oldest queued account exercise run from PostgreSQL.
+2. Claiming transitions the run from `QUEUED` to `RUNNING` and sets
+   `startedAt`.
+3. Once mode exits after at most one claim and execution.
+4. Polling mode sleeps between no-job or completed-job iterations and continues
+   after individual run failures.
+5. The shared Ambient Exercise executor uses the persisted `profileId` and
+   `actionBudget` from the claimed run.
+6. It checks out the profile for `AMBIENT_EXERCISE`, attaches the lease id to
+   the running run, fetches runtime configuration, launches the selected browser
+   provider, visits the Facebook home surface, performs only read-only dwell and
+   light scrolls, closes the browser, releases the lease, and marks the run
+   `SUCCEEDED` or `FAILED`.
+7. `SIGINT` and `SIGTERM` stop polling safely after the current delay or
+   in-flight operation has observed the abort signal.
+
+Worker logs are limited to safe lifecycle lines, run ids, summary counts,
+lease-release status, and sanitized failure codes/messages. They must not
+include cookies, localStorage, proxy credentials, trusted runtime
+configuration, raw Facebook payloads, raw page HTML, screenshots, session
+headers, or browser fingerprint secrets.
 
 ## Assisted Group Access Browser Command
 

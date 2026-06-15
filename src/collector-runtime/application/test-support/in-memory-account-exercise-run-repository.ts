@@ -1,6 +1,7 @@
 import type {
   AccountExerciseRun,
   AccountExerciseRunId,
+  AccountExerciseRunIsoDateTime,
 } from "../../domain";
 import type {
   AccountExerciseRunListQuery,
@@ -44,6 +45,32 @@ export class InMemoryAccountExerciseRunRepository
       total: matchingRuns.length,
     };
   }
+
+  public async claimNextQueued(
+    startedAt: AccountExerciseRunIsoDateTime,
+  ): Promise<AccountExerciseRun | null> {
+    const accountExerciseRun = [...this.accountExerciseRuns.values()]
+      .filter((candidate) => candidate.status === "QUEUED")
+      .sort(compareAccountExerciseRunsByRequestedAtAsc)[0];
+
+    if (accountExerciseRun === undefined) {
+      return null;
+    }
+
+    const claimedAccountExerciseRun: AccountExerciseRun = {
+      ...accountExerciseRun,
+      status: "RUNNING",
+      startedAt,
+      updatedAt: startedAt,
+    };
+
+    this.accountExerciseRuns.set(
+      claimedAccountExerciseRun.id,
+      claimedAccountExerciseRun,
+    );
+
+    return claimedAccountExerciseRun;
+  }
 }
 
 function compareAccountExerciseRunsByCreatedAtDesc(
@@ -57,4 +84,25 @@ function compareAccountExerciseRunsByCreatedAtDesc(
   }
 
   return right.id.localeCompare(left.id);
+}
+
+function compareAccountExerciseRunsByRequestedAtAsc(
+  left: AccountExerciseRun,
+  right: AccountExerciseRun,
+): number {
+  const requestedAtComparison =
+    Date.parse(left.requestedAt) - Date.parse(right.requestedAt);
+
+  if (requestedAtComparison !== 0) {
+    return requestedAtComparison;
+  }
+
+  const createdAtComparison =
+    Date.parse(left.createdAt) - Date.parse(right.createdAt);
+
+  if (createdAtComparison !== 0) {
+    return createdAtComparison;
+  }
+
+  return left.id.localeCompare(right.id);
 }
