@@ -162,6 +162,7 @@ describe("runFacebookCollectorCommand", () => {
         platform: "FACEBOOK",
         status: "ACTIVE",
         url: "https://www.facebook.com/groups/stored-group",
+        categoryId: "category-1",
       },
     });
     const logger = new MemoryLogger();
@@ -202,6 +203,7 @@ describe("runFacebookCollectorCommand", () => {
         platform: "FACEBOOK",
         status: "PAUSED",
         url: "https://www.facebook.com/groups/group-1",
+        categoryId: "category-1",
       },
     });
     const logger = new MemoryLogger();
@@ -477,6 +479,7 @@ class FakeSourceGroupResolver implements FacebookCollectorSourceGroupResolver {
           platform: "FACEBOOK",
           status: "ACTIVE",
           url: "https://www.facebook.com/groups/group-1",
+          categoryId: "category-1",
         },
       } satisfies ContentManagerSourceGroupLookupResult);
   }

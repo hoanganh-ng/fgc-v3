@@ -391,6 +391,7 @@ function toSourceGroupLookupResult(
   const platform = body.sourceGroup.platform;
   const status = body.sourceGroup.status;
   const url = body.sourceGroup.url;
+  const categoryId = body.sourceGroup.categoryId;
   const entryRoutes = toSourceGroupEntryRoutes(body.sourceGroup.entryRoutes);
 
   if (
@@ -401,7 +402,9 @@ function toSourceGroupLookupResult(
     typeof status !== "string" ||
     status.trim().length === 0 ||
     typeof url !== "string" ||
-    url.trim().length === 0
+    url.trim().length === 0 ||
+    typeof categoryId !== "string" ||
+    categoryId.trim().length === 0
   ) {
     return undefined;
   }
@@ -411,6 +414,7 @@ function toSourceGroupLookupResult(
     platform,
     status,
     url,
+    categoryId,
     entryRoutes,
   };
 }

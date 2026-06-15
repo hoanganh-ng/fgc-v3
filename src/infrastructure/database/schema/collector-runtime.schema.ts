@@ -16,6 +16,7 @@ import type {
   AccountExerciseRunActionBudget,
   AccountExerciseRunFailureReason,
   AccountExerciseRunSafeSummary,
+  CategoryBrowseExerciseTarget,
   CollectionRunFailureReason,
   CollectionRunParameters,
   CollectionRunSummary,
@@ -82,6 +83,7 @@ export const collectorAccountExerciseRuns = pgTable(
     stageAtStart: text("stage_at_start").notNull(),
     actionBudget:
       jsonb("action_budget").$type<AccountExerciseRunActionBudget>().notNull(),
+    target: jsonb("target").$type<CategoryBrowseExerciseTarget>(),
     safeSummary:
       jsonb("safe_summary").$type<AccountExerciseRunSafeSummary>(),
     failureReason:

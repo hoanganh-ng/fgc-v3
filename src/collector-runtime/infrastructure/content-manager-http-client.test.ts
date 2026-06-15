@@ -168,6 +168,7 @@ describe("ContentManagerHttpClient", () => {
         platform: "FACEBOOK",
         status: "ACTIVE",
         url: "https://www.facebook.com/groups/fb-group-1",
+        categoryId: "category-1",
         entryRoutes: [
           {
             id: "route-1",
@@ -202,6 +203,7 @@ describe("ContentManagerHttpClient", () => {
           platform: "FACEBOOK",
           status: "ACTIVE",
           url: "https://www.facebook.com/groups/fb-group-1",
+          categoryId: "category-1",
           entryRoutes: [
             {
               id: "route-1",
@@ -223,6 +225,7 @@ describe("ContentManagerHttpClient", () => {
         platform: "FACEBOOK",
         status: "ACTIVE",
         url: "https://www.facebook.com/groups/fb-group-1",
+        categoryId: "category-1",
         entryRoutes: [],
       },
     });

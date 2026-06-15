@@ -37,6 +37,7 @@ export function toAccountExerciseRunRow(
     status: validRun.status,
     stageAtStart: validRun.stageAtStart,
     actionBudget: { ...validRun.actionBudget },
+    target: validRun.target === undefined ? null : { ...validRun.target },
     safeSummary:
       validRun.safeSummary === undefined
         ? null
@@ -64,6 +65,7 @@ export function toAccountExerciseRunDomain(
     status: row.status,
     stageAtStart: row.stageAtStart,
     actionBudget: row.actionBudget,
+    ...optional("target", row.target),
     ...optional("safeSummary", row.safeSummary),
     ...optional("failureReason", row.failureReason),
     requestedAt: normalizeIsoDateTime(row.requestedAt),

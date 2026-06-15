@@ -12,6 +12,11 @@ export type CollectorRuntimeApplicationErrorCode =
   | "INVALID_ACCOUNT_EXERCISE_RUN_STATUS_TRANSITION"
   | "COLLECTION_RUN_VALIDATION_ERROR"
   | "ACCOUNT_EXERCISE_RUN_VALIDATION_ERROR"
+  | "ACCOUNT_EXERCISE_SOURCE_GROUP_NOT_FOUND"
+  | "ACCOUNT_EXERCISE_SOURCE_GROUP_NOT_ACTIVE"
+  | "ACCOUNT_EXERCISE_SOURCE_GROUP_PLATFORM_UNSUPPORTED"
+  | "CATEGORY_BROWSE_ENTRY_ROUTE_NOT_FOUND"
+  | "CATEGORY_BROWSE_ENTRY_ROUTE_NOT_ELIGIBLE"
   | "COLLECTION_RUN_SOURCE_GROUP_NOT_FOUND"
   | "COLLECTION_RUN_SOURCE_GROUP_NOT_ACTIVE"
   | "COLLECTION_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED"
@@ -119,6 +124,69 @@ export class AccountExerciseRunValidationError extends CollectorRuntimeApplicati
       "Account exercise run input is invalid.",
     );
     this.issues = issues;
+  }
+}
+
+export class AccountExerciseSourceGroupNotFoundError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+
+  public constructor(sourceGroupId: string) {
+    super(
+      "ACCOUNT_EXERCISE_SOURCE_GROUP_NOT_FOUND",
+      `Source group not found for account exercise request: ${sourceGroupId}.`,
+    );
+    this.sourceGroupId = sourceGroupId;
+  }
+}
+
+export class AccountExerciseSourceGroupNotActiveError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+  public readonly status: string;
+
+  public constructor(sourceGroupId: string, status: string) {
+    super(
+      "ACCOUNT_EXERCISE_SOURCE_GROUP_NOT_ACTIVE",
+      `Source group ${sourceGroupId} must be ACTIVE before Category Browse exercise.`,
+    );
+    this.sourceGroupId = sourceGroupId;
+    this.status = status;
+  }
+}
+
+export class AccountExerciseSourceGroupPlatformUnsupportedError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+  public readonly platform: string;
+
+  public constructor(sourceGroupId: string, platform: string) {
+    super(
+      "ACCOUNT_EXERCISE_SOURCE_GROUP_PLATFORM_UNSUPPORTED",
+      `Source group ${sourceGroupId} must use platform FACEBOOK before Category Browse exercise.`,
+    );
+    this.sourceGroupId = sourceGroupId;
+    this.platform = platform;
+  }
+}
+
+export class CategoryBrowseEntryRouteNotFoundError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+  public readonly entryRouteId: string;
+
+  public constructor(sourceGroupId: string, entryRouteId: string) {
+    super(
+      "CATEGORY_BROWSE_ENTRY_ROUTE_NOT_FOUND",
+      `Category Browse entry route not found for source group ${sourceGroupId}: ${entryRouteId}.`,
+    );
+    this.sourceGroupId = sourceGroupId;
+    this.entryRouteId = entryRouteId;
+  }
+}
+
+export class CategoryBrowseEntryRouteNotEligibleError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+
+  public constructor(sourceGroupId: string, message: string) {
+    super("CATEGORY_BROWSE_ENTRY_ROUTE_NOT_ELIGIBLE", message);
+    this.sourceGroupId = sourceGroupId;
   }
 }
 

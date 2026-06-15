@@ -88,6 +88,7 @@ describe("assisted access runner", () => {
         platform: "FACEBOOK",
         status: "ACTIVE",
         url: "https://www.facebook.com/groups/group-1",
+        categoryId: "category-1",
         entryRoutes: [],
       },
       allowHighRiskRoute: false,
@@ -472,6 +473,7 @@ function createSourceGroup(): SourceGroupLookupSourceGroup {
     platform: "FACEBOOK",
     status: "ACTIVE",
     url: "https://www.facebook.com/groups/group-1",
+    categoryId: "category-1",
     entryRoutes: [
       {
         id: "route-1",

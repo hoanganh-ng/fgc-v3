@@ -1,12 +1,14 @@
 import { z } from "zod";
 import {
   ACCOUNT_EXERCISE_RUN_STATUSES,
+  ACCOUNT_EXERCISE_TYPES,
   COLLECTION_RUN_STATUSES,
   COLLECTION_RUN_TRIGGER_TYPES,
   AccountExerciseRunFailureReasonSchema,
   AccountExerciseRunIdSchema,
   AccountExerciseRunSafeSummarySchema,
   AccountExerciseRunStatusSchema,
+  AccountExerciseTypeSchema,
   CollectionRunIdSchema,
   CollectionRunSourceGroupIdSchema,
   CollectionRunStatusSchema,
@@ -45,11 +47,38 @@ export const RequestAccountExerciseRunHttpBodySchema = z
   .object({
     profileId: NonEmptyStringHttpSchema,
     stageAtStart: NonEmptyStringHttpSchema,
+    exerciseType: AccountExerciseTypeSchema.optional(),
+    sourceGroupId: NonEmptyStringHttpSchema.optional(),
+    entryRouteId: NonEmptyStringHttpSchema.optional(),
     maxDurationMs: z.number().int().min(1),
     maxScrolls: z.number().int().min(0),
     minDwellMs: z.number().int().min(0).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((body, context) => {
+    const exerciseType = body.exerciseType ?? "AMBIENT_ACCOUNT";
+    if (
+      exerciseType === "CATEGORY_BROWSE" &&
+      body.sourceGroupId === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["sourceGroupId"],
+        message: "sourceGroupId is required for Category Browse exercise.",
+      });
+    }
+
+    if (
+      exerciseType === "AMBIENT_ACCOUNT" &&
+      (body.sourceGroupId !== undefined || body.entryRouteId !== undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["exerciseType"],
+        message: "Ambient account exercise requests must not include a target.",
+      });
+    }
+  });
 
 export const StartAccountExerciseRunHttpBodySchema = z
   .object({
@@ -270,6 +299,33 @@ const accountExerciseRunFailureReasonJsonSchema = {
   },
 } as const;
 
+const categoryBrowseExerciseTargetJsonSchema = {
+  type: "object",
+  required: [
+    "categoryId",
+    "sourceGroupId",
+    "entryRouteId",
+    "entryRouteType",
+    "url",
+    "riskLevel",
+  ],
+  additionalProperties: false,
+  properties: {
+    categoryId: nonEmptyStringJsonSchema,
+    sourceGroupId: nonEmptyStringJsonSchema,
+    entryRouteId: nonEmptyStringJsonSchema,
+    entryRouteType: {
+      type: "string",
+      enum: ["CATEGORY_ENTRY_URL"],
+    },
+    url: nonEmptyStringJsonSchema,
+    riskLevel: {
+      type: "string",
+      enum: ["LOW", "MEDIUM"],
+    },
+  },
+} as const;
+
 const collectionRunJsonSchema = {
   type: "object",
   required: [
@@ -325,7 +381,7 @@ const accountExerciseRunJsonSchema = {
     leaseId: nonEmptyStringJsonSchema,
     exerciseType: {
       type: "string",
-      enum: ["AMBIENT_ACCOUNT"],
+      enum: ACCOUNT_EXERCISE_TYPES,
     },
     status: {
       type: "string",
@@ -333,6 +389,7 @@ const accountExerciseRunJsonSchema = {
     },
     stageAtStart: nonEmptyStringJsonSchema,
     actionBudget: accountExerciseRunActionBudgetJsonSchema,
+    target: categoryBrowseExerciseTargetJsonSchema,
     safeSummary: accountExerciseRunSafeSummaryJsonSchema,
     failureReason: accountExerciseRunFailureReasonJsonSchema,
     requestedAt: nonEmptyStringJsonSchema,
@@ -385,6 +442,12 @@ const requestAccountExerciseRunBodyJsonSchema = {
   properties: {
     profileId: nonEmptyStringJsonSchema,
     stageAtStart: nonEmptyStringJsonSchema,
+    exerciseType: {
+      type: "string",
+      enum: ACCOUNT_EXERCISE_TYPES,
+    },
+    sourceGroupId: nonEmptyStringJsonSchema,
+    entryRouteId: nonEmptyStringJsonSchema,
     maxDurationMs: {
       type: "integer",
       minimum: 1,

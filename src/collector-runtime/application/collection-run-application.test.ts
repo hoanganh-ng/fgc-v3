@@ -582,6 +582,7 @@ class FakeSourceGroupLookupPort implements SourceGroupLookupPort {
       platform: "FACEBOOK",
       status: "ACTIVE",
       url: "https://www.facebook.com/groups/source-group-1",
+      categoryId: "category-1",
     },
   };
 
@@ -613,6 +614,7 @@ class FakeSourceGroupLookupPort implements SourceGroupLookupPort {
       readonly platform: string;
       readonly status: string;
       readonly url: string;
+      readonly categoryId: string;
     }>,
   ): void {
     this.result = {
@@ -623,6 +625,7 @@ class FakeSourceGroupLookupPort implements SourceGroupLookupPort {
         platform: options.platform ?? "FACEBOOK",
         status: options.status ?? "ACTIVE",
         url: options.url ?? "https://www.facebook.com/groups/source-group-1",
+        categoryId: options.categoryId ?? "category-1",
       },
     };
   }

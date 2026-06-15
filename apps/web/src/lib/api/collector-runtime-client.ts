@@ -24,7 +24,10 @@ export const AccountExerciseRunStatusSchema = z.enum([
   "CANCELED",
 ]);
 
-export const AccountExerciseTypeSchema = z.enum(["AMBIENT_ACCOUNT"]);
+export const AccountExerciseTypeSchema = z.enum([
+  "AMBIENT_ACCOUNT",
+  "CATEGORY_BROWSE",
+]);
 
 export type CollectionRunStatus = z.infer<typeof CollectionRunStatusSchema>;
 export type CollectionRunTriggerType = z.infer<
@@ -95,6 +98,17 @@ const AccountExerciseRunFailureReasonSchema = z
   })
   .strict();
 
+export const CategoryBrowseExerciseTargetSchema = z
+  .object({
+    categoryId: NonEmptyStringSchema,
+    sourceGroupId: NonEmptyStringSchema,
+    entryRouteId: NonEmptyStringSchema,
+    entryRouteType: z.literal("CATEGORY_ENTRY_URL"),
+    url: NonEmptyStringSchema,
+    riskLevel: z.enum(["LOW", "MEDIUM"]),
+  })
+  .strict();
+
 export const CollectionRunSchema = z
   .object({
     id: NonEmptyStringSchema,
@@ -134,6 +148,7 @@ export const AccountExerciseRunSchema = z
     status: AccountExerciseRunStatusSchema,
     stageAtStart: NonEmptyStringSchema,
     actionBudget: AccountExerciseRunActionBudgetSchema,
+    target: CategoryBrowseExerciseTargetSchema.optional(),
     safeSummary: AccountExerciseRunSafeSummarySchema.optional(),
     failureReason: AccountExerciseRunFailureReasonSchema.optional(),
     requestedAt: z.string().datetime({ offset: true }),
@@ -169,6 +184,9 @@ export const RequestAccountExerciseRunRequestSchema = z
   .object({
     profileId: NonEmptyStringSchema,
     stageAtStart: NonEmptyStringSchema,
+    exerciseType: AccountExerciseTypeSchema.optional(),
+    sourceGroupId: NonEmptyStringSchema.optional(),
+    entryRouteId: NonEmptyStringSchema.optional(),
     maxDurationMs: z.number().int().min(1),
     maxScrolls: z.number().int().min(0),
     minDwellMs: z.number().int().min(0).optional(),

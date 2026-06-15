@@ -119,6 +119,7 @@ class FakeSourceGroupLookupPort implements SourceGroupLookupPort {
         platform: "FACEBOOK",
         status: "ACTIVE",
         url: "https://www.facebook.com/groups/source-group-1",
+        categoryId: "category-1",
       },
     };
   }

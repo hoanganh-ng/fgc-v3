@@ -24,6 +24,7 @@ import type {
   AccountExerciseRunSafeSummary,
   AccountExerciseRunStatus,
   AccountExerciseType,
+  CategoryBrowseExerciseTarget,
   CollectionRun,
   CollectionRunFailureReason,
   CollectionRunId,
@@ -126,6 +127,7 @@ export interface AccountExerciseRunDto {
   readonly status: AccountExerciseRunStatus;
   readonly stageAtStart: string;
   readonly actionBudget: AccountExerciseRunActionBudget;
+  readonly target?: CategoryBrowseExerciseTarget;
   readonly safeSummary?: AccountExerciseRunSafeSummary;
   readonly failureReason?: AccountExerciseRunFailureReason;
   readonly requestedAt: AccountExerciseRunIsoDateTime;
@@ -164,15 +166,33 @@ export function registerCollectorRuntimeRoutes(
         RequestAccountExerciseRunHttpBodySchema,
         request.body,
       );
-      const input = {
-        profileId: body.profileId,
-        stageAtStart: body.stageAtStart,
-        maxDurationMs: body.maxDurationMs,
-        maxScrolls: body.maxScrolls,
-        ...(body.minDwellMs !== undefined
-          ? { minDwellMs: body.minDwellMs }
-          : {}),
-      } satisfies RequestAccountExerciseRunInput;
+      const input = (body.exerciseType === "CATEGORY_BROWSE"
+        ? {
+            profileId: body.profileId,
+            stageAtStart: body.stageAtStart,
+            exerciseType: "CATEGORY_BROWSE" as const,
+            sourceGroupId: body.sourceGroupId!,
+            ...(body.entryRouteId !== undefined
+              ? { entryRouteId: body.entryRouteId }
+              : {}),
+            maxDurationMs: body.maxDurationMs,
+            maxScrolls: body.maxScrolls,
+            ...(body.minDwellMs !== undefined
+              ? { minDwellMs: body.minDwellMs }
+              : {}),
+          }
+        : {
+            profileId: body.profileId,
+            stageAtStart: body.stageAtStart,
+            ...(body.exerciseType === "AMBIENT_ACCOUNT"
+              ? { exerciseType: "AMBIENT_ACCOUNT" as const }
+              : {}),
+            maxDurationMs: body.maxDurationMs,
+            maxScrolls: body.maxScrolls,
+            ...(body.minDwellMs !== undefined
+              ? { minDwellMs: body.minDwellMs }
+              : {}),
+          }) satisfies RequestAccountExerciseRunInput;
       const accountExerciseRun =
         await collectorRuntime.requestAccountExerciseRun.execute(input);
 
@@ -446,6 +466,9 @@ export function toAccountExerciseRunDto(
     status: accountExerciseRun.status,
     stageAtStart: accountExerciseRun.stageAtStart,
     actionBudget: { ...accountExerciseRun.actionBudget },
+    ...(accountExerciseRun.target !== undefined
+      ? { target: { ...accountExerciseRun.target } }
+      : {}),
     ...(accountExerciseRun.safeSummary !== undefined
       ? { safeSummary: { ...accountExerciseRun.safeSummary } }
       : {}),

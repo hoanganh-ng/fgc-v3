@@ -17,7 +17,7 @@ The current focus is the Content Collector: collecting normalized content from c
 - Profile provisioning works through the Web UI plus operator browser CLI.
 - Manual Facebook collection works against configured source groups with provisioned `READY` profiles.
 - A collector worker exists for claiming and executing queued collection runs.
-- An account exercise worker exists for claiming and executing queued Ambient Account Exercise runs.
+- An account exercise worker exists for claiming and executing queued Account Exercise runs (Ambient and Category Browse).
 - The collector worker is available as an opt-in Docker Compose service for dev and preview stacks.
 - The account exercise worker is available as a separate opt-in Docker Compose service for dev and preview stacks.
 - A Collector Runtime browser provider boundary exists.

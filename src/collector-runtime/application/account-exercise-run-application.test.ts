@@ -14,7 +14,7 @@ import {
   RequestAccountExerciseRunUseCase,
   AccountExerciseRunValidationError,
 } from "./index";
-import type { Clock, IdGenerator } from "./index";
+import type { Clock, IdGenerator, SourceGroupLookupPort, SourceGroupLookupResult } from "./index";
 import { InMemoryAccountExerciseRunRepository } from "./test-support/in-memory-account-exercise-run-repository";
 import type {
   AccountExerciseRun,
@@ -31,6 +31,7 @@ describe("collector runtime account exercise run application use cases", () => {
 
     const run = await new RequestAccountExerciseRunUseCase(
       context.accountExerciseRuns,
+      context.sourceGroups,
       context.ids,
       context.clock,
     ).execute({
@@ -56,6 +57,126 @@ describe("collector runtime account exercise run application use cases", () => {
       createdAt,
       updatedAt: createdAt,
     });
+  });
+
+  it("requests a queued category browse exercise run and selects deterministic route", async () => {
+    const context = createTestContext(["exercise-run-created"]);
+
+    const run = await new RequestAccountExerciseRunUseCase(
+      context.accountExerciseRuns,
+      context.sourceGroups,
+      context.ids,
+      context.clock,
+    ).execute({
+      profileId: "profile-1",
+      stageAtStart: "WARMING",
+      exerciseType: "CATEGORY_BROWSE",
+      sourceGroupId: "source-group-1",
+      maxDurationMs: 120_000,
+      maxScrolls: 2,
+    });
+
+    expect(run).toEqual({
+      id: "exercise-run-created",
+      profileId: "profile-1",
+      exerciseType: "CATEGORY_BROWSE",
+      status: "QUEUED",
+      stageAtStart: "WARMING",
+      actionBudget: {
+        maxDurationMs: 120_000,
+        maxScrolls: 2,
+      },
+      target: {
+        categoryId: "category-1",
+        sourceGroupId: "source-group-1",
+        entryRouteId: "route-1",
+        entryRouteType: "CATEGORY_ENTRY_URL",
+        url: "https://www.facebook.com/groups/source-group-1/category-1",
+        riskLevel: "LOW",
+      },
+      requestedAt: createdAt,
+      createdAt,
+      updatedAt: createdAt,
+    });
+  });
+
+  it("selects default entry route before non-default within equal risk", async () => {
+    const context = createTestContext(["exercise-run-created"]);
+    context.sourceGroups.result = {
+      ok: true,
+      statusCode: 200,
+      sourceGroup: {
+        id: "source-group-1",
+        platform: "FACEBOOK",
+        status: "ACTIVE",
+        url: "https://www.facebook.com/groups/source-group-1",
+        categoryId: "category-1",
+        entryRoutes: [
+          {
+            id: "route-non-default",
+            type: "CATEGORY_ENTRY_URL",
+            url: "https://www.facebook.com/groups/source-group-1/route-non-default",
+            riskLevel: "LOW",
+            isDefault: false,
+          },
+          {
+            id: "route-default",
+            type: "CATEGORY_ENTRY_URL",
+            url: "https://www.facebook.com/groups/source-group-1/route-default",
+            riskLevel: "LOW",
+            isDefault: true,
+          },
+        ],
+      },
+    };
+
+    const run = await new RequestAccountExerciseRunUseCase(
+      context.accountExerciseRuns,
+      context.sourceGroups,
+      context.ids,
+      context.clock,
+    ).execute({
+      profileId: "profile-1",
+      stageAtStart: "WARMING",
+      exerciseType: "CATEGORY_BROWSE",
+      sourceGroupId: "source-group-1",
+      maxDurationMs: 120_000,
+      maxScrolls: 2,
+    });
+
+    expect(run.target?.entryRouteId).toBe("route-default");
+  });
+
+  it("rejects category browse exercise run requests when source group is paused", async () => {
+    const context = createTestContext();
+    context.sourceGroups.result = {
+      ok: true,
+      statusCode: 200,
+      sourceGroup: {
+        id: "source-group-1",
+        platform: "FACEBOOK",
+        status: "PAUSED",
+        url: "https://www.facebook.com/groups/source-group-1",
+        categoryId: "category-1",
+        entryRoutes: [],
+      },
+    };
+
+    await expect(
+      new RequestAccountExerciseRunUseCase(
+        context.accountExerciseRuns,
+        context.sourceGroups,
+        context.ids,
+        context.clock,
+      ).execute({
+        profileId: "profile-1",
+        stageAtStart: "WARMING",
+        exerciseType: "CATEGORY_BROWSE",
+        sourceGroupId: "source-group-1",
+        maxDurationMs: 120_000,
+        maxScrolls: 2,
+      }),
+    ).rejects.toThrow();
   });
 
   it("moves queued runs through running and succeeded transitions", async () => {
@@ -467,6 +588,7 @@ describe("collector runtime account exercise run application use cases", () => {
 
 interface TestContext {
   readonly accountExerciseRuns: InMemoryAccountExerciseRunRepository;
+  readonly sourceGroups: FakeSourceGroupLookupPort;
   readonly clock: FixedClock;
   readonly ids: FakeIdGenerator;
 }
@@ -474,9 +596,52 @@ interface TestContext {
 function createTestContext(ids: readonly string[] = []): TestContext {
   return {
     accountExerciseRuns: new InMemoryAccountExerciseRunRepository(),
+    sourceGroups: new FakeSourceGroupLookupPort(),
     clock: new FixedClock(),
     ids: new FakeIdGenerator(ids),
   };
+}
+
+class FakeSourceGroupLookupPort implements SourceGroupLookupPort {
+  public readonly calls: string[] = [];
+  public result: SourceGroupLookupResult = {
+    ok: true,
+    statusCode: 200,
+    sourceGroup: {
+      id: "source-group-1",
+      platform: "FACEBOOK",
+      status: "ACTIVE",
+      url: "https://www.facebook.com/groups/source-group-1",
+      categoryId: "category-1",
+      entryRoutes: [
+        {
+          id: "route-1",
+          type: "CATEGORY_ENTRY_URL",
+          url: "https://www.facebook.com/groups/source-group-1/category-1",
+          riskLevel: "LOW",
+          isDefault: true,
+        },
+      ],
+    },
+  };
+
+  public async getSourceGroup(
+    requestedSourceGroupId: string,
+  ): Promise<SourceGroupLookupResult> {
+    this.calls.push(requestedSourceGroupId);
+
+    if (this.result.ok) {
+      return {
+        ...this.result,
+        sourceGroup: {
+          ...this.result.sourceGroup,
+          id: requestedSourceGroupId,
+        },
+      };
+    }
+
+    return this.result;
+  }
 }
 
 async function seedAccountExerciseRun(

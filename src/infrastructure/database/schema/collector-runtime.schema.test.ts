@@ -49,6 +49,9 @@ describe("collector runtime database schema", () => {
       "FAILED",
       "CANCELED",
     ]);
-    expect(accountExerciseTypeEnum.enumValues).toEqual(["AMBIENT_ACCOUNT"]);
+    expect(accountExerciseTypeEnum.enumValues).toEqual([
+      "AMBIENT_ACCOUNT",
+      "CATEGORY_BROWSE",
+    ]);
   });
 });

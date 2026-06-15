@@ -19,6 +19,8 @@ import type {
   IdGenerator,
   ProfileLeaseReleaseResult,
   RuntimeProfileConfigurationResult,
+  SourceGroupLookupPort,
+  SourceGroupLookupResult,
 } from "../../collector-runtime/application";
 import type {
   AccountExerciseRun,
@@ -453,9 +455,16 @@ export async function executeRunningProfileExerciseRun(
 
     session = await dependencies.browserProvider.launch(launchConfig);
     const page = await session.newPage();
-    const browserOutcome = await exerciseFacebookHome({
+    const navigationUrlResult = getExerciseNavigationUrl(run);
+
+    if (!navigationUrlResult.ok) {
+      throw new Error(navigationUrlResult.message);
+    }
+
+    const browserOutcome = await exerciseFacebookReadOnly({
       page,
       args,
+      url: navigationUrlResult.url,
       startedAt,
       ...(input.abortSignal !== undefined
         ? { abortSignal: input.abortSignal }
@@ -622,6 +631,18 @@ function toProfileExerciseArgsFromRun(
   };
 }
 
+class AmbientOnlySourceGroupLookupPort implements SourceGroupLookupPort {
+  public async getSourceGroup(
+    sourceGroupId: string,
+  ): Promise<SourceGroupLookupResult> {
+    return {
+      ok: false,
+      errorCode: "AMBIENT_ONLY_SOURCE_GROUP_LOOKUP_FAILED",
+      errorMessage: `Source group lookup is not supported for ambient exercises (tried to look up group ${sourceGroupId}).`,
+    };
+  }
+}
+
 class RepositoryProfileExerciseRunRecordPort
   implements ProfileExerciseRunRecordPort
 {
@@ -637,6 +658,7 @@ class RepositoryProfileExerciseRunRecordPort
     return this.executeRepositoryOperation(async () =>
       new RequestAccountExerciseRunUseCase(
         this.accountExerciseRuns,
+        new AmbientOnlySourceGroupLookupPort(),
         this.idGenerator,
         this.clock,
       ).execute(input),
@@ -917,9 +939,10 @@ async function failRunAndReturn(input: {
   return result;
 }
 
-async function exerciseFacebookHome(input: {
+async function exerciseFacebookReadOnly(input: {
   readonly page: BrowserProviderPage;
   readonly args: ProfileExerciseCliArgs;
+  readonly url: string;
   readonly startedAt: Date;
   readonly abortSignal?: AbortSignal;
 }): Promise<BrowserExerciseOutcome> {
@@ -929,7 +952,7 @@ async function exerciseFacebookHome(input: {
   );
 
   await input.page.goto({
-    url: FACEBOOK_HOME_URL,
+    url: input.url,
     waitUntil: "domcontentloaded",
     timeoutMs: navigationTimeoutMs,
   });
@@ -989,6 +1012,38 @@ async function exerciseFacebookHome(input: {
 
   return {
     safeSummary,
+  };
+}
+
+function getExerciseNavigationUrl(
+  run: AccountExerciseRun,
+):
+  | { readonly ok: true; readonly url: string }
+  | { readonly ok: false; readonly message: string } {
+  if (run.exerciseType === "AMBIENT_ACCOUNT") {
+    return {
+      ok: true,
+      url: FACEBOOK_HOME_URL,
+    };
+  }
+
+  if (run.exerciseType === "CATEGORY_BROWSE") {
+    if (run.target === undefined) {
+      return {
+        ok: false,
+        message: "Category Browse exercise target is missing.",
+      };
+    }
+
+    return {
+      ok: true,
+      url: run.target.url,
+    };
+  }
+
+  return {
+    ok: false,
+    message: "Unsupported account exercise type.",
   };
 }
 

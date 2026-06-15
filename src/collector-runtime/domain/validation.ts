@@ -10,12 +10,14 @@ import type {
   AccountExerciseRunActionBudget,
   AccountExerciseRunFailureReason,
   AccountExerciseRunSafeSummary,
+  CategoryBrowseExerciseTarget,
 } from "./account-exercise-run";
 import {
   AccountExerciseRunActionBudgetSchema,
   AccountExerciseRunFailureReasonSchema,
   AccountExerciseRunSafeSummarySchema,
   AccountExerciseRunSchema,
+  CategoryBrowseExerciseTargetSchema,
 } from "./account-exercise-run.schemas";
 import {
   CollectionRunFailureReasonSchema,
@@ -154,6 +156,21 @@ export function validateAccountExerciseRunFailureReason(
   value: unknown,
 ): ValidationResult<AccountExerciseRunFailureReason> {
   const result = AccountExerciseRunFailureReasonSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateCategoryBrowseExerciseTarget(
+  value: unknown,
+): ValidationResult<CategoryBrowseExerciseTarget> {
+  const result = CategoryBrowseExerciseTargetSchema.safeParse(value);
 
   if (!result.success) {
     return invalid(formatZodIssues(result.error.issues));

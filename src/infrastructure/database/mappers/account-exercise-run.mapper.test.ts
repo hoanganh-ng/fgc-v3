@@ -77,6 +77,7 @@ function toSelectRow(
     status: run.status,
     stageAtStart: run.stageAtStart,
     actionBudget: row.actionBudget,
+    target: row.target ?? null,
     safeSummary: row.safeSummary ?? null,
     failureReason: row.failureReason ?? null,
     requestedAt: run.requestedAt,

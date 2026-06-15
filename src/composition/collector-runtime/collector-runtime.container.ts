@@ -69,6 +69,7 @@ export function createCollectorRuntime(
   return {
     requestAccountExerciseRun: new RequestAccountExerciseRunUseCase(
       accountExerciseRuns,
+      sourceGroups,
       idGenerator,
       clock,
     ),

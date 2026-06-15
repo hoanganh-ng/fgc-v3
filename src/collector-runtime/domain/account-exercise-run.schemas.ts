@@ -46,6 +46,32 @@ export const AccountExerciseRunFailureReasonSchema = z
   })
   .strict();
 
+export const CategoryBrowseExerciseTargetSchema = z
+  .object({
+    categoryId: NonEmptyStringSchema,
+    sourceGroupId: NonEmptyStringSchema,
+    entryRouteId: NonEmptyStringSchema,
+    entryRouteType: z.literal("CATEGORY_ENTRY_URL"),
+    url: NonEmptyStringSchema,
+    riskLevel: z.enum(["LOW", "MEDIUM"]),
+  })
+  .strict()
+  .superRefine((target, context) => {
+    const parsedUrl = parseUrl(target.url);
+
+    if (
+      parsedUrl === undefined ||
+      parsedUrl.protocol !== "https:" ||
+      !isFacebookHostname(parsedUrl.hostname)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["url"],
+        message: "Category Browse target URL must be an https Facebook URL.",
+      });
+    }
+  });
+
 export const AccountExerciseRunSchema = z
   .object({
     id: AccountExerciseRunIdSchema,
@@ -55,6 +81,7 @@ export const AccountExerciseRunSchema = z
     status: AccountExerciseRunStatusSchema,
     stageAtStart: NonEmptyStringSchema,
     actionBudget: AccountExerciseRunActionBudgetSchema,
+    target: CategoryBrowseExerciseTargetSchema.optional(),
     safeSummary: AccountExerciseRunSafeSummarySchema.optional(),
     failureReason: AccountExerciseRunFailureReasonSchema.optional(),
     requestedAt: AccountExerciseRunIsoDateTimeSchema,
@@ -63,4 +90,38 @@ export const AccountExerciseRunSchema = z
     createdAt: AccountExerciseRunIsoDateTimeSchema,
     updatedAt: AccountExerciseRunIsoDateTimeSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((run, context) => {
+    if (run.exerciseType === "AMBIENT_ACCOUNT" && run.target !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["target"],
+        message: "Ambient account exercise runs must not include a target.",
+      });
+    }
+
+    if (run.exerciseType === "CATEGORY_BROWSE" && run.target === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["target"],
+        message: "Category Browse exercise runs require a target.",
+      });
+    }
+  });
+
+function parseUrl(value: string): URL | undefined {
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function isFacebookHostname(hostname: string): boolean {
+  const normalizedHostname = hostname.toLowerCase();
+
+  return (
+    normalizedHostname === "facebook.com" ||
+    normalizedHostname.endsWith(".facebook.com")
+  );
+}

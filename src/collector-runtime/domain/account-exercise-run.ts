@@ -6,6 +6,7 @@ import type {
   AccountExerciseRunIsoDateTimeSchema,
   AccountExerciseRunSafeSummarySchema,
   AccountExerciseRunSchema,
+  CategoryBrowseExerciseTargetSchema,
 } from "./account-exercise-run.schemas";
 
 export type AccountExerciseRunIsoDateTime = zInfer<
@@ -20,5 +21,8 @@ export type AccountExerciseRunSafeSummary = zInfer<
 >;
 export type AccountExerciseRunFailureReason = zInfer<
   typeof AccountExerciseRunFailureReasonSchema
+>;
+export type CategoryBrowseExerciseTarget = zInfer<
+  typeof CategoryBrowseExerciseTargetSchema
 >;
 export type AccountExerciseRun = zInfer<typeof AccountExerciseRunSchema>;

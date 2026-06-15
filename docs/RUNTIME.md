@@ -1,6 +1,6 @@
 # Full-Stack Runtime
 
-Sprint 027 provides two Docker Compose runtimes for the current Content Collector management surface. Sprint 037B adds an opt-in containerized worker service for consuming queued collection runs from those stacks. Sprint 047A adds a separate opt-in containerized worker service for queued Ambient Account Exercise runs.
+Sprint 027 provides two Docker Compose runtimes for the current Content Collector management surface. Sprint 037B adds an opt-in containerized worker service for consuming queued collection runs from those stacks. Sprint 047A adds a separate opt-in containerized worker service for queued Account Exercise runs.
 
 ## Command Groups
 

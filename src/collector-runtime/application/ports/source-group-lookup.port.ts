@@ -3,6 +3,7 @@ export interface SourceGroupLookupSourceGroup {
   readonly platform: string;
   readonly status: string;
   readonly url: string;
+  readonly categoryId: string;
   readonly entryRoutes?: readonly SourceGroupLookupEntryRoute[];
 }
 

@@ -188,8 +188,8 @@ export function AccountExerciseRunsPage(): JSX.Element {
   return (
     <PageShell
       eyebrow="Collector Runtime"
-      title="Ambient Exercise Runs"
-      description="Request, monitor, inspect, and cancel queued ambient account exercise runs."
+      title="Account Exercise Runs"
+      description="Request, monitor, inspect, and cancel queued account exercise runs."
       actions={
         <Button variant="secondary" onClick={refresh}>
           <RefreshCw aria-hidden="true" className="size-4" />
@@ -295,9 +295,9 @@ function AccountExerciseRunsList({
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <CardTitle>Ambient Exercise Runs</CardTitle>
+          <CardTitle>Account Exercise Runs</CardTitle>
           <CardDescription>
-            {formatCount(page.total ?? runs.length, "ambient exercise run")}
+            {formatCount(page.total ?? runs.length, "account exercise run")}
           </CardDescription>
         </div>
         <div className="grid size-11 place-items-center rounded border border-border bg-muted text-primary">
@@ -595,20 +595,18 @@ function CancelRunButton({
   return (
     <div className="grid max-w-sm justify-items-end gap-2">
       <Button
-        aria-label={`Cancel ambient exercise run ${accountExerciseRunId}`}
+        aria-label={`Cancel account exercise run ${accountExerciseRunId}`}
         disabled={cancelMutation.isPending}
         size="sm"
-        variant="danger"
-        onClick={() => {
-          void cancel();
-        }}
+        variant="secondary"
+        onClick={cancel}
       >
         <Ban aria-hidden="true" className="size-4" />
-        {cancelMutation.isPending ? "Canceling" : "Cancel"}
+        Cancel
       </Button>
       <BackendErrorPanel
         error={cancelMutation.error}
-        fallbackMessage="Ambient exercise run cancellation failed."
+        fallbackMessage="Account exercise run cancellation failed."
       />
     </div>
   );
@@ -689,7 +687,7 @@ function RequestAccountExerciseRunCard({
         <div className="min-w-0">
           <CardTitle>Request Exercise Run</CardTitle>
           <CardDescription>
-            Queue a read-only ambient exercise run for one profile.
+            Queue a read-only account exercise run for one profile.
           </CardDescription>
         </div>
         <div className="grid size-11 place-items-center rounded border border-border bg-muted text-primary">
@@ -709,7 +707,7 @@ function RequestAccountExerciseRunCard({
 
           <BackendErrorPanel
             error={requestMutation.error}
-            fallbackMessage="Ambient exercise run request failed."
+            fallbackMessage="Account exercise run request failed."
           />
 
           <BackendErrorPanel
@@ -728,7 +726,7 @@ function RequestAccountExerciseRunCard({
 
           {createdRunId !== undefined ? (
             <SuccessPanel
-              message={`Ambient exercise run ${createdRunId} was queued.`}
+              message={`Account exercise run ${createdRunId} was queued.`}
             />
           ) : null}
 
@@ -844,7 +842,7 @@ function FilterCard({
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between xl:flex-col xl:items-start">
         <div className="min-w-0">
           <CardTitle>Filters</CardTitle>
-          <CardDescription>Narrow the ambient exercise run list.</CardDescription>
+          <CardDescription>Narrow the account exercise run list.</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -994,6 +992,40 @@ function RunDetailContent({
         <RunDefinitionFields run={run} />
       </dl>
 
+      {run.target !== undefined && (
+        <div className="rounded border border-border bg-muted/20 p-3 text-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-2">
+            Category Browse Target
+          </p>
+          <dl className="grid gap-2 text-xs">
+            <div>
+              <dt className="font-semibold text-muted-foreground inline">Category ID: </dt>
+              <dd className="inline font-mono">{run.target.categoryId}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-muted-foreground inline">Source Group ID: </dt>
+              <dd className="inline font-mono">{run.target.sourceGroupId}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-muted-foreground inline">Entry Route ID: </dt>
+              <dd className="inline font-mono">{run.target.entryRouteId}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-muted-foreground inline">Entry Route Type: </dt>
+              <dd className="inline font-mono">{run.target.entryRouteType}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-muted-foreground inline">URL: </dt>
+              <dd className="inline font-mono break-all">{run.target.url}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-muted-foreground inline">Risk Level: </dt>
+              <dd className="inline font-medium text-foreground ml-1">{run.target.riskLevel}</dd>
+            </div>
+          </dl>
+        </div>
+      )}
+
       <RunSafeSummary run={run} />
       <RunFailureReason run={run} />
     </div>
@@ -1049,9 +1081,9 @@ function RunsLoadingState(): JSX.Element {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Loading Ambient Exercise Runs</CardTitle>
+        <CardTitle>Loading Account Exercise Runs</CardTitle>
         <CardDescription>
-          Reading ambient exercise runs from Collector Runtime.
+          Reading account exercise runs from Collector Runtime.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -1076,7 +1108,7 @@ function RunsErrorState({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Ambient Exercise Runs Could Not Load</CardTitle>
+        <CardTitle>Account Exercise Runs Could Not Load</CardTitle>
         <CardDescription>{formatApiError(error)}</CardDescription>
       </CardHeader>
       <CardContent>
@@ -1094,9 +1126,9 @@ function RunsEmptyState(): JSX.Element {
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <CardTitle>No Ambient Exercise Runs</CardTitle>
+          <CardTitle>No Account Exercise Runs</CardTitle>
           <CardDescription>
-            No ambient exercise runs match the current filters.
+            No account exercise runs match the current filters.
           </CardDescription>
         </div>
         <StatusBadge label="Empty" tone="neutral" />
@@ -1162,7 +1194,7 @@ function formatApiError(error: unknown): string {
     return error.message;
   }
 
-  return "The ambient exercise run request failed.";
+  return "The account exercise run request failed.";
 }
 
 function formatDateTime(value: string): string {

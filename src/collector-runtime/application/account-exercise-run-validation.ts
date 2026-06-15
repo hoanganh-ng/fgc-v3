@@ -8,6 +8,7 @@ import {
   validateAccountExerciseRunActionBudget,
   validateAccountExerciseRunFailureReason,
   validateAccountExerciseRunSafeSummary,
+  validateCategoryBrowseExerciseTarget,
 } from "../domain";
 import type {
   AccountExerciseRun,
@@ -16,6 +17,7 @@ import type {
   AccountExerciseRunId,
   AccountExerciseRunIsoDateTime,
   AccountExerciseRunSafeSummary,
+  CategoryBrowseExerciseTarget,
 } from "../domain";
 
 export function toAccountExerciseRunIsoDateTime(
@@ -77,6 +79,18 @@ export function validateAccountExerciseRunFailureReasonForApplication(
   failureReason: AccountExerciseRunFailureReason,
 ): AccountExerciseRunFailureReason {
   const result = validateAccountExerciseRunFailureReason(failureReason);
+
+  if (!result.valid) {
+    throw new AccountExerciseRunValidationError(result.issues);
+  }
+
+  return result.value;
+}
+
+export function validateCategoryBrowseExerciseTargetForApplication(
+  target: CategoryBrowseExerciseTarget,
+): CategoryBrowseExerciseTarget {
+  const result = validateCategoryBrowseExerciseTarget(target);
 
   if (!result.valid) {
     throw new AccountExerciseRunValidationError(result.issues);
