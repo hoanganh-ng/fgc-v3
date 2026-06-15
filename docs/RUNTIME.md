@@ -43,7 +43,7 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | --- | --- | --- |
 | `pnpm operator:profile:provision` | Complete manual profile provisioning in a headed browser. | `pnpm profile:provision` |
 | `pnpm operator:profile:exercise` | Run one read-only ambient account exercise attempt for a specified profile. | `pnpm profile:exercise:run` |
-| `pnpm operator:profile:exercise-worker` | Claim and execute queued Ambient Account Exercise runs. | `pnpm profile:exercise-worker:run` |
+| `pnpm operator:profile:exercise-worker` | Claim and execute queued Ambient Account and Category Browse exercise runs. | `pnpm profile:exercise-worker:run` |
 | `pnpm operator:profile:assisted-access` | Open one assisted group access browser session for manual operator inspection. | `pnpm profile:assisted-access:run` |
 | `pnpm operator:collector:facebook` | Run one manual Facebook collection for a source group. | `pnpm collector:facebook:run` |
 | `pnpm operator:collector:worker` | Claim and execute queued collection runs. | `pnpm collector:worker:run` |
@@ -243,7 +243,7 @@ The worker image uses the Playwright runtime base image aligned to the locked Pl
 
 When no jobs exist, the polling worker logs safe operational lines such as `Collector worker started.` and `No queued collection run found.`. The one-shot worker exits after a single no-job check. When a queued run exists, the worker claims the oldest `QUEUED` run, marks it `RUNNING`, executes the existing Facebook collector orchestration, and records either `SUCCEEDED` with safe summary counts or `FAILED` with a sanitized failure reason. Profile leases should be released by the existing collector flow when a profile was checked out.
 
-When no account exercise jobs exist, the polling account exercise worker logs safe operational lines such as `Account exercise worker started.` and `No queued account exercise run found.`. The one-shot account exercise worker exits after a single no-job check. When a queued run exists, the worker claims the oldest `QUEUED` run, marks it `RUNNING`, executes the existing Ambient Account Exercise flow with the persisted profile id and action budget, and records either `SUCCEEDED` with safe summary counts or `FAILED` with sanitized failure data. Profile leases should be released by the existing ambient exercise executor when a profile was checked out.
+When no account exercise jobs exist, the polling account exercise worker logs safe operational lines such as `Account exercise worker started.` and `No queued account exercise run found.`. The one-shot account exercise worker exits after a single no-job check. When a queued run exists, the worker claims the oldest `QUEUED` run, marks it `RUNNING`, executes the Ambient Account or Category Browse Exercise flow with the persisted profile id and action budget, and records either `SUCCEEDED` with safe summary counts or `FAILED` with sanitized failure data. Profile leases should be released by the existing ambient exercise executor when a profile was checked out.
 
 ## Profile Provisioning CLI
 
@@ -342,7 +342,7 @@ Exercise checkout eligibility:
 
 ## Account Exercise Worker Command
 
-Sprint 047 adds a separate operator command for consuming queued Ambient Account
+Sprint 047 adds a separate operator command for consuming queued Ambient Account and Category Browse
 Exercise runs created by the Web UI or API.
 
 Run once against the preview gateway:

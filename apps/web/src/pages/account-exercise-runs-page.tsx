@@ -26,6 +26,13 @@ import {
   hasActiveAccountExerciseRuns,
   shouldShowPaginationControls,
   toRequestAccountExerciseRunRequest,
+  deriveEligibleCategoryBrowseRoutes,
+  getSourceGroupAvailabilityHint,
+  getSourceGroupDisplayName,
+  deriveRequestPreviewModel,
+  isRequestSubmitDisabled,
+  handleExerciseTypeChange,
+  handleSourceGroupChange,
   type RequestAccountExerciseRunFormValues,
 } from "@/features/collector-runtime/account-exercise-run-view-model";
 import {
@@ -671,13 +678,17 @@ function RequestAccountExerciseRunCard({
 
   const exerciseType = form.watch("exerciseType");
   const sourceGroupId = form.watch("sourceGroupId");
+  const profileIdWatch = form.watch("profileId");
+  const entryRouteIdWatch = form.watch("entryRouteId");
 
   const previousExerciseTypeRef = useRef(exerciseType);
   useEffect(() => {
     if (exerciseType !== previousExerciseTypeRef.current) {
-      form.setValue("sourceGroupId", "");
-      form.setValue("entryRouteId", "");
-      form.clearErrors(["sourceGroupId", "entryRouteId"]);
+      handleExerciseTypeChange(
+        (exerciseType ?? "AMBIENT_ACCOUNT") as "AMBIENT_ACCOUNT" | "CATEGORY_BROWSE",
+        form.setValue,
+        form.clearErrors,
+      );
       previousExerciseTypeRef.current = exerciseType;
     }
   }, [exerciseType, form]);
@@ -685,7 +696,7 @@ function RequestAccountExerciseRunCard({
   const previousSourceGroupIdRef = useRef(sourceGroupId);
   useEffect(() => {
     if (sourceGroupId !== previousSourceGroupIdRef.current) {
-      form.setValue("entryRouteId", "");
+      handleSourceGroupChange(form.setValue);
       previousSourceGroupIdRef.current = sourceGroupId;
     }
   }, [sourceGroupId, form]);
@@ -698,12 +709,19 @@ function RequestAccountExerciseRunCard({
     if (!selectedSourceGroup) {
       return [];
     }
-    return selectedSourceGroup.entryRoutes.filter(
-      (route) =>
-        route.type === "CATEGORY_ENTRY_URL" &&
-        (route.riskLevel === "LOW" || route.riskLevel === "MEDIUM"),
-    );
+    return deriveEligibleCategoryBrowseRoutes(selectedSourceGroup.entryRoutes);
   }, [selectedSourceGroup]);
+
+  const preview = useMemo(() => {
+    return deriveRequestPreviewModel({
+      profileId: profileIdWatch,
+      sourceGroupId: sourceGroupId ?? "",
+      entryRouteId: entryRouteIdWatch,
+      profileById,
+      sourceGroups,
+      categoriesById: categoryById,
+    });
+  }, [profileIdWatch, sourceGroupId, entryRouteIdWatch, profileById, sourceGroups, categoryById]);
 
   const hasSourceGroupsPaginationWarning = useMemo(() => {
     const sourceGroupsData = sourceGroupsQuery.data;
@@ -759,13 +777,16 @@ function RequestAccountExerciseRunCard({
     }
   }
 
-  const isSubmitDisabled =
-    profilesLoading ||
-    hasProfilesError ||
-    profiles.length === 0 ||
-    requestMutation.isPending ||
-    (exerciseType === "CATEGORY_BROWSE" &&
-      (sourceGroupsQuery.isPending || sourceGroups.length === 0));
+  const isSubmitDisabled = isRequestSubmitDisabled({
+    exerciseType: (exerciseType ?? "AMBIENT_ACCOUNT") as "AMBIENT_ACCOUNT" | "CATEGORY_BROWSE",
+    profilesLoading,
+    hasProfilesError,
+    hasProfiles: profiles.length > 0,
+    requestPending: requestMutation.isPending,
+    sourceGroupsPending: sourceGroupsQuery.isPending,
+    sourceGroupsError: sourceGroupsQuery.isError,
+    hasSourceGroups: sourceGroups.length > 0,
+  });
 
   return (
     <Card className="min-w-0">
@@ -903,24 +924,8 @@ function RequestAccountExerciseRunCard({
                     >
                       <option value="">Select source group</option>
                       {sourceGroups.map((sg) => {
-                        const categoryName = categoryById.get(sg.categoryId)?.name ?? sg.categoryId;
-                        const displayName = `${categoryName} / ${sg.name}`;
-
-                        const hasCategoryBrowseRoute = sg.entryRoutes.some(
-                          (r) => r.type === "CATEGORY_ENTRY_URL",
-                        );
-                        const hasLowOrMediumRisk = sg.entryRoutes.some(
-                          (r) =>
-                            r.type === "CATEGORY_ENTRY_URL" &&
-                            (r.riskLevel === "LOW" || r.riskLevel === "MEDIUM"),
-                        );
-
-                        let hint = "eligible";
-                        if (!hasCategoryBrowseRoute) {
-                          hint = "no Category Browse route";
-                        } else if (!hasLowOrMediumRisk) {
-                          hint = "high-risk-only";
-                        }
+                        const displayName = getSourceGroupDisplayName(sg, categoryById);
+                        const hint = getSourceGroupAvailabilityHint(sg.entryRoutes);
 
                         return (
                           <option key={sg.id} value={sg.id}>
@@ -943,7 +948,7 @@ function RequestAccountExerciseRunCard({
                       <option value="">Auto-select safest eligible route</option>
                       {eligibleRoutes.map((route) => (
                         <option key={route.id} value={route.id}>
-                          {route.label || route.url} ({route.riskLevel})
+                          {route.label || route.id} ({route.riskLevel})
                         </option>
                       ))}
                     </Select>
@@ -953,24 +958,31 @@ function RequestAccountExerciseRunCard({
                     <p className="font-semibold text-muted-foreground mb-2">
                       Request Preview
                     </p>
-                    <dl className="grid gap-1 font-mono">
+                    <dl className="grid gap-1 font-mono text-[11px]">
                       <div>
                         <span className="text-muted-foreground">Type: </span>
                         <span>CATEGORY_BROWSE</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Profile: </span>
-                        <span>{form.watch("profileId") || "(none)"}</span>
+                        <span>{preview.profileName}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Group: </span>
-                        <span>{form.watch("sourceGroupId") || "(none)"}</span>
+                        <span>{preview.sourceGroupName}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Category: </span>
+                        <span>{preview.categoryName}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Route: </span>
-                        <span>{form.watch("entryRouteId") || "Auto-select"}</span>
+                        <span>{preview.routeName}</span>
                       </div>
                     </dl>
+                    <p className="mt-3 text-muted-foreground text-[10px] leading-relaxed">
+                      The server validates and freezes the final managed route when the run is queued.
+                    </p>
                   </div>
                 </>
               )}

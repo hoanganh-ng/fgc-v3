@@ -10,6 +10,14 @@ import {
   hasActiveAccountExerciseRuns,
   shouldShowPaginationControls,
   toRequestAccountExerciseRunRequest,
+  deriveEligibleCategoryBrowseRoutes,
+  getSourceGroupAvailabilityHint,
+  getSourceGroupAvailabilityState,
+  getSourceGroupDisplayName,
+  deriveRequestPreviewModel,
+  isRequestSubmitDisabled,
+  handleExerciseTypeChange,
+  handleSourceGroupChange,
 } from "@/features/collector-runtime/account-exercise-run-view-model";
 import type { ProfileSummary } from "@/lib/api/profile-manager-client";
 
@@ -350,6 +358,165 @@ describe("account-exercise-run view model", () => {
           sourceGroupId: "",
         };
         expect(RequestAccountExerciseRunFormSchema.safeParse(invalidValues).success).toBe(false);
+      });
+    });
+
+    describe("Extracted View-Model Helpers", () => {
+      it("deriveEligibleCategoryBrowseRoutes filters correctly", () => {
+        const routes = [
+          { id: "r1", type: "CATEGORY_ENTRY_URL", url: "url1", riskLevel: "LOW" },
+          { id: "r2", type: "CATEGORY_ENTRY_URL", url: "url2", riskLevel: "MEDIUM" },
+          { id: "r3", type: "CATEGORY_ENTRY_URL", url: "url3", riskLevel: "HIGH" },
+          { id: "r4", type: "DIRECT_GROUP_URL", url: "url4", riskLevel: "LOW" },
+        ];
+        const result = deriveEligibleCategoryBrowseRoutes(routes);
+        expect(result).toHaveLength(2);
+        const [first, second] = result;
+        expect(first?.id).toBe("r1");
+        expect(second?.id).toBe("r2");
+      });
+
+      it("getSourceGroupAvailabilityState & getSourceGroupAvailabilityHint handles different route availabilities", () => {
+        // No category route at all
+        const noCategoryRoutes = [
+          { id: "r1", type: "DIRECT_GROUP_URL", url: "url1", riskLevel: "LOW" },
+        ];
+        expect(getSourceGroupAvailabilityState(noCategoryRoutes)).toBe("NO_CATEGORY_ROUTE");
+        expect(getSourceGroupAvailabilityHint(noCategoryRoutes)).toBe("no Category Browse route");
+
+        // High risk only
+        const highRiskOnlyRoutes = [
+          { id: "r1", type: "CATEGORY_ENTRY_URL", url: "url1", riskLevel: "HIGH" },
+        ];
+        expect(getSourceGroupAvailabilityState(highRiskOnlyRoutes)).toBe("HIGH_RISK_ONLY");
+        expect(getSourceGroupAvailabilityHint(highRiskOnlyRoutes)).toBe("high-risk-only");
+
+        // Eligible
+        const eligibleRoutes = [
+          { id: "r1", type: "CATEGORY_ENTRY_URL", url: "url1", riskLevel: "LOW" },
+        ];
+        expect(getSourceGroupAvailabilityState(eligibleRoutes)).toBe("ELIGIBLE");
+        expect(getSourceGroupAvailabilityHint(eligibleRoutes)).toBe("eligible");
+      });
+
+      it("getSourceGroupDisplayName enriches name and falls back to categoryId", () => {
+        const sg = { name: "Group Name", categoryId: "cat-1" };
+        const categoriesById = new Map([["cat-1", { name: "Category Name" }]]);
+
+        // Category found
+        expect(getSourceGroupDisplayName(sg, categoriesById)).toBe("Category Name / Group Name");
+
+        // Category not found fallback to categoryId
+        expect(getSourceGroupDisplayName(sg, new Map())).toBe("cat-1 / Group Name");
+      });
+
+      it("handleExerciseTypeChange and handleSourceGroupChange transition values correctly", () => {
+        const values: Record<string, string> = {
+          sourceGroupId: "old-sg",
+          entryRouteId: "old-er",
+        };
+        const setValue = (field: string, value: string) => {
+          values[field] = value;
+        };
+        const clearedErrors: string[] = [];
+        const clearErrors = (fields: string[]) => {
+          clearedErrors.push(...fields);
+        };
+
+        handleExerciseTypeChange("AMBIENT_ACCOUNT", setValue, clearErrors);
+        expect(values.sourceGroupId).toBe("");
+        expect(values.entryRouteId).toBe("");
+        expect(clearedErrors).toContain("sourceGroupId");
+        expect(clearedErrors).toContain("entryRouteId");
+
+        values.entryRouteId = "old-er";
+        handleSourceGroupChange(setValue);
+        expect(values.entryRouteId).toBe("");
+      });
+
+      it("isRequestSubmitDisabled handles submission blocks and failures correctly", () => {
+        // Ambient remains enabled even if source groups fail or are missing
+        expect(isRequestSubmitDisabled({
+          exerciseType: "AMBIENT_ACCOUNT",
+          profilesLoading: false,
+          hasProfilesError: false,
+          hasProfiles: true,
+          requestPending: false,
+          sourceGroupsPending: false,
+          sourceGroupsError: true,
+          hasSourceGroups: false,
+        })).toBe(false);
+
+        // Category Browse is disabled if source groups query is erroring
+        expect(isRequestSubmitDisabled({
+          exerciseType: "CATEGORY_BROWSE",
+          profilesLoading: false,
+          hasProfilesError: false,
+          hasProfiles: true,
+          requestPending: false,
+          sourceGroupsPending: false,
+          sourceGroupsError: true,
+          hasSourceGroups: true, // cached items present
+        })).toBe(true);
+
+        // Category Browse is disabled if source groups query is pending
+        expect(isRequestSubmitDisabled({
+          exerciseType: "CATEGORY_BROWSE",
+          profilesLoading: false,
+          hasProfilesError: false,
+          hasProfiles: true,
+          requestPending: false,
+          sourceGroupsPending: true,
+          sourceGroupsError: false,
+          hasSourceGroups: true,
+        })).toBe(true);
+      });
+
+      it("deriveRequestPreviewModel derives values for automatic and explicit routes", () => {
+        const profileById = new Map([["p1", { displayName: "Profile One" }]]);
+        const sourceGroups = [
+          {
+            id: "sg1",
+            name: "Source Group One",
+            categoryId: "c1",
+            entryRoutes: [
+              { id: "r1", type: "CATEGORY_ENTRY_URL", url: "url1", riskLevel: "LOW", label: "Low Route Label" },
+            ],
+          },
+        ];
+        const categoriesById = new Map([["c1", { name: "Cat One" }]]);
+
+        // Automatic route selection preview
+        const previewAuto = deriveRequestPreviewModel({
+          profileId: "p1",
+          sourceGroupId: "sg1",
+          entryRouteId: "",
+          profileById,
+          sourceGroups,
+          categoriesById,
+        });
+        expect(previewAuto).toEqual({
+          profileName: "Profile One",
+          categoryName: "Cat One",
+          sourceGroupName: "Source Group One",
+          routeName: "Auto-select safest eligible route",
+        });
+
+        // Explicit route selection preview
+        const previewExplicit = deriveRequestPreviewModel({
+          profileId: "p1",
+          sourceGroupId: "sg1",
+          entryRouteId: "r1",
+          profileById,
+          sourceGroups,
+          categoriesById,
+        });
+        expect(previewExplicit).toEqual({
+          profileName: "Profile One",
+          categoryName: "Cat One",
+          sourceGroupName: "Source Group One",
+          routeName: "LOW - Low Route Label",
+        });
       });
     });
   });

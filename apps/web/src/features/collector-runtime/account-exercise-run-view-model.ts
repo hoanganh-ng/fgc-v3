@@ -5,6 +5,10 @@ import type {
   RequestAccountExerciseRunRequest,
 } from "@/lib/api/collector-runtime-client";
 import type { ProfileSummary } from "@/lib/api/profile-manager-client";
+import type {
+  SourceGroup,
+  SourceGroupEntryRoute,
+} from "@/lib/api/content-manager-client";
 
 export const DEFAULT_ACCOUNT_EXERCISE_MAX_DURATION_MS = 120_000;
 export const DEFAULT_ACCOUNT_EXERCISE_MAX_SCROLLS = 2;
@@ -188,4 +192,184 @@ export function getProfileDisplay(
     secondary: `${profile.id} / ${profile.status} / ${profile.accountStage}`,
     found: true,
   };
+}
+
+export interface SourceGroupRoute {
+  readonly id: string;
+  readonly type: string;
+  readonly url: string;
+  readonly riskLevel: string;
+  readonly label?: string | null | undefined;
+}
+
+export type SourceGroupAvailabilityState = "ELIGIBLE" | "NO_CATEGORY_ROUTE" | "HIGH_RISK_ONLY";
+
+export interface RequestPreviewModel {
+  readonly profileName: string;
+  readonly categoryName: string;
+  readonly sourceGroupName: string;
+  readonly routeName: string;
+}
+
+/**
+ * Filter routes: only CATEGORY_ENTRY_URL types and LOW/MEDIUM risk levels.
+ */
+export function deriveEligibleCategoryBrowseRoutes(
+  entryRoutes: readonly SourceGroupRoute[],
+): SourceGroupRoute[] {
+  return entryRoutes.filter(
+    (route) =>
+      route.type === "CATEGORY_ENTRY_URL" &&
+      (route.riskLevel === "LOW" || route.riskLevel === "MEDIUM"),
+  );
+}
+
+/**
+ * Derives availability state for source group options.
+ */
+export function getSourceGroupAvailabilityState(
+  entryRoutes: readonly SourceGroupRoute[],
+): SourceGroupAvailabilityState {
+  const hasCategoryBrowseRoute = entryRoutes.some(
+    (r) => r.type === "CATEGORY_ENTRY_URL",
+  );
+  if (!hasCategoryBrowseRoute) {
+    return "NO_CATEGORY_ROUTE";
+  }
+  const hasLowOrMediumRisk = entryRoutes.some(
+    (r) =>
+      r.type === "CATEGORY_ENTRY_URL" &&
+      (r.riskLevel === "LOW" || r.riskLevel === "MEDIUM"),
+  );
+  if (!hasLowOrMediumRisk) {
+    return "HIGH_RISK_ONLY";
+  }
+  return "ELIGIBLE";
+}
+
+/**
+ * Derives human-readable status hint for a source group option.
+ */
+export function getSourceGroupAvailabilityHint(
+  entryRoutes: readonly SourceGroupRoute[],
+): string {
+  const state = getSourceGroupAvailabilityState(entryRoutes);
+  if (state === "NO_CATEGORY_ROUTE") {
+    return "no Category Browse route";
+  }
+  if (state === "HIGH_RISK_ONLY") {
+    return "high-risk-only";
+  }
+  return "eligible";
+}
+
+/**
+ * Get source group display name.
+ */
+export function getSourceGroupDisplayName(
+  sourceGroup: { readonly name: string; readonly categoryId: string },
+  categoriesById: ReadonlyMap<string, { readonly name: string }>,
+): string {
+  const categoryName = categoriesById.get(sourceGroup.categoryId)?.name ?? sourceGroup.categoryId;
+  return `${categoryName} / ${sourceGroup.name}`;
+}
+
+/**
+ * Derive human-readable values for the Category Browse request preview.
+ */
+export function deriveRequestPreviewModel({
+  profileId,
+  sourceGroupId,
+  entryRouteId,
+  profileById,
+  sourceGroups,
+  categoriesById,
+}: {
+  readonly profileId: string;
+  readonly sourceGroupId: string;
+  readonly entryRouteId: string | undefined;
+  readonly profileById: ReadonlyMap<string, { readonly displayName: string }>;
+  readonly sourceGroups: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly categoryId: string;
+    readonly entryRoutes: readonly SourceGroupRoute[];
+  }[];
+  readonly categoriesById: ReadonlyMap<string, { readonly name: string }>;
+}): RequestPreviewModel {
+  const profile = profileById.get(profileId);
+  const profileName = profile?.displayName ?? profileId ?? "(none)";
+
+  const sourceGroup = sourceGroups.find((sg) => sg.id === sourceGroupId);
+  const sourceGroupName = sourceGroup?.name ?? "(none)";
+
+  const categoryId = sourceGroup?.categoryId;
+  const categoryName = categoryId
+    ? (categoriesById.get(categoryId)?.name ?? categoryId)
+    : "(none)";
+
+  let routeName = "Auto-select safest eligible route";
+  if (entryRouteId && entryRouteId.trim().length > 0) {
+    const route = sourceGroup?.entryRoutes.find((r) => r.id === entryRouteId);
+    if (route) {
+      const label = route.label || route.id;
+      routeName = `${route.riskLevel} - ${label}`;
+    } else {
+      routeName = entryRouteId;
+    }
+  }
+
+  return {
+    profileName,
+    categoryName,
+    sourceGroupName,
+    routeName,
+  };
+}
+
+/**
+ * Computes whether the submit button is disabled.
+ */
+export function isRequestSubmitDisabled({
+  exerciseType,
+  profilesLoading,
+  hasProfilesError,
+  hasProfiles,
+  requestPending,
+  sourceGroupsPending,
+  sourceGroupsError,
+  hasSourceGroups,
+}: {
+  readonly exerciseType: "AMBIENT_ACCOUNT" | "CATEGORY_BROWSE";
+  readonly profilesLoading: boolean;
+  readonly hasProfilesError: boolean;
+  readonly hasProfiles: boolean;
+  readonly requestPending: boolean;
+  readonly sourceGroupsPending: boolean;
+  readonly sourceGroupsError: boolean;
+  readonly hasSourceGroups: boolean;
+}): boolean {
+  if (profilesLoading || hasProfilesError || !hasProfiles || requestPending) {
+    return true;
+  }
+  if (exerciseType === "CATEGORY_BROWSE") {
+    return sourceGroupsPending || sourceGroupsError || !hasSourceGroups;
+  }
+  return false;
+}
+
+export function handleExerciseTypeChange(
+  newType: "AMBIENT_ACCOUNT" | "CATEGORY_BROWSE",
+  setValue: (field: any, value: string) => void,
+  clearErrors: (fields: any[]) => void,
+): void {
+  setValue("sourceGroupId", "");
+  setValue("entryRouteId", "");
+  clearErrors(["sourceGroupId", "entryRouteId"]);
+}
+
+export function handleSourceGroupChange(
+  setValue: (field: any, value: string) => void,
+): void {
+  setValue("entryRouteId", "");
 }
