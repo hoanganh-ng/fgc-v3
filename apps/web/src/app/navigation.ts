@@ -1,4 +1,5 @@
 import {
+  Activity,
   ClipboardList,
   FileText,
   FolderKanban,
@@ -38,5 +39,10 @@ export const primaryNavigation: readonly NavigationItem[] = [
     label: "Collection Runs",
     path: "/collection-runs",
     icon: ClipboardList,
+  },
+  {
+    label: "Exercise Runs",
+    path: "/account-exercise-runs",
+    icon: Activity,
   },
 ];

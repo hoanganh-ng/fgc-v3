@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 import { DashboardLayout } from "@/app/layout/dashboard-layout";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
+import { AccountExerciseRunsPage } from "@/pages/account-exercise-runs-page";
 import { CollectionRunsPage } from "@/pages/collection-runs-page";
 import { ContentItemDetailPage } from "@/pages/content-item-detail-page";
 import { ContentItemsPage } from "@/pages/content-items-page";
@@ -53,6 +54,10 @@ export const router = createBrowserRouter([
       {
         path: "collection-runs",
         element: <CollectionRunsPage />,
+      },
+      {
+        path: "account-exercise-runs",
+        element: <AccountExerciseRunsPage />,
       },
       {
         path: "*",
