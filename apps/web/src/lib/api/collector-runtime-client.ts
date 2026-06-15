@@ -229,18 +229,28 @@ export const RequestCollectionRunRequestSchema = z
   })
   .strict();
 
-export const RequestAccountExerciseRunRequestSchema = z
-  .object({
-    profileId: NonEmptyStringSchema,
-    stageAtStart: NonEmptyStringSchema,
-    exerciseType: AccountExerciseTypeSchema.optional(),
-    sourceGroupId: NonEmptyStringSchema.optional(),
-    entryRouteId: NonEmptyStringSchema.optional(),
-    maxDurationMs: z.number().int().min(1),
-    maxScrolls: z.number().int().min(0),
-    minDwellMs: z.number().int().min(0).optional(),
-  })
-  .strict();
+const BaseRequestSchema = z.object({
+  profileId: NonEmptyStringSchema,
+  stageAtStart: NonEmptyStringSchema,
+  maxDurationMs: z.number().int().min(1),
+  maxScrolls: z.number().int().min(0),
+  minDwellMs: z.number().int().min(0).optional(),
+});
+
+const AmbientRequestSchema = BaseRequestSchema.extend({
+  exerciseType: z.literal("AMBIENT_ACCOUNT").optional(),
+}).strict();
+
+const CategoryBrowseRequestSchema = BaseRequestSchema.extend({
+  exerciseType: z.literal("CATEGORY_BROWSE"),
+  sourceGroupId: NonEmptyStringSchema,
+  entryRouteId: NonEmptyStringSchema.optional(),
+}).strict();
+
+export const RequestAccountExerciseRunRequestSchema = z.union([
+  AmbientRequestSchema,
+  CategoryBrowseRequestSchema,
+]);
 
 export type CollectionRun = z.infer<typeof CollectionRunSchema>;
 export type CollectionRunParameters = z.infer<

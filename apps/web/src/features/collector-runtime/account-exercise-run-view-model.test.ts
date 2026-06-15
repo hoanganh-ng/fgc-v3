@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { RequestAccountExerciseRunRequestSchema } from "@/lib/api/collector-runtime-client";
 import { accountExerciseRunQueryKeys } from "@/features/collector-runtime/account-exercise-run-queries";
 import {
   RequestAccountExerciseRunFormSchema,
@@ -176,6 +177,180 @@ describe("account-exercise-run view model", () => {
       primary: "Warming Profile",
       secondary: "profile-1 / READY / WARMING",
       found: true,
+    });
+  });
+
+  describe("Sprint 049 - Category Browse support", () => {
+    describe("RequestAccountExerciseRunRequestSchema schema discrimination", () => {
+      it("accepts valid AMBIENT_ACCOUNT request and rejects unknown/target fields", () => {
+        const validAmbient = {
+          profileId: "profile-1",
+          stageAtStart: "NEW_ACCOUNT",
+          exerciseType: "AMBIENT_ACCOUNT",
+          maxDurationMs: 60000,
+          maxScrolls: 5,
+        };
+        expect(RequestAccountExerciseRunRequestSchema.safeParse(validAmbient).success).toBe(true);
+
+        const invalidAmbient = {
+          ...validAmbient,
+          sourceGroupId: "source-1",
+        };
+        expect(RequestAccountExerciseRunRequestSchema.safeParse(invalidAmbient).success).toBe(false);
+      });
+
+      it("accepts CATEGORY_BROWSE request with sourceGroupId and optional entryRouteId", () => {
+        const validCategory = {
+          profileId: "profile-1",
+          stageAtStart: "NEW_ACCOUNT",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-1",
+          maxDurationMs: 60000,
+          maxScrolls: 5,
+        };
+        expect(RequestAccountExerciseRunRequestSchema.safeParse(validCategory).success).toBe(true);
+
+        const withRoute = {
+          ...validCategory,
+          entryRouteId: "route-1",
+        };
+        expect(RequestAccountExerciseRunRequestSchema.safeParse(withRoute).success).toBe(true);
+
+        const withoutSource = {
+          ...validCategory,
+          sourceGroupId: undefined,
+        };
+        expect(RequestAccountExerciseRunRequestSchema.safeParse(withoutSource).success).toBe(false);
+      });
+
+      it("preserves compatibility with ambient requests that omit exerciseType", () => {
+        const omittedType = {
+          profileId: "profile-1",
+          stageAtStart: "NEW_ACCOUNT",
+          maxDurationMs: 60000,
+          maxScrolls: 5,
+        };
+        expect(RequestAccountExerciseRunRequestSchema.safeParse(omittedType).success).toBe(true);
+      });
+
+      it("rejects unknown fields via strict evaluation", () => {
+        const withUnknown = {
+          profileId: "profile-1",
+          stageAtStart: "NEW_ACCOUNT",
+          maxDurationMs: 60000,
+          maxScrolls: 5,
+          unknownField: "yes",
+        };
+        expect(RequestAccountExerciseRunRequestSchema.safeParse(withUnknown).success).toBe(false);
+      });
+    });
+
+    describe("toRequestAccountExerciseRunRequest request builder", () => {
+      it("builds correct request for Ambient (emits no target fields)", () => {
+        const values = {
+          profileId: "profile-1",
+          exerciseType: "AMBIENT_ACCOUNT" as const,
+          sourceGroupId: "",
+          entryRouteId: "",
+          maxDurationMs: "",
+          maxScrolls: "",
+          minDwellMs: "",
+        };
+        const request = toRequestAccountExerciseRunRequest(
+          RequestAccountExerciseRunFormSchema.parse(values),
+          createProfileSummary({ accountStage: "WARMING" })
+        );
+        expect(request).toEqual({
+          profileId: "profile-1",
+          stageAtStart: "WARMING",
+          maxDurationMs: 120000,
+          maxScrolls: 2,
+        });
+        expect((request as any).sourceGroupId).toBeUndefined();
+        expect((request as any).entryRouteId).toBeUndefined();
+      });
+
+      it("builds correct request for Category Browse", () => {
+        const values = {
+          profileId: "profile-1",
+          exerciseType: "CATEGORY_BROWSE" as const,
+          sourceGroupId: "source-1",
+          entryRouteId: "route-1",
+          maxDurationMs: "60000",
+          maxScrolls: "10",
+          minDwellMs: "",
+        };
+        const request = toRequestAccountExerciseRunRequest(
+          RequestAccountExerciseRunFormSchema.parse(values),
+          createProfileSummary({ accountStage: "COLLECTION_READY" })
+        );
+        expect(request).toEqual({
+          profileId: "profile-1",
+          stageAtStart: "COLLECTION_READY",
+          exerciseType: "CATEGORY_BROWSE",
+          sourceGroupId: "source-1",
+          entryRouteId: "route-1",
+          maxDurationMs: 60000,
+          maxScrolls: 10,
+        });
+      });
+
+      it("omits entryRouteId when it is blank/empty", () => {
+        const values = {
+          profileId: "profile-1",
+          exerciseType: "CATEGORY_BROWSE" as const,
+          sourceGroupId: "source-1",
+          entryRouteId: "   ",
+          maxDurationMs: "60000",
+          maxScrolls: "10",
+          minDwellMs: "",
+        };
+        const request = toRequestAccountExerciseRunRequest(
+          RequestAccountExerciseRunFormSchema.parse(values),
+          createProfileSummary({ accountStage: "COLLECTION_READY" })
+        );
+        expect((request as any).entryRouteId).toBeUndefined();
+      });
+    });
+
+    describe("Form validation rules", () => {
+      it("validates Ambient form values correctly", () => {
+        const validValues = {
+          profileId: "profile-1",
+          exerciseType: "AMBIENT_ACCOUNT" as const,
+          sourceGroupId: "",
+          entryRouteId: "",
+          maxDurationMs: "",
+          maxScrolls: "",
+          minDwellMs: "",
+        };
+        expect(RequestAccountExerciseRunFormSchema.safeParse(validValues).success).toBe(true);
+
+        const invalidValues = {
+          ...validValues,
+          sourceGroupId: "source-1",
+        };
+        expect(RequestAccountExerciseRunFormSchema.safeParse(invalidValues).success).toBe(false);
+      });
+
+      it("validates Category Browse form values correctly", () => {
+        const validValues = {
+          profileId: "profile-1",
+          exerciseType: "CATEGORY_BROWSE" as const,
+          sourceGroupId: "source-1",
+          entryRouteId: "",
+          maxDurationMs: "",
+          maxScrolls: "",
+          minDwellMs: "",
+        };
+        expect(RequestAccountExerciseRunFormSchema.safeParse(validValues).success).toBe(true);
+
+        const invalidValues = {
+          ...validValues,
+          sourceGroupId: "",
+        };
+        expect(RequestAccountExerciseRunFormSchema.safeParse(invalidValues).success).toBe(false);
+      });
     });
   });
 });

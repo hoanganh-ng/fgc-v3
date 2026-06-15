@@ -37,6 +37,10 @@ import {
 } from "@/features/collector-runtime/account-exercise-run-detail-drawer-state";
 import { useProfilesQuery } from "@/features/profiles/profile-queries";
 import {
+  useContentCategoriesQuery,
+  useSourceGroupsQuery,
+} from "@/features/content-manager/content-manager-queries";
+import {
   applyZodFieldErrors,
   BackendErrorPanel,
   FormField,
@@ -255,6 +259,7 @@ export function AccountExerciseRunsPage(): JSX.Element {
             onRetryProfiles={() => {
               void profilesQuery.refetch();
             }}
+            onSuccess={refresh}
           />
 
           <FilterCard
@@ -618,24 +623,45 @@ function RequestAccountExerciseRunCard({
   profilesError,
   hasPaginationWarning,
   onRetryProfiles,
+  onSuccess,
 }: {
   readonly profiles: readonly ProfileSummary[];
   readonly profilesLoading: boolean;
   readonly profilesError: unknown;
   readonly hasPaginationWarning: boolean;
   readonly onRetryProfiles: () => void;
+  readonly onSuccess: () => void;
 }): JSX.Element {
   const requestMutation = useRequestAccountExerciseRunMutation();
   const [validationSummary, setValidationSummary] = useState<string>();
-  const [createdRunId, setCreatedRunId] = useState<string>();
+  const [createdRun, setCreatedRun] = useState<{ id: string; exerciseType: string }>();
   const hasProfilesError = profilesError !== null && profilesError !== undefined;
   const profileById = useMemo(
     () => new Map(profiles.map((profile) => [profile.id, profile])),
     [profiles],
   );
+
+  const sourceGroupsQuery = useSourceGroupsQuery({
+    status: "ACTIVE",
+    limit: 100,
+    offset: 0,
+  });
+  const categoriesQuery = useContentCategoriesQuery();
+
+  const sourceGroups = sourceGroupsQuery.data?.items ?? [];
+  const categories = categoriesQuery.data?.items ?? [];
+
+  const categoryById = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories],
+  );
+
   const form = useForm<RequestAccountExerciseRunFormValues>({
     defaultValues: {
       profileId: "",
+      exerciseType: "AMBIENT_ACCOUNT",
+      sourceGroupId: "",
+      entryRouteId: "",
       maxDurationMs: "",
       maxScrolls: "",
       minDwellMs: "",
@@ -643,9 +669,54 @@ function RequestAccountExerciseRunCard({
   });
   const { reset } = form;
 
+  const exerciseType = form.watch("exerciseType");
+  const sourceGroupId = form.watch("sourceGroupId");
+
+  const previousExerciseTypeRef = useRef(exerciseType);
+  useEffect(() => {
+    if (exerciseType !== previousExerciseTypeRef.current) {
+      form.setValue("sourceGroupId", "");
+      form.setValue("entryRouteId", "");
+      form.clearErrors(["sourceGroupId", "entryRouteId"]);
+      previousExerciseTypeRef.current = exerciseType;
+    }
+  }, [exerciseType, form]);
+
+  const previousSourceGroupIdRef = useRef(sourceGroupId);
+  useEffect(() => {
+    if (sourceGroupId !== previousSourceGroupIdRef.current) {
+      form.setValue("entryRouteId", "");
+      previousSourceGroupIdRef.current = sourceGroupId;
+    }
+  }, [sourceGroupId, form]);
+
+  const selectedSourceGroup = useMemo(() => {
+    return sourceGroups.find((sg) => sg.id === sourceGroupId);
+  }, [sourceGroups, sourceGroupId]);
+
+  const eligibleRoutes = useMemo(() => {
+    if (!selectedSourceGroup) {
+      return [];
+    }
+    return selectedSourceGroup.entryRoutes.filter(
+      (route) =>
+        route.type === "CATEGORY_ENTRY_URL" &&
+        (route.riskLevel === "LOW" || route.riskLevel === "MEDIUM"),
+    );
+  }, [selectedSourceGroup]);
+
+  const hasSourceGroupsPaginationWarning = useMemo(() => {
+    const sourceGroupsData = sourceGroupsQuery.data;
+    if (!sourceGroupsData) {
+      return false;
+    }
+    const total = sourceGroupsData.page.total;
+    return total !== undefined && total > sourceGroupsData.items.length;
+  }, [sourceGroupsQuery.data]);
+
   async function submit(values: RequestAccountExerciseRunFormValues): Promise<void> {
     setValidationSummary(undefined);
-    setCreatedRunId(undefined);
+    setCreatedRun(undefined);
     requestMutation.reset();
 
     const parsed = RequestAccountExerciseRunFormSchema.safeParse(values);
@@ -671,15 +742,30 @@ function RequestAccountExerciseRunCard({
 
       reset({
         profileId: "",
+        exerciseType: "AMBIENT_ACCOUNT",
+        sourceGroupId: "",
+        entryRouteId: "",
         maxDurationMs: "",
         maxScrolls: "",
         minDwellMs: "",
       });
-      setCreatedRunId(response.accountExerciseRun.id);
+      setCreatedRun({
+        id: response.accountExerciseRun.id,
+        exerciseType: response.accountExerciseRun.exerciseType,
+      });
+      onSuccess();
     } catch {
       return;
     }
   }
+
+  const isSubmitDisabled =
+    profilesLoading ||
+    hasProfilesError ||
+    profiles.length === 0 ||
+    requestMutation.isPending ||
+    (exerciseType === "CATEGORY_BROWSE" &&
+      (sourceGroupsQuery.isPending || sourceGroups.length === 0));
 
   return (
     <Card className="min-w-0">
@@ -687,7 +773,7 @@ function RequestAccountExerciseRunCard({
         <div className="min-w-0">
           <CardTitle>Request Exercise Run</CardTitle>
           <CardDescription>
-            Queue an Ambient Account Exercise run for one profile.
+            Queue an Ambient Account Exercise or Category Browse run for one profile.
           </CardDescription>
         </div>
         <div className="grid size-11 place-items-center rounded border border-border bg-muted text-primary">
@@ -724,9 +810,9 @@ function RequestAccountExerciseRunCard({
             </div>
           ) : null}
 
-          {createdRunId !== undefined ? (
+          {createdRun !== undefined ? (
             <SuccessPanel
-              message={`Account exercise run ${createdRunId} was queued.`}
+              message={`Account exercise run ${createdRun.id} (${createdRun.exerciseType}) was queued.`}
             />
           ) : null}
 
@@ -735,6 +821,20 @@ function RequestAccountExerciseRunCard({
               Some profiles may not appear in the selector because the list is paginated.
             </div>
           ) : null}
+
+          <FormField
+            error={getErrorMessage(form.formState.errors.exerciseType)}
+            htmlFor="exercise-type"
+            label="Exercise Type"
+          >
+            <Select
+              id="exercise-type"
+              {...form.register("exerciseType")}
+            >
+              <option value="AMBIENT_ACCOUNT">Ambient Account</option>
+              <option value="CATEGORY_BROWSE">Category Browse</option>
+            </Select>
+          </FormField>
 
           <FormField
             error={getErrorMessage(form.formState.errors.profileId)}
@@ -754,6 +854,128 @@ function RequestAccountExerciseRunCard({
               ))}
             </Select>
           </FormField>
+
+          {exerciseType === "CATEGORY_BROWSE" && (
+            <div className="grid gap-4">
+              {sourceGroupsQuery.isPending && (
+                <div className="text-sm text-muted-foreground animate-pulse py-2">
+                  Loading active source groups...
+                </div>
+              )}
+
+              {sourceGroupsQuery.isError && (
+                <div className="grid gap-2 rounded border border-[#e4a0a0] bg-[#fff5f5] p-3 text-sm text-[#8f3030]">
+                  <p>Failed to load active source groups.</p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    type="button"
+                    onClick={() => void sourceGroupsQuery.refetch()}
+                  >
+                    <RefreshCw aria-hidden="true" className="mr-2 size-4" />
+                    Retry Source Groups
+                  </Button>
+                </div>
+              )}
+
+              {sourceGroupsQuery.isSuccess && sourceGroups.length === 0 && (
+                <div className="rounded border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+                  No active source groups found.
+                </div>
+              )}
+
+              {sourceGroupsQuery.isSuccess && sourceGroups.length > 0 && (
+                <>
+                  {hasSourceGroupsPaginationWarning && (
+                    <div className="rounded border border-[#dfc36e] bg-[#fff7dc] px-3 py-2 text-xs font-medium text-[#76591a]">
+                      Some active source groups may not appear in the selector because the list is paginated.
+                    </div>
+                  )}
+
+                  <FormField
+                    error={getErrorMessage(form.formState.errors.sourceGroupId)}
+                    htmlFor="exercise-source-group"
+                    label="Source Group"
+                  >
+                    <Select
+                      id="exercise-source-group"
+                      {...form.register("sourceGroupId")}
+                    >
+                      <option value="">Select source group</option>
+                      {sourceGroups.map((sg) => {
+                        const categoryName = categoryById.get(sg.categoryId)?.name ?? sg.categoryId;
+                        const displayName = `${categoryName} / ${sg.name}`;
+
+                        const hasCategoryBrowseRoute = sg.entryRoutes.some(
+                          (r) => r.type === "CATEGORY_ENTRY_URL",
+                        );
+                        const hasLowOrMediumRisk = sg.entryRoutes.some(
+                          (r) =>
+                            r.type === "CATEGORY_ENTRY_URL" &&
+                            (r.riskLevel === "LOW" || r.riskLevel === "MEDIUM"),
+                        );
+
+                        let hint = "eligible";
+                        if (!hasCategoryBrowseRoute) {
+                          hint = "no Category Browse route";
+                        } else if (!hasLowOrMediumRisk) {
+                          hint = "high-risk-only";
+                        }
+
+                        return (
+                          <option key={sg.id} value={sg.id}>
+                            {displayName} ({hint})
+                          </option>
+                        );
+                      })}
+                    </Select>
+                  </FormField>
+
+                  <FormField
+                    error={getErrorMessage(form.formState.errors.entryRouteId)}
+                    htmlFor="exercise-entry-route"
+                    label="Entry Route"
+                  >
+                    <Select
+                      id="exercise-entry-route"
+                      {...form.register("entryRouteId")}
+                    >
+                      <option value="">Auto-select safest eligible route</option>
+                      {eligibleRoutes.map((route) => (
+                        <option key={route.id} value={route.id}>
+                          {route.label || route.url} ({route.riskLevel})
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+
+                  <div className="rounded border border-border bg-muted/40 p-3 text-xs">
+                    <p className="font-semibold text-muted-foreground mb-2">
+                      Request Preview
+                    </p>
+                    <dl className="grid gap-1 font-mono">
+                      <div>
+                        <span className="text-muted-foreground">Type: </span>
+                        <span>CATEGORY_BROWSE</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Profile: </span>
+                        <span>{form.watch("profileId") || "(none)"}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Group: </span>
+                        <span>{form.watch("sourceGroupId") || "(none)"}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Route: </span>
+                        <span>{form.watch("entryRouteId") || "Auto-select"}</span>
+                      </div>
+                    </dl>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           <div className="grid min-w-0 gap-4 md:grid-cols-2">
             <FormField
@@ -807,12 +1029,7 @@ function RequestAccountExerciseRunCard({
 
           <div className="flex flex-wrap justify-end gap-2">
             <Button
-              disabled={
-                profilesLoading ||
-                hasProfilesError ||
-                profiles.length === 0 ||
-                requestMutation.isPending
-              }
+              disabled={isSubmitDisabled}
               type="submit"
             >
               <ArrowUpRight aria-hidden="true" className="size-4" />

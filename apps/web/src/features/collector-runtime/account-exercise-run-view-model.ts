@@ -18,6 +18,9 @@ const OptionalNonNegativeIntegerStringSchema = z
 export const RequestAccountExerciseRunFormSchema = z
   .object({
     profileId: z.string().trim().min(1, "Profile is required."),
+    exerciseType: z.enum(["AMBIENT_ACCOUNT", "CATEGORY_BROWSE"]).optional(),
+    sourceGroupId: z.string().trim().optional(),
+    entryRouteId: z.string().trim().optional(),
     maxDurationMs: z
       .string()
       .trim()
@@ -26,7 +29,35 @@ export const RequestAccountExerciseRunFormSchema = z
     maxScrolls: OptionalNonNegativeIntegerStringSchema,
     minDwellMs: OptionalNonNegativeIntegerStringSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((values, context) => {
+    const exerciseType = values.exerciseType ?? "AMBIENT_ACCOUNT";
+    if (exerciseType === "CATEGORY_BROWSE") {
+      if (values.sourceGroupId === undefined || values.sourceGroupId.trim().length === 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["sourceGroupId"],
+          message: "Source group is required for Category Browse.",
+        });
+      }
+    } else {
+      // AMBIENT_ACCOUNT
+      if (values.sourceGroupId !== undefined && values.sourceGroupId.trim().length > 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["sourceGroupId"],
+          message: "Ambient account exercise runs must not include sourceGroupId.",
+        });
+      }
+      if (values.entryRouteId !== undefined && values.entryRouteId.trim().length > 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["entryRouteId"],
+          message: "Ambient account exercise runs must not include entryRouteId.",
+        });
+      }
+    }
+  });
 
 export type RequestAccountExerciseRunFormValues = z.input<
   typeof RequestAccountExerciseRunFormSchema
@@ -111,7 +142,7 @@ export function toRequestAccountExerciseRunRequest(
   values: ParsedRequestAccountExerciseRunFormValues,
   profile: Pick<ProfileSummary, "accountStage">,
 ): RequestAccountExerciseRunRequest {
-  return {
+  const base = {
     profileId: values.profileId,
     stageAtStart: profile.accountStage,
     maxDurationMs:
@@ -121,6 +152,21 @@ export function toRequestAccountExerciseRunRequest(
       ? { minDwellMs: values.minDwellMs }
       : {}),
   };
+
+  const exerciseType = values.exerciseType ?? "AMBIENT_ACCOUNT";
+
+  if (exerciseType === "CATEGORY_BROWSE") {
+    return {
+      ...base,
+      exerciseType: "CATEGORY_BROWSE",
+      sourceGroupId: values.sourceGroupId!,
+      ...(values.entryRouteId && values.entryRouteId.trim().length > 0
+        ? { entryRouteId: values.entryRouteId }
+        : {}),
+    };
+  }
+
+  return base;
 }
 
 export function getProfileDisplay(
