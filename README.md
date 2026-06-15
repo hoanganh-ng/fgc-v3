@@ -19,6 +19,7 @@ The current focus is the Content Collector: collecting normalized content from c
 - A collector worker exists for claiming and executing queued collection runs.
 - An account exercise worker exists for claiming and executing queued Ambient Account Exercise runs.
 - The collector worker is available as an opt-in Docker Compose service for dev and preview stacks.
+- The account exercise worker is available as a separate opt-in Docker Compose service for dev and preview stacks.
 - A Collector Runtime browser provider boundary exists.
 - CloakBrowser support is experimental and not yet production-proven; Playwright Chromium remains the default provider.
 
@@ -55,11 +56,11 @@ pnpm typecheck
 pnpm test
 ```
 
-Start the containerized worker when queued collection runs should be consumed automatically:
+Start containerized workers only when queued jobs should be consumed automatically:
 
 ```bash
-pnpm stack:dev:worker:start
-pnpm stack:dev:worker:logs
+pnpm stack:dev:workers:start
+pnpm stack:dev:workers:logs
 ```
 
 ## Commands
@@ -103,10 +104,14 @@ pnpm stack:dev:worker:logs
 
 - `pnpm stack:dev:start`, `pnpm stack:dev:stop`, `pnpm stack:dev:reset`
 - `pnpm stack:dev:worker:start`, `pnpm stack:dev:worker:once`, `pnpm stack:dev:worker:logs`
+- `pnpm stack:dev:exercise-worker:start`, `pnpm stack:dev:exercise-worker:once`, `pnpm stack:dev:exercise-worker:logs`
+- `pnpm stack:dev:workers:start`, `pnpm stack:dev:workers:logs`
 - `pnpm stack:preview:start`, `pnpm stack:preview:stop`, `pnpm stack:preview:reset`
 - `pnpm stack:preview:worker:start`, `pnpm stack:preview:worker:once`, `pnpm stack:preview:worker:logs`
+- `pnpm stack:preview:exercise-worker:start`, `pnpm stack:preview:exercise-worker:once`, `pnpm stack:preview:exercise-worker:logs`
+- `pnpm stack:preview:workers:start`, `pnpm stack:preview:workers:logs`
 
-The `collector-worker` Compose service is behind the `worker` profile and exposes no ports. Inside Docker it talks to the API at `http://api:3000`; host commands still use `http://localhost:8081` for preview gateway access or `http://localhost:3000` for direct API access.
+The `collector-worker` and `account-exercise-worker` Compose services are behind the `worker` profile and expose no ports. Inside Docker they talk to the API at `http://api:3000`; host commands still use `http://localhost:8081` for preview gateway access or `http://localhost:3000` for direct API access.
 
 ## Deeper Docs
 

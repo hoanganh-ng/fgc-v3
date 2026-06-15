@@ -58,5 +58,28 @@ services:
       api:
         condition: service_started
 
+  account-exercise-worker:
+    profiles:
+      - worker
+    build:
+      context: .
+      target: worker-runtime
+    init: true
+    command:
+      - sh
+      - scripts/run-account-exercise-worker-container.sh
+    environment:
+      DATABASE_URL: postgres://content_pipeline:content_pipeline@postgres:5432/content_pipeline
+      ACCOUNT_EXERCISE_WORKER_BASE_URL: http://api:3000
+      ACCOUNT_EXERCISE_WORKER_MODE_ARGS: "--poll-interval-ms 5000"
+      ACCOUNT_EXERCISE_WORKER_DISPLAY: ":99"
+      ACCOUNT_EXERCISE_WORKER_XVFB_SCREEN: 1280x720x24
+      BROWSER_PROVIDER: playwright
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+
 volumes:
   fgc_preview_postgres_data:
