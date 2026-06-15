@@ -242,14 +242,10 @@ describe("Collector Runtime HTTP routes", () => {
       expect(service.markAccountExerciseRunRunning.calls).toEqual([
         {
           accountExerciseRunId: "account-exercise-run-1",
-        },
-      ]);
-      expect(service.attachAccountExerciseRunLease.calls).toEqual([
-        {
-          accountExerciseRunId: "account-exercise-run-1",
           leaseId: "lease-1",
         },
       ]);
+      expect(service.attachAccountExerciseRunLease.calls).toEqual([]);
       expect(service.markAccountExerciseRunSucceeded.calls).toEqual([
         {
           accountExerciseRunId: "account-exercise-run-1",
@@ -316,6 +312,75 @@ describe("Collector Runtime HTTP routes", () => {
       expectAccountExerciseRunPayloadIsSafe(succeedResponse.json());
       expectAccountExerciseRunPayloadIsSafe(failResponse.json());
       expectAccountExerciseRunPayloadIsSafe(cancelResponse.json());
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("starts account exercise runs without a lease id", async () => {
+    const { server, service } = createTestServer();
+
+    service.markAccountExerciseRunRunning.setOutput(
+      createAccountExerciseRun({
+        status: "RUNNING",
+        startedAt: "2026-04-01T10:00:00.000Z",
+        updatedAt: "2026-04-01T10:00:00.000Z",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/account-exercise-runs/account-exercise-run-1/start",
+        payload: {},
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.markAccountExerciseRunRunning.calls).toEqual([
+        {
+          accountExerciseRunId: "account-exercise-run-1",
+        },
+      ]);
+      expect(service.attachAccountExerciseRunLease.calls).toEqual([]);
+      expect(response.json()).toMatchObject({
+        accountExerciseRun: {
+          status: "RUNNING",
+        },
+      });
+      expect(response.json().accountExerciseRun).not.toHaveProperty("leaseId");
+      expectAccountExerciseRunPayloadIsSafe(response.json());
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("attaches a lease through the dedicated account exercise run lease endpoint", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/account-exercise-runs/account-exercise-run-1/lease",
+        payload: {
+          leaseId: "lease-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.markAccountExerciseRunRunning.calls).toEqual([]);
+      expect(service.attachAccountExerciseRunLease.calls).toEqual([
+        {
+          accountExerciseRunId: "account-exercise-run-1",
+          leaseId: "lease-1",
+        },
+      ]);
+      expect(response.json()).toMatchObject({
+        accountExerciseRun: {
+          status: "RUNNING",
+          leaseId: "lease-1",
+        },
+      });
+      expectAccountExerciseRunPayloadIsSafe(response.json());
     } finally {
       await server.close();
     }

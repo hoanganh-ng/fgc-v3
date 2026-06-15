@@ -237,22 +237,12 @@ export function registerCollectorRuntimeRoutes(
         StartAccountExerciseRunHttpBodySchema,
         request.body ?? {},
       );
+      const input = {
+        accountExerciseRunId: params.accountExerciseRunId,
+        ...(body.leaseId !== undefined ? { leaseId: body.leaseId } : {}),
+      } satisfies MarkAccountExerciseRunRunningInput;
       const accountExerciseRun =
-        await collectorRuntime.markAccountExerciseRunRunning.execute({
-          accountExerciseRunId: params.accountExerciseRunId,
-        });
-
-      if (body.leaseId !== undefined) {
-        const attachedAccountExerciseRun =
-          await collectorRuntime.attachAccountExerciseRunLease.execute({
-            accountExerciseRunId: accountExerciseRun.id,
-            leaseId: body.leaseId,
-          });
-
-        return {
-          accountExerciseRun: toAccountExerciseRunDto(attachedAccountExerciseRun),
-        };
-      }
+        await collectorRuntime.markAccountExerciseRunRunning.execute(input);
 
       return {
         accountExerciseRun: toAccountExerciseRunDto(accountExerciseRun),
