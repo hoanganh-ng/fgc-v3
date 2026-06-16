@@ -56,13 +56,21 @@ describe("profile state machine", () => {
       ["PENDING_CONFIG", "BUSY"],
       ["PENDING_LOGIN", "BUSY"],
       ["PENDING_LOGIN", "PENDING_CONFIG"],
-      ["READY", "PENDING_LOGIN"],
       ["BUSY", "PENDING_LOGIN"],
       ["PENDING_CONFIG", "PENDING_CONFIG"],
       ["PENDING_LOGIN", "PENDING_LOGIN"],
       ["READY", "READY"],
       ["BUSY", "BUSY"],
     ];
+
+  // Sprint 055: READY -> PENDING_LOGIN is a guarded recovery transition
+  // permitted by the state machine and orchestrated by
+  // `StartProfileProvisioningUseCase`. The eligibility invariant lives
+  // in `canStartProvisioning`; the state machine simply permits the
+  // transition.
+  it("permits READY -> PENDING_LOGIN (Sprint 055 recovery)", () => {
+    expect(() => transitionProfileStatus("READY", "PENDING_LOGIN")).not.toThrow();
+  });
 
   for (const [from, to] of invalidTransitions) {
     it(`rejects ${from} -> ${to}`, () => {

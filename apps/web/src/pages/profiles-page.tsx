@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProfileAccountStageBadge } from "@/features/profiles/profile-account-stage-badge";
+import { ProfileAuthenticationHealthBadge } from "@/features/profiles/profile-authentication-health-badge";
 import { ProfileStatusBadge } from "@/features/profiles/profile-status-badge";
 import { useProfilesQuery } from "@/features/profiles/profile-queries";
 import { isApiResultError } from "@/lib/api/http-client";
@@ -86,12 +87,13 @@ function ProfilesTable({
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[66rem] border-collapse text-left text-sm">
+          <table className="w-full min-w-[72rem] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/45 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Account Stage</th>
+                <th className="px-4 py-3">Authentication Health</th>
                 <th className="px-4 py-3">Timezone</th>
                 <th className="px-4 py-3">Created</th>
                 <th className="px-4 py-3">Updated</th>
@@ -123,6 +125,11 @@ function ProfilesTable({
                   <td className="px-4 py-4">
                     <ProfileAccountStageBadge
                       accountStage={profile.accountStage}
+                    />
+                  </td>
+                  <td className="px-4 py-4">
+                    <ProfileAuthenticationHealthBadge
+                      health={profile.authenticationHealth}
                     />
                   </td>
                   <td className="px-4 py-4 text-muted-foreground">
@@ -164,11 +171,12 @@ function ProfilesLoadingState(): JSX.Element {
         {["one", "two", "three", "four"].map((row) => (
           <div
             key={row}
-            className="grid min-h-14 animate-pulse grid-cols-[minmax(12rem,1fr)_8rem_10rem_10rem] items-center gap-4 border-b border-border last:border-b-0"
+            className="grid min-h-14 animate-pulse grid-cols-[minmax(12rem,1fr)_8rem_10rem_10rem_10rem] items-center gap-4 border-b border-border last:border-b-0"
           >
             <div className="h-4 rounded bg-muted" />
             <div className="h-6 rounded bg-muted" />
             <div className="h-4 rounded bg-muted" />
+            <div className="h-6 rounded bg-muted" />
             <div className="h-4 rounded bg-muted" />
           </div>
         ))}

@@ -341,6 +341,55 @@ from a configured proxy to a direct connection, or from one proxy protocol to
 another. Provider and proxy launch failures stop the command with sanitized
 output. Empty or incomplete authentication-state capture is not submitted.
 
+## Authentication Recovery Reprovisioning
+
+Sprint 055 closes the recovery loop for `READY` profiles whose
+`authenticationHealth` is `REAUTH_REQUIRED` (a previous session was
+reported as login-required) or `CHECKPOINT_REVIEW_REQUIRED` (a
+previous session was reported as checkpoint-required). The same
+`POST /collector/profiles/:profileId/provisioning/start` endpoint
+and the same `pnpm operator:profile:provision` CLI handle first-time
+provisioning, token restart, and recovery reprovisioning; no new
+endpoint or CLI is added.
+
+The profile detail Web UI surfaces the current `authenticationHealth`
+on the inventory row, the status summary card, and the timestamps
+card. The provisioning card adapts to the profile state:
+
+- `PENDING_CONFIG`: **Start Provisioning** (unchanged first-time flow).
+- `PENDING_LOGIN`: **Issue New Provisioning Token**, with a warning
+  that the previous token becomes invalid and is no longer
+  acceptable for session ingestion. The new token replaces the
+  previous one and supersedes it; reusing the previous token fails
+  through the existing `findByProvisioningToken` and
+  `assertUsableProvisioningToken` policy.
+- `READY` + `REAUTH_REQUIRED`: **Start Reauthentication**; the
+  backend transitions the profile back to `PENDING_LOGIN` while
+  preserving `accountStage`, hardware fingerprint, configuration,
+  `authenticationState`, `authenticationHealth`, and
+  `authenticationHealthUpdatedAt`. The operator then captures a fresh
+  Facebook session with the same CLI.
+- `READY` + `CHECKPOINT_REVIEW_REQUIRED`: **Start Manual Checkpoint
+  Recovery**, explicitly stating there is no automated bypass. The
+  operator must drive the same headed provisioning CLI to perform the
+  manual Facebook checkpoint flow.
+- `READY` + `HEALTHY` and `BUSY`: no provisioning action is offered.
+
+The health value is never restored to `HEALTHY` by `Start Provisioning`,
+`Issue New Provisioning Token`, `Start Reauthentication`, or `Start
+Manual Checkpoint Recovery`. The only path that sets `HEALTHY` is
+successful session ingestion through the existing
+`POST /collector/provisioning/:token/session` route, which consumes
+the active token, transitions the profile to `READY`, and updates
+`authenticationHealthUpdatedAt`.
+
+Recovery operations use the same provisioning token redaction, the
+same operator-only CLI, and the same Web UI safe-read rules. Cookies,
+localStorage, proxy credentials, provisioning token hashes, raw
+session state, trusted runtime configuration, screenshots, page
+text, and raw Facebook payloads are never persisted, logged, or
+rendered through the recovery flow.
+
 ## Ambient Profile Exercise Command
 
 Sprint 039 adds an operator-only command for read-only ambient account exercise. It is intended for `READY` profiles whose account stage is not yet normal collection-ready.

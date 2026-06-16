@@ -23,6 +23,7 @@ import {
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProfileAccountStageBadge } from "@/features/profiles/profile-account-stage-badge";
+import { ProfileAuthenticationHealthBadge } from "@/features/profiles/profile-authentication-health-badge";
 import {
   useStartProfileProvisioningMutation,
   useUpdateProfileAccountStageMutation,
@@ -182,6 +183,14 @@ function StatusSummaryCard({
           <ProfileAccountStageBadge accountStage={profile.accountStage} />
         </div>
         <div className="flex items-center justify-between gap-3">
+          <span className="text-sm text-muted-foreground">
+            Authentication Health
+          </span>
+          <ProfileAuthenticationHealthBadge
+            health={profile.authenticationHealth}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3">
           <span className="text-sm text-muted-foreground">Authentication</span>
           <StatusBadge
             label={profile.hasAuthenticationState ? "Captured" : "Missing"}
@@ -313,14 +322,18 @@ function StartProvisioningCard({
   );
   const [provisioningSuccess, setProvisioningSuccess] =
     useState<ImmediateProvisioningSuccess | null>(null);
-  const canStartProvisioning = profile.status === "PENDING_CONFIG";
+  const action = resolveProvisioningAction(
+    profile.status,
+    profile.authenticationHealth,
+  );
   const provisioningToken = provisioningSuccess?.provisioningToken;
   const expiresAt = provisioningSuccess?.expiresAt;
 
   function start(): void {
-    const confirmed = window.confirm(
-      `Start provisioning for ${profile.displayName} (${profile.id})?\n\nThe backend may issue a one-time provisioning token. Save it immediately if it is returned.`,
-    );
+    if (action.kind !== "action") {
+      return;
+    }
+    const confirmed = window.confirm(action.confirmPrompt(profile));
 
     if (!confirmed) {
       return;
@@ -376,7 +389,7 @@ function StartProvisioningCard({
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <CardTitle>Provisioning</CardTitle>
-          <CardDescription>Start login provisioning through the backend API.</CardDescription>
+          <CardDescription>{action.cardDescription}</CardDescription>
         </div>
         <div className="grid size-11 place-items-center rounded border border-border bg-muted text-primary">
           <KeyRound aria-hidden="true" className="size-5" />
@@ -387,12 +400,20 @@ function StartProvisioningCard({
           <span className="text-sm text-muted-foreground">Current Status</span>
           <ProfileStatusBadge status={profile.status} />
         </div>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm text-muted-foreground">
+            Authentication Health
+          </span>
+          <ProfileAuthenticationHealthBadge
+            health={profile.authenticationHealth}
+          />
+        </div>
 
         <p className="text-sm leading-6 text-muted-foreground">
-          {getProvisioningStatusText(profile.status)}
+          {action.explanation}
         </p>
 
-        {canStartProvisioning ? (
+        {action.kind === "action" ? (
           <Button
             className="w-full"
             disabled={startProvisioning.isPending}
@@ -400,8 +421,8 @@ function StartProvisioningCard({
           >
             <KeyRound aria-hidden="true" className="size-4" />
             {startProvisioning.isPending
-              ? "Starting Provisioning"
-              : "Start Provisioning"}
+              ? action.pendingLabel
+              : action.buttonLabel}
           </Button>
         ) : null}
 
@@ -436,7 +457,7 @@ function StartProvisioningCard({
                 className="mt-0.5 size-4 shrink-0"
               />
               <div className="min-w-0">
-                <p className="font-semibold">Provisioning started.</p>
+                <p className="font-semibold">{action.successTitle}</p>
                 <p className="mt-1 leading-6">
                   The profile list and detail are refreshing from the backend.
                 </p>
@@ -494,6 +515,107 @@ function StartProvisioningCard({
 interface ImmediateProvisioningSuccess {
   readonly provisioningToken?: string;
   readonly expiresAt?: string;
+}
+
+type ProvisioningAction =
+  | {
+      readonly kind: "action";
+      readonly buttonLabel: string;
+      readonly pendingLabel: string;
+      readonly successTitle: string;
+      readonly cardDescription: string;
+      readonly explanation: string;
+      readonly confirmPrompt: (profile: ProfileDetail) => string;
+    }
+  | {
+      readonly kind: "none";
+      readonly cardDescription: string;
+      readonly explanation: string;
+      readonly successTitle: string;
+    };
+
+function resolveProvisioningAction(
+  status: ProfileDetail["status"],
+  health: ProfileDetail["authenticationHealth"],
+): ProvisioningAction {
+  if (status === "PENDING_CONFIG") {
+    return {
+      kind: "action",
+      buttonLabel: "Start Provisioning",
+      pendingLabel: "Starting Provisioning",
+      successTitle: "Provisioning started.",
+      cardDescription: "Start login provisioning through the backend API.",
+      explanation:
+        "PENDING_CONFIG can start provisioning after the backend accepts the required configuration.",
+      confirmPrompt: (profile) =>
+        `Start provisioning for ${profile.displayName} (${profile.id})?\n\nThe backend may issue a one-time provisioning token. Save it immediately if it is returned.`,
+    };
+  }
+
+  if (status === "PENDING_LOGIN") {
+    return {
+      kind: "action",
+      buttonLabel: "Issue New Provisioning Token",
+      pendingLabel: "Issuing Provisioning Token",
+      successTitle: "New provisioning token issued.",
+      cardDescription:
+        "Issue a new provisioning token through the backend API.",
+      explanation:
+        "PENDING_LOGIN means provisioning has started. Issuing a new token supersedes the previous one; the previous token is no longer acceptable for session ingestion.",
+      confirmPrompt: (profile) =>
+        `Issue a new provisioning token for ${profile.displayName} (${profile.id})?\n\nThe previous token becomes invalid immediately and cannot be used to submit a session. Save the new token if one is returned.`,
+    };
+  }
+
+  if (status === "READY" && health === "REAUTH_REQUIRED") {
+    return {
+      kind: "action",
+      buttonLabel: "Start Reauthentication",
+      pendingLabel: "Starting Reauthentication",
+      successTitle: "Reauthentication started.",
+      cardDescription:
+        "Start reprovisioning for a REAUTH_REQUIRED profile through the backend API.",
+      explanation:
+        "READY + REAUTH_REQUIRED means a previous session was reported as login-required. The backend will issue a new provisioning token and the operator must drive the same provisioning CLI to capture a fresh Facebook session.",
+      confirmPrompt: (profile) =>
+        `Start reauthentication for ${profile.displayName} (${profile.id})?\n\nThe backend will issue a new one-time provisioning token. The previous token is no longer acceptable for session ingestion. Save the new token immediately if one is returned.`,
+    };
+  }
+
+  if (status === "READY" && health === "CHECKPOINT_REVIEW_REQUIRED") {
+    return {
+      kind: "action",
+      buttonLabel: "Start Manual Checkpoint Recovery",
+      pendingLabel: "Starting Manual Checkpoint Recovery",
+      successTitle: "Manual checkpoint recovery started.",
+      cardDescription:
+        "Start reprovisioning for a CHECKPOINT_REVIEW_REQUIRED profile through the backend API.",
+      explanation:
+        "READY + CHECKPOINT_REVIEW_REQUIRED means a previous session was reported as a Facebook checkpoint. There is no automated bypass. The backend will issue a new provisioning token and the operator must drive the existing headed provisioning CLI to perform the manual Facebook checkpoint flow.",
+      confirmPrompt: (profile) =>
+        `Start manual checkpoint recovery for ${profile.displayName} (${profile.id})?\n\nThe backend will issue a new one-time provisioning token. The previous token is no longer acceptable for session ingestion. There is no automated bypass — you must drive the existing headed provisioning CLI to complete the manual Facebook checkpoint flow. Save the new token immediately if one is returned.`,
+    };
+  }
+
+  if (status === "BUSY") {
+    return {
+      kind: "none",
+      cardDescription:
+        "Provisioning is not available while the profile is BUSY.",
+      explanation:
+        "BUSY means the profile is currently checked out by runtime work. Provisioning actions will be available again after the lease is released.",
+      successTitle: "Provisioning started.",
+    };
+  }
+
+  return {
+    kind: "none",
+    cardDescription:
+      "Provisioning is not available for the current health state.",
+    explanation:
+      "READY + HEALTHY means authentication state is already captured. The backend will only allow provisioning when authenticationHealth is REAUTH_REQUIRED or CHECKPOINT_REVIEW_REQUIRED.",
+    successTitle: "Provisioning started.",
+  };
 }
 
 const profileAccountStages = [
@@ -666,6 +788,10 @@ function TimestampSummaryCard({
           <Field label="Created" value={formatDateTime(profile.createdAt)} />
           <Field label="Updated" value={formatDateTime(profile.updatedAt)} />
           <Field
+            label="Authentication Health Updated"
+            value={formatDateTime(profile.authenticationHealthUpdatedAt)}
+          />
+          <Field
             label="Last Checkout"
             value={formatNullableDateTime(profile.lastCheckoutAt)}
           />
@@ -800,24 +926,4 @@ function formatDateTime(value: string): string {
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
-}
-
-function getProvisioningStatusText(status: string): string {
-  if (status === "PENDING_CONFIG") {
-    return "PENDING_CONFIG can start provisioning after the backend accepts the required configuration.";
-  }
-
-  if (status === "PENDING_LOGIN") {
-    return "PENDING_LOGIN means provisioning has started and login is the next lifecycle step.";
-  }
-
-  if (status === "READY") {
-    return "READY means authentication state is already captured for backend checkout.";
-  }
-
-  if (status === "BUSY") {
-    return "BUSY means the profile is currently checked out by runtime work.";
-  }
-
-  return `${status} is reported by the backend.`;
 }

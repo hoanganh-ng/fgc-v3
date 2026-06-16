@@ -67,7 +67,7 @@ describe("collector profile application use cases", () => {
     );
   });
 
-  it("starts provisioning only from PENDING_CONFIG", async () => {
+  it("rejects start-provisioning for READY with HEALTHY health", async () => {
     const context = createTestContext();
     const profile = await createConfiguredPendingProfile(context);
 
@@ -75,15 +75,34 @@ describe("collector profile application use cases", () => {
       ...profile,
       identity: {
         ...profile.identity,
-        status: "PENDING_LOGIN",
+        status: "READY",
+        updatedAt: now,
+      },
+      authenticationState: {
+        cookies: [
+          {
+            name: "session",
+            value: "abc123",
+            domain: "example.test",
+            path: "/",
+            expiresAt: "2026-01-02T10:00:00.000Z",
+            httpOnly: true,
+            secure: true,
+          },
+        ],
+        localStorage: [],
+        sessionCapturedAt: now,
+        sessionExpiresAt: null,
       },
       provisioningToken: {
-        status: "ISSUED",
-        tokenHash: "existing-token",
+        status: "CONSUMED",
+        tokenHash: null,
         issuedAt: now,
         expiresAt: "2026-01-01T10:15:00.000Z",
-        consumedAt: null,
+        consumedAt: now,
       },
+      authenticationHealth: "HEALTHY",
+      authenticationHealthUpdatedAt: now,
     });
 
     await expect(

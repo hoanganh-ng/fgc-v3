@@ -6,7 +6,15 @@ export const ALLOWED_PROFILE_STATUS_TRANSITIONS: Readonly<
 > = {
   PENDING_CONFIG: ["PENDING_LOGIN"],
   PENDING_LOGIN: ["READY"],
-  READY: ["BUSY"],
+  // `READY` may transition to `PENDING_LOGIN` only as a guarded
+  // reprovisioning recovery step driven by
+  // `StartProfileProvisioningUseCase` (Sprint 055). The use case
+  // additionally requires `authenticationHealth` to be
+  // `REAUTH_REQUIRED` or `CHECKPOINT_REVIEW_REQUIRED` before
+  // allowing this transition. The state machine permits the
+  // transition; the eligibility invariant lives in
+  // `canStartProvisioning`.
+  READY: ["BUSY", "PENDING_LOGIN"],
   BUSY: ["READY"],
 };
 

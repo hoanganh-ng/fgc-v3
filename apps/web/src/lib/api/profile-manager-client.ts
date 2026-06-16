@@ -47,9 +47,11 @@ export const KnownProfileAuthenticationHealthSchema = z.enum([
   "CHECKPOINT_REVIEW_REQUIRED",
 ]);
 
-export type ProfileAuthenticationHealth = z.infer<
+export type KnownProfileAuthenticationHealth = z.infer<
   typeof KnownProfileAuthenticationHealthSchema
 >;
+
+export type ProfileAuthenticationHealth = KnownProfileAuthenticationHealth;
 
 export const ProvisioningTokenStatusSchema = z.enum([
   "NOT_ISSUED",

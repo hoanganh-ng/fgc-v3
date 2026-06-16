@@ -8,7 +8,11 @@ import {
   validateProfileForApplication,
   validateRequiredConfigurationForApplication,
 } from "../profile-validation";
-import { transitionCollectorProfileStatus } from "../../domain";
+import {
+  canStartProvisioning,
+  explainStartProvisioningRejection,
+  transitionCollectorProfileStatus,
+} from "../../domain";
 import type { CollectorProfile, IsoDateTime, ProfileId } from "../../domain";
 
 const PROVISIONING_TOKEN_TTL_MS = 15 * 60 * 1000;
@@ -21,6 +25,35 @@ export interface StartProfileProvisioningOutput {
   readonly profile: CollectorProfile;
   readonly provisioningToken: string;
   readonly expiresAt: IsoDateTime;
+}
+
+/**
+ * Domain-owned assertion that the profile is eligible to start or restart
+ * provisioning. Throws `InvalidApplicationOperationError` with a
+ * backend-owned message when the profile is `BUSY` or `READY` with a
+ * health value other than `REAUTH_REQUIRED` /
+ * `CHECKPOINT_REVIEW_REQUIRED`. The companion `canStartProvisioning`
+ * predicate is the single source of truth for this rule; this helper
+ * only translates its `false` result into the application-layer error.
+ */
+function assertStartProvisioningEligibility(
+  profile: CollectorProfile,
+): void {
+  if (canStartProvisioning(profile)) {
+    return;
+  }
+
+  const reason = explainStartProvisioningRejection(profile);
+
+  if (reason === "PROFILE_BUSY") {
+    throw new InvalidApplicationOperationError(
+      "Profile provisioning cannot start while the profile is BUSY. Release the active lease first.",
+    );
+  }
+
+  throw new InvalidApplicationOperationError(
+    "Profile provisioning can only start from PENDING_CONFIG, PENDING_LOGIN, or READY with authenticationHealth REAUTH_REQUIRED or CHECKPOINT_REVIEW_REQUIRED.",
+  );
 }
 
 export class StartProfileProvisioningUseCase {
@@ -38,12 +71,14 @@ export class StartProfileProvisioningUseCase {
       input.profileId,
     );
 
-    if (profile.identity.status !== "PENDING_CONFIG") {
-      throw new InvalidApplicationOperationError(
-        "Profile provisioning can only start from PENDING_CONFIG.",
-      );
-    }
+    assertStartProvisioningEligibility(profile);
 
+    // Required configuration must be present for every supported
+    // entry point: initial PENDING_CONFIG, READY recovery, and the
+    // PENDING_LOGIN restart path. The existing
+    // `transitionCollectorProfileStatus` helper also performs this
+    // validation when the status moves from PENDING_CONFIG to
+    // PENDING_LOGIN.
     validateRequiredConfigurationForApplication(profile);
 
     const token = await this.tokenGenerator.generateToken();
@@ -52,11 +87,33 @@ export class StartProfileProvisioningUseCase {
     const expiresAt = toIsoDateTime(
       new Date(issuedAtDate.getTime() + PROVISIONING_TOKEN_TTL_MS),
     );
-    const pendingLoginProfile = transitionCollectorProfileStatus(
-      profile,
-      "PENDING_LOGIN",
-      issuedAt,
-    );
+
+    const pendingLoginProfile =
+      profile.identity.status === "PENDING_LOGIN"
+        ? // PENDING_LOGIN restart: keep the status, refresh updatedAt.
+          // The previous ISSUED token is superseded by the new one; the
+          // previous token hash is no longer findable, so reusing it
+          // fails `findByProvisioningToken`.
+          {
+            ...profile,
+            identity: {
+              ...profile.identity,
+              updatedAt: issuedAt,
+            },
+            provisioningToken: {
+              status: "ISSUED",
+              tokenHash: token,
+              issuedAt,
+              expiresAt,
+              consumedAt: null,
+            },
+          }
+        : transitionCollectorProfileStatus(
+            profile,
+            "PENDING_LOGIN",
+            issuedAt,
+          );
+
     const profileWithToken: CollectorProfile = {
       ...pendingLoginProfile,
       provisioningToken: {
