@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ProfileSourceAccessCheckRunResponseSchema,
   ProfileSourceAccessCheckRunsListResponseSchema,
+  ProfileSourceAccessCheckRunAccountStageSchema,
+  ProfileSourceAccessCheckRunSchema,
   RequestProfileSourceAccessCheckRunRequestSchema,
   createCollectorRuntimeClient,
   toListProfileSourceAccessCheckRunsQueryParams,
@@ -212,6 +214,40 @@ describe("collector runtime profile-source-access-check-run client", () => {
     expect(capturedBody).toEqual({
       profileId: "profile-1",
       sourceGroupId: "source-group-1",
+    });
+  });
+
+  describe("accountStageAtRequest enum", () => {
+    const supportedStages = [
+      "NEW_ACCOUNT",
+      "WARMING",
+      "COLLECTION_READY",
+      "LIMITED",
+      "NEEDS_REVIEW",
+      "RETIRED",
+    ] as const;
+
+    it("parses every supported account stage", () => {
+      for (const stage of supportedStages) {
+        const result = ProfileSourceAccessCheckRunSchema.safeParse(
+          createCheckRun({ accountStageAtRequest: stage }),
+        );
+        expect(result.success, `expected stage '${stage}' to parse`).toBe(true);
+      }
+    });
+
+    it("rejects an unknown non-empty stage", () => {
+      const result = ProfileSourceAccessCheckRunSchema.safeParse(
+        createCheckRun({ accountStageAtRequest: "UNKNOWN_STAGE" as never }),
+      );
+      expect(result.success).toBe(false);
+    });
+
+    it("exports the account stage enum schema", () => {
+      for (const stage of supportedStages) {
+        expect(ProfileSourceAccessCheckRunAccountStageSchema.safeParse(stage).success).toBe(true);
+      }
+      expect(ProfileSourceAccessCheckRunAccountStageSchema.safeParse("BOGUS").success).toBe(false);
     });
   });
 });

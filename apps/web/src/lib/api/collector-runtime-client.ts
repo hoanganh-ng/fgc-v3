@@ -309,6 +309,15 @@ export const ProfileSourceAccessCheckRunOutcomeSchema = z.enum([
   "NEEDS_MANUAL_REVIEW",
 ]);
 
+export const ProfileSourceAccessCheckRunAccountStageSchema = z.enum([
+  "NEW_ACCOUNT",
+  "WARMING",
+  "COLLECTION_READY",
+  "LIMITED",
+  "NEEDS_REVIEW",
+  "RETIRED",
+]);
+
 export type ProfileSourceAccessCheckRunStatus = z.infer<
   typeof ProfileSourceAccessCheckRunStatusSchema
 >;
@@ -317,6 +326,9 @@ export type ProfileSourceAccessCheckRunTriggerType = z.infer<
 >;
 export type ProfileSourceAccessCheckRunOutcome = z.infer<
   typeof ProfileSourceAccessCheckRunOutcomeSchema
+>;
+export type ProfileSourceAccessCheckRunAccountStage = z.infer<
+  typeof ProfileSourceAccessCheckRunAccountStageSchema
 >;
 
 const ProfileSourceAccessCheckRunTargetSchema = z
@@ -373,7 +385,7 @@ export const ProfileSourceAccessCheckRunSchema = z
     sourceGroupId: NonEmptyStringSchema,
     triggerType: ProfileSourceAccessCheckRunTriggerTypeSchema,
     status: ProfileSourceAccessCheckRunStatusSchema,
-    accountStageAtRequest: NonEmptyStringSchema,
+    accountStageAtRequest: ProfileSourceAccessCheckRunAccountStageSchema,
     target: ProfileSourceAccessCheckRunTargetSchema,
     outcome: ProfileSourceAccessCheckRunOutcomeSchema.optional(),
     failureReason: ProfileSourceAccessCheckRunFailureReasonSchema.optional(),
