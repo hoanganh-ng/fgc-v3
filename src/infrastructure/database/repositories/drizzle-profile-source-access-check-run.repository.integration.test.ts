@@ -256,6 +256,8 @@ if (!shouldRunDbTests) {
       const run1 = trackCheckRun(
         createCheckRun({
           id: nextTestId("claim-newer"),
+          profileId: "profile-claim-1",
+          sourceGroupId: "group-claim-1",
           requestedAt: "2026-05-01T10:02:00.000Z",
           createdAt: "2026-05-01T10:02:00.000Z",
         }),
@@ -263,6 +265,8 @@ if (!shouldRunDbTests) {
       const run2 = trackCheckRun(
         createCheckRun({
           id: nextTestId("claim-oldest"),
+          profileId: "profile-claim-2",
+          sourceGroupId: "group-claim-2",
           requestedAt: "2026-05-01T10:00:00.000Z",
           createdAt: "2026-05-01T10:00:00.000Z",
         }),

@@ -59,13 +59,36 @@ Sprint 054B.
 
 ## Verification
 
-Required:
+### Corrections Pass (June 2026)
 
-- `pnpm typecheck`
-- `pnpm web:typecheck`
-- `pnpm web:build`
-- `pnpm test`
-- `git diff --check`
+We completed a narrow contract validation and correction pass with the following enhancements:
+1. **Frontend compatibility**: Expose strict closed enum `KnownProfileAuthenticationHealthSchema` and type `ProfileAuthenticationHealth` in API client. Standardized Zod schemas. Added 35 frontend API parsing tests (`profile-manager-client.test.ts`).
+2. **Safe HTTP Response schemas consistency**: Deriving required properties in `profileDetailJsonSchema` from `profileReadSummaryJsonSchema.required`, resolving the missing `accountStage` property validation.
+3. **Strict cookie verification at Ingest boundary**: Session ingestion use case and schemas reject empty cookies.
+4. **Hardened tests**: Enhanced domain/schema health type validation, empty cookies guards, mapper preservation tests, and HTTP route assertions.
+
+### Completed verification commands
+
+```bash
+pnpm typecheck
+pnpm web:typecheck
+pnpm web:build
+pnpm test
+pnpm test:db
+pnpm test:http:db
+git diff --check
+```
+
+### Final test counts
+
+- `pnpm test`: 926 passed
+- `pnpm test:db`: 75 passed
+- `pnpm test:http:db`: 114 passed
+- Total: 1115 passed tests
+
+### DB-backed verification results
+
+All migrations applied successfully via `pnpm db:migrate`. Verified `toCollectorProfileRow` and `toCollectorProfileDomain` correctly map database rows, defaulting `null` states to `NOT_PROVISIONED` and fallback to `updatedAt` / `createdAt` for `authenticationHealthUpdatedAt`.
 
 ## Sprint Status
 

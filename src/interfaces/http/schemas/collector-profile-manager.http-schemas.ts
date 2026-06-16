@@ -110,7 +110,7 @@ export const UpdateProfileAccountStageHttpBodySchema = z
 
 export const IngestProfileSessionHttpBodySchema = z
   .object({
-    cookies: z.array(BrowserCookieSchema),
+    cookies: z.array(BrowserCookieSchema).min(1),
     localStorage: z.array(LocalStorageEntrySchema),
     sessionExpiresAt: IsoDateTimeSchema.nullable().optional(),
   })
@@ -405,20 +405,7 @@ const profileReadSummaryJsonSchema = {
 const profileDetailJsonSchema = {
   type: "object",
   required: [
-    "id",
-    "displayName",
-    "status",
-    "timezone",
-    "createdAt",
-    "updatedAt",
-    "lastCheckoutAt",
-    "lastReleasedAt",
-    "nextAvailableAt",
-    "dailyUsage",
-    "hasHardwareFingerprint",
-    "hasAuthenticationState",
-    "authenticationHealth",
-    "authenticationHealthUpdatedAt",
+    ...profileReadSummaryJsonSchema.required,
     "networkContext",
     "hardwareFingerprint",
     "behavioralPersona",
@@ -785,6 +772,7 @@ export const ingestProfileSessionHttpRouteSchema = {
     properties: {
       cookies: {
         type: "array",
+        minItems: 1,
         items: looseObjectJsonSchema,
       },
       localStorage: {

@@ -40,6 +40,17 @@ export const ProfileAccountStageSchema = z
   .min(1)
   .transform((stage) => stage as ProfileAccountStage);
 
+export const KnownProfileAuthenticationHealthSchema = z.enum([
+  "NOT_PROVISIONED",
+  "HEALTHY",
+  "REAUTH_REQUIRED",
+  "CHECKPOINT_REVIEW_REQUIRED",
+]);
+
+export type ProfileAuthenticationHealth = z.infer<
+  typeof KnownProfileAuthenticationHealthSchema
+>;
+
 export const ProvisioningTokenStatusSchema = z.enum([
   "NOT_ISSUED",
   "ISSUED",
@@ -233,12 +244,7 @@ export const ProfileSummarySchema = z
     dailyUsage: DailyUsageSchema,
     hasHardwareFingerprint: z.boolean(),
     hasAuthenticationState: z.boolean(),
-    authenticationHealth: z.enum([
-      "NOT_PROVISIONED",
-      "HEALTHY",
-      "REAUTH_REQUIRED",
-      "CHECKPOINT_REVIEW_REQUIRED",
-    ]),
+    authenticationHealth: KnownProfileAuthenticationHealthSchema,
     authenticationHealthUpdatedAt: NonEmptyStringSchema,
     externalReference: NonEmptyStringSchema.optional(),
     labels: z.array(NonEmptyStringSchema).optional(),
@@ -260,12 +266,7 @@ export const ProfileMutationSummarySchema = z
     hasHardwareFingerprint: z.boolean(),
     hasAuthenticationState: z.boolean(),
     provisioningTokenStatus: ProvisioningTokenStatusSchema,
-    authenticationHealth: z.enum([
-      "NOT_PROVISIONED",
-      "HEALTHY",
-      "REAUTH_REQUIRED",
-      "CHECKPOINT_REVIEW_REQUIRED",
-    ]),
+    authenticationHealth: KnownProfileAuthenticationHealthSchema,
     authenticationHealthUpdatedAt: NonEmptyStringSchema,
   })
   .strict();

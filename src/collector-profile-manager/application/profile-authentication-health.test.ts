@@ -10,6 +10,8 @@ import type { Clock, TokenGenerator } from "./index";
 import { InMemoryProfileRepository } from "./test-support/in-memory-repositories";
 import {
   PROFILE_AUTHENTICATION_HEALTH_VALUES,
+  ProfileAuthenticationHealthSchema,
+  CollectorProfileSchema,
   createPendingCollectorProfile,
   markCollectorProfileSessionIngested,
 } from "../domain";
@@ -499,3 +501,176 @@ function createCookies(): BrowserCookie[] {
 function createLocalStorage(): LocalStorageEntry[] {
   return [{ origin: "https://example.test", key: "auth", value: "val" }];
 }
+
+// ---------------------------------------------------------------------------
+// Domain/schema: ProfileAuthenticationHealthSchema validation
+// ---------------------------------------------------------------------------
+
+describe("ProfileAuthenticationHealthSchema strict validation", () => {
+  it.each([
+    "NOT_PROVISIONED",
+    "HEALTHY",
+    "REAUTH_REQUIRED",
+    "CHECKPOINT_REVIEW_REQUIRED",
+  ] as const)("parses valid value %s", (value) => {
+    expect(ProfileAuthenticationHealthSchema.safeParse(value).success).toBe(true);
+  });
+
+  it("rejects unknown value", () => {
+    expect(ProfileAuthenticationHealthSchema.safeParse("UNKNOWN").success).toBe(false);
+  });
+
+  it("rejects lowercase variant 'healthy'", () => {
+    expect(ProfileAuthenticationHealthSchema.safeParse("healthy").success).toBe(false);
+  });
+
+  it("rejects lowercase variant 'not_provisioned'", () => {
+    expect(ProfileAuthenticationHealthSchema.safeParse("not_provisioned").success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Domain/schema: CollectorProfileSchema requires health fields
+// ---------------------------------------------------------------------------
+
+describe("CollectorProfileSchema requires authentication health fields", () => {
+  it("fails when authenticationHealth is missing", () => {
+    const profile = createMinimalProfile();
+    const { authenticationHealth: _ah, ...withoutHealth } = profile as unknown as Record<string, unknown>;
+    expect(CollectorProfileSchema.safeParse(withoutHealth).success).toBe(false);
+  });
+
+  it("fails when authenticationHealthUpdatedAt is missing", () => {
+    const profile = createMinimalProfile();
+    const { authenticationHealthUpdatedAt: _ahu, ...withoutTimestamp } = profile as unknown as Record<string, unknown>;
+    expect(CollectorProfileSchema.safeParse(withoutTimestamp).success).toBe(false);
+  });
+
+  it("fails when authenticationHealth is an invalid value", () => {
+    expect(CollectorProfileSchema.safeParse({
+      ...createMinimalProfile(),
+      authenticationHealth: "COMPROMISED",
+    }).success).toBe(false);
+  });
+
+  it("fails when authenticationHealthUpdatedAt is not a valid ISO datetime", () => {
+    expect(CollectorProfileSchema.safeParse({
+      ...createMinimalProfile(),
+      authenticationHealthUpdatedAt: "not-a-date",
+    }).success).toBe(false);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Application: empty cookies rejected before token consumption
+// ---------------------------------------------------------------------------
+
+describe("IngestProfileSessionUseCase empty-cookie guard", () => {
+  it("rejects empty cookies with a clear error message", async () => {
+    const profiles = new InMemoryProfileRepository();
+    const pendingLogin = createPendingLoginProfile();
+    await profiles.save(pendingLogin);
+
+    await expect(
+      new IngestProfileSessionUseCase(profiles, makeClock(later)).execute({
+        provisioningToken: "provisioning-token-1",
+        cookies: [],
+        localStorage: createLocalStorage(),
+      }),
+    ).rejects.toThrow("at least one cookie");
+  });
+
+  it("does not consume provisioning token when cookies are empty", async () => {
+    const profiles = new InMemoryProfileRepository();
+    const pendingLogin = createPendingLoginProfile();
+    await profiles.save(pendingLogin);
+
+    try {
+      await new IngestProfileSessionUseCase(profiles, makeClock(later)).execute({
+        provisioningToken: "provisioning-token-1",
+        cookies: [],
+        localStorage: [],
+      });
+    } catch { /* expected */ }
+
+    const saved = await profiles.findById(pendingLogin.identity.id);
+    expect(saved?.provisioningToken.status).toBe("ISSUED");
+  });
+
+  it("does not transition status to READY when cookies are empty", async () => {
+    const profiles = new InMemoryProfileRepository();
+    const pendingLogin = createPendingLoginProfile();
+    await profiles.save(pendingLogin);
+
+    try {
+      await new IngestProfileSessionUseCase(profiles, makeClock(later)).execute({
+        provisioningToken: "provisioning-token-1",
+        cookies: [],
+        localStorage: [],
+      });
+    } catch { /* expected */ }
+
+    const saved = await profiles.findById(pendingLogin.identity.id);
+    expect(saved?.identity.status).toBe("PENDING_LOGIN");
+  });
+
+  it("does not change authenticationHealth when cookies are empty", async () => {
+    const profiles = new InMemoryProfileRepository();
+    const pendingLogin: CollectorProfile = {
+      ...createPendingLoginProfile(),
+      authenticationHealth: "REAUTH_REQUIRED",
+      authenticationHealthUpdatedAt: now,
+    };
+    await profiles.save(pendingLogin);
+
+    try {
+      await new IngestProfileSessionUseCase(profiles, makeClock(later)).execute({
+        provisioningToken: "provisioning-token-1",
+        cookies: [],
+        localStorage: [],
+      });
+    } catch { /* expected */ }
+
+    const saved = await profiles.findById(pendingLogin.identity.id);
+    expect(saved?.authenticationHealth).toBe("REAUTH_REQUIRED");
+    expect(saved?.authenticationHealthUpdatedAt).toBe(now);
+  });
+
+  it("accepts empty localStorage when cookies are present", async () => {
+    const profiles = new InMemoryProfileRepository();
+    const pendingLogin = createPendingLoginProfile();
+    await profiles.save(pendingLogin);
+
+    const result = await new IngestProfileSessionUseCase(
+      profiles,
+      makeClock(later),
+    ).execute({
+      provisioningToken: "provisioning-token-1",
+      cookies: createCookies(),
+      localStorage: [],
+    });
+
+    expect(result.authenticationHealth).toBe("HEALTHY");
+    expect(result.identity.status).toBe("READY");
+  });
+
+  it("successful ingestion with valid cookies sets HEALTHY and consumes token", async () => {
+    const profiles = new InMemoryProfileRepository();
+    const pendingLogin = createPendingLoginProfile();
+    await profiles.save(pendingLogin);
+
+    const result = await new IngestProfileSessionUseCase(
+      profiles,
+      makeClock(later),
+    ).execute({
+      provisioningToken: "provisioning-token-1",
+      cookies: createCookies(),
+      localStorage: createLocalStorage(),
+    });
+
+    expect(result.authenticationHealth).toBe("HEALTHY");
+    expect(result.provisioningToken.status).toBe("CONSUMED");
+    expect(result.identity.status).toBe("READY");
+  });
+});

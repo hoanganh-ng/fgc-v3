@@ -75,6 +75,67 @@ describe("collector profile database mapper", () => {
   });
 });
 
+  it("maps authentication health fields to row and back", () => {
+    const profile: CollectorProfile = {
+      ...createPersistableProfile(),
+      authenticationHealth: "HEALTHY",
+      authenticationHealthUpdatedAt: createdAt,
+    };
+    const row = toCollectorProfileRow(profile);
+    expect(row.authenticationHealth).toBe("HEALTHY");
+    expect(row.authenticationHealthUpdatedAt).toBe(createdAt);
+
+    const mapped = toCollectorProfileDomain(row);
+    expect(mapped.authenticationHealth).toBe("HEALTHY");
+    expect(mapped.authenticationHealthUpdatedAt).toBe(createdAt);
+  });
+
+  it("maps REAUTH_REQUIRED health round-trip", () => {
+    const profile: CollectorProfile = {
+      ...createPersistableProfile(),
+      authenticationHealth: "REAUTH_REQUIRED",
+      authenticationHealthUpdatedAt: createdAt,
+    };
+    const row = toCollectorProfileRow(profile);
+    expect(row.authenticationHealth).toBe("REAUTH_REQUIRED");
+    const mapped = toCollectorProfileDomain(row);
+    expect(mapped.authenticationHealth).toBe("REAUTH_REQUIRED");
+  });
+
+  it("maps CHECKPOINT_REVIEW_REQUIRED health round-trip", () => {
+    const profile: CollectorProfile = {
+      ...createPersistableProfile(),
+      authenticationHealth: "CHECKPOINT_REVIEW_REQUIRED",
+      authenticationHealthUpdatedAt: createdAt,
+    };
+    const row = toCollectorProfileRow(profile);
+    expect(row.authenticationHealth).toBe("CHECKPOINT_REVIEW_REQUIRED");
+    const mapped = toCollectorProfileDomain(row);
+    expect(mapped.authenticationHealth).toBe("CHECKPOINT_REVIEW_REQUIRED");
+  });
+
+  it("defaults null authentication_health row to NOT_PROVISIONED", () => {
+    const row = {
+      ...toCollectorProfileRow(createPersistableProfile()),
+      authenticationHealth: null as any,
+      authenticationHealthUpdatedAt: null as any,
+    } as any;
+    const mapped = toCollectorProfileDomain(row);
+    expect(mapped.authenticationHealth).toBe("NOT_PROVISIONED");
+  });
+
+  it("falls back to updatedAt for authenticationHealthUpdatedAt when row value is null", () => {
+    const profile = createPersistableProfile();
+    const row = {
+      ...toCollectorProfileRow(profile),
+      authenticationHealthUpdatedAt: null as any,
+    } as any;
+    const mapped = toCollectorProfileDomain(row);
+    expect(mapped.authenticationHealthUpdatedAt).toBe(createdAt);
+  });
+
+
+
 function createPersistableProfile(): CollectorProfile {
   const profile = createPendingCollectorProfile({
     id: "profile-1",

@@ -36,6 +36,12 @@ export class IngestProfileSessionUseCase {
   public async execute(
     input: IngestProfileSessionInput,
   ): Promise<CollectorProfile> {
+    if (input.cookies.length === 0) {
+      throw new InvalidApplicationOperationError(
+        "Session ingestion requires at least one cookie.",
+      );
+    }
+
     const profile = await this.profiles.findByProvisioningToken(
       input.provisioningToken,
     );

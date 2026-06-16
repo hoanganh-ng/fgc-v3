@@ -1461,6 +1461,169 @@ describe("HTTP server", () => {
       await server.close();
     }
   });
+
+  it("list response includes authenticationHealth and authenticationHealthUpdatedAt", async () => {
+    const { server, service } = createTestServer();
+
+    service.listProfiles.setOutput({
+      items: [
+        toProfileSummaryDto(
+          createProfile({
+            status: "READY",
+            authenticationState: createAuthenticationState(),
+            provisioningTokenStatus: "CONSUMED",
+          }),
+        ),
+      ],
+      page: { limit: 10, offset: 0, total: 1 },
+    });
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles",
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body.items[0]).toHaveProperty("authenticationHealth");
+      expect(body.items[0]).toHaveProperty("authenticationHealthUpdatedAt");
+      expect(["NOT_PROVISIONED", "HEALTHY", "REAUTH_REQUIRED", "CHECKPOINT_REVIEW_REQUIRED"]).toContain(
+        body.items[0].authenticationHealth,
+      );
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("get-profile detail response includes authenticationHealth and authenticationHealthUpdatedAt", async () => {
+    const { server, service } = createTestServer();
+
+    service.getProfile.setOutput(
+      toProfileDetailDto(
+        createProfile({ status: "READY", authenticationState: createAuthenticationState(), provisioningTokenStatus: "CONSUMED" }),
+      ),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles/profile-1",
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body.profile).toHaveProperty("authenticationHealth");
+      expect(body.profile).toHaveProperty("authenticationHealthUpdatedAt");
+      expect(body.profile).toHaveProperty("accountStage");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("create-profile mutation response includes authenticationHealth and authenticationHealthUpdatedAt", async () => {
+    const { server } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles",
+        payload: { id: "profile-1", displayName: "Profile 1" },
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(201);
+      expect(body.profile).toHaveProperty("authenticationHealth");
+      expect(body.profile).toHaveProperty("authenticationHealthUpdatedAt");
+      expect(body.profile.authenticationHealth).toBe("NOT_PROVISIONED");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects ingest-session with empty cookies array before calling service", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/provisioning/some-token/session",
+        payload: {
+          cookies: [],
+          localStorage: [],
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(service.ingestProfileSession.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("ingest-session response includes authenticationHealth on success", async () => {
+    const { server, service } = createTestServer();
+
+    service.ingestProfileSession.setOutput(
+      createProfile({
+        status: "READY",
+        authenticationState: createAuthenticationState(),
+        provisioningTokenStatus: "CONSUMED",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/provisioning/some-token/session",
+        payload: {
+          cookies: createCookies(),
+          localStorage: [],
+        },
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body.profile).toHaveProperty("authenticationHealth");
+      expect(body.profile).toHaveProperty("authenticationHealthUpdatedAt");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("release-lease response includes authenticationHealth in profile summary", async () => {
+    const { server, service } = createTestServer();
+    const lease = createReleasedLease();
+
+    service.releaseProfileLease.setOutput({
+      lease,
+      profile: createProfile({
+        status: "READY",
+        authenticationState: createAuthenticationState(),
+        provisioningTokenStatus: "CONSUMED",
+      }),
+    });
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profile-leases/lease-1/release",
+        payload: {},
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body.profile).toHaveProperty("authenticationHealth");
+      expect(body.profile).toHaveProperty("authenticationHealthUpdatedAt");
+    } finally {
+      await server.close();
+    }
+  });
+
+
 });
 
 class StubUseCase<Input, Output> {
