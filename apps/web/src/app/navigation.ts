@@ -4,6 +4,7 @@ import {
   FileText,
   FolderKanban,
   Gauge,
+  ShieldCheck,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -44,5 +45,10 @@ export const primaryNavigation: readonly NavigationItem[] = [
     label: "Exercise Runs",
     path: "/account-exercise-runs",
     icon: Activity,
+  },
+  {
+    label: "Access Checks",
+    path: "/profile-source-access-check-runs",
+    icon: ShieldCheck,
   },
 ];

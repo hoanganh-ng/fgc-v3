@@ -1,7 +1,7 @@
 # Active Sprint
 
-Sprint 051 is active.
+Sprint 052 is active.
 
 Implementation authority:
 
-- [Sprint 051 - Queued Profile-Source Access Check Worker](SPRINT-051-profile-source-access-check-worker.md)
+- [Sprint 052 - Profile-Source Access Check Runs Web UI](SPRINT-052-profile-source-access-check-runs-web-ui.md)

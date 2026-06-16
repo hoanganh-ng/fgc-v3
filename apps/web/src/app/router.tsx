@@ -12,6 +12,7 @@ import { ProfileDetailPage } from "@/pages/profile-detail-page";
 import { ProfilesPage } from "@/pages/profiles-page";
 import { RouteErrorPage } from "@/pages/route-error-page";
 import { SourceGroupsPage } from "@/pages/source-groups-page";
+import { ProfileSourceAccessCheckRunsPage } from "@/pages/profile-source-access-check-runs-page";
 
 export const router = createBrowserRouter([
   {
@@ -58,6 +59,10 @@ export const router = createBrowserRouter([
       {
         path: "account-exercise-runs",
         element: <AccountExerciseRunsPage />,
+      },
+      {
+        path: "profile-source-access-check-runs",
+        element: <ProfileSourceAccessCheckRunsPage />,
       },
       {
         path: "*",
