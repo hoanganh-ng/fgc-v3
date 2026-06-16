@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { COLLECTOR_RUNTIME_ACCOUNT_STAGES } from "./account-stage";
 import { PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUSES } from "./profile-source-access-check-run-status";
 import { PROFILE_SOURCE_ACCESS_CHECK_RUN_TRIGGER_TYPES } from "./profile-source-access-check-run-trigger-type";
 
@@ -92,7 +93,7 @@ export const ProfileSourceAccessCheckRunSchema = z
     sourceGroupId: NonEmptyStringSchema,
     triggerType: ProfileSourceAccessCheckRunTriggerTypeSchema,
     status: ProfileSourceAccessCheckRunStatusSchema,
-    accountStageAtRequest: NonEmptyStringSchema,
+    accountStageAtRequest: z.enum(COLLECTOR_RUNTIME_ACCOUNT_STAGES),
     target: ProfileSourceAccessCheckRunTargetSchema,
     failureReason: ProfileSourceAccessCheckRunFailureReasonSchema.optional(),
     requestedAt: ProfileSourceAccessCheckRunIsoDateTimeSchema,

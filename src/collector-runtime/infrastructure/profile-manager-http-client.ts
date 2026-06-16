@@ -6,6 +6,7 @@ import type {
   ProfileLeaseReleaseResult,
   RuntimeProfileConfigurationPort,
   RuntimeProfileConfigurationResult,
+  CollectorRuntimeAccountStage,
 } from "../application";
 import type {
   FetchLike,
@@ -84,7 +85,7 @@ export type SafeProfileAccountStageResult =
   | {
       readonly ok: true;
       readonly profileId: string;
-      readonly accountStage: string;
+      readonly accountStage: CollectorRuntimeAccountStage;
     }
   | {
       readonly ok: false;
@@ -739,7 +740,7 @@ function toSafeProfileAccountStageSuccessResult(
   return {
     ok: true,
     profileId,
-    accountStage,
+    accountStage: accountStage as CollectorRuntimeAccountStage,
   };
 }
 

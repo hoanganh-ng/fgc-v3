@@ -14,7 +14,7 @@ export interface ProfileSourceAccessCheckRunListQuery {
 
 export interface ProfileSourceAccessCheckRunListResult {
   readonly items: readonly ProfileSourceAccessCheckRun[];
-  readonly total?: number;
+  readonly total: number;
 }
 
 export interface ProfileSourceAccessCheckRunRepository {

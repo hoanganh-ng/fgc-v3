@@ -18,7 +18,7 @@ import type {
 } from "../ports/source-group-lookup.port";
 import { toProfileSourceAccessCheckRunIsoDateTime, validateProfileSourceAccessCheckRunForApplication } from "../profile-source-access-check-run-validation";
 import { canonicalizeFacebookUrl } from "../../domain";
-import type { ProfileSourceAccessCheckRun } from "../../domain";
+import type { CollectorRuntimeAccountStage, ProfileSourceAccessCheckRun } from "../../domain";
 
 export interface RequestProfileSourceAccessCheckRunInput {
   readonly profileId: string;
@@ -88,16 +88,14 @@ export class RequestProfileSourceAccessCheckRunUseCase {
     return checkRun;
   }
 
-  private async resolveProfileStage(profileId: string): Promise<string> {
+  private async resolveProfileStage(profileId: string): Promise<CollectorRuntimeAccountStage> {
     let result;
     try {
       result = await this.profiles.getProfileAccountStage(profileId);
     } catch (error) {
       throw new ProfileReferenceLookupFailedError(
         profileId,
-        error instanceof Error && error.message.trim().length > 0
-          ? error.message
-          : "Could not safely look up profile.",
+        "Could not safely look up profile.",
       );
     }
 
@@ -108,10 +106,14 @@ export class RequestProfileSourceAccessCheckRunUseCase {
       ) {
         throw new ProfileNotFoundError(profileId);
       }
-      throw new ProfileReferenceLookupFailedError(profileId, result.errorMessage, {
+      throw new ProfileReferenceLookupFailedError(profileId, "Profile Manager returned an error.", {
         causeCode: result.errorCode,
         ...(result.statusCode !== undefined ? { statusCode: result.statusCode } : {}),
       });
+    }
+
+    if (result.profileId !== profileId) {
+      throw new ProfileReferenceLookupFailedError(profileId, "Profile Manager returned a mismatched profile ID.");
     }
 
     return result.accountStage;
@@ -126,9 +128,7 @@ export class RequestProfileSourceAccessCheckRunUseCase {
     } catch (error) {
       throw new SourceGroupLookupFailedError(
         sourceGroupId,
-        error instanceof Error && error.message.trim().length > 0
-          ? error.message
-          : "Could not safely look up source group.",
+        "Could not safely look up source group.",
       );
     }
 
@@ -139,13 +139,17 @@ export class RequestProfileSourceAccessCheckRunUseCase {
       ) {
         throw new ProfileSourceAccessCheckRunSourceGroupNotFoundError(sourceGroupId);
       }
-      throw new SourceGroupLookupFailedError(sourceGroupId, result.errorMessage, {
+      throw new SourceGroupLookupFailedError(sourceGroupId, "Content Manager returned an error.", {
         causeCode: result.errorCode,
         ...(result.statusCode !== undefined ? { statusCode: result.statusCode } : {}),
       });
     }
 
     const sourceGroup = result.sourceGroup;
+
+    if (sourceGroup.id !== sourceGroupId) {
+      throw new SourceGroupLookupFailedError(sourceGroupId, "Content Manager returned a mismatched source group ID.");
+    }
 
     if (sourceGroup.platform !== "FACEBOOK") {
       throw new ProfileSourceAccessCheckRunSourceGroupPlatformUnsupportedError(

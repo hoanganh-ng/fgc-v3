@@ -1,8 +1,16 @@
+export type CollectorRuntimeAccountStage =
+  | "NEW_ACCOUNT"
+  | "WARMING"
+  | "COLLECTION_READY"
+  | "LIMITED"
+  | "NEEDS_REVIEW"
+  | "RETIRED";
+
 export type ProfileReferenceResult =
   | {
       readonly ok: true;
       readonly profileId: string;
-      readonly accountStage: string;
+      readonly accountStage: CollectorRuntimeAccountStage;
     }
   | {
       readonly ok: false;

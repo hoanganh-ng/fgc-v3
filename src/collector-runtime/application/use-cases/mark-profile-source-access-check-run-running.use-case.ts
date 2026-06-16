@@ -8,6 +8,10 @@ import {
 import { assertValidProfileSourceAccessCheckRunStatusTransition } from "../../domain";
 import type { ProfileSourceAccessCheckRun } from "../../domain";
 
+export interface MarkProfileSourceAccessCheckRunRunningInput {
+  readonly checkRunId: string;
+}
+
 export class MarkProfileSourceAccessCheckRunRunningUseCase {
   public constructor(
     private readonly checkRuns: ProfileSourceAccessCheckRunRepository,
@@ -15,11 +19,11 @@ export class MarkProfileSourceAccessCheckRunRunningUseCase {
   ) {}
 
   public async execute(
-    checkRunId: string,
+    input: MarkProfileSourceAccessCheckRunRunningInput,
   ): Promise<ProfileSourceAccessCheckRun> {
     const checkRun = await loadValidatedProfileSourceAccessCheckRunById(
       this.checkRuns,
-      checkRunId,
+      input.checkRunId,
     );
 
     assertValidProfileSourceAccessCheckRunStatusTransition(

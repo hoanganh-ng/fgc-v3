@@ -141,7 +141,7 @@ describe("ProfileSourceAccessCheckRun HTTP routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(service.getProfileSourceAccessCheckRun.calls).toEqual(["check-run-1"]);
+      expect(service.getProfileSourceAccessCheckRun.calls).toEqual([{ checkRunId: "check-run-1" }]);
       expect(response.json()).toMatchObject({
         profileSourceAccessCheckRun: {
           id: "check-run-1",
@@ -178,7 +178,11 @@ describe("ProfileSourceAccessCheckRun HTTP routes", () => {
         createProfileSourceAccessCheckRun({ id: "check-run-1" }),
         createProfileSourceAccessCheckRun({ id: "check-run-2" }),
       ],
-      total: 2,
+      page: {
+        limit: 50,
+        offset: 0,
+        total: 2,
+      },
     });
 
     try {
@@ -190,7 +194,7 @@ describe("ProfileSourceAccessCheckRun HTTP routes", () => {
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
         items: [{ id: "check-run-1" }, { id: "check-run-2" }],
-        total: 2,
+        page: { limit: 50, offset: 0, total: 2 },
       });
       expect(service.listProfileSourceAccessCheckRuns.calls).toEqual([
         {
@@ -216,7 +220,7 @@ describe("ProfileSourceAccessCheckRun HTTP routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(service.cancelProfileSourceAccessCheckRun.calls).toEqual(["check-run-1"]);
+      expect(service.cancelProfileSourceAccessCheckRun.calls).toEqual([{ checkRunId: "check-run-1" }]);
       expect(response.json()).toMatchObject({
         profileSourceAccessCheckRun: {
           id: "check-run-1",
@@ -228,115 +232,9 @@ describe("ProfileSourceAccessCheckRun HTTP routes", () => {
     }
   });
 
-  it("marks a check run running", async () => {
-    const { server, service } = createTestServer();
-    service.markProfileSourceAccessCheckRunRunning.setOutput(
-      createProfileSourceAccessCheckRun({ id: "check-run-1", status: "RUNNING" }),
-    );
 
-    try {
-      const response = await server.inject({
-        method: "POST",
-        url: "/collector/profile-source-access-check-runs/check-run-1/running",
-      });
 
-      expect(response.statusCode).toBe(200);
-      expect(service.markProfileSourceAccessCheckRunRunning.calls).toEqual(["check-run-1"]);
-      expect(response.json()).toMatchObject({
-        profileSourceAccessCheckRun: {
-          id: "check-run-1",
-          status: "RUNNING",
-        },
-      });
-    } finally {
-      await server.close();
-    }
-  });
 
-  it("marks a check run succeeded", async () => {
-    const { server, service } = createTestServer();
-    service.markProfileSourceAccessCheckRunSucceeded.setOutput(
-      createProfileSourceAccessCheckRun({ id: "check-run-1", status: "SUCCEEDED" }),
-    );
-
-    try {
-      const response = await server.inject({
-        method: "POST",
-        url: "/collector/profile-source-access-check-runs/check-run-1/succeed",
-      });
-
-      expect(response.statusCode).toBe(200);
-      expect(service.markProfileSourceAccessCheckRunSucceeded.calls).toEqual(["check-run-1"]);
-      expect(response.json()).toMatchObject({
-        profileSourceAccessCheckRun: {
-          id: "check-run-1",
-          status: "SUCCEEDED",
-        },
-      });
-    } finally {
-      await server.close();
-    }
-  });
-
-  it("marks a check run failed", async () => {
-    const { server, service } = createTestServer();
-    service.markProfileSourceAccessCheckRunFailed.setOutput(
-      createProfileSourceAccessCheckRun({ id: "check-run-1", status: "FAILED" }),
-    );
-
-    try {
-      const response = await server.inject({
-        method: "POST",
-        url: "/collector/profile-source-access-check-runs/check-run-1/fail",
-        payload: {
-          failureReason: {
-            code: "WORKER_FAILED",
-            message: "crashed",
-          },
-        },
-      });
-
-      expect(response.statusCode).toBe(200);
-      expect(service.markProfileSourceAccessCheckRunFailed.calls).toEqual([
-        {
-          checkRunId: "check-run-1",
-          failureReason: {
-            code: "WORKER_FAILED",
-            message: "crashed",
-          },
-        },
-      ]);
-      expect(response.json()).toMatchObject({
-        profileSourceAccessCheckRun: {
-          id: "check-run-1",
-          status: "FAILED",
-        },
-      });
-    } finally {
-      await server.close();
-    }
-  });
-
-  it("returns 409 for invalid state transition", async () => {
-    const { server, service } = createTestServer();
-    service.markProfileSourceAccessCheckRunRunning.setError(
-      new InvalidProfileSourceAccessCheckRunStatusTransitionError("SUCCEEDED", "RUNNING"),
-    );
-
-    try {
-      const response = await server.inject({
-        method: "POST",
-        url: "/collector/profile-source-access-check-runs/check-run-1/running",
-      });
-
-      expect(response.statusCode).toBe(409);
-      expect(response.json().error.code).toBe(
-        "INVALID_PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUS_TRANSITION",
-      );
-    } finally {
-      await server.close();
-    }
-  });
 });
 
 function createTestServer(): {

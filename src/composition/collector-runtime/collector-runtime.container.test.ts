@@ -135,7 +135,7 @@ class FakeProfileReferencePort implements ProfileReferencePort {
     return {
       ok: true,
       profileId: "profile-1",
-      accountStage: "WARM",
+      accountStage: "WARMING",
     };
   }
 }

@@ -46,7 +46,7 @@ export interface FakeCollectorRuntimeHttpService
       readonly page: {
         readonly limit: number;
         readonly offset: number;
-        readonly total?: number;
+        readonly total: number;
       };
     }
   >;
@@ -75,7 +75,7 @@ export interface FakeCollectorRuntimeHttpService
       readonly page: {
         readonly limit: number;
         readonly offset: number;
-        readonly total?: number;
+        readonly total: number;
       };
     }
   >;
@@ -86,7 +86,11 @@ export interface FakeCollectorRuntimeHttpService
     unknown,
     {
       readonly items: readonly ProfileSourceAccessCheckRun[];
-      readonly total: number;
+      readonly page: {
+        readonly limit: number;
+        readonly offset: number;
+        readonly total: number;
+      };
     }
   >;
   readonly markProfileSourceAccessCheckRunRunning: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
@@ -180,7 +184,11 @@ export function createFakeCollectorRuntimeHttpService(): FakeCollectorRuntimeHtt
     getProfileSourceAccessCheckRun: new StubUseCase(createProfileSourceAccessCheckRun()),
     listProfileSourceAccessCheckRuns: new StubUseCase({
       items: [createProfileSourceAccessCheckRun()],
-      total: 1,
+      page: {
+        limit: 50,
+        offset: 0,
+        total: 1,
+      },
     }),
     markProfileSourceAccessCheckRunRunning: new StubUseCase(createProfileSourceAccessCheckRun()),
     markProfileSourceAccessCheckRunSucceeded: new StubUseCase(createProfileSourceAccessCheckRun()),
@@ -299,7 +307,7 @@ export function createProfileSourceAccessCheckRun(
     sourceGroupId: options.sourceGroupId ?? "source-group-1",
     triggerType: options.triggerType ?? "MANUAL",
     status: options.status ?? "QUEUED",
-    accountStageAtRequest: options.accountStageAtRequest ?? "WARM",
+    accountStageAtRequest: options.accountStageAtRequest ?? "WARMING",
     target: options.target ?? {
       platform: "FACEBOOK",
       routeType: "DIRECT_GROUP_URL",

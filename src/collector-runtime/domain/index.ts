@@ -3,6 +3,7 @@ export * from "./account-exercise-run-state-machine";
 export * from "./account-exercise-run-status";
 export * from "./account-exercise-run.schemas";
 export * from "./account-exercise-type";
+export * from "./account-stage";
 export * from "./collection-run";
 export * from "./collection-run-errors";
 export * from "./collection-run-state-machine";

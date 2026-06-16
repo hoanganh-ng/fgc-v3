@@ -15,6 +15,12 @@ import type {
   RequestAccountExerciseRunInput,
   RequestCollectionRunInput,
   RequestProfileSourceAccessCheckRunInput,
+  GetProfileSourceAccessCheckRunInput,
+  ListProfileSourceAccessCheckRunsInput,
+  ListProfileSourceAccessCheckRunsOutput,
+  CancelProfileSourceAccessCheckRunInput,
+  MarkProfileSourceAccessCheckRunRunningInput,
+  MarkProfileSourceAccessCheckRunSucceededInput,
 } from "../../../collector-runtime/application";
 import type {
   AccountExerciseRun,
@@ -66,15 +72,11 @@ import {
   startAccountExerciseRunHttpRouteSchema,
   succeedAccountExerciseRunHttpRouteSchema,
   cancelProfileSourceAccessCheckRunHttpRouteSchema,
-  failProfileSourceAccessCheckRunHttpRouteSchema,
   getProfileSourceAccessCheckRunHttpRouteSchema,
   listProfileSourceAccessCheckRunsHttpRouteSchema,
   requestProfileSourceAccessCheckRunHttpRouteSchema,
-  markProfileSourceAccessCheckRunRunningHttpRouteSchema,
-  markProfileSourceAccessCheckRunSucceededHttpRouteSchema,
   ProfileSourceAccessCheckRunIdHttpParamsSchema,
   RequestProfileSourceAccessCheckRunHttpBodySchema,
-  FailProfileSourceAccessCheckRunHttpBodySchema,
   ListProfileSourceAccessCheckRunsHttpQuerySchema,
 } from "../schemas/collector-runtime.http-schemas";
 
@@ -136,27 +138,23 @@ export interface CollectorRuntimeHttpService {
     ProfileSourceAccessCheckRun
   >;
   readonly getProfileSourceAccessCheckRun: ExecutableUseCase<
-    string,
+    GetProfileSourceAccessCheckRunInput,
     ProfileSourceAccessCheckRun
   >;
   readonly listProfileSourceAccessCheckRuns: ExecutableUseCase<
-    any, // ListProfileSourceAccessCheckRunsInput is implicit in schema, typing as any or full query type
-    any
+    ListProfileSourceAccessCheckRunsInput,
+    ListProfileSourceAccessCheckRunsOutput
   >;
   readonly markProfileSourceAccessCheckRunRunning: ExecutableUseCase<
-    string,
+    MarkProfileSourceAccessCheckRunRunningInput,
     ProfileSourceAccessCheckRun
   >;
   readonly markProfileSourceAccessCheckRunSucceeded: ExecutableUseCase<
-    string,
-    ProfileSourceAccessCheckRun
-  >;
-  readonly markProfileSourceAccessCheckRunFailed: ExecutableUseCase<
-    any,
+    MarkProfileSourceAccessCheckRunSucceededInput,
     ProfileSourceAccessCheckRun
   >;
   readonly cancelProfileSourceAccessCheckRun: ExecutableUseCase<
-    string,
+    CancelProfileSourceAccessCheckRunInput,
     ProfileSourceAccessCheckRun
   >;
 }
@@ -542,11 +540,18 @@ export function registerCollectorRuntimeRoutes(
         ListProfileSourceAccessCheckRunsHttpQuerySchema,
         request.query,
       );
-      const output = await collectorRuntime.listProfileSourceAccessCheckRuns.execute(query);
+      const input: ListProfileSourceAccessCheckRunsInput = {
+        ...(query.status !== undefined ? { status: query.status } : {}),
+        ...(query.profileId !== undefined ? { profileId: query.profileId } : {}),
+        ...(query.sourceGroupId !== undefined ? { sourceGroupId: query.sourceGroupId } : {}),
+        limit: query.limit,
+        offset: query.offset,
+      };
+      const output = await collectorRuntime.listProfileSourceAccessCheckRuns.execute(input);
 
       return {
         items: output.items.map(toProfileSourceAccessCheckRunDto),
-        total: output.total,
+        page: output.page,
       };
     },
   );
@@ -559,7 +564,9 @@ export function registerCollectorRuntimeRoutes(
         ProfileSourceAccessCheckRunIdHttpParamsSchema,
         request.params,
       );
-      const checkRun = await collectorRuntime.getProfileSourceAccessCheckRun.execute(params.checkRunId);
+      const checkRun = await collectorRuntime.getProfileSourceAccessCheckRun.execute({
+        checkRunId: params.checkRunId,
+      });
 
       return {
         profileSourceAccessCheckRun: toProfileSourceAccessCheckRunDto(checkRun),
@@ -575,61 +582,8 @@ export function registerCollectorRuntimeRoutes(
         ProfileSourceAccessCheckRunIdHttpParamsSchema,
         request.params,
       );
-      const checkRun = await collectorRuntime.cancelProfileSourceAccessCheckRun.execute(params.checkRunId);
-
-      return {
-        profileSourceAccessCheckRun: toProfileSourceAccessCheckRunDto(checkRun),
-      };
-    },
-  );
-
-  server.post(
-    "/collector/profile-source-access-check-runs/:checkRunId/running",
-    { schema: markProfileSourceAccessCheckRunRunningHttpRouteSchema },
-    async (request) => {
-      const params = parseHttpInput(
-        ProfileSourceAccessCheckRunIdHttpParamsSchema,
-        request.params,
-      );
-      const checkRun = await collectorRuntime.markProfileSourceAccessCheckRunRunning.execute(params.checkRunId);
-
-      return {
-        profileSourceAccessCheckRun: toProfileSourceAccessCheckRunDto(checkRun),
-      };
-    },
-  );
-
-  server.post(
-    "/collector/profile-source-access-check-runs/:checkRunId/succeed",
-    { schema: markProfileSourceAccessCheckRunSucceededHttpRouteSchema },
-    async (request) => {
-      const params = parseHttpInput(
-        ProfileSourceAccessCheckRunIdHttpParamsSchema,
-        request.params,
-      );
-      const checkRun = await collectorRuntime.markProfileSourceAccessCheckRunSucceeded.execute(params.checkRunId);
-
-      return {
-        profileSourceAccessCheckRun: toProfileSourceAccessCheckRunDto(checkRun),
-      };
-    },
-  );
-
-  server.post(
-    "/collector/profile-source-access-check-runs/:checkRunId/fail",
-    { schema: failProfileSourceAccessCheckRunHttpRouteSchema },
-    async (request) => {
-      const params = parseHttpInput(
-        ProfileSourceAccessCheckRunIdHttpParamsSchema,
-        request.params,
-      );
-      const body = parseHttpInput(
-        FailProfileSourceAccessCheckRunHttpBodySchema,
-        request.body,
-      );
-      const checkRun = await collectorRuntime.markProfileSourceAccessCheckRunFailed.execute({
+      const checkRun = await collectorRuntime.cancelProfileSourceAccessCheckRun.execute({
         checkRunId: params.checkRunId,
-        failureReason: body.failureReason,
       });
 
       return {
@@ -637,6 +591,7 @@ export function registerCollectorRuntimeRoutes(
       };
     },
   );
+
 }
 
 export function toAccountExerciseRunDto(

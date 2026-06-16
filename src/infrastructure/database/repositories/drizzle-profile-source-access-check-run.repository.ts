@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { DatabaseSession } from "../client";
 import { collectorProfileSourceAccessCheckRuns } from "../schema";
 import {
@@ -14,6 +14,7 @@ import type {
   ProfileSourceAccessCheckRunListResult,
   ProfileSourceAccessCheckRunRepository,
 } from "../../../collector-runtime/application";
+import { ProfileSourceAccessCheckRunConflictError } from "../../../collector-runtime/application";
 
 export class DrizzleProfileSourceAccessCheckRunRepository
   implements ProfileSourceAccessCheckRunRepository
@@ -23,19 +24,36 @@ export class DrizzleProfileSourceAccessCheckRunRepository
   public async save(run: ProfileSourceAccessCheckRun): Promise<void> {
     const record = toProfileSourceAccessCheckRunRecord(run);
 
-    await this.client
-      .insert(collectorProfileSourceAccessCheckRuns)
-      .values(record)
-      .onConflictDoUpdate({
-        target: collectorProfileSourceAccessCheckRuns.id,
-        set: {
-          status: record.status,
-          failureReason: record.failureReason,
-          startedAt: record.startedAt,
-          finishedAt: record.finishedAt,
-          updatedAt: record.updatedAt,
-        },
-      });
+    try {
+      await this.client
+        .insert(collectorProfileSourceAccessCheckRuns)
+        .values(record)
+        .onConflictDoUpdate({
+          target: collectorProfileSourceAccessCheckRuns.id,
+          set: {
+            status: record.status,
+            failureReason: record.failureReason,
+            startedAt: record.startedAt,
+            finishedAt: record.finishedAt,
+            updatedAt: record.updatedAt,
+          },
+        });
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "23505" &&
+        "constraint" in error &&
+        error.constraint === "collector_psa_check_runs_active_unique_idx"
+      ) {
+        throw new ProfileSourceAccessCheckRunConflictError(
+          run.profileId,
+          run.sourceGroupId,
+        );
+      }
+      throw error;
+    }
   }
 
   public async findById(
@@ -93,6 +111,13 @@ export class DrizzleProfileSourceAccessCheckRunRepository
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
+    const countResult = await this.client
+      .select({ count: sql<number>`count(*)::int` })
+      .from(collectorProfileSourceAccessCheckRuns)
+      .where(whereClause);
+
+    const total = countResult[0]?.count ?? 0;
+
     const results = await this.client
       .select()
       .from(collectorProfileSourceAccessCheckRuns)
@@ -103,6 +128,7 @@ export class DrizzleProfileSourceAccessCheckRunRepository
 
     return {
       items: results.map(toDomainProfileSourceAccessCheckRun),
+      total,
     };
   }
 }

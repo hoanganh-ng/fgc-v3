@@ -124,11 +124,7 @@ export const FailAccountExerciseRunHttpBodySchema = z
   })
   .strict();
 
-export const FailProfileSourceAccessCheckRunHttpBodySchema = z
-  .object({
-    failureReason: ProfileSourceAccessCheckRunFailureReasonSchema,
-  })
-  .strict();
+
 
 export const ListCollectionRunsHttpQuerySchema = z
   .object({
@@ -203,9 +199,7 @@ export type SucceedAccountExerciseRunHttpBody = z.infer<
 export type FailAccountExerciseRunHttpBody = z.infer<
   typeof FailAccountExerciseRunHttpBodySchema
 >;
-export type FailProfileSourceAccessCheckRunHttpBody = z.infer<
-  typeof FailProfileSourceAccessCheckRunHttpBodySchema
->;
+
 export type ListCollectionRunsHttpQuery = z.infer<
   typeof ListCollectionRunsHttpQuerySchema
 >;
@@ -841,22 +835,7 @@ const requestProfileSourceAccessCheckRunBodyJsonSchema = {
   },
 } as const;
 
-const failProfileSourceAccessCheckRunBodyJsonSchema = {
-  type: "object",
-  required: ["failureReason"],
-  additionalProperties: false,
-  properties: {
-    failureReason: {
-      type: "object",
-      required: ["code", "message"],
-      additionalProperties: true,
-      properties: {
-        code: nonEmptyStringJsonSchema,
-        message: nonEmptyStringJsonSchema,
-      },
-    },
-  },
-} as const;
+
 
 const profileSourceAccessCheckRunJsonSchema = {
   type: "object",
@@ -937,14 +916,14 @@ export const listProfileSourceAccessCheckRunsHttpRouteSchema = {
   response: {
     200: {
       type: "object",
-      required: ["items", "total"],
+      required: ["items", "page"],
       additionalProperties: false,
       properties: {
         items: {
           type: "array",
           items: profileSourceAccessCheckRunJsonSchema,
         },
-        total: { type: "integer" },
+        page: pageJsonSchema,
       },
     },
     "4xx": errorResponseJsonSchema,
@@ -952,54 +931,7 @@ export const listProfileSourceAccessCheckRunsHttpRouteSchema = {
   },
 } as const;
 
-export const markProfileSourceAccessCheckRunRunningHttpRouteSchema = {
-  params: profileSourceAccessCheckRunIdParamsJsonSchema,
-  response: {
-    200: {
-      type: "object",
-      required: ["profileSourceAccessCheckRun"],
-      additionalProperties: false,
-      properties: {
-        profileSourceAccessCheckRun: profileSourceAccessCheckRunJsonSchema,
-      },
-    },
-    "4xx": errorResponseJsonSchema,
-    "5xx": errorResponseJsonSchema,
-  },
-} as const;
 
-export const markProfileSourceAccessCheckRunSucceededHttpRouteSchema = {
-  params: profileSourceAccessCheckRunIdParamsJsonSchema,
-  response: {
-    200: {
-      type: "object",
-      required: ["profileSourceAccessCheckRun"],
-      additionalProperties: false,
-      properties: {
-        profileSourceAccessCheckRun: profileSourceAccessCheckRunJsonSchema,
-      },
-    },
-    "4xx": errorResponseJsonSchema,
-    "5xx": errorResponseJsonSchema,
-  },
-} as const;
-
-export const failProfileSourceAccessCheckRunHttpRouteSchema = {
-  params: profileSourceAccessCheckRunIdParamsJsonSchema,
-  body: failProfileSourceAccessCheckRunBodyJsonSchema,
-  response: {
-    200: {
-      type: "object",
-      required: ["profileSourceAccessCheckRun"],
-      additionalProperties: false,
-      properties: {
-        profileSourceAccessCheckRun: profileSourceAccessCheckRunJsonSchema,
-      },
-    },
-    "4xx": errorResponseJsonSchema,
-    "5xx": errorResponseJsonSchema,
-  },
-} as const;
 
 export const cancelProfileSourceAccessCheckRunHttpRouteSchema = {
   params: profileSourceAccessCheckRunIdParamsJsonSchema,

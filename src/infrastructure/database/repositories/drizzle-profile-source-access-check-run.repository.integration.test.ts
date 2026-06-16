@@ -217,7 +217,7 @@ if (!shouldRunDbTests) {
         sourceGroupId: "group-1",
         triggerType: "MANUAL",
         status: "QUEUED",
-        accountStageAtRequest: "WARM",
+        accountStageAtRequest: "WARMING",
         target: {
           platform: "FACEBOOK",
           routeType: "DIRECT_GROUP_URL",

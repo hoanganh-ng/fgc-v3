@@ -49,7 +49,7 @@ describe("collector runtime profile-source access check run application use case
       sourceGroupId: "source-group-1",
       triggerType: "MANUAL",
       status: "QUEUED",
-      accountStageAtRequest: "WARM",
+      accountStageAtRequest: "WARMING",
       target: {
         platform: "FACEBOOK",
         routeType: "DIRECT_GROUP_URL",
@@ -156,7 +156,7 @@ describe("collector runtime profile-source access check run application use case
 
     const get = await new GetProfileSourceAccessCheckRunUseCase(
       context.checkRuns,
-    ).execute(requested.id);
+    ).execute({ checkRunId: requested.id });
 
     expect(get).toEqual(requested);
   });
@@ -179,7 +179,7 @@ describe("collector runtime profile-source access check run application use case
     const canceled = await new CancelProfileSourceAccessCheckRunUseCase(
       context.checkRuns,
       context.clock,
-    ).execute(requested.id);
+    ).execute({ checkRunId: requested.id });
 
     expect(canceled.status).toBe("CANCELED");
     expect(canceled.finishedAt).toBe(updatedAt);
@@ -204,7 +204,7 @@ describe("collector runtime profile-source access check run application use case
     const running = await new MarkProfileSourceAccessCheckRunRunningUseCase(
       context.checkRuns,
       context.clock,
-    ).execute(requested.id);
+    ).execute({ checkRunId: requested.id });
 
     expect(running.status).toBe("RUNNING");
     expect(running.startedAt).toBe(updatedAt);
@@ -229,12 +229,12 @@ describe("collector runtime profile-source access check run application use case
     await new MarkProfileSourceAccessCheckRunRunningUseCase(
       context.checkRuns,
       context.clock,
-    ).execute(requested.id);
+    ).execute({ checkRunId: requested.id });
 
     const succeeded = await new MarkProfileSourceAccessCheckRunSucceededUseCase(
       context.checkRuns,
       context.clock,
-    ).execute(requested.id);
+    ).execute({ checkRunId: requested.id });
 
     expect(succeeded.status).toBe("SUCCEEDED");
     expect(succeeded.finishedAt).toBe(updatedAt);
@@ -259,7 +259,7 @@ describe("collector runtime profile-source access check run application use case
     await new MarkProfileSourceAccessCheckRunRunningUseCase(
       context.checkRuns,
       context.clock,
-    ).execute(requested.id);
+    ).execute({ checkRunId: requested.id });
 
     const failed = await new MarkProfileSourceAccessCheckRunFailedUseCase(
       context.checkRuns,
@@ -343,7 +343,7 @@ class FakeProfileReferencePort implements ProfileReferencePort {
   public result: ProfileReferenceResult = {
     ok: true,
     profileId: "profile-1",
-    accountStage: "WARM",
+    accountStage: "WARMING",
   };
 
   public async getProfileAccountStage(): Promise<ProfileReferenceResult> {
