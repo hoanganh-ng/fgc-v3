@@ -421,6 +421,49 @@ describe("ProfileManagerHttpClient", () => {
     });
   });
 
+  it("posts release request with authenticationObservation when provided", async () => {
+    const fetch = new FakeFetch(createReleaseResponse());
+    const client = createClient(fetch.fetch);
+
+    await client.releaseProfileLease({
+      profileId: "profile-1",
+      leaseId: "lease-1",
+      authenticationObservation: "LOGIN_REQUIRED",
+    });
+
+    expect(parseRequestBody(fetch)).toEqual({
+      authenticationObservation: "LOGIN_REQUIRED",
+    });
+  });
+
+  it("posts release request with CHECKPOINT_REQUIRED authenticationObservation when provided", async () => {
+    const fetch = new FakeFetch(createReleaseResponse());
+    const client = createClient(fetch.fetch);
+
+    await client.releaseProfileLease({
+      profileId: "profile-1",
+      leaseId: "lease-1",
+      authenticationObservation: "CHECKPOINT_REQUIRED",
+    });
+
+    expect(parseRequestBody(fetch)).toEqual({
+      authenticationObservation: "CHECKPOINT_REQUIRED",
+    });
+  });
+
+  it("omits authenticationObservation from request body when not provided", async () => {
+    const fetch = new FakeFetch(createReleaseResponse());
+    const client = createClient(fetch.fetch);
+
+    await client.releaseProfileLease({
+      profileId: "profile-1",
+      leaseId: "lease-1",
+    });
+
+    const body = parseRequestBody(fetch);
+    expect(body).not.toHaveProperty("authenticationObservation");
+  });
+
   it("maps release success responses", async () => {
     const fetch = new FakeFetch(createReleaseResponse());
     const client = createClient(fetch.fetch);

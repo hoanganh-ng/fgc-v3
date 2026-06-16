@@ -651,10 +651,13 @@ function isSuccessStatusCode(statusCode: number): boolean {
 
 function toReleaseProfileLeaseRequestBody(
   input: ProfileLeaseReleaseInput,
-): Record<string, number> {
+): Record<string, unknown> {
   return {
     ...(input.macroActionsPerformed !== undefined
       ? { macroActionsPerformed: input.macroActionsPerformed }
+      : {}),
+    ...(input.authenticationObservation !== undefined
+      ? { authenticationObservation: input.authenticationObservation }
       : {}),
   };
 }

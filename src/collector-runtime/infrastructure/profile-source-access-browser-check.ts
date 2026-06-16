@@ -1,6 +1,7 @@
 import type {
   BrowserProviderPort,
   BrowserProviderSession,
+  ProfileAuthenticationObservation,
   ProfileLeaseReleaseResult,
   RuntimeProfileConfigurationResult,
 } from "../application";
@@ -32,6 +33,7 @@ export interface ProfileSourceAccessBrowserProfileManagerPort {
     readonly profileId: string;
     readonly leaseId: string;
     readonly macroActionsPerformed?: number;
+    readonly authenticationObservation?: ProfileAuthenticationObservation;
   }): Promise<ProfileLeaseReleaseResult>;
 }
 
@@ -74,6 +76,7 @@ export class ProfileSourceAccessBrowserCheckAdapter
     let session: BrowserProviderSession | undefined;
     let closeFailed: CleanupFailureCode | undefined;
     let releaseResult: ProfileLeaseReleaseResult | undefined;
+    let blockingObservation: ProfileAuthenticationObservation | undefined;
 
     try {
       throwIfAborted(input.abortSignal);
@@ -179,11 +182,14 @@ export class ProfileSourceAccessBrowserCheckAdapter
           this.now,
           input.abortSignal,
         );
-        const blockingObservation = toBlockingObservation(
+        const sourceAccessObservation = toBlockingObservation(
+          observedPageState.blockingState,
+        );
+        blockingObservation = toAuthenticationObservation(
           observedPageState.blockingState,
         );
         const observation =
-          blockingObservation ??
+          sourceAccessObservation ??
           ProfileSourceAccessBrowserObservationSchema.parse(
             await runBoundedPhase(
               () =>
@@ -212,6 +218,7 @@ export class ProfileSourceAccessBrowserCheckAdapter
           leaseId,
           safeDeadlineAt,
           this.now,
+          blockingObservation,
         );
 
         if (closeFailed === "TIMEOUT") {
@@ -259,6 +266,7 @@ export class ProfileSourceAccessBrowserCheckAdapter
           leaseId,
           safeDeadlineAt,
           this.now,
+          blockingObservation,
         );
       }
     }
@@ -316,6 +324,7 @@ async function releaseLeaseSafely(
   leaseId: string,
   safeDeadlineAt: number | undefined,
   now: () => Date,
+  authenticationObservation?: ProfileAuthenticationObservation,
 ): Promise<ProfileLeaseReleaseResult> {
   if (profileId === undefined) {
     return {
@@ -330,6 +339,9 @@ async function releaseLeaseSafely(
       profileManager.releaseProfileLease({
         profileId,
         leaseId,
+        ...(authenticationObservation !== undefined
+          ? { authenticationObservation }
+          : {}),
       }),
     safeDeadlineAt,
     now,
@@ -628,5 +640,17 @@ function toBlockingObservation(
     };
   }
 
+  return undefined;
+}
+
+function toAuthenticationObservation(
+  blockingState: FacebookPageBlockingState,
+): ProfileAuthenticationObservation | undefined {
+  if (blockingState === "CHECKPOINT_REQUIRED") {
+    return "CHECKPOINT_REQUIRED";
+  }
+  if (blockingState === "LOGIN_REQUIRED") {
+    return "LOGIN_REQUIRED";
+  }
   return undefined;
 }

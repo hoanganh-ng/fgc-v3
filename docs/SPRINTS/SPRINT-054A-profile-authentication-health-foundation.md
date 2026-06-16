@@ -92,7 +92,9 @@ All migrations applied successfully via `pnpm db:migrate`. Verified `toCollector
 
 ## Sprint Status
 
-Sprint 054A is active.
+Sprint 054A is accepted. It established the profile authentication-health
+domain model that Sprint 054B builds on for runtime reporting and checkout
+enforcement.
 ## Required Context
 
 To work on this sprint, read the following:

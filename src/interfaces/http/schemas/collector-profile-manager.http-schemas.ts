@@ -8,6 +8,7 @@ import {
   LocalStorageEntrySchema,
   NetworkContextSchema,
   ProfileAccountStageSchema,
+  ProfileAuthenticationHealthObservationSchema,
   ProfileIdSchema,
   ProfileLeaseIdSchema,
   ProfileSourceAccessSourceGroupIdSchema,
@@ -132,6 +133,8 @@ export const CheckoutProfileForAssistedGroupAccessHttpBodySchema = z
 export const ReleaseProfileLeaseHttpBodySchema = z
   .object({
     macroActionsPerformed: z.number().int().min(0).optional(),
+    authenticationObservation:
+      ProfileAuthenticationHealthObservationSchema.optional(),
   })
   .strict();
 
@@ -911,6 +914,10 @@ export const releaseProfileLeaseHttpRouteSchema = {
       macroActionsPerformed: {
         type: "integer",
         minimum: 0,
+      },
+      authenticationObservation: {
+        type: "string",
+        enum: ["LOGIN_REQUIRED", "CHECKPOINT_REQUIRED"],
       },
     },
   },

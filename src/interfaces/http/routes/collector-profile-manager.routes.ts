@@ -439,6 +439,9 @@ export function registerCollectorProfileManagerRoutes(
         ...(body.macroActionsPerformed !== undefined
           ? { macroActionsPerformed: body.macroActionsPerformed }
           : {}),
+        ...(body.authenticationObservation !== undefined
+          ? { authenticationObservation: body.authenticationObservation }
+          : {}),
       } satisfies ReleaseProfileLeaseInput;
       const output =
         await collectorProfileManager.releaseProfileLease.execute(input);

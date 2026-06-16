@@ -1316,6 +1316,121 @@ describe("HTTP server", () => {
     }
   });
 
+  it("releases a profile lease with an authenticationObservation", async () => {
+    const { server, service } = createTestServer();
+    const lease = createReleasedLease();
+
+    service.releaseProfileLease.setOutput({
+      lease,
+      profile: createProfile({
+        status: "READY",
+        authenticationState: createAuthenticationState(),
+        provisioningTokenStatus: "CONSUMED",
+        authenticationHealth: "REAUTH_REQUIRED",
+      }),
+    });
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profile-leases/lease-1/release",
+        payload: {
+          authenticationObservation: "LOGIN_REQUIRED",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.releaseProfileLease.calls).toEqual([
+        {
+          leaseId: "lease-1",
+          authenticationObservation: "LOGIN_REQUIRED",
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("accepts a backward-compatible release request without authenticationObservation", async () => {
+    const { server, service } = createTestServer();
+    const lease = createReleasedLease();
+
+    service.releaseProfileLease.setOutput({
+      lease,
+      profile: createProfile({
+        status: "READY",
+        authenticationState: createAuthenticationState(),
+        provisioningTokenStatus: "CONSUMED",
+      }),
+    });
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profile-leases/lease-1/release",
+        payload: {},
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.releaseProfileLease.calls).toEqual([
+        {
+          leaseId: "lease-1",
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects release with an invalid authenticationObservation value", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profile-leases/lease-1/release",
+        payload: {
+          authenticationObservation: "INVALID_OBSERVATION",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "VALIDATION_ERROR",
+        },
+      });
+      expect(service.releaseProfileLease.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects release with an unknown extra property in body", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profile-leases/lease-1/release",
+        payload: {
+          authenticationObservation: "LOGIN_REQUIRED",
+          sensitiveProperty: "secret",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "VALIDATION_ERROR",
+        },
+      });
+      expect(service.releaseProfileLease.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("returns trusted runtime configuration for an active profile lease", async () => {
     const { server, service } = createTestServer();
 
@@ -1808,6 +1923,7 @@ interface CreateProfileOptions {
   readonly status?: CollectorProfile["identity"]["status"];
   readonly accountStage?: ProfileAccountStage;
   readonly authenticationState?: AuthenticationState;
+  readonly authenticationHealth?: CollectorProfile["authenticationHealth"];
   readonly provisioningTokenStatus?: CollectorProfile["provisioningToken"]["status"];
 }
 
@@ -1837,6 +1953,8 @@ function createProfile(options: CreateProfileOptions = {}): CollectorProfile {
     },
     authenticationState:
       options.authenticationState ?? profile.authenticationState,
+    authenticationHealth:
+      options.authenticationHealth ?? profile.authenticationHealth,
     provisioningToken:
       provisioningTokenStatus === "ISSUED"
         ? {

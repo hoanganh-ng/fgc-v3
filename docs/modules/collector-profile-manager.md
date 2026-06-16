@@ -6,8 +6,9 @@
 - Profile property invariants.
 - Provisioning token lifecycle.
 - Session ingestion rules.
-- Checkout eligibility rules (including temporal windows, cooldowns, and safety thresholds).
+- Checkout eligibility rules (including temporal windows, cooldowns, safety thresholds, and `authenticationHealth === HEALTHY` for every checkout purpose).
 - Profile lease management and lease purpose rules (`COLLECTION`, `AMBIENT_EXERCISE`, `ASSISTED_GROUP_ACCESS`).
+- Profile authentication-health transition policy (`REAUTH_REQUIRED`, `CHECKPOINT_REVIEW_REQUIRED`) driven only by the optional `authenticationObservation` accepted on lease release.
 - Profile-source access state (mapping profileId + sourceGroupId).
 - Trusted runtime configuration provisioning for browsers.
 

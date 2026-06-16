@@ -17,6 +17,7 @@ import type {
   BrowserProviderSession,
   Clock,
   IdGenerator,
+  ProfileAuthenticationObservation,
   ProfileLeaseReleaseResult,
   RuntimeProfileConfigurationResult,
   SourceGroupLookupPort,
@@ -66,6 +67,7 @@ export interface ProfileExerciseProfileManagerPort {
     readonly profileId: string;
     readonly leaseId: string;
     readonly macroActionsPerformed?: number;
+    readonly authenticationObservation?: ProfileAuthenticationObservation;
   }): Promise<ProfileLeaseReleaseResult>;
 }
 
@@ -159,6 +161,7 @@ interface BuiltDependencies {
 interface BrowserExerciseOutcome {
   readonly safeSummary: Omit<AccountExerciseRunSafeSummary, "leaseReleased">;
   readonly failureReason?: AccountExerciseRunFailureReason;
+  readonly authenticationObservation?: ProfileAuthenticationObservation;
 }
 
 const FACEBOOK_HOME_URL = "https://www.facebook.com/";
@@ -482,6 +485,7 @@ export async function executeRunningProfileExerciseRun(
       dependencies.profileManager,
       run.profileId,
       leaseId,
+      browserOutcome.authenticationObservation,
     );
     leaseReleased = releaseResult.ok;
 
@@ -1056,6 +1060,7 @@ function toBlockedExerciseOutcome(
         code: "LOGIN_REQUIRED",
         message: "Login is required before ambient exercise can continue.",
       },
+      authenticationObservation: "LOGIN_REQUIRED",
     };
   }
 
@@ -1066,6 +1071,7 @@ function toBlockedExerciseOutcome(
         code: "CHECKPOINT_REQUIRED",
         message: "Checkpoint review is required before ambient exercise can continue.",
       },
+      authenticationObservation: "CHECKPOINT_REQUIRED",
     };
   }
 
@@ -1108,12 +1114,16 @@ async function releaseLease(
   profileManager: ProfileExerciseProfileManagerPort,
   profileId: string,
   leaseId: string,
+  authenticationObservation?: ProfileAuthenticationObservation,
 ): Promise<ProfileLeaseReleaseResult> {
   try {
     return await profileManager.releaseProfileLease({
       profileId,
       leaseId,
       macroActionsPerformed: 0,
+      ...(authenticationObservation !== undefined
+        ? { authenticationObservation }
+        : {}),
     });
   } catch (error) {
     return {

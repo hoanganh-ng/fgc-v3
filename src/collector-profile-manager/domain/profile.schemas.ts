@@ -8,7 +8,10 @@ import {
 } from "./profile-lease";
 import { PROFILE_ACCOUNT_STAGES } from "./profile-account-stage";
 import { PROFILE_STATUSES } from "./profile-status";
-import { PROFILE_AUTHENTICATION_HEALTH_VALUES } from "./profile-authentication-health";
+import {
+  PROFILE_AUTHENTICATION_HEALTH_OBSERVATION_VALUES,
+  PROFILE_AUTHENTICATION_HEALTH_VALUES,
+} from "./profile-authentication-health";
 import {
   CHRONOTYPES,
   COOKIE_SAME_SITE_VALUES,
@@ -39,6 +42,9 @@ export const ProfileStatusSchema = z.enum(PROFILE_STATUSES);
 export const ProfileAccountStageSchema = z.enum(PROFILE_ACCOUNT_STAGES);
 export const ProfileAuthenticationHealthSchema = z.enum(
   PROFILE_AUTHENTICATION_HEALTH_VALUES,
+);
+export const ProfileAuthenticationHealthObservationSchema = z.enum(
+  PROFILE_AUTHENTICATION_HEALTH_OBSERVATION_VALUES,
 );
 export const ProfileSourceAccessStateSchema = z.enum(
   PROFILE_SOURCE_ACCESS_STATES,

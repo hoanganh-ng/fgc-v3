@@ -12,6 +12,7 @@ import type {
   FacebookGroupPayloadCapturePort,
   FacebookPayloadCaptureDiagnostics,
   FacebookPayloadCaptureResult,
+  ProfileAuthenticationObservation,
   ProfileCheckoutResult,
   ProfileLeasePort,
   ProfileLeaseReleaseResult,
@@ -27,6 +28,8 @@ import type {
 } from "../platform-extractors/facebook";
 
 const DEFAULT_CHECKOUT_PURPOSE = "FACEBOOK_GROUP_COLLECTION";
+const LOGIN_REQUIRED_ERROR_CODE = "LOGIN_REQUIRED";
+const CHECKPOINT_REQUIRED_ERROR_CODE = "CHECKPOINT_REQUIRED";
 
 export interface RunFacebookGroupCollectionInput {
   readonly sourceGroupId: string;
@@ -87,6 +90,7 @@ interface CollectionAccumulator {
   failedSubmissionCount: number;
   leaseReleased: boolean;
   leaseReleaseError?: CollectorRuntimeError;
+  leaseReleaseObservation?: ProfileAuthenticationObservation;
   readonly warnings: RunFacebookGroupCollectionWarning[];
   readonly errors: CollectorRuntimeError[];
   readonly payloadResults: RunFacebookGroupCollectionPayloadResult[];
@@ -151,6 +155,12 @@ export class RunFacebookGroupCollectionUseCase {
           { causeCode: captureResult.errorCode },
         ),
       );
+      const captureObservation = toAuthenticationObservation(
+        captureResult.errorCode,
+      );
+      if (captureObservation !== undefined) {
+        accumulator.leaseReleaseObservation = captureObservation;
+      }
 
       await this.releaseLease(accumulator);
 
@@ -284,6 +294,7 @@ export class RunFacebookGroupCollectionUseCase {
     const releaseResult = await this.releaseProfileLease(
       accumulator.profileId,
       accumulator.leaseId,
+      toAuthenticationObservation(accumulator.leaseReleaseObservation),
     );
 
     if (releaseResult.ok) {
@@ -309,11 +320,15 @@ export class RunFacebookGroupCollectionUseCase {
   private async releaseProfileLease(
     profileId: string,
     leaseId: string,
+    authenticationObservation?: ProfileAuthenticationObservation,
   ): Promise<ProfileLeaseReleaseResult> {
     try {
       return await this.profileLeasePort.releaseProfileLease({
         profileId,
         leaseId,
+        ...(authenticationObservation !== undefined
+          ? { authenticationObservation }
+          : {}),
       });
     } catch (error) {
       return {
@@ -323,6 +338,18 @@ export class RunFacebookGroupCollectionUseCase {
       };
     }
   }
+}
+
+function toAuthenticationObservation(
+  errorCode: string | undefined,
+): ProfileAuthenticationObservation | undefined {
+  if (errorCode === LOGIN_REQUIRED_ERROR_CODE) {
+    return "LOGIN_REQUIRED";
+  }
+  if (errorCode === CHECKPOINT_REQUIRED_ERROR_CODE) {
+    return "CHECKPOINT_REQUIRED";
+  }
+  return undefined;
 }
 
 function createCheckoutFailureResult(

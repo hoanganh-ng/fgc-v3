@@ -16,6 +16,7 @@ export type CheckoutIneligibilityReasonCode =
   | "ACCOUNT_STAGE_NOT_ASSISTED_GROUP_ACCESS_ELIGIBLE"
   | "AUTHENTICATION_MISSING"
   | "AUTHENTICATION_EXPIRED"
+  | "AUTHENTICATION_HEALTH_NOT_HEALTHY"
   | "NETWORK_CONTEXT_MISSING"
   | "HARDWARE_FINGERPRINT_MISSING"
   | "INVALID_TEMPORAL_ROUTINE"
@@ -119,6 +120,14 @@ export function evaluateCheckoutEligibility(
     reasons.push({
       code: "AUTHENTICATION_EXPIRED",
       message: "Profile authentication session is expired.",
+    });
+  }
+
+  if (profile.authenticationHealth !== "HEALTHY") {
+    reasons.push({
+      code: "AUTHENTICATION_HEALTH_NOT_HEALTHY",
+      message:
+        "Profile authentication health must be HEALTHY before checkout.",
     });
   }
 

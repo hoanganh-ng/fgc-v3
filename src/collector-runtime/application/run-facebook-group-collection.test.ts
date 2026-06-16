@@ -350,6 +350,128 @@ describe("RunFacebookGroupCollectionUseCase", () => {
       message: "Lease release endpoint failed.",
     });
   });
+
+  it("passes LOGIN_REQUIRED observation to release when capture fails with exact LOGIN_REQUIRED code", async () => {
+    const context = createContext();
+
+    context.capturePort.setResult({
+      ok: false,
+      errorCode: "LOGIN_REQUIRED",
+      errorMessage: "Login wall observed.",
+      warnings: [],
+    });
+
+    await context.useCase.execute({
+      sourceGroupId,
+      sourceGroupUrl,
+    });
+
+    expect(context.profileLeasePort.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+        authenticationObservation: "LOGIN_REQUIRED",
+      },
+    ]);
+  });
+
+  it("passes CHECKPOINT_REQUIRED observation to release when capture fails with exact CHECKPOINT_REQUIRED code", async () => {
+    const context = createContext();
+
+    context.capturePort.setResult({
+      ok: false,
+      errorCode: "CHECKPOINT_REQUIRED",
+      errorMessage: "Checkpoint wall observed.",
+      warnings: [],
+    });
+
+    await context.useCase.execute({
+      sourceGroupId,
+      sourceGroupUrl,
+    });
+
+    expect(context.profileLeasePort.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+        authenticationObservation: "CHECKPOINT_REQUIRED",
+      },
+    ]);
+  });
+
+  it("does not infer observation from non-exact capture error codes", async () => {
+    const context = createContext();
+
+    context.capturePort.setResult({
+      ok: false,
+      errorCode: "FACEBOOK_LOGIN_REDIRECT",
+      errorMessage: "Login redirect suspected.",
+      warnings: [],
+    });
+
+    await context.useCase.execute({
+      sourceGroupId,
+      sourceGroupUrl,
+    });
+
+    expect(context.profileLeasePort.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+      },
+    ]);
+  });
+
+  it("does not infer observation from loginRedirectSuspected diagnostics", async () => {
+    const context = createContext();
+
+    context.capturePort.setResult({
+      ok: true,
+      capturedPayloads: [],
+      warnings: [],
+      diagnostics: {
+        pageContextFetchCaptureCount: 0,
+        pageContextXhrCaptureCount: 0,
+        networkListenerCaptureCount: 0,
+        parseFailureCount: 0,
+        totalPayloadsPassedToExtractor: 0,
+        finalPageUrl: "https://www.facebook.com/login",
+        loginRedirectSuspected: true,
+      },
+    });
+
+    await context.useCase.execute({
+      sourceGroupId,
+      sourceGroupUrl,
+    });
+
+    expect(context.profileLeasePort.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+      },
+    ]);
+  });
+
+  it("does not include authenticationObservation on healthy release", async () => {
+    const context = createContext({
+      capturedPayloads: [createCapturedPayload(syntheticValidGroupPostPayload)],
+    });
+
+    await context.useCase.execute({
+      sourceGroupId,
+      sourceGroupUrl,
+    });
+
+    expect(context.profileLeasePort.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+      },
+    ]);
+    const releaseCall = context.profileLeasePort.releaseCalls[0];
+    expect(releaseCall).not.toHaveProperty("authenticationObservation");
+  });
 });
 
 interface TestContextOptions {

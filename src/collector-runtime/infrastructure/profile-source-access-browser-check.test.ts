@@ -81,6 +81,69 @@ describe("profile-source access browser check adapter", () => {
     expect(profileManager.releaseCalls).toHaveLength(1);
   });
 
+  it("propagates LOGIN_REQUIRED observation to release when login modal blocks the page", async () => {
+    const profileManager = new FakeProfileManager();
+    const browserProvider = new FakeBrowserProvider();
+    browserProvider.session.page.pageState = {
+      pageLoaded: true,
+      blockingState: "LOGIN_REQUIRED",
+    };
+
+    await new ProfileSourceAccessBrowserCheckAdapter(
+      profileManager,
+      browserProvider,
+    ).check(checkInput());
+
+    expect(profileManager.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+        authenticationObservation: "LOGIN_REQUIRED",
+      },
+    ]);
+  });
+
+  it("propagates CHECKPOINT_REQUIRED observation to release when checkpoint blocks the page", async () => {
+    const profileManager = new FakeProfileManager();
+    const browserProvider = new FakeBrowserProvider();
+    browserProvider.session.page.pageState = {
+      pageLoaded: true,
+      blockingState: "CHECKPOINT_REQUIRED",
+    };
+
+    await new ProfileSourceAccessBrowserCheckAdapter(
+      profileManager,
+      browserProvider,
+    ).check(checkInput());
+
+    expect(profileManager.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+        authenticationObservation: "CHECKPOINT_REQUIRED",
+      },
+    ]);
+  });
+
+  it("does not include authenticationObservation on healthy release", async () => {
+    const profileManager = new FakeProfileManager();
+    const browserProvider = new FakeBrowserProvider();
+
+    await new ProfileSourceAccessBrowserCheckAdapter(
+      profileManager,
+      browserProvider,
+    ).check(checkInput());
+
+    expect(profileManager.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+      },
+    ]);
+    const releaseCall = profileManager.releaseCalls[0];
+    expect(releaseCall).not.toHaveProperty("authenticationObservation");
+  });
+
   it("attempts lease release and returns sanitized failure when browser cleanup fails", async () => {
     const profileManager = new FakeProfileManager();
     const browserProvider = new FakeBrowserProvider();

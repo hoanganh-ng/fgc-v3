@@ -153,6 +153,107 @@ describe("profile exercise runner", () => {
     expect(context.browserProvider.lastSession?.page.scrollCalls).toBe(1);
     expect(context.profileManager.releaseCalls).toHaveLength(1);
   });
+
+  it("propagates LOGIN_REQUIRED observation to release when initial page state is login wall", async () => {
+    const context = createTestContext({
+      pageState: {
+        pageLoaded: true,
+        loginRequired: true,
+        checkpointDetected: false,
+      },
+    });
+
+    await runProfileExerciseCommand({
+      args: createArgs(),
+      dependencies: context.dependencies,
+      now: () => new Date(),
+    });
+
+    expect(context.profileManager.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+        macroActionsPerformed: 0,
+        authenticationObservation: "LOGIN_REQUIRED",
+      },
+    ]);
+  });
+
+  it("propagates CHECKPOINT_REQUIRED observation to release when initial page state is checkpoint wall", async () => {
+    const context = createTestContext({
+      pageState: {
+        pageLoaded: true,
+        loginRequired: false,
+        checkpointDetected: true,
+      },
+    });
+
+    await runProfileExerciseCommand({
+      args: createArgs(),
+      dependencies: context.dependencies,
+      now: () => new Date(),
+    });
+
+    expect(context.profileManager.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+        macroActionsPerformed: 0,
+        authenticationObservation: "CHECKPOINT_REQUIRED",
+      },
+    ]);
+  });
+
+  it("preserves checkpoint precedence over login when both are observed", async () => {
+    const context = createTestContext({
+      pageState: {
+        pageLoaded: true,
+        loginRequired: true,
+        checkpointDetected: true,
+      },
+    });
+
+    await runProfileExerciseCommand({
+      args: createArgs(),
+      dependencies: context.dependencies,
+      now: () => new Date(),
+    });
+
+    expect(context.profileManager.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+        macroActionsPerformed: 0,
+        authenticationObservation: "CHECKPOINT_REQUIRED",
+      },
+    ]);
+  });
+
+  it("does not include authenticationObservation on healthy release", async () => {
+    const context = createTestContext({
+      pageState: {
+        pageLoaded: true,
+        loginRequired: false,
+        checkpointDetected: false,
+      },
+    });
+
+    await runProfileExerciseCommand({
+      args: createArgs(),
+      dependencies: context.dependencies,
+      now: () => new Date(),
+    });
+
+    expect(context.profileManager.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+        macroActionsPerformed: 0,
+      },
+    ]);
+    const releaseCall = context.profileManager.releaseCalls[0];
+    expect(releaseCall).not.toHaveProperty("authenticationObservation");
+  });
 });
 
 interface TestContext {

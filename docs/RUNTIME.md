@@ -392,10 +392,21 @@ Exercise checkout eligibility:
 - Normal collection checkout still requires `accountStage = COLLECTION_READY`.
 - Ambient exercise checkout allows `NEW_ACCOUNT`, `WARMING`, `LIMITED`, and `COLLECTION_READY`.
 - Ambient exercise checkout rejects `NEEDS_REVIEW` and `RETIRED`.
+- All three purposes (`COLLECTION`, `AMBIENT_EXERCISE`,
+  `ASSISTED_GROUP_ACCESS`) additionally require
+  `authenticationHealth === HEALTHY`. Profiles in `NOT_PROVISIONED`,
+  `REAUTH_REQUIRED`, or `CHECKPOINT_REVIEW_REQUIRED` are rejected with the
+  `AUTHENTICATION_HEALTH_NOT_HEALTHY` reason and must be reprovisioned
+  before future automated checkout. Successful session ingestion remains
+  the only recovery transition to `HEALTHY`.
 - A shared Collector Runtime Facebook page-state observer checks for login and
   checkpoint walls after navigation, after dwell/scroll steps, and at the end.
   It detects structural authentication modals over Facebook pages, including
-  localized login modals, and records only safe booleans/counts.
+  localized login modals, and records only safe booleans/counts. When the
+  observer reports `LOGIN_REQUIRED` or `CHECKPOINT_REQUIRED`, the
+  exercise runner forwards that observation to the lease release so the
+  profile's `authenticationHealth` is transitioned atomically. Checkpoint
+  precedence is preserved when both walls are observed.
 
 ## Account Exercise Worker Command
 
@@ -594,7 +605,7 @@ Expected operator flow:
 9. The existing Playwright network response listener remains enabled as secondary capture and diagnostics.
 10. Captured page-context and network-listener payloads are deduplicated in memory and passed to the existing Facebook GraphQL extractor.
 11. Normalized candidates are submitted to Content Manager through `POST /collector/content-items` using the same `sourceGroupId`.
-12. The profile lease is released even when capture, extraction, or submission fails.
+12. The profile lease is released even when capture, extraction, or submission fails. When capture fails with the exact error code `LOGIN_REQUIRED` or `CHECKPOINT_REQUIRED`, the lease release forwards that observation to Profile Manager, which atomically transitions the profile's `authenticationHealth` (`REAUTH_REQUIRED` or `CHECKPOINT_REVIEW_REQUIRED`) alongside the lease release. The observation is never inferred from `loginRedirectSuspected`, URLs, navigation errors, or missing payloads.
 
 The safe summary prints counts only:
 

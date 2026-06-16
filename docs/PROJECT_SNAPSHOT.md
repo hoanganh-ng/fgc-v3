@@ -4,7 +4,8 @@
 The product is currently in the **Content Collector** stage (Stage 1 of 3, preceding Builder and Publisher). The core focus is collecting normalized content from configured Facebook sources while maintaining strict isolation between profile management, collection orchestration, and content storage.
 
 ## Current Active Sprint
-Sprint 054A: Profile Authentication Health Foundation (Active).
+Sprint 054B: Runtime Authentication Health Reporting and Checkout Enforcement (Active).
+Sprint 054A: Profile Authentication Health Foundation (Accepted).
 
 ## Currently Available Capabilities
 - **Profile Management**: Creation, lifecycle, session ingestion, checkout leasing.
@@ -40,4 +41,6 @@ pnpm web:build
 ```
 
 ## Immediate Next Expected Work
-Sprint 054B: Runtime reporting and checkout enforcement for the Profile Authentication Health model.
+Future sprint work after Sprint 054B will depend on the runtime
+authentication health reporting and checkout enforcement surface area
+established here.

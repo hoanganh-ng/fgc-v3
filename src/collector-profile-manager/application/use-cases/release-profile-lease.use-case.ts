@@ -14,16 +14,23 @@ import {
   validateProfileForApplication,
 } from "../profile-validation";
 import {
+  applyProfileAuthenticationHealthObservation,
   getProfileLocalDate,
   markProfileReleasedFromLease,
   releaseProfileLease,
   toUtcDateString,
 } from "../../domain";
-import type { CollectorProfile, ProfileLease, ProfileLeaseId } from "../../domain";
+import type {
+  CollectorProfile,
+  ProfileAuthenticationHealthObservation,
+  ProfileLease,
+  ProfileLeaseId,
+} from "../../domain";
 
 export interface ReleaseProfileLeaseInput {
   readonly leaseId: ProfileLeaseId;
   readonly macroActionsPerformed?: number;
+  readonly authenticationObservation?: ProfileAuthenticationHealthObservation;
 }
 
 export interface ReleaseProfileLeaseOutput {
@@ -97,16 +104,20 @@ export class ReleaseProfileLeaseUseCase {
 
     const localDate = getProfileLocalDate(profile, now) ?? toUtcDateString(now);
     const releasedAt = toIsoDateTime(now);
+    const releasedLease = releaseProfileLease(lease, releasedAt);
     const releasedProfile = validateProfileForApplication(
-      markProfileReleasedFromLease(
-        profile,
-        lease,
-        now,
-        localDate,
-        macroActionsPerformed,
+      applyProfileAuthenticationObservationTransition(
+        markProfileReleasedFromLease(
+          profile,
+          releasedLease,
+          now,
+          localDate,
+          macroActionsPerformed,
+        ),
+        input.authenticationObservation,
+        releasedAt,
       ),
     );
-    const releasedLease = releaseProfileLease(lease, releasedAt);
 
     await profiles.save(releasedProfile);
     await leases.updateStatus(releasedLease);
@@ -116,4 +127,29 @@ export class ReleaseProfileLeaseUseCase {
       profile: releasedProfile,
     };
   }
+}
+
+function applyProfileAuthenticationObservationTransition(
+  profile: CollectorProfile,
+  observation: ProfileAuthenticationHealthObservation | undefined,
+  releasedAt: string,
+): CollectorProfile {
+  if (observation === undefined) {
+    return profile;
+  }
+
+  const transition = applyProfileAuthenticationHealthObservation(
+    profile.authenticationHealth,
+    observation,
+  );
+
+  if (!transition.changed) {
+    return profile;
+  }
+
+  return {
+    ...profile,
+    authenticationHealth: transition.nextHealth,
+    authenticationHealthUpdatedAt: releasedAt,
+  };
 }

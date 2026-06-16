@@ -205,6 +205,7 @@ describe("runFacebookCollectorCommand", () => {
       {
         profileId: "profile-1",
         leaseId: "lease-1",
+        authenticationObservation: "LOGIN_REQUIRED",
       },
     ]);
   });

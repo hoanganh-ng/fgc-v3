@@ -22,10 +22,15 @@ export type ProfileCheckoutResult =
       readonly errorMessage: string;
     };
 
+export type ProfileAuthenticationObservation =
+  | "LOGIN_REQUIRED"
+  | "CHECKPOINT_REQUIRED";
+
 export interface ProfileLeaseReleaseInput {
   readonly profileId: string;
   readonly leaseId: string;
   readonly macroActionsPerformed?: number;
+  readonly authenticationObservation?: ProfileAuthenticationObservation;
 }
 
 export type ProfileLeaseReleaseResult =
