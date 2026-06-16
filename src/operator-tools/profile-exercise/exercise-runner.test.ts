@@ -108,6 +108,7 @@ describe("profile exercise runner", () => {
       safeSummary: {
         pageLoaded: true,
         loginRequired: true,
+        scrollsPerformed: 0,
         leaseReleased: true,
       },
     });
@@ -117,6 +118,40 @@ describe("profile exercise runner", () => {
         code: "LOGIN_REQUIRED",
       },
     });
+    expect(context.browserProvider.lastSession?.page.scrollCalls).toBe(0);
+  });
+
+  it("stops scrolling when a login wall appears mid-run", async () => {
+    const context = createTestContext({
+      blockAfterScrollCount: 1,
+      blockingStateAfterScroll: "LOGIN_REQUIRED",
+    });
+
+    const result = await runProfileExerciseCommand({
+      args: {
+        ...createArgs(),
+        maxScrolls: 3,
+      },
+      dependencies: context.dependencies,
+      now: () => new Date(),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "FAILED",
+      failureReason: {
+        code: "LOGIN_REQUIRED",
+      },
+      safeSummary: {
+        pageLoaded: true,
+        loginRequired: true,
+        checkpointDetected: false,
+        scrollsPerformed: 1,
+        leaseReleased: true,
+      },
+    });
+    expect(context.browserProvider.lastSession?.page.scrollCalls).toBe(1);
+    expect(context.profileManager.releaseCalls).toHaveLength(1);
   });
 });
 
@@ -130,6 +165,8 @@ interface TestContext {
 function createTestContext(
   options: {
     readonly pageState?: FakePageState;
+    readonly blockAfterScrollCount?: number;
+    readonly blockingStateAfterScroll?: FakeBlockingState;
   } = {},
 ): TestContext {
   const accountExerciseRuns = new InMemoryAccountExerciseRunRepository();
@@ -139,6 +176,14 @@ function createTestContext(
       pageLoaded: true,
       loginRequired: false,
       checkpointDetected: false,
+    },
+    {
+      ...(options.blockAfterScrollCount !== undefined
+        ? { blockAfterScrollCount: options.blockAfterScrollCount }
+        : {}),
+      ...(options.blockingStateAfterScroll !== undefined
+        ? { blockingStateAfterScroll: options.blockingStateAfterScroll }
+        : {}),
     },
   );
 
@@ -258,18 +303,29 @@ interface FakePageState {
   readonly checkpointDetected: boolean;
 }
 
+type FakeBlockingState =
+  | "NONE_DETECTED"
+  | "LOGIN_REQUIRED"
+  | "CHECKPOINT_REQUIRED";
+
 class FakeBrowserProvider implements BrowserProviderPort {
   public readonly providerName = "PLAYWRIGHT_CHROMIUM" as const;
   public readonly launchCalls: BrowserProviderLaunchConfig[] = [];
   public lastSession?: FakeBrowserSession;
 
-  public constructor(private readonly pageState: FakePageState) {}
+  public constructor(
+    private readonly pageState: FakePageState,
+    private readonly options: {
+      readonly blockAfterScrollCount?: number;
+      readonly blockingStateAfterScroll?: FakeBlockingState;
+    } = {},
+  ) {}
 
   public async launch(
     config: BrowserProviderLaunchConfig,
   ): Promise<BrowserProviderSession> {
     this.launchCalls.push(config);
-    const session = new FakeBrowserSession(this.pageState);
+    const session = new FakeBrowserSession(this.pageState, this.options);
     this.lastSession = session;
     return session;
   }
@@ -280,8 +336,14 @@ class FakeBrowserSession implements BrowserProviderSession {
   public readonly page: FakeBrowserPage;
   public closed = false;
 
-  public constructor(pageState: FakePageState) {
-    this.page = new FakeBrowserPage(pageState);
+  public constructor(
+    pageState: FakePageState,
+    options: {
+      readonly blockAfterScrollCount?: number;
+      readonly blockingStateAfterScroll?: FakeBlockingState;
+    },
+  ) {
+    this.page = new FakeBrowserPage(pageState, options);
   }
 
   public async newPage(): Promise<BrowserProviderPage> {
@@ -296,8 +358,15 @@ class FakeBrowserSession implements BrowserProviderSession {
 class FakeBrowserPage implements BrowserProviderPage {
   private currentUrl = "about:blank";
   public readonly navigatedUrls: string[] = [];
+  public scrollCalls = 0;
 
-  public constructor(private readonly pageState: FakePageState) {}
+  public constructor(
+    private readonly pageState: FakePageState,
+    private readonly options: {
+      readonly blockAfterScrollCount?: number;
+      readonly blockingStateAfterScroll?: FakeBlockingState;
+    },
+  ) {}
 
   public url(): string {
     return this.currentUrl;
@@ -316,10 +385,24 @@ class FakeBrowserPage implements BrowserProviderPage {
 
   public async evaluate<T = unknown>(script: string): Promise<T> {
     if (script.includes("window.scrollBy")) {
+      this.scrollCalls += 1;
       return undefined as T;
     }
 
-    return this.pageState as T;
+    const blockingState =
+      this.options.blockAfterScrollCount !== undefined &&
+      this.scrollCalls >= this.options.blockAfterScrollCount
+        ? this.options.blockingStateAfterScroll ?? "LOGIN_REQUIRED"
+        : this.pageState.checkpointDetected
+          ? "CHECKPOINT_REQUIRED"
+          : this.pageState.loginRequired
+            ? "LOGIN_REQUIRED"
+            : "NONE_DETECTED";
+
+    return {
+      pageLoaded: this.pageState.pageLoaded,
+      blockingState,
+    } as T;
   }
 
   public async exposeBinding(): Promise<void> {}

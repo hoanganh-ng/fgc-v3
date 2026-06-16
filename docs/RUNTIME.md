@@ -340,6 +340,10 @@ Exercise checkout eligibility:
 - Normal collection checkout still requires `accountStage = COLLECTION_READY`.
 - Ambient exercise checkout allows `NEW_ACCOUNT`, `WARMING`, `LIMITED`, and `COLLECTION_READY`.
 - Ambient exercise checkout rejects `NEEDS_REVIEW` and `RETIRED`.
+- A shared Collector Runtime Facebook page-state observer checks for login and
+  checkpoint walls after navigation, after dwell/scroll steps, and at the end.
+  It detects structural authentication modals over Facebook pages, including
+  localized login modals, and records only safe booleans/counts.
 
 ## Account Exercise Worker Command
 
@@ -531,10 +535,14 @@ Expected operator flow:
 5. The selected browser provider opens a headed browser with the profile cookies, localStorage, browser fingerprint, locale/language, timezone, viewport, and proxy settings it can honor from Profile Manager runtime configuration.
 6. The browser visits the stored Facebook group URL, unless `--group-url` was provided as a development override.
 7. Before navigation, the adapter injects page-context instrumentation that patches `window.fetch` and XHR to capture parsed JSON response bodies from `/api/graphql`, `/graphql`, `/ajax/`, and JSON content-type responses.
-8. The existing Playwright network response listener remains enabled as secondary capture and diagnostics.
-9. Captured page-context and network-listener payloads are deduplicated in memory and passed to the existing Facebook GraphQL extractor.
-10. Normalized candidates are submitted to Content Manager through `POST /collector/content-items` using the same `sourceGroupId`.
-11. The profile lease is released even when capture, extraction, or submission fails.
+8. The shared Facebook page-state observer checks for login and checkpoint
+   walls before scrolling, during scroll/dwell, and at the end. Login or
+   checkpoint walls fail capture with `LOGIN_REQUIRED` or
+   `CHECKPOINT_REQUIRED`.
+9. The existing Playwright network response listener remains enabled as secondary capture and diagnostics.
+10. Captured page-context and network-listener payloads are deduplicated in memory and passed to the existing Facebook GraphQL extractor.
+11. Normalized candidates are submitted to Content Manager through `POST /collector/content-items` using the same `sourceGroupId`.
+12. The profile lease is released even when capture, extraction, or submission fails.
 
 The safe summary prints counts only:
 
@@ -712,11 +720,14 @@ Expected worker flow:
 3. Fetch lease-scoped runtime configuration and launch the selected browser
    provider headless.
 4. Navigate only to the run's frozen Facebook `DIRECT_GROUP_URL`.
-5. Collect sanitized observation booleans/enums only.
-6. Close the browser and release the lease before classification and mutation.
-7. Classify the observation into a safe outcome, mutate Profile Manager
+5. Use the shared Facebook page-state observer before group-content
+   classification so login modals over `/groups/...` become `LOGIN_REQUIRED`
+   and checkpoint evidence takes precedence.
+6. Collect sanitized observation booleans/enums only.
+7. Close the browser and release the lease before classification and mutation.
+8. Classify the observation into a safe outcome, mutate Profile Manager
    profile-source access through HTTP, then mark the check run `SUCCEEDED`.
-8. Mark the check run `FAILED` with a sanitized reason when browser,
+9. Mark the check run `FAILED` with a sanitized reason when browser,
    cleanup, classification, or mutation fails.
 
 Logs may include run IDs, safe outcomes, sanitized failure codes, and lifecycle

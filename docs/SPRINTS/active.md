@@ -1,7 +1,7 @@
 # Active Sprint
 
-Sprint 052 is active.
+Sprint 053 is active.
 
 Implementation authority:
 
-- [Sprint 052 - Profile-Source Access Check Runs Web UI](SPRINT-052-profile-source-access-check-runs-web-ui.md)
+- [Sprint 053 - Facebook Authentication Wall Detection Hardening](SPRINT-053-facebook-authentication-wall-detection-hardening.md)

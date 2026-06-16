@@ -14,6 +14,8 @@ import {
   PROFILE_SOURCE_ACCESS_OBSERVATION_SCRIPT,
   ProfileSourceAccessBrowserCheckAdapter,
 } from "./profile-source-access-browser-check";
+import { DeterministicProfileSourceAccessOutcomeClassifier } from "./profile-source-access-outcome-classifier";
+import type { FacebookPageState } from "./facebook-page-state-observer";
 import type {
   ProfileAssistedGroupAccessCheckoutResult,
 } from "./profile-manager-http-client";
@@ -44,6 +46,39 @@ describe("profile-source access browser check adapter", () => {
         leaseId: "lease-1",
       },
     ]);
+  });
+
+  it("maps a login modal over a group URL to a safe login observation", async () => {
+    const profileManager = new FakeProfileManager();
+    const browserProvider = new FakeBrowserProvider();
+    browserProvider.session.page.pageState = {
+      pageLoaded: true,
+      blockingState: "LOGIN_REQUIRED",
+    };
+
+    const result = await new ProfileSourceAccessBrowserCheckAdapter(
+      profileManager,
+      browserProvider,
+    ).check(checkInput());
+
+    expect(result).toEqual({
+      ok: true,
+      observation: {
+        pageKind: "FACEBOOK_LOGIN",
+        groupContentVisible: false,
+        joinActionVisible: false,
+        joinedIndicatorVisible: false,
+        accessDeniedIndicatorVisible: false,
+      },
+    });
+    if (result.ok) {
+      await expect(
+        new DeterministicProfileSourceAccessOutcomeClassifier().classify(
+          result.observation,
+        ),
+      ).resolves.toBe("LOGIN_REQUIRED");
+    }
+    expect(profileManager.releaseCalls).toHaveLength(1);
   });
 
   it("attempts lease release and returns sanitized failure when browser cleanup fails", async () => {
@@ -525,6 +560,10 @@ class FakePage implements BrowserProviderPage {
   public evaluateError: Error | undefined;
   public onEvaluate: (() => void) | undefined;
   public onGoto: (() => void) | undefined;
+  public pageState: FacebookPageState = {
+    pageLoaded: true,
+    blockingState: "NONE_DETECTED",
+  };
 
   public url(): string {
     return "https://www.facebook.com/groups/source-group-1";
@@ -535,10 +574,14 @@ class FakePage implements BrowserProviderPage {
     return { status: 200 };
   }
 
-  public async evaluate<T = unknown>(): Promise<T> {
+  public async evaluate<T = unknown>(script?: string): Promise<T> {
     this.onEvaluate?.();
     if (this.evaluateError !== undefined) {
       throw this.evaluateError;
+    }
+
+    if (script?.includes("__FGC_FB_PAGE_STATE_OBSERVER__") === true) {
+      return this.pageState as T;
     }
 
     return {

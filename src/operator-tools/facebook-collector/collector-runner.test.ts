@@ -152,6 +152,63 @@ describe("runFacebookCollectorCommand", () => {
     expect(output).not.toContain("proxy-password");
   });
 
+  it("does not submit content when payload capture fails for an auth wall", async () => {
+    const profileLeasePort = new FakeProfileLeasePort();
+    const payloadCapturePort = new FakeCapturePort();
+    const submitCapturedPayloadUseCase = new FakeSubmissionUseCase();
+
+    payloadCapturePort.result = {
+      ok: false,
+      errorCode: "LOGIN_REQUIRED",
+      errorMessage:
+        "Facebook presented a login wall. Re-provision the profile session before retrying.",
+      warnings: [],
+      diagnostics: {
+        pageContextFetchCaptureCount: 0,
+        pageContextXhrCaptureCount: 0,
+        networkListenerCaptureCount: 0,
+        parseFailureCount: 0,
+        totalPayloadsPassedToExtractor: 0,
+        finalPageUrl: "https://www.facebook.com/groups/group-1",
+        loginRedirectSuspected: true,
+      },
+    };
+
+    const result = await runFacebookCollectorCommand({
+      args: {
+        sourceGroupId: "source-group-1",
+        baseUrl: "http://localhost:8081",
+        browserProvider: "playwright",
+        maxScrolls: 3,
+        maxDurationMs: 30_000,
+        diagnoseCheckout: false,
+      },
+      dependencies: {
+        profileLeasePort,
+        payloadCapturePort,
+        submitCapturedPayloadUseCase,
+        sourceGroupResolver: new FakeSourceGroupResolver(),
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      leaseReleased: true,
+      capturedGraphQLResponseCount: 0,
+    });
+    expect(result.errors[0]).toMatchObject({
+      code: "FACEBOOK_PAYLOAD_CAPTURE_FAILED",
+      causeCode: "LOGIN_REQUIRED",
+    });
+    expect(submitCapturedPayloadUseCase.calls).toEqual([]);
+    expect(profileLeasePort.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+      },
+    ]);
+  });
+
   it("uses --group-url only as a warned development override", async () => {
     const profileLeasePort = new FakeProfileLeasePort();
     const payloadCapturePort = new FakeCapturePort();
@@ -390,11 +447,16 @@ class FakeProfileLeasePort implements ProfileLeasePort {
 
 class FakeCapturePort implements FacebookGroupPayloadCapturePort {
   public readonly calls: FacebookGroupPayloadCaptureInput[] = [];
+  public result: FacebookPayloadCaptureResult | undefined;
 
   public async captureGroupPayloads(
     input: FacebookGroupPayloadCaptureInput,
   ): Promise<FacebookPayloadCaptureResult> {
     this.calls.push(input);
+
+    if (this.result !== undefined) {
+      return this.result;
+    }
 
     return {
       ok: true,

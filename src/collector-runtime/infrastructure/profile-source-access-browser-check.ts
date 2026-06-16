@@ -4,7 +4,10 @@ import type {
   ProfileLeaseReleaseResult,
   RuntimeProfileConfigurationResult,
 } from "../application";
-import { ProfileSourceAccessBrowserObservationSchema } from "../application";
+import {
+  ProfileSourceAccessBrowserObservationSchema,
+  type ProfileSourceAccessBrowserObservation,
+} from "../application";
 import type {
   ProfileSourceAccessBrowserCheckInput,
   ProfileSourceAccessBrowserCheckPort,
@@ -12,6 +15,10 @@ import type {
 } from "../application/ports/profile-source-access-check-execution.port";
 import { buildBrowserProviderLaunchConfig } from "./browser-providers/browser-provider-launch-config";
 import type { ProfileAssistedGroupAccessCheckoutResult } from "./profile-manager-http-client";
+import {
+  observeFacebookPageState,
+  type FacebookPageBlockingState,
+} from "./facebook-page-state-observer";
 
 export interface ProfileSourceAccessBrowserProfileManagerPort {
   checkoutProfileForAssistedGroupAccess(
@@ -157,15 +164,35 @@ export class ProfileSourceAccessBrowserCheckAdapter
           input.abortSignal,
         );
 
-        const observation = ProfileSourceAccessBrowserObservationSchema.parse(
-          await runBoundedPhase(
-            () =>
-              page.evaluate<unknown>(PROFILE_SOURCE_ACCESS_OBSERVATION_SCRIPT),
-            safeDeadlineAt,
-            this.now,
-            input.abortSignal,
-          ),
+        const observedPageState = await runBoundedPhase(
+          () =>
+            observeFacebookPageState(page, {
+              settleMs: 500,
+              pollIntervalMs: 100,
+              ...(safeDeadlineAt !== undefined ? { deadlineAt: safeDeadlineAt } : {}),
+              ...(input.abortSignal !== undefined
+                ? { abortSignal: input.abortSignal }
+                : {}),
+              now: () => this.now().getTime(),
+            }),
+          safeDeadlineAt,
+          this.now,
+          input.abortSignal,
         );
+        const blockingObservation = toBlockingObservation(
+          observedPageState.blockingState,
+        );
+        const observation =
+          blockingObservation ??
+          ProfileSourceAccessBrowserObservationSchema.parse(
+            await runBoundedPhase(
+              () =>
+                page.evaluate<unknown>(PROFILE_SOURCE_ACCESS_OBSERVATION_SCRIPT),
+              safeDeadlineAt,
+              this.now,
+              input.abortSignal,
+            ),
+          );
 
         throwIfAborted(input.abortSignal);
 
@@ -547,12 +574,6 @@ export const PROFILE_SOURCE_ACCESS_OBSERVATION_SCRIPT = `(() => {
     controls.some((element) => values.some((value) => controlText(element).includes(value)));
   const pageKind = (() => {
     if (!isFacebook) return "OTHER";
-    if (pathname.includes("/checkpoint") || hasScopedText(["checkpoint", "security check"])) {
-      return "FACEBOOK_CHECKPOINT";
-    }
-    if (pathname.includes("/login") || hasScopedText(["log in to facebook", "you must log in"])) {
-      return "FACEBOOK_LOGIN";
-    }
     if (hasScopedText(["content isn't available", "this content isn't available", "page isn't available"])) {
       return "FACEBOOK_UNAVAILABLE";
     }
@@ -583,3 +604,29 @@ export const PROFILE_SOURCE_ACCESS_OBSERVATION_SCRIPT = `(() => {
     accessDeniedIndicatorVisible
   };
 })()`;
+
+function toBlockingObservation(
+  blockingState: FacebookPageBlockingState,
+): ProfileSourceAccessBrowserObservation | undefined {
+  if (blockingState === "CHECKPOINT_REQUIRED") {
+    return {
+      pageKind: "FACEBOOK_CHECKPOINT",
+      groupContentVisible: false,
+      joinActionVisible: false,
+      joinedIndicatorVisible: false,
+      accessDeniedIndicatorVisible: false,
+    };
+  }
+
+  if (blockingState === "LOGIN_REQUIRED") {
+    return {
+      pageKind: "FACEBOOK_LOGIN",
+      groupContentVisible: false,
+      joinActionVisible: false,
+      joinedIndicatorVisible: false,
+      accessDeniedIndicatorVisible: false,
+    };
+  }
+
+  return undefined;
+}

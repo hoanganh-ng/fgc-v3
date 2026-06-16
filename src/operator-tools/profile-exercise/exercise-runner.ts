@@ -33,7 +33,9 @@ import {
 import {
   ProfileManagerHttpClient,
   buildBrowserProviderLaunchConfig,
+  observeFacebookPageState,
   resolveBrowserProvider,
+  type FacebookPageState,
   type ProfileExerciseCheckoutResult,
   type SafeProfileAccountStageResult,
 } from "../../collector-runtime/infrastructure";
@@ -164,6 +166,8 @@ const ACCOUNT_EXERCISE_RUNS_PATH = "collector/account-exercise-runs";
 const COLLECTOR_RUNTIME_HTTP_ERROR = "COLLECTOR_RUNTIME_HTTP_ERROR";
 const COLLECTOR_RUNTIME_NETWORK_ERROR = "COLLECTOR_RUNTIME_NETWORK_ERROR";
 const COLLECTOR_RUNTIME_RESPONSE_ERROR = "COLLECTOR_RUNTIME_RESPONSE_ERROR";
+const FACEBOOK_PAGE_STATE_SETTLE_MS = 500;
+const FACEBOOK_PAGE_STATE_POLL_INTERVAL_MS = 100;
 const NOOP_LOGGER: ProfileExerciseLogger = {
   info() {},
 };
@@ -956,12 +960,24 @@ async function exerciseFacebookReadOnly(input: {
     waitUntil: "domcontentloaded",
     timeoutMs: navigationTimeoutMs,
   });
+  let scrollsPerformed = 0;
+
+  let pageState = await observeExerciseFacebookPageState(input);
+  let blockedOutcome = toBlockedExerciseOutcome(input, pageState, scrollsPerformed);
+  if (blockedOutcome !== undefined) {
+    return blockedOutcome;
+  }
+
   await delay(
     Math.min(input.args.minDwellMs, getRemainingBudgetMs(input.startedAt, input.args)),
     input.abortSignal,
   );
 
-  let scrollsPerformed = 0;
+  pageState = await observeExerciseFacebookPageState(input, 0);
+  blockedOutcome = toBlockedExerciseOutcome(input, pageState, scrollsPerformed);
+  if (blockedOutcome !== undefined) {
+    return blockedOutcome;
+  }
 
   while (
     scrollsPerformed < input.args.maxScrolls &&
@@ -979,18 +995,61 @@ async function exerciseFacebookReadOnly(input: {
       ),
       input.abortSignal,
     );
+    pageState = await observeExerciseFacebookPageState(input, 0);
+    blockedOutcome = toBlockedExerciseOutcome(input, pageState, scrollsPerformed);
+    if (blockedOutcome !== undefined) {
+      return blockedOutcome;
+    }
   }
 
-  const pageState = await detectSafeFacebookPageState(input.page);
+  pageState = await observeExerciseFacebookPageState(input, 0);
+
+  return {
+    safeSummary: {
+      pageLoaded: pageState.pageLoaded,
+      loginRequired: pageState.blockingState === "LOGIN_REQUIRED",
+      checkpointDetected: pageState.blockingState === "CHECKPOINT_REQUIRED",
+      scrollsPerformed,
+      durationMs: getDurationMs(input.startedAt),
+    },
+  };
+}
+
+async function observeExerciseFacebookPageState(
+  input: {
+    readonly page: BrowserProviderPage;
+    readonly args: ProfileExerciseCliArgs;
+    readonly startedAt: Date;
+    readonly abortSignal?: AbortSignal;
+  },
+  settleMs = FACEBOOK_PAGE_STATE_SETTLE_MS,
+): Promise<FacebookPageState> {
+  return observeFacebookPageState(input.page, {
+    settleMs,
+    pollIntervalMs: FACEBOOK_PAGE_STATE_POLL_INTERVAL_MS,
+    deadlineAt: input.startedAt.getTime() + input.args.maxDurationMs,
+    ...(input.abortSignal !== undefined
+      ? { abortSignal: input.abortSignal }
+      : {}),
+  });
+}
+
+function toBlockedExerciseOutcome(
+  input: {
+    readonly startedAt: Date;
+  },
+  pageState: FacebookPageState,
+  scrollsPerformed: number,
+): BrowserExerciseOutcome | undefined {
   const safeSummary = {
     pageLoaded: pageState.pageLoaded,
-    loginRequired: pageState.loginRequired,
-    checkpointDetected: pageState.checkpointDetected,
+    loginRequired: pageState.blockingState === "LOGIN_REQUIRED",
+    checkpointDetected: pageState.blockingState === "CHECKPOINT_REQUIRED",
     scrollsPerformed,
     durationMs: getDurationMs(input.startedAt),
   };
 
-  if (pageState.loginRequired) {
+  if (pageState.blockingState === "LOGIN_REQUIRED") {
     return {
       safeSummary,
       failureReason: {
@@ -1000,7 +1059,7 @@ async function exerciseFacebookReadOnly(input: {
     };
   }
 
-  if (pageState.checkpointDetected) {
+  if (pageState.blockingState === "CHECKPOINT_REQUIRED") {
     return {
       safeSummary,
       failureReason: {
@@ -1010,9 +1069,7 @@ async function exerciseFacebookReadOnly(input: {
     };
   }
 
-  return {
-    safeSummary,
-  };
+  return undefined;
 }
 
 function getExerciseNavigationUrl(
@@ -1044,51 +1101,6 @@ function getExerciseNavigationUrl(
   return {
     ok: false,
     message: "Unsupported account exercise type.",
-  };
-}
-
-async function detectSafeFacebookPageState(
-  page: BrowserProviderPage,
-): Promise<{
-  readonly pageLoaded: boolean;
-  readonly loginRequired: boolean;
-  readonly checkpointDetected: boolean;
-}> {
-  const result = await page.evaluate<unknown>(`
-    (() => {
-      const href = String(window.location.href || "").toLowerCase();
-      const bodyText = String(document.body?.innerText || "").toLowerCase();
-      const hasLoginInput = Boolean(
-        document.querySelector('input[name="email"], input[name="pass"]')
-      );
-
-      return {
-        pageLoaded: document.readyState === "interactive" || document.readyState === "complete",
-        loginRequired:
-          href.includes("/login") ||
-          hasLoginInput ||
-          bodyText.includes("log in") ||
-          bodyText.includes("log into facebook"),
-        checkpointDetected:
-          href.includes("/checkpoint") ||
-          bodyText.includes("checkpoint") ||
-          bodyText.includes("confirm your identity")
-      };
-    })();
-  `);
-
-  if (!isRecord(result)) {
-    return {
-      pageLoaded: false,
-      loginRequired: false,
-      checkpointDetected: false,
-    };
-  }
-
-  return {
-    pageLoaded: result.pageLoaded === true,
-    loginRequired: result.loginRequired === true,
-    checkpointDetected: result.checkpointDetected === true,
   };
 }
 

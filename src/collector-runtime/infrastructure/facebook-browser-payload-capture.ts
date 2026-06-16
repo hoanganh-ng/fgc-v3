@@ -20,6 +20,10 @@ import {
   PlaywrightChromiumBrowserProvider,
   buildBrowserProviderLaunchConfig,
 } from "./browser-providers";
+import {
+  observeFacebookPageState,
+  type FacebookPageBlockingState,
+} from "./facebook-page-state-observer";
 
 const DEFAULT_MAX_SCROLLS = 3;
 const DEFAULT_MAX_DURATION_MS = 30_000;
@@ -190,9 +194,15 @@ export class FacebookBrowserPayloadCaptureAdapter
           };
         }
 
-        const initialAccessFailure = classifyFacebookAccessFailure(page.url());
+        const initialAccessFailure = await Promise.race([
+          detectFacebookAccessFailure(page, deadlineAt, this.abortSignal),
+          pageFailureWatcher.promise,
+        ]);
         if (initialAccessFailure !== undefined) {
-          pageCaptureBuffer.recordFinalPageUrl(page.url());
+          pageCaptureBuffer.recordFinalPageUrl(
+            page.url(),
+            initialAccessFailure.blockingState,
+          );
           return {
             ok: false,
             errorCode: initialAccessFailure.errorCode,
@@ -202,7 +212,7 @@ export class FacebookBrowserPayloadCaptureAdapter
           };
         }
 
-        await Promise.race([
+        const scrollingAccessFailure = await Promise.race([
           scrollFacebookGroupPage(
             page,
             this.maxScrolls,
@@ -212,9 +222,29 @@ export class FacebookBrowserPayloadCaptureAdapter
           pageFailureWatcher.promise,
         ]);
 
-        const finalAccessFailure = classifyFacebookAccessFailure(page.url());
+        if (scrollingAccessFailure !== undefined) {
+          pageCaptureBuffer.recordFinalPageUrl(
+            page.url(),
+            scrollingAccessFailure.blockingState,
+          );
+          return {
+            ok: false,
+            errorCode: scrollingAccessFailure.errorCode,
+            errorMessage: scrollingAccessFailure.errorMessage,
+            warnings,
+            diagnostics: pageCaptureBuffer.toDiagnostics(),
+          };
+        }
+
+        const finalAccessFailure = await Promise.race([
+          detectFacebookAccessFailure(page, deadlineAt, this.abortSignal),
+          pageFailureWatcher.promise,
+        ]);
         if (finalAccessFailure !== undefined) {
-          pageCaptureBuffer.recordFinalPageUrl(page.url());
+          pageCaptureBuffer.recordFinalPageUrl(
+            page.url(),
+            finalAccessFailure.blockingState,
+          );
           return {
             ok: false,
             errorCode: finalAccessFailure.errorCode,
@@ -444,9 +474,14 @@ class FacebookPayloadCaptureBuffer {
     this.parseFailureCount += 1;
   }
 
-  public recordFinalPageUrl(url: string): void {
+  public recordFinalPageUrl(
+    url: string,
+    blockingState: FacebookPageBlockingState = "NONE_DETECTED",
+  ): void {
     this.finalPageUrl = sanitizeFacebookDiagnosticUrl(url);
-    this.loginRedirectSuspected = classifyFacebookAccessFailure(url) !== undefined;
+    this.loginRedirectSuspected =
+      blockingState !== "NONE_DETECTED" ||
+      classifyFacebookAccessFailure(url) !== undefined;
   }
 
   public getCapturedPayloads(): readonly CapturedFacebookPayload[] {
@@ -889,21 +924,32 @@ async function scrollFacebookGroupPage(
   maxScrolls: number,
   deadlineAt: number,
   abortSignal: AbortSignal | undefined,
-): Promise<void> {
+): Promise<FacebookAccessFailure | undefined> {
   for (let scrollIndex = 0; scrollIndex < maxScrolls; scrollIndex += 1) {
     throwIfAborted(abortSignal);
 
     if (Date.now() >= deadlineAt) {
-      return;
+      return undefined;
     }
 
     await page.evaluate(
       `window.scrollBy(0, Math.max(window.innerHeight, ${MIN_SCROLL_DISTANCE_PX}));`,
     );
     await sleepUntilNextStep(BETWEEN_SCROLL_SETTLE_MS, deadlineAt, abortSignal);
+    const accessFailure = await detectFacebookAccessFailure(
+      page,
+      deadlineAt,
+      abortSignal,
+      0,
+    );
+
+    if (accessFailure !== undefined) {
+      return accessFailure;
+    }
   }
 
   await sleepUntilNextStep(POST_NAVIGATION_SETTLE_MS, deadlineAt, abortSignal);
+  return undefined;
 }
 
 async function settlePendingCaptures(
@@ -980,7 +1026,7 @@ async function closeBrowserProviderSession(
 
 function classifyFacebookAccessFailure(
   value: string,
-): { readonly errorCode: string; readonly errorMessage: string } | undefined {
+): Omit<FacebookAccessFailure, "blockingState"> | undefined {
   let parsedUrl: URL;
 
   try {
@@ -1004,6 +1050,52 @@ function classifyFacebookAccessFailure(
       errorCode: "LOGIN_REQUIRED",
       errorMessage:
         "Facebook redirected to login. Re-provision the profile session before retrying.",
+    };
+  }
+
+  return undefined;
+}
+
+interface FacebookAccessFailure {
+  readonly blockingState: Exclude<FacebookPageBlockingState, "NONE_DETECTED">;
+  readonly errorCode: string;
+  readonly errorMessage: string;
+}
+
+async function detectFacebookAccessFailure(
+  page: BrowserProviderPage,
+  deadlineAt: number,
+  abortSignal: AbortSignal | undefined,
+  settleMs = POST_NAVIGATION_SETTLE_MS,
+): Promise<FacebookAccessFailure | undefined> {
+  const pageState = await observeFacebookPageState(page, {
+    settleMs,
+    pollIntervalMs: 100,
+    deadlineAt,
+    ...(abortSignal !== undefined ? { abortSignal } : {}),
+  });
+
+  return toFacebookAccessFailure(pageState.blockingState);
+}
+
+function toFacebookAccessFailure(
+  blockingState: FacebookPageBlockingState,
+): FacebookAccessFailure | undefined {
+  if (blockingState === "CHECKPOINT_REQUIRED") {
+    return {
+      blockingState,
+      errorCode: "CHECKPOINT_REQUIRED",
+      errorMessage:
+        "Facebook presented a checkpoint wall. Re-provision or review the profile session before retrying.",
+    };
+  }
+
+  if (blockingState === "LOGIN_REQUIRED") {
+    return {
+      blockingState,
+      errorCode: "LOGIN_REQUIRED",
+      errorMessage:
+        "Facebook presented a login wall. Re-provision the profile session before retrying.",
     };
   }
 
