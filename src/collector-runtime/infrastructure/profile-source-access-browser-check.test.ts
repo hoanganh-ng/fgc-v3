@@ -1,3 +1,4 @@
+import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import type {
   BrowserProviderLaunchConfig,
@@ -9,7 +10,10 @@ import type {
   ProfileLeaseReleaseResult,
   RuntimeProfileConfigurationResult,
 } from "../application";
-import { ProfileSourceAccessBrowserCheckAdapter } from "./profile-source-access-browser-check";
+import {
+  PROFILE_SOURCE_ACCESS_OBSERVATION_SCRIPT,
+  ProfileSourceAccessBrowserCheckAdapter,
+} from "./profile-source-access-browser-check";
 import type {
   ProfileAssistedGroupAccessCheckoutResult,
 } from "./profile-manager-http-client";
@@ -82,6 +86,196 @@ describe("profile-source access browser check adapter", () => {
     expect(profileManager.releaseCalls).toHaveLength(1);
     expect(JSON.stringify(result)).not.toContain("raw page text");
   });
+
+  it("does not treat accessible private group privacy text as access denied evidence", () => {
+    const observation = runObservationScript({
+      mainText: "Private group\nRecent posts",
+      controls: [],
+    });
+
+    expect(observation).toMatchObject({
+      pageKind: "FACEBOOK_GROUP",
+      groupContentVisible: true,
+      accessDeniedIndicatorVisible: false,
+    });
+  });
+
+  it("detects joined accessible private group evidence without denied evidence", () => {
+    const observation = runObservationScript({
+      mainText: "Private group\nRecent posts",
+      controls: ["Joined"],
+    });
+
+    expect(observation).toEqual({
+      pageKind: "FACEBOOK_GROUP",
+      groupContentVisible: true,
+      joinActionVisible: false,
+      joinedIndicatorVisible: true,
+      accessDeniedIndicatorVisible: false,
+    });
+  });
+
+  it("releases the actual leased profile when checkout returns a mismatched profile", async () => {
+    const profileManager = new FakeProfileManager();
+    const browserProvider = new FakeBrowserProvider();
+    profileManager.checkoutResult = {
+      ok: true,
+      profileId: "actual-profile",
+      accountStage: "WARMING",
+      leaseId: "actual-lease",
+      leaseExpiresAt: "2026-05-01T10:10:00.000Z",
+    };
+
+    const result = await new ProfileSourceAccessBrowserCheckAdapter(
+      profileManager,
+      browserProvider,
+    ).check(checkInput());
+
+    expect(result).toMatchObject({
+      ok: false,
+      failureReason: {
+        code: "ACCESS_CHECK_PROFILE_ID_MISMATCH",
+      },
+    });
+    expect(browserProvider.launchConfig).toBeUndefined();
+    expect(profileManager.releaseCalls).toEqual([
+      {
+        profileId: "actual-profile",
+        leaseId: "actual-lease",
+      },
+    ]);
+  });
+
+  it("releases the lease and prevents browser launch when runtime lease ID mismatches", async () => {
+    const profileManager = new FakeProfileManager();
+    const browserProvider = new FakeBrowserProvider();
+    profileManager.runtimeConfigurationResult = {
+      ok: true,
+      configuration: {
+        profileId: "profile-1",
+        leaseId: "different-lease",
+        hardwareFingerprint: {
+          viewport: {
+            width: 1280,
+            height: 720,
+          },
+          languages: ["en-US"],
+        },
+        networkContext: {},
+        authenticationState: {
+          cookies: [],
+          localStorage: [],
+        },
+      },
+    };
+
+    const result = await new ProfileSourceAccessBrowserCheckAdapter(
+      profileManager,
+      browserProvider,
+    ).check(checkInput());
+
+    expect(result).toMatchObject({
+      ok: false,
+      failureReason: {
+        code: "ACCESS_CHECK_RUNTIME_LEASE_ID_MISMATCH",
+      },
+    });
+    expect(browserProvider.launchConfig).toBeUndefined();
+    expect(profileManager.releaseCalls).toEqual([
+      {
+        profileId: "profile-1",
+        leaseId: "lease-1",
+      },
+    ]);
+  });
+
+  it("prevents browser launch when the safe lease deadline is too close", async () => {
+    const profileManager = new FakeProfileManager();
+    const browserProvider = new FakeBrowserProvider();
+    profileManager.checkoutResult = {
+      ok: true,
+      profileId: "profile-1",
+      accountStage: "WARMING",
+      leaseId: "lease-1",
+      leaseExpiresAt: "2026-05-01T10:00:05.500Z",
+    };
+
+    const result = await new ProfileSourceAccessBrowserCheckAdapter(
+      profileManager,
+      browserProvider,
+      {
+        now: () => new Date("2026-05-01T10:00:00.000Z"),
+      },
+    ).check(checkInput());
+
+    expect(result).toMatchObject({
+      ok: false,
+      failureReason: {
+        code: "ACCESS_CHECK_LEASE_EXPIRY_TOO_CLOSE",
+      },
+    });
+    expect(browserProvider.launchConfig).toBeUndefined();
+    expect(profileManager.releaseCalls).toHaveLength(1);
+  });
+
+  it("attempts browser close and lease release when aborted after browser work", async () => {
+    const profileManager = new FakeProfileManager();
+    const browserProvider = new FakeBrowserProvider();
+    const abortController = new AbortController();
+    browserProvider.session.page.onEvaluate = () => {
+      abortController.abort();
+    };
+
+    const result = await new ProfileSourceAccessBrowserCheckAdapter(
+      profileManager,
+      browserProvider,
+    ).check({
+      ...checkInput(),
+      abortSignal: abortController.signal,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      failureReason: {
+        code: "ACCESS_CHECK_ABORTED",
+      },
+    });
+    expect(browserProvider.session.closeCalls).toBeGreaterThanOrEqual(1);
+    expect(profileManager.releaseCalls).toHaveLength(1);
+  });
+
+  it("attempts browser close and lease release when the safe deadline expires during execution", async () => {
+    const profileManager = new FakeProfileManager();
+    const browserProvider = new FakeBrowserProvider();
+    let now = new Date("2026-05-01T10:00:00.000Z");
+    profileManager.checkoutResult = {
+      ok: true,
+      profileId: "profile-1",
+      accountStage: "WARMING",
+      leaseId: "lease-1",
+      leaseExpiresAt: "2026-05-01T10:00:06.001Z",
+    };
+    browserProvider.session.page.onGoto = () => {
+      now = new Date("2026-05-01T10:00:01.002Z");
+    };
+
+    const result = await new ProfileSourceAccessBrowserCheckAdapter(
+      profileManager,
+      browserProvider,
+      {
+        now: () => now,
+      },
+    ).check(checkInput());
+
+    expect(result).toMatchObject({
+      ok: false,
+      failureReason: {
+        code: "ACCESS_CHECK_TIMEOUT",
+      },
+    });
+    expect(browserProvider.session.closeCalls).toBeGreaterThanOrEqual(1);
+    expect(profileManager.releaseCalls).toHaveLength(1);
+  });
 });
 
 function checkInput() {
@@ -99,37 +293,39 @@ function checkInput() {
 
 class FakeProfileManager {
   public readonly releaseCalls: ProfileLeaseReleaseInput[] = [];
+  public checkoutResult: ProfileAssistedGroupAccessCheckoutResult = {
+    ok: true,
+    profileId: "profile-1",
+    accountStage: "WARMING",
+    leaseId: "lease-1",
+    leaseExpiresAt: "2030-05-01T10:10:00.000Z",
+  };
+  public runtimeConfigurationResult: RuntimeProfileConfigurationResult = {
+    ok: true,
+    configuration: {
+      profileId: "profile-1",
+      leaseId: "lease-1",
+      hardwareFingerprint: {
+        viewport: {
+          width: 1280,
+          height: 720,
+        },
+        languages: ["en-US"],
+      },
+      networkContext: {},
+      authenticationState: {
+        cookies: [],
+        localStorage: [],
+      },
+    },
+  };
 
   public async checkoutProfileForAssistedGroupAccess(): Promise<ProfileAssistedGroupAccessCheckoutResult> {
-    return {
-      ok: true,
-      profileId: "profile-1",
-      accountStage: "WARMING",
-      leaseId: "lease-1",
-      leaseExpiresAt: "2026-05-01T10:10:00.000Z",
-    };
+    return this.checkoutResult;
   }
 
   public async getRuntimeProfileConfiguration(): Promise<RuntimeProfileConfigurationResult> {
-    return {
-      ok: true,
-      configuration: {
-        profileId: "profile-1",
-        leaseId: "lease-1",
-        hardwareFingerprint: {
-          viewport: {
-            width: 1280,
-            height: 720,
-          },
-          languages: ["en-US"],
-        },
-        networkContext: {},
-        authenticationState: {
-          cookies: [],
-          localStorage: [],
-        },
-      },
-    };
+    return this.runtimeConfigurationResult;
   }
 
   public async releaseProfileLease(
@@ -157,12 +353,14 @@ class FakeBrowserSession implements BrowserProviderSession {
   public readonly providerName = "PLAYWRIGHT_CHROMIUM" as const;
   public readonly page = new FakePage();
   public closeError: Error | undefined;
+  public closeCalls = 0;
 
   public async newPage(): Promise<BrowserProviderPage> {
     return this.page;
   }
 
   public async close(): Promise<void> {
+    this.closeCalls += 1;
     if (this.closeError !== undefined) {
       throw this.closeError;
     }
@@ -171,16 +369,20 @@ class FakeBrowserSession implements BrowserProviderSession {
 
 class FakePage implements BrowserProviderPage {
   public evaluateError: Error | undefined;
+  public onEvaluate: (() => void) | undefined;
+  public onGoto: (() => void) | undefined;
 
   public url(): string {
     return "https://www.facebook.com/groups/source-group-1";
   }
 
   public async goto(): Promise<{ readonly status: number }> {
+    this.onGoto?.();
     return { status: 200 };
   }
 
   public async evaluate<T = unknown>(): Promise<T> {
+    this.onEvaluate?.();
     if (this.evaluateError !== undefined) {
       throw this.evaluateError;
     }
@@ -207,4 +409,40 @@ class FakePage implements BrowserProviderPage {
   public onceCrash(_listener: () => void): void {}
 
   public offCrash(_listener: () => void): void {}
+}
+
+function runObservationScript(input: {
+  readonly mainText: string;
+  readonly controls: readonly string[];
+}) {
+  const mainElement = createElement(input.mainText);
+  const sandbox = {
+    window: {
+      location: {
+        hostname: "www.facebook.com",
+        pathname: "/groups/source-group-1",
+      },
+    },
+    document: {
+      body: mainElement,
+      querySelector: (selector: string) => {
+        if (selector.includes("[role='main']")) {
+          return mainElement;
+        }
+
+        return null;
+      },
+      querySelectorAll: () => input.controls.map(createElement),
+    },
+  };
+
+  return vm.runInNewContext(PROFILE_SOURCE_ACCESS_OBSERVATION_SCRIPT, sandbox);
+}
+
+function createElement(text: string) {
+  return {
+    innerText: text,
+    textContent: text,
+    getAttribute: (name: string) => (name === "aria-label" ? text : null),
+  };
 }

@@ -66,6 +66,21 @@ describe("profile-source access check worker runner", () => {
     );
   });
 
+  it("passes the worker abort signal into browser check execution", async () => {
+    const context = createContext();
+    await context.checkRuns.save(createCheckRun());
+    const abortController = new AbortController();
+
+    await runProfileSourceAccessCheckWorkerCommand({
+      args: workerArgs({ once: true }),
+      logger: context.logger,
+      abortSignal: abortController.signal,
+      dependencies: context.dependencies,
+    });
+
+    expect(context.browser.abortSignals).toEqual([abortController.signal]);
+  });
+
   it("continues polling after an individual failure and stops on abort", async () => {
     const context = createContext();
     await context.checkRuns.save(
@@ -180,8 +195,12 @@ class FakeBrowserCheckPort implements ProfileSourceAccessBrowserCheckPort {
     },
   };
   public results: ProfileSourceAccessBrowserCheckResult[] = [];
+  public readonly abortSignals: Array<AbortSignal | undefined> = [];
 
-  public async check(): Promise<ProfileSourceAccessBrowserCheckResult> {
+  public async check(input: {
+    readonly abortSignal?: AbortSignal;
+  }): Promise<ProfileSourceAccessBrowserCheckResult> {
+    this.abortSignals.push(input.abortSignal);
     return this.results.shift() ?? this.result;
   }
 }

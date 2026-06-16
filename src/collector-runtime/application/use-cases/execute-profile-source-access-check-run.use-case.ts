@@ -5,6 +5,7 @@ import type {
   ProfileSourceAccessMutationPort,
   ProfileSourceAccessOutcomeClassifierPort,
 } from "../ports/profile-source-access-check-execution.port";
+import { ProfileSourceAccessBrowserObservationSchema } from "../ports/profile-source-access-check-execution.port";
 import type { ProfileSourceAccessCheckRunRepository } from "../ports/profile-source-access-check-run-repository.port";
 import {
   loadValidatedProfileSourceAccessCheckRunById,
@@ -21,6 +22,7 @@ import type {
 
 export interface ExecuteProfileSourceAccessCheckRunInput {
   readonly checkRunId: ProfileSourceAccessCheckRunId;
+  readonly abortSignal?: AbortSignal;
 }
 
 export class ExecuteProfileSourceAccessCheckRunUseCase {
@@ -50,15 +52,24 @@ export class ExecuteProfileSourceAccessCheckRunUseCase {
     const browserResult = await executeBrowserCheckSafely(
       this.browserCheck,
       checkRun,
+      input.abortSignal,
     );
 
     if (!browserResult.ok) {
       return this.failRun(checkRun, browserResult.failureReason);
     }
 
+    const observationResult = validateObservationSafely(
+      browserResult.observation,
+    );
+
+    if (!observationResult.ok) {
+      return this.failRun(checkRun, observationResult.failureReason);
+    }
+
     const outcomeResult = await classifySafely(
       this.classifier,
-      browserResult.observation,
+      observationResult.observation,
     );
 
     if (!outcomeResult.ok) {
@@ -121,14 +132,33 @@ export class ExecuteProfileSourceAccessCheckRunUseCase {
 async function executeBrowserCheckSafely(
   browserCheck: ProfileSourceAccessBrowserCheckPort,
   checkRun: ProfileSourceAccessCheckRun,
+  abortSignal: AbortSignal | undefined,
 ) {
   try {
-    return await browserCheck.check({
+    const input = {
       checkRunId: checkRun.id,
       profileId: checkRun.profileId,
       sourceGroupId: checkRun.sourceGroupId,
       target: checkRun.target,
+    };
+
+    const result = await browserCheck.check({
+      ...input,
+      ...(abortSignal === undefined ? {} : { abortSignal }),
     });
+
+    if (!result.ok) {
+      return {
+        ok: false as const,
+        failureReason: sanitizeFailureReason(
+          result.failureReason,
+          "ACCESS_CHECK_BROWSER_FAILED",
+          "Profile-source access browser check failed.",
+        ),
+      };
+    }
+
+    return result;
   } catch {
     return {
       ok: false as const,
@@ -138,6 +168,39 @@ async function executeBrowserCheckSafely(
       },
     };
   }
+}
+
+function sanitizeFailureReason(
+  failureReason: ProfileSourceAccessCheckRunFailureReason,
+  fallbackCode: string,
+  message: string,
+): ProfileSourceAccessCheckRunFailureReason {
+  const trimmedCode = failureReason.code.trim();
+  const code = /^[A-Z0-9_]+$/.test(trimmedCode) ? trimmedCode : fallbackCode;
+
+  return {
+    code,
+    message,
+  };
+}
+
+function validateObservationSafely(observation: unknown) {
+  const result = ProfileSourceAccessBrowserObservationSchema.safeParse(observation);
+
+  if (result.success) {
+    return {
+      ok: true as const,
+      observation: result.data,
+    };
+  }
+
+  return {
+    ok: false as const,
+    failureReason: {
+      code: "ACCESS_CHECK_OBSERVATION_INVALID",
+      message: "Profile-source access browser check observation is invalid.",
+    },
+  };
 }
 
 async function classifySafely(

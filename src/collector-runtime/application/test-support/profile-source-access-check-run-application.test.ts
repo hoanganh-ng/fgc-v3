@@ -408,6 +408,76 @@ describe("collector runtime profile-source access check run application use case
     expect(context.mutation.calls).toHaveLength(0);
   });
 
+  it("does not mutate profile-source access when browser execution fails", async () => {
+    const context = createExecutionContext();
+    const running = createCheckRunFixture({
+      status: "RUNNING",
+      startedAt: "2026-05-01T10:01:00.000Z",
+    });
+    await context.checkRuns.save(running);
+    context.browser.result = {
+      ok: false,
+      failureReason: {
+        code: "ACCESS_CHECK_BROWSER_FAILED",
+        message: "cookie=secret-token",
+      },
+    };
+
+    const completed = await new ExecuteProfileSourceAccessCheckRunUseCase(
+      context.checkRuns,
+      context.browser,
+      context.classifier,
+      context.mutation,
+      context.clock,
+    ).execute({ checkRunId: running.id });
+
+    expect(completed.status).toBe("FAILED");
+    expect(completed.failureReason).toEqual({
+      code: "ACCESS_CHECK_BROWSER_FAILED",
+      message: "Profile-source access browser check failed.",
+    });
+    expect(JSON.stringify(completed.failureReason)).not.toContain("secret-token");
+    expect(context.classifier.calls).toHaveLength(0);
+    expect(context.mutation.calls).toHaveLength(0);
+  });
+
+  it("fails safely before mutation when browser observation is malformed", async () => {
+    const context = createExecutionContext();
+    const running = createCheckRunFixture({
+      status: "RUNNING",
+      startedAt: "2026-05-01T10:01:00.000Z",
+    });
+    await context.checkRuns.save(running);
+    context.browser.result = {
+      ok: true,
+      observation: {
+        pageKind: "FACEBOOK_GROUP",
+        groupContentVisible: true,
+        joinActionVisible: false,
+        joinedIndicatorVisible: false,
+        accessDeniedIndicatorVisible: false,
+        rawText: "cookie=secret-token",
+      },
+    } as ProfileSourceAccessBrowserCheckResult;
+
+    const completed = await new ExecuteProfileSourceAccessCheckRunUseCase(
+      context.checkRuns,
+      context.browser,
+      context.classifier,
+      context.mutation,
+      context.clock,
+    ).execute({ checkRunId: running.id });
+
+    expect(completed.status).toBe("FAILED");
+    expect(completed.failureReason).toEqual({
+      code: "ACCESS_CHECK_OBSERVATION_INVALID",
+      message: "Profile-source access browser check observation is invalid.",
+    });
+    expect(JSON.stringify(completed.failureReason)).not.toContain("secret-token");
+    expect(context.classifier.calls).toHaveLength(0);
+    expect(context.mutation.calls).toHaveLength(0);
+  });
+
   it("marks the check run failed when mutation fails", async () => {
     const context = createExecutionContext();
     const running = createCheckRunFixture({

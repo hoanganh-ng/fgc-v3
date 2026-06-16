@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type {
   ProfileSourceAccessCheckRunFailureReason,
   ProfileSourceAccessCheckRunOutcome,
@@ -15,19 +16,26 @@ export const PROFILE_SOURCE_ACCESS_BROWSER_PAGE_KINDS = [
 export type ProfileSourceAccessBrowserPageKind =
   (typeof PROFILE_SOURCE_ACCESS_BROWSER_PAGE_KINDS)[number];
 
-export interface ProfileSourceAccessBrowserObservation {
-  readonly pageKind: ProfileSourceAccessBrowserPageKind;
-  readonly groupContentVisible: boolean;
-  readonly joinActionVisible: boolean;
-  readonly joinedIndicatorVisible: boolean;
-  readonly accessDeniedIndicatorVisible: boolean;
-}
+export const ProfileSourceAccessBrowserObservationSchema = z
+  .object({
+    pageKind: z.enum(PROFILE_SOURCE_ACCESS_BROWSER_PAGE_KINDS),
+    groupContentVisible: z.boolean(),
+    joinActionVisible: z.boolean(),
+    joinedIndicatorVisible: z.boolean(),
+    accessDeniedIndicatorVisible: z.boolean(),
+  })
+  .strict();
+
+export type ProfileSourceAccessBrowserObservation = z.infer<
+  typeof ProfileSourceAccessBrowserObservationSchema
+>;
 
 export interface ProfileSourceAccessBrowserCheckInput {
   readonly checkRunId: string;
   readonly profileId: string;
   readonly sourceGroupId: string;
   readonly target: ProfileSourceAccessCheckRunTarget;
+  readonly abortSignal?: AbortSignal;
 }
 
 export type ProfileSourceAccessBrowserCheckResult =

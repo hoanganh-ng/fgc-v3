@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { ProfileSourceAccessCheckRun } from "../../../collector-runtime/domain";
 import { ProfileSourceAccessCheckRunConflictError } from "../../../collector-runtime/application";
@@ -277,6 +277,65 @@ if (!shouldRunDbTests) {
       expect(claim1?.status).toBe("RUNNING");
       expect(claim2?.status).toBe("RUNNING");
       expect((await checkRuns.findById(run2.id))?.startedAt).toBe(startedAt);
+    });
+
+    it("backfills legacy succeeded rows without outcome so they are loadable", async () => {
+      if (client === undefined) {
+        throw new Error("Database client was not initialized.");
+      }
+
+      const legacyId = nextTestId("legacy-succeeded");
+      createdCheckRunIds.add(legacyId);
+
+      await client.db.execute(sql`
+        INSERT INTO collector_profile_source_access_check_runs (
+          id,
+          profile_id,
+          source_group_id,
+          trigger_type,
+          status,
+          account_stage_at_request,
+          target,
+          outcome,
+          failure_reason,
+          requested_at,
+          started_at,
+          finished_at,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ${legacyId},
+          'profile-legacy',
+          'group-legacy',
+          'MANUAL',
+          'SUCCEEDED',
+          'WARMING',
+          '{"platform":"FACEBOOK","routeType":"DIRECT_GROUP_URL","url":"https://www.facebook.com/groups/legacy"}'::jsonb,
+          NULL,
+          NULL,
+          '2026-05-01T10:00:00.000Z',
+          '2026-05-01T10:01:00.000Z',
+          '2026-05-01T10:02:00.000Z',
+          '2026-05-01T10:00:00.000Z',
+          '2026-05-01T10:02:00.000Z'
+        )
+      `);
+
+      await client.db.execute(sql`
+        UPDATE collector_profile_source_access_check_runs
+        SET outcome = 'NEEDS_MANUAL_REVIEW'
+        WHERE status = 'SUCCEEDED'
+          AND outcome IS NULL
+      `);
+
+      const reloaded = await checkRuns.findById(legacyId);
+
+      expect(reloaded).toMatchObject({
+        id: legacyId,
+        status: "SUCCEEDED",
+        outcome: "NEEDS_MANUAL_REVIEW",
+      });
     });
 
     function nextTestId(prefix: string): string {

@@ -79,11 +79,21 @@ export async function runProfileSourceAccessCheckWorkerCommand(
 
   try {
     if (input.args.once) {
-      return await runOneWorkerIteration(dependencies, logger, result);
+      return await runOneWorkerIteration(
+        dependencies,
+        logger,
+        result,
+        input.abortSignal,
+      );
     }
 
     while (!input.abortSignal?.aborted) {
-      await runOneWorkerIteration(dependencies, logger, result);
+      await runOneWorkerIteration(
+        dependencies,
+        logger,
+        result,
+        input.abortSignal,
+      );
       await delay(input.args.pollIntervalMs, input.abortSignal);
     }
 
@@ -98,6 +108,7 @@ async function runOneWorkerIteration(
   dependencies: BuiltDependencies,
   logger: ProfileSourceAccessCheckWorkerLogger,
   totals: ProfileSourceAccessCheckWorkerCommandResult,
+  abortSignal: AbortSignal | undefined,
 ): Promise<ProfileSourceAccessCheckWorkerCommandResult> {
   const claimNext = new ClaimNextProfileSourceAccessCheckRunUseCase(
     dependencies.checkRuns,
@@ -119,7 +130,10 @@ async function runOneWorkerIteration(
     dependencies.classifier,
     dependencies.mutation,
     dependencies.clock,
-  ).execute({ checkRunId: claimedRun.id });
+  ).execute({
+    checkRunId: claimedRun.id,
+    ...(abortSignal === undefined ? {} : { abortSignal }),
+  });
 
   if (completedRun.status === "SUCCEEDED") {
     totals.succeededRuns += 1;

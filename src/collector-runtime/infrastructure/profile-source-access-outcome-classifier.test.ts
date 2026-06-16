@@ -26,6 +26,11 @@ describe("profile-source access outcome classifier", () => {
       "JOINED_ACCESSIBLE",
     ],
     [
+      "joined accessible private group content",
+      observation({ groupContentVisible: true, joinedIndicatorVisible: true }),
+      "JOINED_ACCESSIBLE",
+    ],
+    [
       "join action",
       observation({ groupContentVisible: true, joinActionVisible: true }),
       "JOIN_REQUIRED",
@@ -40,6 +45,36 @@ describe("profile-source access outcome classifier", () => {
     await expect(
       new DeterministicProfileSourceAccessOutcomeClassifier().classify(input),
     ).resolves.toBe(expected);
+  });
+
+  it.each([
+    [
+      "join and joined evidence",
+      observation({
+        groupContentVisible: true,
+        joinActionVisible: true,
+        joinedIndicatorVisible: true,
+      }),
+    ],
+    [
+      "joined and denied evidence",
+      observation({
+        groupContentVisible: true,
+        joinedIndicatorVisible: true,
+        accessDeniedIndicatorVisible: true,
+      }),
+    ],
+    [
+      "visible group content and unavailable evidence",
+      observation({
+        pageKind: "FACEBOOK_UNAVAILABLE",
+        groupContentVisible: true,
+      }),
+    ],
+  ] as const)("routes contradictory %s to manual review", async (_name, input) => {
+    await expect(
+      new DeterministicProfileSourceAccessOutcomeClassifier().classify(input),
+    ).resolves.toBe("NEEDS_MANUAL_REVIEW");
   });
 });
 

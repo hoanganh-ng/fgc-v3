@@ -1,25 +1,9 @@
-import { z } from "zod";
 import type {
   ProfileSourceAccessBrowserObservation,
   ProfileSourceAccessOutcomeClassifierPort,
 } from "../application";
+import { ProfileSourceAccessBrowserObservationSchema } from "../application";
 import type { ProfileSourceAccessCheckRunOutcome } from "../domain";
-
-const BrowserObservationSchema = z
-  .object({
-    pageKind: z.enum([
-      "FACEBOOK_GROUP",
-      "FACEBOOK_LOGIN",
-      "FACEBOOK_CHECKPOINT",
-      "FACEBOOK_UNAVAILABLE",
-      "OTHER",
-    ]),
-    groupContentVisible: z.boolean(),
-    joinActionVisible: z.boolean(),
-    joinedIndicatorVisible: z.boolean(),
-    accessDeniedIndicatorVisible: z.boolean(),
-  })
-  .strict();
 
 export class DeterministicProfileSourceAccessOutcomeClassifier
   implements ProfileSourceAccessOutcomeClassifierPort
@@ -27,7 +11,7 @@ export class DeterministicProfileSourceAccessOutcomeClassifier
   public async classify(
     observation: ProfileSourceAccessBrowserObservation,
   ): Promise<ProfileSourceAccessCheckRunOutcome> {
-    const parsed = BrowserObservationSchema.parse(observation);
+    const parsed = ProfileSourceAccessBrowserObservationSchema.parse(observation);
 
     if (parsed.pageKind === "FACEBOOK_CHECKPOINT") {
       return "CHECKPOINT_REQUIRED";
@@ -35,6 +19,10 @@ export class DeterministicProfileSourceAccessOutcomeClassifier
 
     if (parsed.pageKind === "FACEBOOK_LOGIN") {
       return "LOGIN_REQUIRED";
+    }
+
+    if (hasContradictoryEvidence(parsed)) {
+      return "NEEDS_MANUAL_REVIEW";
     }
 
     if (
@@ -64,4 +52,32 @@ export class DeterministicProfileSourceAccessOutcomeClassifier
 
     return "NEEDS_MANUAL_REVIEW";
   }
+}
+
+function hasContradictoryEvidence(
+  observation: ProfileSourceAccessBrowserObservation,
+): boolean {
+  if (
+    observation.joinActionVisible &&
+    observation.joinedIndicatorVisible
+  ) {
+    return true;
+  }
+
+  if (
+    observation.joinedIndicatorVisible &&
+    observation.accessDeniedIndicatorVisible
+  ) {
+    return true;
+  }
+
+  if (
+    observation.groupContentVisible &&
+    (observation.pageKind === "FACEBOOK_UNAVAILABLE" ||
+      observation.accessDeniedIndicatorVisible)
+  ) {
+    return true;
+  }
+
+  return false;
 }
