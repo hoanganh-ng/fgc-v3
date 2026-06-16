@@ -1,0 +1,49 @@
+# Collector Profile Manager
+
+## Ownership
+- Profile identity and operational lifecycle (status transitions).
+- Account maturity/readiness stage and transition rules.
+- Profile property invariants.
+- Provisioning token lifecycle.
+- Session ingestion rules.
+- Checkout eligibility rules (including temporal windows, cooldowns, and safety thresholds).
+- Profile lease management and lease purpose rules (`COLLECTION`, `AMBIENT_EXERCISE`, `ASSISTED_GROUP_ACCESS`).
+- Profile-source access state (mapping profileId + sourceGroupId).
+- Trusted runtime configuration provisioning for browsers.
+
+## Does Not Own
+- Browser automation execution.
+- Collection task orchestration.
+- Content Manager source group records or entry route metadata.
+- Web UI rendering.
+- Content building or publishing.
+
+## Important Source Paths
+- `src/collector-profile-manager/domain/`
+- `src/collector-profile-manager/application/`
+- `src/collector-profile-manager/infrastructure/`
+- `src/collector-profile-manager/interface/`
+- `src/collector-profile-manager/composition/`
+
+## Important Entrypoints
+- `Fastify API`: `src/collector-profile-manager/interface/http/` (e.g. `/collector/profiles`)
+- `Composition Root`: `src/collector-profile-manager/composition/root.ts`
+
+## Critical Invariants
+- Checkout rules must be respected; profiles are leased atomically to prevent concurrent access.
+- `accountStage` is independent of operational `status`. Collection checkout requires `accountStage = COLLECTION_READY`.
+
+## Cross-Module Communication
+- Does not import Content Manager repositories or runtime implementation directly.
+- Communicates with Content Manager via explicit application ports (e.g., validating `sourceGroupId` existence).
+
+## Sensitive Data Rules
+- Never expose raw cookies, localStorage values, proxy credentials, tokens, or fingerprint secrets in logs, generic read DTOs, or the Web UI.
+- Trusted runtime configurations are only generated within a lease context.
+
+## Relevant Verification Commands
+```bash
+pnpm test src/collector-profile-manager
+pnpm test:db src/collector-profile-manager
+pnpm test:http:db src/collector-profile-manager
+```

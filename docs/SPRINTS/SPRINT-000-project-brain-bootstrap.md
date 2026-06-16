@@ -26,10 +26,10 @@ Create a documentation-based project brain for future development.
 ## Acceptance Criteria
 
 - The requested documentation tree exists.
-- `AGENTS.md` instructs future Builders to read `docs/PROJECT_STATE.md`, `docs/ARCHITECTURE.md`, `docs/MODULE_BOUNDARIES.md`, and `docs/SPRINTS/active.md`.
+- `AGENTS.md` instructs future Builders to read `docs/PROJECT_SNAPSHOT.md`, `docs/ARCHITECTURE.md`, `docs/MODULE_BOUNDARIES.md`, and `docs/SPRINTS/active.md`.
 - `AGENTS.md` instructs future Builders to follow only the active sprint.
 - `AGENTS.md` records that domain logic must not depend on HTTP, database, browser automation, queues, or framework code.
-- `docs/PROJECT_STATE.md` includes current focus, current sprint, decided items, not-decided-yet items, and open questions.
+- `docs/PROJECT_SNAPSHOT.md` includes current focus, current sprint, decided items, not-decided-yet items, and open questions.
 - Product, architecture, module boundary, ADR, and sprint documents describe the requested context.
 - `docs/REQUIREMENTS/collector-profile-manager-fr.md` contains the copied contents of `FR.md`.
 - `docs/REQUIREMENTS/collector-profile-manager-nfr.md` contains the copied contents of `NFR.md`.

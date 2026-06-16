@@ -10,23 +10,17 @@ Implement the active sprint faithfully and narrowly.
 Do not redesign the product, expand the sprint, or begin future roadmap work
 unless explicitly directed.
 
-## Mandatory reading
+## Context Loading
 
-Before modifying files, read in this order:
+Before modifying files, follow this progressive context loading strategy:
 
-1. `README.md`
-2. `docs/PROJECT_STATE.md`
-3. `docs/ARCHITECTURE.md`
-4. `docs/MODULE_BOUNDARIES.md`
-5. `docs/SPRINTS/active.md`
-6. The active sprint document referenced by `active.md`
+1. Read `docs/SPRINTS/active.md`
+2. Read the referenced active sprint document
+3. Read all files listed in the sprint's `Required Context` section
+4. Inspect the affected implementation, nearby tests, `git status`, and relevant package scripts
 
-Then inspect:
-
-- `git status`
-- the affected implementation
-- nearby tests
-- relevant package scripts
+Do not read all historical sprints, project state, or scan unrelated modules by default.
+Load global architecture, module documents, or historical records only when explicitly required by the sprint or when a discovered dependency makes them necessary.
 
 The active sprint is the implementation authority.
 
@@ -52,41 +46,6 @@ Application code owns port contracts and must not depend on concrete adapters.
 Cross-module communication must use explicit ports, safe HTTP contracts, or
 composition adapters. Do not import another module's repositories, database
 tables, or composition root.
-
-## Module ownership
-
-### Collector Profile Manager
-
-Owns profiles, sessions, provisioning, account stage, checkout eligibility,
-leases, trusted runtime configuration, and profile-source access state.
-
-Does not own browser execution, source-group records, content records, or
-collection orchestration.
-
-### Content Manager
-
-Owns categories, source groups, entry-route metadata, normalized content,
-deduplication, content lifecycle, engagement metadata, and safe reads.
-
-Does not own profiles, sessions, profile-source access, browser execution, or
-raw Facebook payload parsing.
-
-### Collector Runtime
-
-Owns collection orchestration, browser execution, browser providers, captured
-platform artifacts, platform extractors, workers, and submission of normalized
-content candidates.
-
-Does not own profile eligibility, account-stage rules, content deduplication, or
-another module's persistence.
-
-### Web UI
-
-Owns operator presentation, safe API calls, forms, client validation, and query
-state.
-
-Does not own domain rules, persistence, browser execution, or sensitive runtime
-configuration.
 
 ## Security
 
@@ -128,3 +87,4 @@ Always run:
 ```bash
 pnpm typecheck
 pnpm test
+```

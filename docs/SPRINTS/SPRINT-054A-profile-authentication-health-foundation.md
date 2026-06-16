@@ -93,3 +93,12 @@ All migrations applied successfully via `pnpm db:migrate`. Verified `toCollector
 ## Sprint Status
 
 Sprint 054A is active.
+## Required Context
+
+To work on this sprint, read the following:
+- `AGENTS.md` (root execution contract)
+- `docs/PROJECT_SNAPSHOT.md` (concise current state)
+- `docs/modules/collector-profile-manager.md` (owning module boundaries)
+- Relevant Profile Manager implementation files and nearby tests.
+
+Do not scan `Content Manager`, `Collector Runtime`, or `Web UI` modules by default, as they are out of scope for this foundation phase.

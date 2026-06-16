@@ -13,7 +13,7 @@ The project is at the start of development. Future Builders need a stable source
 Create a documentation-based project brain with:
 
 - `AGENTS.md` as the Builder entrypoint.
-- `docs/PROJECT_STATE.md` for current focus, sprint, decisions, unknowns, and open questions.
+- `docs/PROJECT_SNAPSHOT.md` for current focus, sprint, decisions, unknowns, and open questions.
 - `docs/PRODUCT_OVERVIEW.md` for product-level context.
 - `docs/ROADMAP.md` for broad sequencing.
 - `docs/GLOSSARY.md` for shared vocabulary.

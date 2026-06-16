@@ -122,7 +122,8 @@ The `collector-worker` and `account-exercise-worker` Compose services are behind
 
 ## Deeper Docs
 
-- [Project State](docs/PROJECT_STATE.md)
+- [Project Snapshot](docs/PROJECT_SNAPSHOT.md)
+- [Project History](docs/PROJECT_HISTORY.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Module Boundaries](docs/MODULE_BOUNDARIES.md)
 - [Runtime](docs/RUNTIME.md)
