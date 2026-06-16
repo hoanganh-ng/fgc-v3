@@ -31,4 +31,12 @@ Harden the Profile-Source Access Check Run HTTP layer and domain types to safely
 - [x] HTTP integration tests correctly handle 409 Conflict constraints.
 - [x] Removed lifecycle routes return 404 Not Found.
 - [x] Endpoints gracefully handle mapping to 502 Bad Gateway for upstream reference resolution issues.
-- [x] Successful executions of `pnpm typecheck`, `pnpm test`, and `pnpm web:build`.
+- [x] Successful execution of the following verification commands:
+  - `pnpm typecheck`
+  - `pnpm web:typecheck`
+  - `pnpm web:build`
+  - `pnpm test`
+  - `git diff --check`
+  - `DATABASE_URL=<isolated-test-db> pnpm db:migrate`
+  - `DATABASE_URL=<isolated-test-db> pnpm test:db`
+  - `DATABASE_URL=<isolated-test-db> pnpm test:http:db`

@@ -39,14 +39,24 @@ export class DrizzleProfileSourceAccessCheckRunRepository
           },
         });
     } catch (error: unknown) {
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        error.code === "23505" &&
-        "constraint" in error &&
-        error.constraint === "collector_psa_check_runs_active_unique_idx"
-      ) {
+      const isConflict =
+        (typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "23505" &&
+          "constraint" in error &&
+          error.constraint === "collector_psa_check_runs_active_unique_idx") ||
+        (typeof error === "object" &&
+          error !== null &&
+          "cause" in error &&
+          typeof error.cause === "object" &&
+          error.cause !== null &&
+          "code" in error.cause &&
+          error.cause.code === "23505" &&
+          "constraint" in error.cause &&
+          error.cause.constraint === "collector_psa_check_runs_active_unique_idx");
+
+      if (isConflict) {
         throw new ProfileSourceAccessCheckRunConflictError(
           run.profileId,
           run.sourceGroupId,

@@ -116,6 +116,7 @@ if (!shouldRunDbTests) {
           id: nextTestId("find-ps-1"),
           profileId: "profile-1",
           sourceGroupId: "group-1",
+          status: "SUCCEEDED",
           createdAt: "2026-05-01T10:00:00.000Z",
         }),
       );
@@ -200,14 +201,30 @@ if (!shouldRunDbTests) {
     });
 
     it("returns total and respects limit and offset when listing", async () => {
+      const sharedProfileId = nextTestId("shared-profile");
       const run1 = trackCheckRun(
-        createCheckRun({ id: nextTestId("page-1"), createdAt: "2026-05-01T10:00:00.000Z" }),
+        createCheckRun({
+          id: nextTestId("page-1"),
+          profileId: sharedProfileId,
+          sourceGroupId: "group-1",
+          createdAt: "2026-05-01T10:00:00.000Z",
+        }),
       );
       const run2 = trackCheckRun(
-        createCheckRun({ id: nextTestId("page-2"), createdAt: "2026-05-01T10:01:00.000Z" }),
+        createCheckRun({
+          id: nextTestId("page-2"),
+          profileId: sharedProfileId,
+          sourceGroupId: "group-2",
+          createdAt: "2026-05-01T10:01:00.000Z",
+        }),
       );
       const run3 = trackCheckRun(
-        createCheckRun({ id: nextTestId("page-3"), createdAt: "2026-05-01T10:02:00.000Z" }),
+        createCheckRun({
+          id: nextTestId("page-3"),
+          profileId: sharedProfileId,
+          sourceGroupId: "group-3",
+          createdAt: "2026-05-01T10:02:00.000Z",
+        }),
       );
 
       await checkRuns.save(run1);
@@ -215,16 +232,16 @@ if (!shouldRunDbTests) {
       await checkRuns.save(run3);
 
       const result = await checkRuns.list({
-        limit: 2,
+        profileId: sharedProfileId,
+        limit: 1,
         offset: 1,
       });
 
-      expect(result.total).toBeGreaterThanOrEqual(3);
-      expect(result.items).toHaveLength(2);
-      // Assuming descending order by createdAt
-      // page-3 is newest, page-2 is next, page-1 is oldest
-      // if offset is 1, it should skip page-3 and return page-2, page-1
-      expect(result.items.map(i => i.id)).toEqual([run2.id, run1.id]);
+      expect(result.total).toBe(3);
+      expect(result.items).toHaveLength(1);
+      // Descending by createdAt: run3 is newest, run2 is second-newest, run1 is oldest.
+      // Offset 1 skips run3, returns run2.
+      expect(result.items[0]).toEqual(run2);
     });
 
     function nextTestId(prefix: string): string {
