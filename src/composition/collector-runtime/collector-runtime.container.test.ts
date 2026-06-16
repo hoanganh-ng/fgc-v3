@@ -23,9 +23,12 @@ import type {
   IdGenerator,
   SourceGroupLookupPort,
   SourceGroupLookupResult,
+  ProfileReferencePort,
+  ProfileReferenceResult,
 } from "../../collector-runtime/application";
 import { InMemoryCollectionRunRepository } from "../../collector-runtime/application/test-support/in-memory-collection-run-repository";
 import { InMemoryAccountExerciseRunRepository } from "../../collector-runtime/application/test-support/in-memory-account-exercise-run-repository";
+import { InMemoryProfileSourceAccessCheckRunRepository } from "../../collector-runtime/application/test-support/in-memory-profile-source-access-check-run-repository";
 import { createCollectorRuntime } from "./collector-runtime.container";
 
 describe("collector runtime composition container", () => {
@@ -34,7 +37,9 @@ describe("collector runtime composition container", () => {
     const services = createCollectorRuntime({
       accountExerciseRuns: new InMemoryAccountExerciseRunRepository(),
       collectionRuns: new InMemoryCollectionRunRepository(),
+      checkRuns: new InMemoryProfileSourceAccessCheckRunRepository(),
       sourceGroups: new FakeSourceGroupLookupPort(),
+      profiles: new FakeProfileReferencePort(),
       clock: new FixedClock(),
       idGenerator: new FakeIdGenerator(),
       close: async () => {
@@ -121,6 +126,16 @@ class FakeSourceGroupLookupPort implements SourceGroupLookupPort {
         url: "https://www.facebook.com/groups/source-group-1",
         categoryId: "category-1",
       },
+    };
+  }
+}
+
+class FakeProfileReferencePort implements ProfileReferencePort {
+  public async getProfileAccountStage(): Promise<ProfileReferenceResult> {
+    return {
+      ok: true,
+      profileId: "profile-1",
+      accountStage: "WARM",
     };
   }
 }

@@ -16,6 +16,13 @@ import {
   MarkCollectionRunSucceededUseCase,
   RequestAccountExerciseRunUseCase,
   RequestCollectionRunUseCase,
+  RequestProfileSourceAccessCheckRunUseCase,
+  GetProfileSourceAccessCheckRunUseCase,
+  ListProfileSourceAccessCheckRunsUseCase,
+  MarkProfileSourceAccessCheckRunFailedUseCase,
+  MarkProfileSourceAccessCheckRunRunningUseCase,
+  MarkProfileSourceAccessCheckRunSucceededUseCase,
+  CancelProfileSourceAccessCheckRunUseCase,
 } from "../../collector-runtime/application";
 import type {
   AccountExerciseRunRepository,
@@ -23,11 +30,15 @@ import type {
   CollectionRunRepository,
   IdGenerator,
   SourceGroupLookupPort,
+  ProfileSourceAccessCheckRunRepository,
+  ProfileReferencePort,
 } from "../../collector-runtime/application";
 
 export interface CollectorRuntimeDependencies {
   readonly accountExerciseRuns: AccountExerciseRunRepository;
   readonly collectionRuns: CollectionRunRepository;
+  readonly checkRuns: ProfileSourceAccessCheckRunRepository;
+  readonly profiles: ProfileReferencePort;
   readonly sourceGroups: SourceGroupLookupPort;
   readonly clock: Clock;
   readonly idGenerator: IdGenerator;
@@ -50,6 +61,13 @@ export interface CollectorRuntimeContainer {
   readonly markCollectionRunSucceeded: MarkCollectionRunSucceededUseCase;
   readonly markCollectionRunFailed: MarkCollectionRunFailedUseCase;
   readonly cancelCollectionRun: CancelCollectionRunUseCase;
+  readonly requestProfileSourceAccessCheckRun: RequestProfileSourceAccessCheckRunUseCase;
+  readonly getProfileSourceAccessCheckRun: GetProfileSourceAccessCheckRunUseCase;
+  readonly listProfileSourceAccessCheckRuns: ListProfileSourceAccessCheckRunsUseCase;
+  readonly markProfileSourceAccessCheckRunRunning: MarkProfileSourceAccessCheckRunRunningUseCase;
+  readonly markProfileSourceAccessCheckRunSucceeded: MarkProfileSourceAccessCheckRunSucceededUseCase;
+  readonly markProfileSourceAccessCheckRunFailed: MarkProfileSourceAccessCheckRunFailedUseCase;
+  readonly cancelProfileSourceAccessCheckRun: CancelProfileSourceAccessCheckRunUseCase;
   readonly claimNextAccountExerciseRun: ClaimNextAccountExerciseRunUseCase;
   readonly claimNextCollectionRun: ClaimNextCollectionRunUseCase;
   close(): Promise<void>;
@@ -61,6 +79,8 @@ export function createCollectorRuntime(
   const {
     accountExerciseRuns,
     collectionRuns,
+    checkRuns,
+    profiles,
     sourceGroups,
     clock,
     idGenerator,
@@ -121,6 +141,35 @@ export function createCollectorRuntime(
     ),
     cancelCollectionRun: new CancelCollectionRunUseCase(
       collectionRuns,
+      clock,
+    ),
+    requestProfileSourceAccessCheckRun: new RequestProfileSourceAccessCheckRunUseCase(
+      checkRuns,
+      profiles,
+      sourceGroups,
+      idGenerator,
+      clock,
+    ),
+    getProfileSourceAccessCheckRun: new GetProfileSourceAccessCheckRunUseCase(
+      checkRuns,
+    ),
+    listProfileSourceAccessCheckRuns: new ListProfileSourceAccessCheckRunsUseCase(
+      checkRuns,
+    ),
+    markProfileSourceAccessCheckRunRunning: new MarkProfileSourceAccessCheckRunRunningUseCase(
+      checkRuns,
+      clock,
+    ),
+    markProfileSourceAccessCheckRunSucceeded: new MarkProfileSourceAccessCheckRunSucceededUseCase(
+      checkRuns,
+      clock,
+    ),
+    markProfileSourceAccessCheckRunFailed: new MarkProfileSourceAccessCheckRunFailedUseCase(
+      checkRuns,
+      clock,
+    ),
+    cancelProfileSourceAccessCheckRun: new CancelProfileSourceAccessCheckRunUseCase(
+      checkRuns,
       clock,
     ),
     claimNextAccountExerciseRun: new ClaimNextAccountExerciseRunUseCase(

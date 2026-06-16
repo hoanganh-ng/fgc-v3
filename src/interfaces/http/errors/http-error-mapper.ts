@@ -23,8 +23,10 @@ import {
 import {
   CollectionRunValidationError,
   AccountExerciseRunValidationError,
+  ProfileSourceAccessCheckRunValidationError,
   CollectorRuntimeApplicationError,
   SourceGroupLookupFailedError,
+  ProfileReferenceLookupFailedError,
   type CollectorRuntimeApplicationErrorCode,
 } from "../../../collector-runtime/application";
 import {
@@ -159,7 +161,8 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
 
   if (
     error instanceof CollectionRunValidationError ||
-    error instanceof AccountExerciseRunValidationError
+    error instanceof AccountExerciseRunValidationError ||
+    error instanceof ProfileSourceAccessCheckRunValidationError
   ) {
     return {
       statusCode: 400,
@@ -203,6 +206,28 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
           error: {
             code: "SOURCE_GROUP_LOOKUP_FAILED",
             message: "Content Manager source group lookup failed.",
+            reasons: [
+              ...(validCauseCode !== undefined ? [{ causeCode: validCauseCode }] : []),
+              ...(error.statusCode !== undefined ? [{ statusCode: error.statusCode }] : []),
+            ],
+          },
+        },
+      };
+    }
+
+    if (error instanceof ProfileReferenceLookupFailedError) {
+      const causeCodeRegex = /^[A-Z][A-Z0-9_]{0,63}$/;
+      const validCauseCode =
+        error.causeCode !== undefined && causeCodeRegex.test(error.causeCode)
+          ? error.causeCode
+          : undefined;
+
+      return {
+        statusCode: 502,
+        body: {
+          error: {
+            code: "PROFILE_REFERENCE_LOOKUP_FAILED",
+            message: "Profile Manager profile lookup failed.",
             reasons: [
               ...(validCauseCode !== undefined ? [{ causeCode: validCauseCode }] : []),
               ...(error.statusCode !== undefined ? [{ statusCode: error.statusCode }] : []),
@@ -315,6 +340,15 @@ const collectorRuntimeApplicationErrorStatus: Record<
   COLLECTION_RUN_SOURCE_GROUP_NOT_ACTIVE: 409,
   COLLECTION_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED: 409,
   SOURCE_GROUP_LOOKUP_FAILED: 502,
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_NOT_FOUND: 404,
+  INVALID_PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUS_TRANSITION: 409,
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_VALIDATION_ERROR: 400,
+  PROFILE_REFERENCE_LOOKUP_FAILED: 502,
+  PROFILE_NOT_FOUND: 404,
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_CONFLICT: 409,
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_FOUND: 404,
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_ACTIVE: 409,
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED: 409,
 };
 
 const contentDomainErrorStatus: Record<ContentManagerDomainErrorCode, number> = {
@@ -327,6 +361,7 @@ const collectorRuntimeDomainErrorStatus: Record<
 > = {
   INVALID_COLLECTION_RUN_STATUS_TRANSITION: 409,
   INVALID_ACCOUNT_EXERCISE_RUN_STATUS_TRANSITION: 409,
+  INVALID_PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUS_TRANSITION: 409,
 };
 
 function mapKnownError(

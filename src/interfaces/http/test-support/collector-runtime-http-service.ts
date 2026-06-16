@@ -1,6 +1,7 @@
 import type {
   AccountExerciseRun,
   CollectionRun,
+  ProfileSourceAccessCheckRun,
 } from "../../../collector-runtime/domain";
 import type {
   CollectorRuntimeHttpService,
@@ -79,6 +80,19 @@ export interface FakeCollectorRuntimeHttpService
     }
   >;
   readonly cancelCollectionRun: StubUseCase<unknown, CollectionRun>;
+  readonly requestProfileSourceAccessCheckRun: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
+  readonly getProfileSourceAccessCheckRun: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
+  readonly listProfileSourceAccessCheckRuns: StubUseCase<
+    unknown,
+    {
+      readonly items: readonly ProfileSourceAccessCheckRun[];
+      readonly total: number;
+    }
+  >;
+  readonly markProfileSourceAccessCheckRunRunning: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
+  readonly markProfileSourceAccessCheckRunSucceeded: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
+  readonly markProfileSourceAccessCheckRunFailed: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
+  readonly cancelProfileSourceAccessCheckRun: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
 }
 
 export function createFakeCollectorRuntimeHttpService(): FakeCollectorRuntimeHttpService {
@@ -162,7 +176,17 @@ export function createFakeCollectorRuntimeHttpService(): FakeCollectorRuntimeHtt
         updatedAt: collectorRuntimeHttpTestNow,
       }),
     ),
-  } as FakeCollectorRuntimeHttpService;
+    requestProfileSourceAccessCheckRun: new StubUseCase(createProfileSourceAccessCheckRun()),
+    getProfileSourceAccessCheckRun: new StubUseCase(createProfileSourceAccessCheckRun()),
+    listProfileSourceAccessCheckRuns: new StubUseCase({
+      items: [createProfileSourceAccessCheckRun()],
+      total: 1,
+    }),
+    markProfileSourceAccessCheckRunRunning: new StubUseCase(createProfileSourceAccessCheckRun()),
+    markProfileSourceAccessCheckRunSucceeded: new StubUseCase(createProfileSourceAccessCheckRun()),
+    markProfileSourceAccessCheckRunFailed: new StubUseCase(createProfileSourceAccessCheckRun()),
+    cancelProfileSourceAccessCheckRun: new StubUseCase(createProfileSourceAccessCheckRun()),
+  } as unknown as FakeCollectorRuntimeHttpService;
 }
 
 export function createUnusedCollectorRuntimeHttpService(): CollectorRuntimeHttpService {
@@ -185,6 +209,13 @@ export function createUnusedCollectorRuntimeHttpService(): CollectorRuntimeHttpS
     getCollectionRun: useCase,
     listCollectionRuns: useCase,
     cancelCollectionRun: useCase,
+    requestProfileSourceAccessCheckRun: useCase,
+    getProfileSourceAccessCheckRun: useCase,
+    listProfileSourceAccessCheckRuns: useCase,
+    markProfileSourceAccessCheckRunRunning: useCase,
+    markProfileSourceAccessCheckRunSucceeded: useCase,
+    markProfileSourceAccessCheckRunFailed: useCase,
+    cancelProfileSourceAccessCheckRun: useCase,
   } as unknown as CollectorRuntimeHttpService;
 }
 
@@ -254,6 +285,32 @@ export function createCollectionRun(
     ...(options.finishedAt !== undefined
       ? { finishedAt: options.finishedAt }
       : {}),
+    createdAt: options.createdAt ?? collectorRuntimeHttpTestNow,
+    updatedAt: options.updatedAt ?? collectorRuntimeHttpTestNow,
+  };
+}
+
+export function createProfileSourceAccessCheckRun(
+  options: Partial<ProfileSourceAccessCheckRun> = {},
+): ProfileSourceAccessCheckRun {
+  return {
+    id: options.id ?? "check-run-1",
+    profileId: options.profileId ?? "profile-1",
+    sourceGroupId: options.sourceGroupId ?? "source-group-1",
+    triggerType: options.triggerType ?? "MANUAL",
+    status: options.status ?? "QUEUED",
+    accountStageAtRequest: options.accountStageAtRequest ?? "WARM",
+    target: options.target ?? {
+      platform: "FACEBOOK",
+      routeType: "DIRECT_GROUP_URL",
+      url: "https://www.facebook.com/groups/source-group-1",
+    },
+    ...(options.failureReason !== undefined
+      ? { failureReason: options.failureReason }
+      : {}),
+    requestedAt: options.requestedAt ?? collectorRuntimeHttpTestNow,
+    ...(options.startedAt !== undefined ? { startedAt: options.startedAt } : {}),
+    ...(options.finishedAt !== undefined ? { finishedAt: options.finishedAt } : {}),
     createdAt: options.createdAt ?? collectorRuntimeHttpTestNow,
     updatedAt: options.updatedAt ?? collectorRuntimeHttpTestNow,
   };

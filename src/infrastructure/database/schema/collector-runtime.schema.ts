@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   index,
   jsonb,
@@ -5,12 +6,15 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import {
   ACCOUNT_EXERCISE_RUN_STATUSES,
   ACCOUNT_EXERCISE_TYPES,
   COLLECTION_RUN_STATUSES,
   COLLECTION_RUN_TRIGGER_TYPES,
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUSES,
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_TRIGGER_TYPES,
 } from "../../../collector-runtime/domain";
 import type {
   AccountExerciseRunActionBudget,
@@ -20,6 +24,8 @@ import type {
   CollectionRunFailureReason,
   CollectionRunParameters,
   CollectionRunSummary,
+  ProfileSourceAccessCheckRunTarget,
+  ProfileSourceAccessCheckRunFailureReason,
 } from "../../../collector-runtime/domain";
 
 export const collectionRunStatusEnum = pgEnum(
@@ -40,6 +46,16 @@ export const accountExerciseRunStatusEnum = pgEnum(
 export const accountExerciseTypeEnum = pgEnum(
   "account_exercise_type",
   ACCOUNT_EXERCISE_TYPES,
+);
+
+export const profileSourceAccessCheckRunStatusEnum = pgEnum(
+  "profile_source_access_check_run_status",
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUSES,
+);
+
+export const profileSourceAccessCheckRunTriggerTypeEnum = pgEnum(
+  "profile_source_access_check_run_trigger_type",
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_TRIGGER_TYPES,
 );
 
 const timestampWithTimezone = (name: string) =>
@@ -101,5 +117,35 @@ export const collectorAccountExerciseRuns = pgTable(
     index("collector_account_exercise_runs_requested_at_idx").on(
       table.requestedAt,
     ),
+  ],
+);
+
+export const collectorProfileSourceAccessCheckRuns = pgTable(
+  "collector_profile_source_access_check_runs",
+  {
+    id: text("id").primaryKey(),
+    profileId: text("profile_id").notNull(),
+    sourceGroupId: text("source_group_id").notNull(),
+    triggerType: profileSourceAccessCheckRunTriggerTypeEnum("trigger_type").notNull(),
+    status: profileSourceAccessCheckRunStatusEnum("status").notNull(),
+    accountStageAtRequest: text("account_stage_at_request").notNull(),
+    target: jsonb("target").$type<ProfileSourceAccessCheckRunTarget>().notNull(),
+    failureReason:
+      jsonb("failure_reason").$type<ProfileSourceAccessCheckRunFailureReason>(),
+    requestedAt: timestampWithTimezone("requested_at").notNull(),
+    startedAt: timestampWithTimezone("started_at"),
+    finishedAt: timestampWithTimezone("finished_at"),
+    createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
+    updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("collector_psa_check_runs_status_idx").on(table.status),
+    index("collector_psa_check_runs_profile_id_idx").on(table.profileId),
+    index("collector_psa_check_runs_source_group_id_idx").on(table.sourceGroupId),
+    index("collector_psa_check_runs_created_at_idx").on(table.createdAt),
+    index("collector_psa_check_runs_requested_at_idx").on(table.requestedAt),
+    uniqueIndex("collector_psa_check_runs_active_unique_idx")
+      .on(table.profileId, table.sourceGroupId)
+      .where(sql`status IN ('QUEUED', 'RUNNING')`),
   ],
 );

@@ -2,11 +2,17 @@ import type {
   Clock,
   IdGenerator,
   SourceGroupLookupPort,
+  ProfileReferencePort,
 } from "../../collector-runtime/application";
-import { ContentManagerHttpClient } from "../../collector-runtime/infrastructure";
+import {
+  ContentManagerHttpClient,
+  ProfileManagerHttpClient,
+  ProfileManagerProfileReferenceAdapter,
+} from "../../collector-runtime/infrastructure";
 import {
   DrizzleAccountExerciseRunRepository,
   DrizzleCollectionRunRepository,
+  DrizzleProfileSourceAccessCheckRunRepository,
   createDatabaseClient,
 } from "../../infrastructure/database";
 import type {
@@ -22,6 +28,7 @@ import type { CollectorRuntimeContainer } from "./collector-runtime.container";
 export interface CollectorRuntimeEnvironment
   extends CompositionEnvironment {
   readonly CONTENT_MANAGER_BASE_URL?: string;
+  readonly PROFILE_MANAGER_BASE_URL?: string;
   readonly HTTP_PORT?: string;
 }
 
@@ -31,7 +38,9 @@ export interface CreateCollectorRuntimeOptions {
   readonly clock?: Clock;
   readonly idGenerator?: IdGenerator;
   readonly sourceGroupLookupPort?: SourceGroupLookupPort;
+  readonly profileReferencePort?: ProfileReferencePort;
   readonly contentManagerBaseUrl?: string;
+  readonly profileManagerBaseUrl?: string;
 }
 
 export interface CreateCollectorRuntimeFromEnvOptions {
@@ -40,6 +49,7 @@ export interface CreateCollectorRuntimeFromEnvOptions {
   readonly clock?: Clock;
   readonly idGenerator?: IdGenerator;
   readonly sourceGroupLookupPort?: SourceGroupLookupPort;
+  readonly profileReferencePort?: ProfileReferencePort;
 }
 
 export type CollectorRuntimeService = CollectorRuntimeContainer;
@@ -53,6 +63,7 @@ export function createCollectorRuntimeFromEnv(
   return createCollectorRuntimeFromDatabase({
     databaseUrl: config.databaseUrl,
     contentManagerBaseUrl: loadContentManagerBaseUrl(environment),
+    profileManagerBaseUrl: loadProfileManagerBaseUrl(environment),
     ...(options.poolConfig !== undefined
       ? { poolConfig: options.poolConfig }
       : {}),
@@ -62,6 +73,9 @@ export function createCollectorRuntimeFromEnv(
       : {}),
     ...(options.sourceGroupLookupPort !== undefined
       ? { sourceGroupLookupPort: options.sourceGroupLookupPort }
+      : {}),
+    ...(options.profileReferencePort !== undefined
+      ? { profileReferencePort: options.profileReferencePort }
       : {}),
   });
 }
@@ -87,7 +101,7 @@ export function createCollectorRuntimeFromDatabaseClient(
   overrides: Partial<
     Pick<
       CreateCollectorRuntimeOptions,
-      "clock" | "idGenerator" | "sourceGroupLookupPort" | "contentManagerBaseUrl"
+      "clock" | "idGenerator" | "sourceGroupLookupPort" | "contentManagerBaseUrl" | "profileReferencePort" | "profileManagerBaseUrl"
     >
   > = {},
 ): CollectorRuntimeService {
@@ -100,10 +114,22 @@ export function createCollectorRuntimeFromDatabaseClient(
     new ContentManagerHttpClient({
       baseUrl: overrides.contentManagerBaseUrl ?? DEFAULT_CONTENT_MANAGER_BASE_URL,
     });
+  const checkRuns = new DrizzleProfileSourceAccessCheckRunRepository(
+    databaseClient.db,
+  );
+  const profiles =
+    overrides.profileReferencePort ??
+    new ProfileManagerProfileReferenceAdapter(
+      new ProfileManagerHttpClient({
+        baseUrl: overrides.profileManagerBaseUrl ?? DEFAULT_PROFILE_MANAGER_BASE_URL,
+      }),
+    );
 
   return createCollectorRuntime({
     accountExerciseRuns,
     collectionRuns,
+    checkRuns,
+    profiles,
     sourceGroups,
     clock: overrides.clock ?? new SystemClock(),
     idGenerator: overrides.idGenerator ?? new CryptoIdGenerator(),
@@ -127,6 +153,27 @@ function loadContentManagerBaseUrl(
 
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     return DEFAULT_CONTENT_MANAGER_BASE_URL;
+  }
+
+  return `http://127.0.0.1:${port}`;
+}
+
+const DEFAULT_PROFILE_MANAGER_BASE_URL = "http://127.0.0.1:3000";
+
+function loadProfileManagerBaseUrl(
+  environment: CollectorRuntimeEnvironment,
+): string {
+  const configuredBaseUrl = environment.PROFILE_MANAGER_BASE_URL?.trim();
+
+  if (configuredBaseUrl !== undefined && configuredBaseUrl !== "") {
+    return configuredBaseUrl;
+  }
+
+  const rawPort = environment.HTTP_PORT?.trim() ?? "3000";
+  const port = Number(rawPort);
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    return DEFAULT_PROFILE_MANAGER_BASE_URL;
   }
 
   return `http://127.0.0.1:${port}`;

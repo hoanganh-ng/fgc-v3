@@ -1,0 +1,6 @@
+[
+  {
+    "path": "target.url",
+    "message": "Check run target URL must be a valid URL."
+  }
+]

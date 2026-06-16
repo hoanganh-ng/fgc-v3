@@ -1,6 +1,7 @@
 import type {
   AccountExerciseRunStatus,
   CollectionRunStatus,
+  ProfileSourceAccessCheckRunStatus,
   ValidationIssue,
 } from "../domain";
 
@@ -20,7 +21,16 @@ export type CollectorRuntimeApplicationErrorCode =
   | "COLLECTION_RUN_SOURCE_GROUP_NOT_FOUND"
   | "COLLECTION_RUN_SOURCE_GROUP_NOT_ACTIVE"
   | "COLLECTION_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED"
-  | "SOURCE_GROUP_LOOKUP_FAILED";
+  | "SOURCE_GROUP_LOOKUP_FAILED"
+  | "PROFILE_SOURCE_ACCESS_CHECK_RUN_NOT_FOUND"
+  | "INVALID_PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUS_TRANSITION"
+  | "PROFILE_SOURCE_ACCESS_CHECK_RUN_VALIDATION_ERROR"
+  | "PROFILE_REFERENCE_LOOKUP_FAILED"
+  | "PROFILE_NOT_FOUND"
+  | "PROFILE_SOURCE_ACCESS_CHECK_RUN_CONFLICT"
+  | "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_FOUND"
+  | "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_ACTIVE"
+  | "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED";
 
 export abstract class CollectorRuntimeApplicationError extends Error {
   public readonly code: CollectorRuntimeApplicationErrorCode;
@@ -251,5 +261,131 @@ export class SourceGroupLookupFailedError extends CollectorRuntimeApplicationErr
     if (context.statusCode !== undefined) {
       this.statusCode = context.statusCode;
     }
+  }
+}
+
+export class ProfileSourceAccessCheckRunNotFoundError extends CollectorRuntimeApplicationError {
+  public readonly checkRunId: string;
+
+  public constructor(checkRunId: string) {
+    super(
+      "PROFILE_SOURCE_ACCESS_CHECK_RUN_NOT_FOUND",
+      `Profile-source access check run not found: ${checkRunId}.`,
+    );
+    this.checkRunId = checkRunId;
+  }
+}
+
+export class ProfileSourceAccessCheckRunSourceGroupNotFoundError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+
+  public constructor(sourceGroupId: string) {
+    super(
+      "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_FOUND",
+      `Source group not found: ${sourceGroupId}`,
+    );
+    this.sourceGroupId = sourceGroupId;
+  }
+}
+
+export class ProfileSourceAccessCheckRunSourceGroupNotActiveError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+
+  public constructor(sourceGroupId: string) {
+    super(
+      "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_ACTIVE",
+      `Source group is not active: ${sourceGroupId}`,
+    );
+    this.sourceGroupId = sourceGroupId;
+  }
+}
+
+export class ProfileSourceAccessCheckRunSourceGroupPlatformUnsupportedError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+  public readonly platform: string;
+
+  public constructor(sourceGroupId: string, platform: string) {
+    super(
+      "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED",
+      `Source group platform is not supported: ${platform}`,
+    );
+    this.sourceGroupId = sourceGroupId;
+    this.platform = platform;
+  }
+}
+
+export class InvalidProfileSourceAccessCheckRunStatusTransitionError extends CollectorRuntimeApplicationError {
+  public readonly from: ProfileSourceAccessCheckRunStatus;
+  public readonly to: ProfileSourceAccessCheckRunStatus;
+
+  public constructor(
+    from: ProfileSourceAccessCheckRunStatus,
+    to: ProfileSourceAccessCheckRunStatus,
+  ) {
+    super(
+      "INVALID_PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUS_TRANSITION",
+      `Invalid profile-source access check run status transition: ${from} -> ${to}.`,
+    );
+    this.from = from;
+    this.to = to;
+  }
+}
+
+export class ProfileSourceAccessCheckRunValidationError extends CollectorRuntimeApplicationError {
+  public readonly issues: readonly ValidationIssue[];
+
+  public constructor(issues: readonly ValidationIssue[]) {
+    super(
+      "PROFILE_SOURCE_ACCESS_CHECK_RUN_VALIDATION_ERROR",
+      "Profile-source access check run input is invalid.",
+    );
+    this.issues = issues;
+  }
+}
+
+export class ProfileNotFoundError extends CollectorRuntimeApplicationError {
+  public readonly profileId: string;
+
+  public constructor(profileId: string) {
+    super("PROFILE_NOT_FOUND", `Profile not found: ${profileId}.`);
+    this.profileId = profileId;
+  }
+}
+
+export class ProfileReferenceLookupFailedError extends CollectorRuntimeApplicationError {
+  public readonly profileId: string;
+  public readonly causeCode?: string;
+  public readonly statusCode?: number;
+
+  public constructor(
+    profileId: string,
+    message: string,
+    context: {
+      readonly causeCode?: string;
+      readonly statusCode?: number;
+    } = {},
+  ) {
+    super("PROFILE_REFERENCE_LOOKUP_FAILED", message);
+    this.profileId = profileId;
+    if (context.causeCode !== undefined) {
+      this.causeCode = context.causeCode;
+    }
+    if (context.statusCode !== undefined) {
+      this.statusCode = context.statusCode;
+    }
+  }
+}
+
+export class ProfileSourceAccessCheckRunConflictError extends CollectorRuntimeApplicationError {
+  public readonly profileId: string;
+  public readonly sourceGroupId: string;
+
+  public constructor(profileId: string, sourceGroupId: string) {
+    super(
+      "PROFILE_SOURCE_ACCESS_CHECK_RUN_CONFLICT",
+      `A check run is already queued or running for profile ${profileId} and source group ${sourceGroupId}.`,
+    );
+    this.profileId = profileId;
+    this.sourceGroupId = sourceGroupId;
   }
 }

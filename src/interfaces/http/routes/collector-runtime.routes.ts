@@ -14,6 +14,7 @@ import type {
   MarkAccountExerciseRunSucceededInput,
   RequestAccountExerciseRunInput,
   RequestCollectionRunInput,
+  RequestProfileSourceAccessCheckRunInput,
 } from "../../../collector-runtime/application";
 import type {
   AccountExerciseRun,
@@ -33,6 +34,12 @@ import type {
   CollectionRunStatus,
   CollectionRunSummary,
   CollectionRunTriggerType,
+  ProfileSourceAccessCheckRun,
+  ProfileSourceAccessCheckRunFailureReason,
+  ProfileSourceAccessCheckRunId,
+  ProfileSourceAccessCheckRunStatus,
+  ProfileSourceAccessCheckRunTarget,
+  ProfileSourceAccessCheckRunTriggerType,
 } from "../../../collector-runtime/domain";
 import {
   AccountExerciseRunIdHttpParamsSchema,
@@ -58,6 +65,17 @@ import {
   requestCollectionRunHttpRouteSchema,
   startAccountExerciseRunHttpRouteSchema,
   succeedAccountExerciseRunHttpRouteSchema,
+  cancelProfileSourceAccessCheckRunHttpRouteSchema,
+  failProfileSourceAccessCheckRunHttpRouteSchema,
+  getProfileSourceAccessCheckRunHttpRouteSchema,
+  listProfileSourceAccessCheckRunsHttpRouteSchema,
+  requestProfileSourceAccessCheckRunHttpRouteSchema,
+  markProfileSourceAccessCheckRunRunningHttpRouteSchema,
+  markProfileSourceAccessCheckRunSucceededHttpRouteSchema,
+  ProfileSourceAccessCheckRunIdHttpParamsSchema,
+  RequestProfileSourceAccessCheckRunHttpBodySchema,
+  FailProfileSourceAccessCheckRunHttpBodySchema,
+  ListProfileSourceAccessCheckRunsHttpQuerySchema,
 } from "../schemas/collector-runtime.http-schemas";
 
 interface ExecutableUseCase<Input, Output> {
@@ -113,6 +131,34 @@ export interface CollectorRuntimeHttpService {
     CancelCollectionRunInput,
     CollectionRun
   >;
+  readonly requestProfileSourceAccessCheckRun: ExecutableUseCase<
+    RequestProfileSourceAccessCheckRunInput,
+    ProfileSourceAccessCheckRun
+  >;
+  readonly getProfileSourceAccessCheckRun: ExecutableUseCase<
+    string,
+    ProfileSourceAccessCheckRun
+  >;
+  readonly listProfileSourceAccessCheckRuns: ExecutableUseCase<
+    any, // ListProfileSourceAccessCheckRunsInput is implicit in schema, typing as any or full query type
+    any
+  >;
+  readonly markProfileSourceAccessCheckRunRunning: ExecutableUseCase<
+    string,
+    ProfileSourceAccessCheckRun
+  >;
+  readonly markProfileSourceAccessCheckRunSucceeded: ExecutableUseCase<
+    string,
+    ProfileSourceAccessCheckRun
+  >;
+  readonly markProfileSourceAccessCheckRunFailed: ExecutableUseCase<
+    any,
+    ProfileSourceAccessCheckRun
+  >;
+  readonly cancelProfileSourceAccessCheckRun: ExecutableUseCase<
+    string,
+    ProfileSourceAccessCheckRun
+  >;
 }
 
 export interface RegisterCollectorRuntimeRoutesOptions {
@@ -150,6 +196,22 @@ export interface CollectionRunDto {
   readonly finishedAt?: CollectionRunIsoDateTime;
   readonly createdAt: CollectionRunIsoDateTime;
   readonly updatedAt: CollectionRunIsoDateTime;
+}
+
+export interface ProfileSourceAccessCheckRunDto {
+  readonly id: ProfileSourceAccessCheckRunId;
+  readonly profileId: string;
+  readonly sourceGroupId: string;
+  readonly triggerType: ProfileSourceAccessCheckRunTriggerType;
+  readonly status: ProfileSourceAccessCheckRunStatus;
+  readonly accountStageAtRequest: string;
+  readonly target: ProfileSourceAccessCheckRunTarget;
+  readonly failureReason?: ProfileSourceAccessCheckRunFailureReason;
+  readonly requestedAt: string;
+  readonly startedAt?: string;
+  readonly finishedAt?: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
 export function registerCollectorRuntimeRoutes(
@@ -451,6 +513,130 @@ export function registerCollectorRuntimeRoutes(
       };
     },
   );
+
+  server.post(
+    "/collector/profile-source-access-check-runs",
+    { schema: requestProfileSourceAccessCheckRunHttpRouteSchema },
+    async (request, reply) => {
+      const body = parseHttpInput(
+        RequestProfileSourceAccessCheckRunHttpBodySchema,
+        request.body,
+      );
+      const input = {
+        profileId: body.profileId,
+        sourceGroupId: body.sourceGroupId,
+      };
+      const checkRun = await collectorRuntime.requestProfileSourceAccessCheckRun.execute(input);
+
+      return reply.code(201).send({
+        profileSourceAccessCheckRun: toProfileSourceAccessCheckRunDto(checkRun),
+      });
+    },
+  );
+
+  server.get(
+    "/collector/profile-source-access-check-runs",
+    { schema: listProfileSourceAccessCheckRunsHttpRouteSchema },
+    async (request) => {
+      const query = parseHttpInput(
+        ListProfileSourceAccessCheckRunsHttpQuerySchema,
+        request.query,
+      );
+      const output = await collectorRuntime.listProfileSourceAccessCheckRuns.execute(query);
+
+      return {
+        items: output.items.map(toProfileSourceAccessCheckRunDto),
+        total: output.total,
+      };
+    },
+  );
+
+  server.get(
+    "/collector/profile-source-access-check-runs/:checkRunId",
+    { schema: getProfileSourceAccessCheckRunHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileSourceAccessCheckRunIdHttpParamsSchema,
+        request.params,
+      );
+      const checkRun = await collectorRuntime.getProfileSourceAccessCheckRun.execute(params.checkRunId);
+
+      return {
+        profileSourceAccessCheckRun: toProfileSourceAccessCheckRunDto(checkRun),
+      };
+    },
+  );
+
+  server.post(
+    "/collector/profile-source-access-check-runs/:checkRunId/cancel",
+    { schema: cancelProfileSourceAccessCheckRunHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileSourceAccessCheckRunIdHttpParamsSchema,
+        request.params,
+      );
+      const checkRun = await collectorRuntime.cancelProfileSourceAccessCheckRun.execute(params.checkRunId);
+
+      return {
+        profileSourceAccessCheckRun: toProfileSourceAccessCheckRunDto(checkRun),
+      };
+    },
+  );
+
+  server.post(
+    "/collector/profile-source-access-check-runs/:checkRunId/running",
+    { schema: markProfileSourceAccessCheckRunRunningHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileSourceAccessCheckRunIdHttpParamsSchema,
+        request.params,
+      );
+      const checkRun = await collectorRuntime.markProfileSourceAccessCheckRunRunning.execute(params.checkRunId);
+
+      return {
+        profileSourceAccessCheckRun: toProfileSourceAccessCheckRunDto(checkRun),
+      };
+    },
+  );
+
+  server.post(
+    "/collector/profile-source-access-check-runs/:checkRunId/succeed",
+    { schema: markProfileSourceAccessCheckRunSucceededHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileSourceAccessCheckRunIdHttpParamsSchema,
+        request.params,
+      );
+      const checkRun = await collectorRuntime.markProfileSourceAccessCheckRunSucceeded.execute(params.checkRunId);
+
+      return {
+        profileSourceAccessCheckRun: toProfileSourceAccessCheckRunDto(checkRun),
+      };
+    },
+  );
+
+  server.post(
+    "/collector/profile-source-access-check-runs/:checkRunId/fail",
+    { schema: failProfileSourceAccessCheckRunHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileSourceAccessCheckRunIdHttpParamsSchema,
+        request.params,
+      );
+      const body = parseHttpInput(
+        FailProfileSourceAccessCheckRunHttpBodySchema,
+        request.body,
+      );
+      const checkRun = await collectorRuntime.markProfileSourceAccessCheckRunFailed.execute({
+        checkRunId: params.checkRunId,
+        failureReason: body.failureReason,
+      });
+
+      return {
+        profileSourceAccessCheckRun: toProfileSourceAccessCheckRunDto(checkRun),
+      };
+    },
+  );
 }
 
 export function toAccountExerciseRunDto(
@@ -511,5 +697,27 @@ export function toCollectionRunDto(
       : {}),
     createdAt: collectionRun.createdAt,
     updatedAt: collectionRun.updatedAt,
+  };
+}
+
+export function toProfileSourceAccessCheckRunDto(
+  run: ProfileSourceAccessCheckRun,
+): ProfileSourceAccessCheckRunDto {
+  return {
+    id: run.id,
+    profileId: run.profileId,
+    sourceGroupId: run.sourceGroupId,
+    triggerType: run.triggerType,
+    status: run.status,
+    accountStageAtRequest: run.accountStageAtRequest,
+    target: { ...run.target },
+    ...(run.failureReason !== undefined
+      ? { failureReason: { ...run.failureReason } }
+      : {}),
+    requestedAt: run.requestedAt,
+    ...(run.startedAt !== undefined ? { startedAt: run.startedAt } : {}),
+    ...(run.finishedAt !== undefined ? { finishedAt: run.finishedAt } : {}),
+    createdAt: run.createdAt,
+    updatedAt: run.updatedAt,
   };
 }

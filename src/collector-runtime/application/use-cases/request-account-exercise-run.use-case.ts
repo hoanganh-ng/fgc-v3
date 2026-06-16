@@ -28,6 +28,10 @@ import type {
   CategoryBrowseExerciseTarget,
   ValidationIssue,
 } from "../../domain";
+import {
+  canonicalizeFacebookUrl,
+  sameNormalizedUrl,
+} from "../../domain";
 
 interface RequestAccountExerciseRunBaseInput {
   readonly profileId: string;
@@ -342,49 +346,6 @@ function riskSortValue(riskLevel: string): number {
   return riskLevel === "LOW" ? 0 : 1;
 }
 
-export function canonicalizeFacebookUrl(urlString: string): string | undefined {
-  try {
-    const url = new URL(urlString);
-    if (url.protocol !== "https:") {
-      return undefined;
-    }
-    if (url.username || url.password) {
-      return undefined;
-    }
-    const hostname = url.hostname.toLowerCase();
-    const isFacebook = hostname === "facebook.com" || hostname.endsWith(".facebook.com");
-    if (!isFacebook) {
-      return undefined;
-    }
-    let normalizedHost = hostname;
-    if (normalizedHost.startsWith("www.")) {
-      normalizedHost = normalizedHost.slice(4);
-    }
-    if (normalizedHost.startsWith("m.")) {
-      normalizedHost = normalizedHost.slice(2);
-    }
-    if (normalizedHost.startsWith("web.")) {
-      normalizedHost = normalizedHost.slice(4);
-    }
-
-    let pathname = url.pathname;
-    while (pathname.endsWith("/")) {
-      pathname = pathname.slice(0, -1);
-    }
-
-    return `${normalizedHost}${pathname}`;
-  } catch {
-    return undefined;
-  }
-}
-
-export function sameNormalizedUrl(left: string, right: string): boolean {
-  const leftCanon = canonicalizeFacebookUrl(left);
-  const rightCanon = canonicalizeFacebookUrl(right);
-
-  return leftCanon !== undefined && rightCanon !== undefined && leftCanon === rightCanon;
-}
-
 function toSourceGroupLookupError(
   sourceGroupId: string,
   lookupResult: Extract<SourceGroupLookupResult, { readonly ok: false }>,
@@ -407,3 +368,7 @@ function toSourceGroupLookupError(
     },
   );
 }
+
+export type { SourceGroupLookupSourceGroup };
+// Re-export URL utilities that external consumers may have imported from here.
+export { canonicalizeFacebookUrl, sameNormalizedUrl };

@@ -12,6 +12,7 @@ import type {
   AccountExerciseRunSafeSummary,
   CategoryBrowseExerciseTarget,
 } from "./account-exercise-run";
+import type { ProfileSourceAccessCheckRun } from "./profile-source-access-check-run";
 import {
   AccountExerciseRunActionBudgetSchema,
   AccountExerciseRunFailureReasonSchema,
@@ -25,6 +26,7 @@ import {
   CollectionRunSchema,
   CollectionRunSummarySchema,
 } from "./collection-run.schemas";
+import { ProfileSourceAccessCheckRunSchema } from "./profile-source-access-check-run.schemas";
 
 export interface ValidationIssue {
   readonly path: string;
@@ -198,5 +200,20 @@ function invalid(issues: readonly ValidationIssue[]): {
   return {
     valid: false,
     issues,
+  };
+}
+
+export function validateProfileSourceAccessCheckRun(
+  value: unknown,
+): ValidationResult<ProfileSourceAccessCheckRun> {
+  const result = ProfileSourceAccessCheckRunSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
   };
 }

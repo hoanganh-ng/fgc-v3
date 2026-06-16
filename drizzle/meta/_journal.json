@@ -71,6 +71,13 @@
       "when": 1781513034919,
       "tag": "0009_sharp_nighthawk",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781577728027,
+      "tag": "0010_free_thaddeus_ross",
+      "breakpoints": true
     }
   ]
 }

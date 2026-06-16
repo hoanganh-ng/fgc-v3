@@ -12,6 +12,9 @@ import {
   CollectionRunIdSchema,
   CollectionRunSourceGroupIdSchema,
   CollectionRunStatusSchema,
+  ProfileSourceAccessCheckRunFailureReasonSchema,
+  ProfileSourceAccessCheckRunIdSchema,
+  ProfileSourceAccessCheckRunStatusSchema,
 } from "../../../collector-runtime/domain";
 import {
   DEFAULT_ACCOUNT_EXERCISE_RUN_LIST_LIMIT,
@@ -20,6 +23,9 @@ import {
   MAX_COLLECTION_RUN_LIST_LIMIT,
 } from "../../../collector-runtime/application";
 export { parseHttpInput } from "./http-validation";
+
+const DEFAULT_PROFILE_SOURCE_ACCESS_CHECK_RUN_LIST_LIMIT = 50;
+const MAX_PROFILE_SOURCE_ACCESS_CHECK_RUN_LIST_LIMIT = 500;
 
 const NonEmptyStringHttpSchema = z.string().trim().min(1);
 
@@ -32,6 +38,12 @@ export const CollectionRunIdHttpParamsSchema = z
 export const AccountExerciseRunIdHttpParamsSchema = z
   .object({
     accountExerciseRunId: AccountExerciseRunIdSchema,
+  })
+  .strict();
+
+export const ProfileSourceAccessCheckRunIdHttpParamsSchema = z
+  .object({
+    checkRunId: ProfileSourceAccessCheckRunIdSchema,
   })
   .strict();
 
@@ -80,6 +92,13 @@ export const RequestAccountExerciseRunHttpBodySchema = z
     }
   });
 
+export const RequestProfileSourceAccessCheckRunHttpBodySchema = z
+  .object({
+    profileId: NonEmptyStringHttpSchema,
+    sourceGroupId: NonEmptyStringHttpSchema,
+  })
+  .strict();
+
 export const StartAccountExerciseRunHttpBodySchema = z
   .object({
     leaseId: NonEmptyStringHttpSchema.optional(),
@@ -102,6 +121,12 @@ export const FailAccountExerciseRunHttpBodySchema = z
   .object({
     failureReason: AccountExerciseRunFailureReasonSchema,
     safeSummary: AccountExerciseRunSafeSummarySchema.optional(),
+  })
+  .strict();
+
+export const FailProfileSourceAccessCheckRunHttpBodySchema = z
+  .object({
+    failureReason: ProfileSourceAccessCheckRunFailureReasonSchema,
   })
   .strict();
 
@@ -133,17 +158,38 @@ export const ListAccountExerciseRunsHttpQuerySchema = z
   })
   .strict();
 
+export const ListProfileSourceAccessCheckRunsHttpQuerySchema = z
+  .object({
+    status: ProfileSourceAccessCheckRunStatusSchema.optional(),
+    profileId: NonEmptyStringHttpSchema.optional(),
+    sourceGroupId: NonEmptyStringHttpSchema.optional(),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_PROFILE_SOURCE_ACCESS_CHECK_RUN_LIST_LIMIT)
+      .default(DEFAULT_PROFILE_SOURCE_ACCESS_CHECK_RUN_LIST_LIMIT),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .strict();
+
 export type CollectionRunIdHttpParams = z.infer<
   typeof CollectionRunIdHttpParamsSchema
 >;
 export type AccountExerciseRunIdHttpParams = z.infer<
   typeof AccountExerciseRunIdHttpParamsSchema
 >;
+export type ProfileSourceAccessCheckRunIdHttpParams = z.infer<
+  typeof ProfileSourceAccessCheckRunIdHttpParamsSchema
+>;
 export type RequestCollectionRunHttpBody = z.infer<
   typeof RequestCollectionRunHttpBodySchema
 >;
 export type RequestAccountExerciseRunHttpBody = z.infer<
   typeof RequestAccountExerciseRunHttpBodySchema
+>;
+export type RequestProfileSourceAccessCheckRunHttpBody = z.infer<
+  typeof RequestProfileSourceAccessCheckRunHttpBodySchema
 >;
 export type StartAccountExerciseRunHttpBody = z.infer<
   typeof StartAccountExerciseRunHttpBodySchema
@@ -157,11 +203,17 @@ export type SucceedAccountExerciseRunHttpBody = z.infer<
 export type FailAccountExerciseRunHttpBody = z.infer<
   typeof FailAccountExerciseRunHttpBodySchema
 >;
+export type FailProfileSourceAccessCheckRunHttpBody = z.infer<
+  typeof FailProfileSourceAccessCheckRunHttpBodySchema
+>;
 export type ListCollectionRunsHttpQuery = z.infer<
   typeof ListCollectionRunsHttpQuerySchema
 >;
 export type ListAccountExerciseRunsHttpQuery = z.infer<
   typeof ListAccountExerciseRunsHttpQuerySchema
+>;
+export type ListProfileSourceAccessCheckRunsHttpQuery = z.infer<
+  typeof ListProfileSourceAccessCheckRunsHttpQuerySchema
 >;
 
 const nonEmptyStringJsonSchema = { type: "string", minLength: 1 } as const;
@@ -763,6 +815,201 @@ export const cancelAccountExerciseRunHttpRouteSchema = {
       additionalProperties: false,
       properties: {
         accountExerciseRun: accountExerciseRunJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+const profileSourceAccessCheckRunIdParamsJsonSchema = {
+  type: "object",
+  required: ["checkRunId"],
+  additionalProperties: false,
+  properties: {
+    checkRunId: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+const requestProfileSourceAccessCheckRunBodyJsonSchema = {
+  type: "object",
+  required: ["profileId", "sourceGroupId"],
+  additionalProperties: false,
+  properties: {
+    profileId: nonEmptyStringJsonSchema,
+    sourceGroupId: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+const failProfileSourceAccessCheckRunBodyJsonSchema = {
+  type: "object",
+  required: ["failureReason"],
+  additionalProperties: false,
+  properties: {
+    failureReason: {
+      type: "object",
+      required: ["code", "message"],
+      additionalProperties: true,
+      properties: {
+        code: nonEmptyStringJsonSchema,
+        message: nonEmptyStringJsonSchema,
+      },
+    },
+  },
+} as const;
+
+const profileSourceAccessCheckRunJsonSchema = {
+  type: "object",
+  required: [
+    "id",
+    "profileId",
+    "sourceGroupId",
+    "triggerType",
+    "status",
+    "accountStageAtRequest",
+    "target",
+    "requestedAt",
+    "createdAt",
+    "updatedAt",
+  ],
+  additionalProperties: true,
+  properties: {
+    id: nonEmptyStringJsonSchema,
+    profileId: nonEmptyStringJsonSchema,
+    sourceGroupId: nonEmptyStringJsonSchema,
+    triggerType: nonEmptyStringJsonSchema,
+    status: nonEmptyStringJsonSchema,
+    accountStageAtRequest: nonEmptyStringJsonSchema,
+    target: { type: "object", additionalProperties: true },
+    failureReason: { type: "object", additionalProperties: true },
+    requestedAt: nonEmptyStringJsonSchema,
+    startedAt: nonEmptyStringJsonSchema,
+    finishedAt: nonEmptyStringJsonSchema,
+    createdAt: nonEmptyStringJsonSchema,
+    updatedAt: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+export const requestProfileSourceAccessCheckRunHttpRouteSchema = {
+  body: requestProfileSourceAccessCheckRunBodyJsonSchema,
+  response: {
+    201: {
+      type: "object",
+      required: ["profileSourceAccessCheckRun"],
+      additionalProperties: false,
+      properties: {
+        profileSourceAccessCheckRun: profileSourceAccessCheckRunJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const getProfileSourceAccessCheckRunHttpRouteSchema = {
+  params: profileSourceAccessCheckRunIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["profileSourceAccessCheckRun"],
+      additionalProperties: false,
+      properties: {
+        profileSourceAccessCheckRun: profileSourceAccessCheckRunJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const listProfileSourceAccessCheckRunsHttpRouteSchema = {
+  querystring: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      status: { type: "string" },
+      profileId: { type: "string" },
+      sourceGroupId: { type: "string" },
+      limit: { type: "integer" },
+      offset: { type: "integer" },
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      required: ["items", "total"],
+      additionalProperties: false,
+      properties: {
+        items: {
+          type: "array",
+          items: profileSourceAccessCheckRunJsonSchema,
+        },
+        total: { type: "integer" },
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const markProfileSourceAccessCheckRunRunningHttpRouteSchema = {
+  params: profileSourceAccessCheckRunIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["profileSourceAccessCheckRun"],
+      additionalProperties: false,
+      properties: {
+        profileSourceAccessCheckRun: profileSourceAccessCheckRunJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const markProfileSourceAccessCheckRunSucceededHttpRouteSchema = {
+  params: profileSourceAccessCheckRunIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["profileSourceAccessCheckRun"],
+      additionalProperties: false,
+      properties: {
+        profileSourceAccessCheckRun: profileSourceAccessCheckRunJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const failProfileSourceAccessCheckRunHttpRouteSchema = {
+  params: profileSourceAccessCheckRunIdParamsJsonSchema,
+  body: failProfileSourceAccessCheckRunBodyJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["profileSourceAccessCheckRun"],
+      additionalProperties: false,
+      properties: {
+        profileSourceAccessCheckRun: profileSourceAccessCheckRunJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const cancelProfileSourceAccessCheckRunHttpRouteSchema = {
+  params: profileSourceAccessCheckRunIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["profileSourceAccessCheckRun"],
+      additionalProperties: false,
+      properties: {
+        profileSourceAccessCheckRun: profileSourceAccessCheckRunJsonSchema,
       },
     },
     "4xx": errorResponseJsonSchema,
