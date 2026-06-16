@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build, coverage, and tool outputs
+dist/
+**/dist/
+coverage/
+**/coverage/
+.vite/
+**/.vite/
+playwright-report/
+test-results/
+blob-report/
+**/*.trace.zip
+**/*.har
+
+# Local caches, logs, and temporary files
+.cache/
+**/.cache/
+tmp/
+temp/
+*.log
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
