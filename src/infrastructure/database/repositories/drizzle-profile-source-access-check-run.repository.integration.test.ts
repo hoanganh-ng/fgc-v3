@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { inArray, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { ProfileSourceAccessCheckRun } from "../../../collector-runtime/domain";
@@ -7,6 +8,10 @@ import { collectorProfileSourceAccessCheckRuns } from "../schema/collector-runti
 import { DrizzleProfileSourceAccessCheckRunRepository } from "./drizzle-profile-source-access-check-run.repository";
 
 const shouldRunDbTests = process.env.RUN_DB_TESTS === "true";
+const PROFILE_SOURCE_ACCESS_CHECK_OUTCOME_BACKFILL_MIGRATION = new URL(
+  "../../../../drizzle/0012_profile_source_access_check_outcome_backfill.sql",
+  import.meta.url,
+);
 
 if (!shouldRunDbTests) {
   describe.skip("Collector Runtime PostgreSQL profile-source access check run repository integration", () => {
@@ -279,7 +284,7 @@ if (!shouldRunDbTests) {
       expect((await checkRuns.findById(run2.id))?.startedAt).toBe(startedAt);
     });
 
-    it("backfills legacy succeeded rows without outcome so they are loadable", async () => {
+    it("loads a legacy succeeded row after the outcome backfill migration is applied", async () => {
       if (client === undefined) {
         throw new Error("Database client was not initialized.");
       }
@@ -322,12 +327,7 @@ if (!shouldRunDbTests) {
         )
       `);
 
-      await client.db.execute(sql`
-        UPDATE collector_profile_source_access_check_runs
-        SET outcome = 'NEEDS_MANUAL_REVIEW'
-        WHERE status = 'SUCCEEDED'
-          AND outcome IS NULL
-      `);
+      await applySqlMigration(PROFILE_SOURCE_ACCESS_CHECK_OUTCOME_BACKFILL_MIGRATION);
 
       const reloaded = await checkRuns.findById(legacyId);
 
@@ -370,6 +370,22 @@ if (!shouldRunDbTests) {
         updatedAt: "2026-05-01T10:00:00.000Z",
         ...overrides,
       };
+    }
+
+    async function applySqlMigration(migrationUrl: URL): Promise<void> {
+      if (client === undefined) {
+        throw new Error("Database client was not initialized.");
+      }
+
+      const migrationSql = await readFile(migrationUrl, "utf8");
+      const statements = migrationSql
+        .split("--> statement-breakpoint")
+        .map((statement) => statement.trim())
+        .filter((statement) => statement.length > 0);
+
+      for (const statement of statements) {
+        await client.db.execute(sql.raw(statement));
+      }
     }
   });
 }

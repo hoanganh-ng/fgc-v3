@@ -83,7 +83,9 @@ export class ProfileSourceAccessBrowserCheckAdapter
 
       leaseId = checkoutResult.leaseId;
       leasedProfileId = checkoutResult.profileId;
-      safeDeadlineAt = this.getSafeDeadlineAt(checkoutResult.leaseExpiresAt);
+      safeDeadlineAt = this.getRequiredSafeDeadlineAt(
+        checkoutResult.leaseExpiresAt,
+      );
 
       if (checkoutResult.profileId !== input.profileId) {
         return failure("ACCESS_CHECK_PROFILE_ID_MISMATCH");
@@ -205,6 +207,10 @@ export class ProfileSourceAccessBrowserCheckAdapter
         return failure("ACCESS_CHECK_LEASE_EXPIRY_TOO_CLOSE");
       }
 
+      if (error instanceof AccessCheckLeaseExpiryInvalidError) {
+        return failure("ACCESS_CHECK_LEASE_EXPIRY_INVALID");
+      }
+
       if (isAbortLikeError(error, input.abortSignal)) {
         return failure("ACCESS_CHECK_ABORTED");
       }
@@ -231,14 +237,14 @@ export class ProfileSourceAccessBrowserCheckAdapter
     }
   }
 
-  private getSafeDeadlineAt(leaseExpiresAt: string | undefined): number | undefined {
+  private getRequiredSafeDeadlineAt(leaseExpiresAt: string | undefined): number {
     if (leaseExpiresAt === undefined) {
-      return undefined;
+      throw new AccessCheckLeaseExpiryInvalidError();
     }
 
     const expiresMs = Date.parse(leaseExpiresAt);
     if (!Number.isFinite(expiresMs)) {
-      return undefined;
+      throw new AccessCheckLeaseExpiryInvalidError();
     }
 
     return expiresMs - this.leaseShutdownMarginMs;
@@ -344,7 +350,7 @@ async function runBoundedPhase<T>(
   operationPromise.then(
     (value) => {
       if (raceFinished && onLateResolve !== undefined) {
-        void onLateResolve(value);
+        runDetachedCleanup(() => onLateResolve(value));
       }
     },
     () => {},
@@ -451,7 +457,7 @@ function createAbortCloseListener(
   }
 
   const onAbort = (): void => {
-    void session.close();
+    runDetachedCleanup(() => session.close());
   };
 
   abortSignal.addEventListener("abort", onAbort, { once: true });
@@ -459,6 +465,12 @@ function createAbortCloseListener(
   return () => {
     abortSignal.removeEventListener("abort", onAbort);
   };
+}
+
+function runDetachedCleanup(operation: () => Promise<unknown> | undefined): void {
+  void Promise.resolve()
+    .then(operation)
+    .catch(() => {});
 }
 
 function throwIfAborted(abortSignal: AbortSignal | undefined): void {
@@ -482,6 +494,14 @@ class AccessCheckLeaseExpiryTooCloseError extends Error {
   public constructor() {
     super("Profile-source access lease expiry is too close.");
     this.name = "AccessCheckLeaseExpiryTooCloseError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+class AccessCheckLeaseExpiryInvalidError extends Error {
+  public constructor() {
+    super("Profile-source access lease expiry is invalid.");
+    this.name = "AccessCheckLeaseExpiryInvalidError";
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }

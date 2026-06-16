@@ -218,6 +218,72 @@ describe("profile-source access browser check adapter", () => {
     expect(profileManager.releaseCalls).toHaveLength(1);
   });
 
+  it("releases the actual lease and skips runtime config when lease expiry is missing", async () => {
+    const profileManager = new FakeProfileManager();
+    const browserProvider = new FakeBrowserProvider();
+    profileManager.checkoutResult = {
+      ok: true,
+      profileId: "actual-profile",
+      accountStage: "WARMING",
+      leaseId: "actual-lease",
+    };
+
+    const result = await new ProfileSourceAccessBrowserCheckAdapter(
+      profileManager,
+      browserProvider,
+    ).check(checkInput());
+
+    expect(result).toEqual({
+      ok: false,
+      failureReason: {
+        code: "ACCESS_CHECK_LEASE_EXPIRY_INVALID",
+        message: "Profile-source access browser check failed.",
+      },
+    });
+    expect(profileManager.runtimeConfigurationCalls).toBe(0);
+    expect(browserProvider.launchConfig).toBeUndefined();
+    expect(profileManager.releaseCalls).toEqual([
+      {
+        profileId: "actual-profile",
+        leaseId: "actual-lease",
+      },
+    ]);
+  });
+
+  it("releases the actual lease and skips runtime config when lease expiry is malformed", async () => {
+    const profileManager = new FakeProfileManager();
+    const browserProvider = new FakeBrowserProvider();
+    profileManager.checkoutResult = {
+      ok: true,
+      profileId: "actual-profile",
+      accountStage: "WARMING",
+      leaseId: "actual-lease",
+      leaseExpiresAt: "not-a-date",
+    };
+
+    const result = await new ProfileSourceAccessBrowserCheckAdapter(
+      profileManager,
+      browserProvider,
+    ).check(checkInput());
+
+    expect(result).toEqual({
+      ok: false,
+      failureReason: {
+        code: "ACCESS_CHECK_LEASE_EXPIRY_INVALID",
+        message: "Profile-source access browser check failed.",
+      },
+    });
+    expect(profileManager.runtimeConfigurationCalls).toBe(0);
+    expect(browserProvider.launchConfig).toBeUndefined();
+    expect(profileManager.releaseCalls).toEqual([
+      {
+        profileId: "actual-profile",
+        leaseId: "actual-lease",
+      },
+    ]);
+    expect(JSON.stringify(result)).not.toContain("not-a-date");
+  });
+
   it("attempts browser close and lease release when aborted after browser work", async () => {
     const profileManager = new FakeProfileManager();
     const browserProvider = new FakeBrowserProvider();
@@ -242,6 +308,40 @@ describe("profile-source access browser check adapter", () => {
     });
     expect(browserProvider.session.closeCalls).toBeGreaterThanOrEqual(1);
     expect(profileManager.releaseCalls).toHaveLength(1);
+  });
+
+  it("catches rejected detached browser close triggered by abort", async () => {
+    const unhandled = captureUnhandledRejections();
+    try {
+      const profileManager = new FakeProfileManager();
+      const browserProvider = new FakeBrowserProvider();
+      const abortController = new AbortController();
+      browserProvider.session.closeError = new Error("raw abort close failure");
+      browserProvider.session.page.onEvaluate = () => {
+        abortController.abort();
+      };
+
+      const result = await new ProfileSourceAccessBrowserCheckAdapter(
+        profileManager,
+        browserProvider,
+      ).check({
+        ...checkInput(),
+        abortSignal: abortController.signal,
+      });
+
+      await waitForUnhandledRejectionTurn();
+
+      expect(result).toMatchObject({
+        ok: false,
+        failureReason: {
+          code: "ACCESS_CHECK_ABORTED",
+        },
+      });
+      expect(unhandled.rejections).toEqual([]);
+      expect(JSON.stringify(result)).not.toContain("raw abort close failure");
+    } finally {
+      unhandled.dispose();
+    }
   });
 
   it("attempts browser close and lease release when the safe deadline expires during execution", async () => {
@@ -276,6 +376,54 @@ describe("profile-source access browser check adapter", () => {
     expect(browserProvider.session.closeCalls).toBeGreaterThanOrEqual(1);
     expect(profileManager.releaseCalls).toHaveLength(1);
   });
+
+  it("catches rejected detached browser close after late launch resolution", async () => {
+    const unhandled = captureUnhandledRejections();
+    try {
+      const profileManager = new FakeProfileManager();
+      const browserProvider = new FakeBrowserProvider();
+      const baseNow = new Date("2026-05-01T10:00:00.000Z");
+      let nowCalls = 0;
+      profileManager.checkoutResult = {
+        ok: true,
+        profileId: "profile-1",
+        accountStage: "WARMING",
+        leaseId: "lease-1",
+        leaseExpiresAt: "2026-05-01T10:00:01.000Z",
+      };
+      browserProvider.launchDelayMs = 5;
+      browserProvider.session.closeError = new Error("raw late close failure");
+
+      const result = await new ProfileSourceAccessBrowserCheckAdapter(
+        profileManager,
+        browserProvider,
+        {
+          leaseShutdownMarginMs: 0,
+          now: () => {
+            nowCalls += 1;
+            return nowCalls >= 5
+              ? new Date(baseNow.getTime() + 999)
+              : baseNow;
+          },
+        },
+      ).check(checkInput());
+
+      await delay(20);
+      await waitForUnhandledRejectionTurn();
+
+      expect(result).toMatchObject({
+        ok: false,
+        failureReason: {
+          code: "ACCESS_CHECK_TIMEOUT",
+        },
+      });
+      expect(browserProvider.session.closeCalls).toBeGreaterThanOrEqual(1);
+      expect(unhandled.rejections).toEqual([]);
+      expect(JSON.stringify(result)).not.toContain("raw late close failure");
+    } finally {
+      unhandled.dispose();
+    }
+  });
 });
 
 function checkInput() {
@@ -293,6 +441,7 @@ function checkInput() {
 
 class FakeProfileManager {
   public readonly releaseCalls: ProfileLeaseReleaseInput[] = [];
+  public runtimeConfigurationCalls = 0;
   public checkoutResult: ProfileAssistedGroupAccessCheckoutResult = {
     ok: true,
     profileId: "profile-1",
@@ -325,6 +474,7 @@ class FakeProfileManager {
   }
 
   public async getRuntimeProfileConfiguration(): Promise<RuntimeProfileConfigurationResult> {
+    this.runtimeConfigurationCalls += 1;
     return this.runtimeConfigurationResult;
   }
 
@@ -340,11 +490,15 @@ class FakeBrowserProvider implements BrowserProviderPort {
   public readonly providerName = "PLAYWRIGHT_CHROMIUM" as const;
   public readonly session = new FakeBrowserSession();
   public launchConfig: BrowserProviderLaunchConfig | undefined;
+  public launchDelayMs = 0;
 
   public async launch(
     config: BrowserProviderLaunchConfig,
   ): Promise<BrowserProviderSession> {
     this.launchConfig = config;
+    if (this.launchDelayMs > 0) {
+      await delay(this.launchDelayMs);
+    }
     return this.session;
   }
 }
@@ -445,4 +599,34 @@ function createElement(text: string) {
     textContent: text,
     getAttribute: (name: string) => (name === "aria-label" ? text : null),
   };
+}
+
+function captureUnhandledRejections(): {
+  readonly rejections: unknown[];
+  dispose(): void;
+} {
+  const rejections: unknown[] = [];
+  const listener = (reason: unknown): void => {
+    rejections.push(reason);
+  };
+  process.on("unhandledRejection", listener);
+
+  return {
+    rejections,
+    dispose: () => {
+      process.off("unhandledRejection", listener);
+    },
+  };
+}
+
+async function waitForUnhandledRejectionTurn(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
+async function delay(milliseconds: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 }
