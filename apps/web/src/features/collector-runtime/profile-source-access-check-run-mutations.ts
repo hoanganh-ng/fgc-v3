@@ -1,6 +1,7 @@
 import {
   useMutation,
   useQueryClient,
+  type QueryClient,
   type UseMutationResult,
 } from "@tanstack/react-query";
 import {
@@ -13,6 +14,14 @@ import { profileSourceAccessCheckRunQueryKeys } from "@/features/collector-runti
 
 export interface CancelProfileSourceAccessCheckRunVariables {
   readonly checkRunId: string;
+}
+
+export async function invalidateProfileSourceAccessCheckRunQueries(
+  queryClient: Pick<QueryClient, "invalidateQueries">,
+): Promise<void> {
+  await queryClient.invalidateQueries({
+    queryKey: profileSourceAccessCheckRunQueryKeys.all,
+  });
 }
 
 export function useRequestProfileSourceAccessCheckRunMutation(): UseMutationResult<
@@ -32,9 +41,7 @@ export function useRequestProfileSourceAccessCheckRunMutation(): UseMutationResu
         await collectorRuntimeClient.requestProfileSourceAccessCheckRun(request),
       ),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: profileSourceAccessCheckRunQueryKeys.all,
-      });
+      await invalidateProfileSourceAccessCheckRunQueries(queryClient);
     },
   });
 }
@@ -56,9 +63,7 @@ export function useCancelProfileSourceAccessCheckRunMutation(): UseMutationResul
         await collectorRuntimeClient.cancelProfileSourceAccessCheckRun(checkRunId),
       ),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: profileSourceAccessCheckRunQueryKeys.all,
-      });
+      await invalidateProfileSourceAccessCheckRunQueries(queryClient);
     },
   });
 }

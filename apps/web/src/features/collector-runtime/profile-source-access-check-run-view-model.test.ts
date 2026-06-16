@@ -5,6 +5,7 @@ import {
   getProfileDisplay,
   getSourceGroupDisplay,
   hasActiveProfileSourceAccessCheckRuns,
+  isCheckRunFiltersActive,
   canCancelProfileSourceAccessCheckRun,
   getPaginationModel,
   shouldShowPaginationControls,
@@ -165,6 +166,34 @@ describe("profile-source-access-check-run view model", () => {
     it("determines when to show controls", () => {
       expect(shouldShowPaginationControls({ offset: 0, limit: 10, itemCount: 10, total: 10 })).toBe(true);
       expect(shouldShowPaginationControls({ offset: 0, limit: 10, itemCount: 0, total: 0 })).toBe(false);
+    });
+  });
+
+  describe("isCheckRunFiltersActive", () => {
+    it("returns false when all filters are empty", () => {
+      expect(isCheckRunFiltersActive({ status: "", profileId: "", sourceGroupId: "" })).toBe(false);
+    });
+
+    it("returns false when all filters are whitespace only", () => {
+      expect(isCheckRunFiltersActive({ status: "  ", profileId: "  ", sourceGroupId: "  " })).toBe(false);
+    });
+
+    it("returns true when status is set", () => {
+      expect(isCheckRunFiltersActive({ status: "QUEUED", profileId: "", sourceGroupId: "" })).toBe(true);
+    });
+
+    it("returns true when profileId is set", () => {
+      expect(isCheckRunFiltersActive({ status: "", profileId: "profile-1", sourceGroupId: "" })).toBe(true);
+    });
+
+    it("returns true when sourceGroupId is set", () => {
+      expect(isCheckRunFiltersActive({ status: "", profileId: "", sourceGroupId: "sg-1" })).toBe(true);
+    });
+
+    it("returns true when multiple filters are set", () => {
+      expect(
+        isCheckRunFiltersActive({ status: "SUCCEEDED", profileId: "profile-1", sourceGroupId: "sg-1" }),
+      ).toBe(true);
     });
   });
 });

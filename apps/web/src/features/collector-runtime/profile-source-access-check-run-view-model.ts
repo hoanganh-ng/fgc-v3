@@ -62,6 +62,20 @@ export function hasActiveProfileSourceAccessCheckRuns(
   return runs.some((run) => run.status === "QUEUED" || run.status === "RUNNING");
 }
 
+export interface CheckRunFilters {
+  readonly status: string;
+  readonly profileId: string;
+  readonly sourceGroupId: string;
+}
+
+export function isCheckRunFiltersActive(filters: CheckRunFilters): boolean {
+  return (
+    filters.status.trim() !== "" ||
+    filters.profileId.trim() !== "" ||
+    filters.sourceGroupId.trim() !== ""
+  );
+}
+
 export function canCancelProfileSourceAccessCheckRun(
   status: ProfileSourceAccessCheckRunStatus,
 ): boolean {

@@ -27,6 +27,7 @@ import {
   getSourceGroupDisplay,
   getOutcomePresentation,
   hasActiveProfileSourceAccessCheckRuns,
+  isCheckRunFiltersActive,
   shouldShowPaginationControls,
   toRequestProfileSourceAccessCheckRunRequest,
   type RequestProfileSourceAccessCheckRunFormValues,
@@ -213,7 +214,7 @@ export function ProfileSourceAccessCheckRunsPage(): JSX.Element {
   return (
     <PageShell
       eyebrow="Collector Runtime"
-      title="Profile-Source Access Check Runs"
+      title="Profile-Source Access Checks"
       description="Request, monitor, inspect, and cancel queued profile-source access checks."
       actions={
         <Button variant="secondary" onClick={refresh}>
@@ -229,7 +230,7 @@ export function ProfileSourceAccessCheckRunsPage(): JSX.Element {
             <RunsErrorState error={effectiveQuery.error} onRetry={refresh} />
           ) : null}
           {effectiveQuery.isSuccess && effectiveQuery.data.items.length === 0 ? (
-            <RunsEmptyState />
+            <RunsEmptyState filtersActive={isCheckRunFiltersActive(filter)} />
           ) : null}
           {effectiveQuery.isSuccess && effectiveQuery.data.items.length > 0 ? (
             <ProfileSourceAccessCheckRunsList
@@ -741,7 +742,7 @@ function RequestProfileSourceAccessCheckRunCard({
                 <option value="">Select profile...</option>
                 {profiles.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.displayName} ({p.id})
+                    {p.displayName} — {p.status} / {p.accountStage} ({p.id})
                   </option>
                 ))}
               </Select>
@@ -988,6 +989,17 @@ function DetailDrawerContent({
       <dl className="grid gap-3 text-sm">
         <div className="min-w-0">
           <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Run ID
+          </dt>
+          <dd className="mt-1 min-w-0">
+            <code className="block truncate rounded border border-border bg-muted/55 px-2 py-1 font-mono text-xs text-foreground">
+              {run.id}
+            </code>
+          </dd>
+        </div>
+
+        <div className="min-w-0">
+          <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Profile
           </dt>
           <dd className="mt-1 min-w-0">
@@ -1015,6 +1027,24 @@ function DetailDrawerContent({
         </div>
 
         <RunDefinitionFields run={run} />
+
+        <div className="min-w-0">
+          <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Created
+          </dt>
+          <dd className="mt-1 text-muted-foreground">
+            {formatDateTime(run.createdAt)}
+          </dd>
+        </div>
+
+        <div className="min-w-0">
+          <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Updated
+          </dt>
+          <dd className="mt-1 text-muted-foreground">
+            {formatDateTime(run.updatedAt)}
+          </dd>
+        </div>
       </dl>
 
       <div className="rounded border border-border bg-muted/20 p-3 text-sm">
@@ -1132,15 +1162,21 @@ function RunsErrorState({
   );
 }
 
-function RunsEmptyState(): JSX.Element {
+function RunsEmptyState({
+  filtersActive,
+}: {
+  readonly filtersActive: boolean;
+}): JSX.Element {
+  const description = filtersActive
+    ? "No access check runs match the current filters."
+    : "No access check runs have been requested yet.";
+
   return (
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <CardTitle>No Access Check Runs</CardTitle>
-          <CardDescription>
-            No access check runs match the current filters.
-          </CardDescription>
+          <CardDescription>{description}</CardDescription>
         </div>
         <StatusBadge label="Empty" tone="neutral" />
       </CardHeader>
