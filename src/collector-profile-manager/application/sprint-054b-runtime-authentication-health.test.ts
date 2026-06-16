@@ -13,9 +13,12 @@ import {
 } from "./index";
 import type {
   Clock,
+  CollectorProfileRepositoryContext,
   LeaseIdGenerator,
+  ProfileLeaseRepository,
   SourceGroupReferencePort,
   TokenGenerator,
+  TransactionManager,
 } from "./index";
 import {
   InMemoryProfileLeaseRepository,
@@ -543,7 +546,15 @@ async function seedReadyProfile(
     updatedAt: checkoutNow,
   });
 
-  return ingested;
+  const persistedProfile = await context.profiles.findById("profile-1");
+
+  if (persistedProfile === null) {
+    throw new Error(
+      "Expected persisted profile after account-stage transitions in seedReadyProfile.",
+    );
+  }
+
+  return persistedProfile;
 }
 
 async function checkoutProfile(
@@ -605,8 +616,8 @@ describe("Sprint 054B use-case checkout enforcement for non-HEALTHY profiles", (
       const profile = await seedReadyProfile(context);
       await context.profiles.save(withHealth(profile, health));
 
-      await expect(
-        new CheckoutProfileUseCase(
+      try {
+        await new CheckoutProfileUseCase(
           context.profiles,
           context.leases,
           context.leaseIds,
@@ -616,8 +627,21 @@ describe("Sprint 054B use-case checkout enforcement for non-HEALTHY profiles", (
         ).execute({
           sourceGroupId: "source-group-1",
           profileId: "profile-1",
-        }),
-      ).rejects.toBeInstanceOf(ProfileNotCheckoutEligibleError);
+        });
+        throw new Error("Expected COLLECTION checkout to fail.");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ProfileNotCheckoutEligibleError);
+        if (error instanceof ProfileNotCheckoutEligibleError) {
+          expect(error.profileId).toBe("profile-1");
+          expect(error.reasons).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                code: "AUTHENTICATION_HEALTH_NOT_HEALTHY",
+              }),
+            ]),
+          );
+        }
+      }
     });
   }
 
@@ -629,14 +653,27 @@ describe("Sprint 054B use-case checkout enforcement for non-HEALTHY profiles", (
       });
       await context.profiles.save(withHealth(profile, health));
 
-      await expect(
-        new CheckoutProfileForExerciseUseCase(
+      try {
+        await new CheckoutProfileForExerciseUseCase(
           context.profiles,
           context.leases,
           context.leaseIds,
           context.clock,
-        ).execute({ profileId: "profile-1" }),
-      ).rejects.toBeInstanceOf(ProfileNotCheckoutEligibleError);
+        ).execute({ profileId: "profile-1" });
+        throw new Error("Expected AMBIENT_EXERCISE checkout to fail.");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ProfileNotCheckoutEligibleError);
+        if (error instanceof ProfileNotCheckoutEligibleError) {
+          expect(error.profileId).toBe("profile-1");
+          expect(error.reasons).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                code: "AUTHENTICATION_HEALTH_NOT_HEALTHY",
+              }),
+            ]),
+          );
+        }
+      }
     });
   }
 
@@ -648,15 +685,31 @@ describe("Sprint 054B use-case checkout enforcement for non-HEALTHY profiles", (
       });
       await context.profiles.save(withHealth(profile, health));
 
-      await expect(
-        new CheckoutProfileForAssistedGroupAccessUseCase(
+      try {
+        await new CheckoutProfileForAssistedGroupAccessUseCase(
           context.profiles,
           context.leases,
           context.leaseIds,
           context.clock,
           context.sourceGroupReference,
-        ).execute({ profileId: "profile-1", sourceGroupId: "source-group-1" }),
-      ).rejects.toBeInstanceOf(ProfileNotCheckoutEligibleError);
+        ).execute({
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+        });
+        throw new Error("Expected ASSISTED_GROUP_ACCESS checkout to fail.");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ProfileNotCheckoutEligibleError);
+        if (error instanceof ProfileNotCheckoutEligibleError) {
+          expect(error.profileId).toBe("profile-1");
+          expect(error.reasons).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                code: "AUTHENTICATION_HEALTH_NOT_HEALTHY",
+              }),
+            ]),
+          );
+        }
+      }
     });
   }
 
@@ -932,5 +985,90 @@ describe("Sprint 054B ReleaseProfileLeaseUseCase observation handling", () => {
     const profileAfter = await context.profiles.findById("profile-1");
     expect(profileAfter?.authenticationHealth).toBe(initialHealth);
     expect(profileAfter?.authenticationHealthUpdatedAt).toBe(initialTimestamp);
+  });
+
+  it("uses transaction manager to prevent externally visible partial release when lease-status write fails", async () => {
+    const context = createTestContext();
+    await seedReadyProfile(context);
+    const { leaseId } = await checkoutProfile(context);
+
+    // Snapshot the externally visible (main) profile and lease before the
+    // failed release attempt. The transaction abstraction must guarantee
+    // that these remain unchanged when the inner lease-status write throws
+    // after the profile health mutation has already been written to the
+    // transaction-scoped repository.
+    const mainProfileBefore = await context.profiles.findById("profile-1");
+    const mainLeaseBefore = await context.leases.findById(leaseId);
+    if (mainProfileBefore === null || mainLeaseBefore === null) {
+      throw new Error("Expected seeded profile and lease before release.");
+    }
+
+    // Mirror the established "uses transaction-scoped repositories" pattern:
+    // writes inside the transaction go to a separate scope and never touch the
+    // externally visible (main) repositories.
+    const transactionProfiles = new InMemoryProfileRepository();
+    const transactionLeases = new InMemoryProfileLeaseRepository();
+    await transactionProfiles.save(mainProfileBefore);
+    await transactionLeases.save(mainLeaseBefore);
+
+    // Wrap the transaction-scoped lease repository so that the lease-status
+    // write (which happens after the profile save) fails. The profile save
+    // above will still succeed, so without the transaction abstraction a
+    // partial mutation would be observable.
+    const failingTransactionLeases: ProfileLeaseRepository = {
+      save: async (lease) => transactionLeases.save(lease),
+      findById: async (id) => transactionLeases.findById(id),
+      findActiveByProfileId: async (profileId) =>
+        transactionLeases.findActiveByProfileId(profileId),
+      updateStatus: async () => {
+        throw new Error("Simulated lease status write failure.");
+      },
+    };
+
+    const transactionManager: TransactionManager = {
+      runInTransaction: async <T>(
+        work: (repositories: CollectorProfileRepositoryContext) => Promise<T>,
+      ): Promise<T> =>
+        work({
+          profiles: transactionProfiles,
+          leases: failingTransactionLeases,
+          profileSourceAccess: context.profileSourceAccess,
+        }),
+    };
+
+    context.clock.setNow(laterNow);
+
+    await expect(
+      new ReleaseProfileLeaseUseCase(
+        context.profiles,
+        context.leases,
+        context.clock,
+        transactionManager,
+      ).execute({
+        leaseId,
+        authenticationObservation: "LOGIN_REQUIRED",
+      }),
+    ).rejects.toThrow("Simulated lease status write failure.");
+
+    // Externally visible (main) profile and lease are unchanged: the
+    // transaction abstraction prevented the partial profile mutation
+    // (already applied to the transaction-scoped profile) from leaking
+    // out, even though the lease-status write failed.
+    const mainProfileAfter = await context.profiles.findById("profile-1");
+    const mainLeaseAfter = await context.leases.findById(leaseId);
+    expect(mainProfileAfter).toEqual(mainProfileBefore);
+    expect(mainLeaseAfter).toEqual(mainLeaseBefore);
+    expect(mainProfileAfter?.authenticationHealth).toBe("HEALTHY");
+    expect(mainProfileAfter?.authenticationHealthUpdatedAt).toBe(checkoutNow);
+    expect(mainLeaseAfter?.status).toBe("ACTIVE");
+
+    // Sanity check: the transaction-scoped profile did receive the partial
+    // mutation before the lease-status write threw, while the transaction-
+    // scoped lease remained ACTIVE.
+    const profileInTxAfter = await transactionProfiles.findById("profile-1");
+    const leaseInTxAfter = await transactionLeases.findById(leaseId);
+    expect(profileInTxAfter?.authenticationHealth).toBe("REAUTH_REQUIRED");
+    expect(profileInTxAfter?.authenticationHealthUpdatedAt).toBe(laterNow);
+    expect(leaseInTxAfter?.status).toBe("ACTIVE");
   });
 });
