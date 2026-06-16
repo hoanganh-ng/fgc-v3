@@ -44,6 +44,7 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | `pnpm operator:profile:provision` | Complete manual profile provisioning in a headed browser. | `pnpm profile:provision` |
 | `pnpm operator:profile:exercise` | Run one read-only ambient account exercise attempt for a specified profile. | `pnpm profile:exercise:run` |
 | `pnpm operator:profile:exercise-worker` | Claim and execute queued Ambient Account and Category Browse exercise runs. | `pnpm profile:exercise-worker:run` |
+| `pnpm operator:profile-source-access-check-worker` | Claim and execute queued Profile-Source Access Check runs. | `pnpm profile-source-access-check-worker:run` |
 | `pnpm operator:profile:assisted-access` | Open one assisted group access browser session for manual operator inspection. | `pnpm profile:assisted-access:run` |
 | `pnpm operator:collector:facebook` | Run one manual Facebook collection for a source group. | `pnpm collector:facebook:run` |
 | `pnpm operator:collector:worker` | Claim and execute queued collection runs. | `pnpm collector:worker:run` |
@@ -680,7 +681,50 @@ The worker:
 
 Worker logs and collection-run records never include raw Facebook payloads, cookies, local storage, proxy credentials, session headers, provisioning tokens, trusted runtime configuration, or browser session material.
 
-Current limitations:
+## Profile-Source Access Check Worker Command
+
+Sprint 051 adds a separate operator command for consuming queued
+Profile-Source Access Check Runs. It does not add public lifecycle endpoints;
+the worker claims and updates runs through Collector Runtime application code.
+
+Run once against the preview gateway:
+
+```bash
+pnpm operator:profile-source-access-check-worker -- --base-url http://localhost:8081 --once --browser-provider playwright
+```
+
+Alias:
+
+```bash
+pnpm profile-source-access-check-worker:run -- --base-url http://localhost:8081 --once
+```
+
+Run in polling mode against the direct local API:
+
+```bash
+pnpm operator:profile-source-access-check-worker -- --base-url http://localhost:3000 --poll-interval-ms 5000
+```
+
+Expected worker flow:
+
+1. Atomically claim the oldest queued check run from PostgreSQL.
+2. Check out the exact requested profile for assisted group access.
+3. Fetch lease-scoped runtime configuration and launch the selected browser
+   provider headless.
+4. Navigate only to the run's frozen Facebook `DIRECT_GROUP_URL`.
+5. Collect sanitized observation booleans/enums only.
+6. Close the browser and release the lease before classification and mutation.
+7. Classify the observation into a safe outcome, mutate Profile Manager
+   profile-source access through HTTP, then mark the check run `SUCCEEDED`.
+8. Mark the check run `FAILED` with a sanitized reason when browser,
+   cleanup, classification, or mutation fails.
+
+Logs may include run IDs, safe outcomes, sanitized failure codes, and lifecycle
+lines only. The worker must not log or persist cookies, localStorage, proxy
+credentials, headers, raw page text, raw HTML, screenshots, network payloads,
+trusted runtime configuration, token material, or full redirected URLs.
+
+Collector worker current limitations:
 
 - One profile.
 - One Facebook group URL.
@@ -691,7 +735,7 @@ Current limitations:
 - A profile shown as `READY` is not always checkout-eligible. Checkout also requires `accountStage = COLLECTION_READY` and can still be blocked by temporal routine windows, cooldowns, daily safety thresholds, or an existing lease/BUSY state.
 - `NO_ELIGIBLE_PROFILE_AVAILABLE` can also happen when the CLI `--base-url` points to a different API/database than the Web UI. For preview stack testing, prefer `--base-url http://localhost:8081`; use `--base-url http://localhost:3000` only for the direct API stack.
 
-Safety boundaries:
+Collector worker safety boundaries:
 
 - The command does not automate credentials, solve CAPTCHAs, bypass access controls, bypass rate limits, post, comment, like, or persist raw payloads.
 - Captured page-context and network-listener payloads stay in memory and are not written to disk.

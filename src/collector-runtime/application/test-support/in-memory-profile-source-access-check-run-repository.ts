@@ -1,6 +1,7 @@
 import type {
   ProfileSourceAccessCheckRun,
   ProfileSourceAccessCheckRunId,
+  ProfileSourceAccessCheckRunIsoDateTime,
 } from "../../domain";
 import type {
   ProfileSourceAccessCheckRunListQuery,
@@ -18,6 +19,29 @@ export class InMemoryProfileSourceAccessCheckRunRepository
 
   public async save(run: ProfileSourceAccessCheckRun): Promise<void> {
     this.checkRuns.set(run.id, run);
+  }
+
+  public async claimNextQueued(
+    startedAt: ProfileSourceAccessCheckRunIsoDateTime,
+  ): Promise<ProfileSourceAccessCheckRun | null> {
+    const checkRun = [...this.checkRuns.values()]
+      .filter((candidate) => candidate.status === "QUEUED")
+      .sort(compareProfileSourceAccessCheckRunsByRequestedAtAsc)[0];
+
+    if (checkRun === undefined) {
+      return null;
+    }
+
+    const claimedCheckRun: ProfileSourceAccessCheckRun = {
+      ...checkRun,
+      status: "RUNNING",
+      startedAt,
+      updatedAt: startedAt,
+    };
+
+    this.checkRuns.set(claimedCheckRun.id, claimedCheckRun);
+
+    return claimedCheckRun;
   }
 
   public async findById(
@@ -74,4 +98,25 @@ function compareProfileSourceAccessCheckRunsByCreatedAtDesc(
   }
 
   return right.id.localeCompare(left.id);
+}
+
+function compareProfileSourceAccessCheckRunsByRequestedAtAsc(
+  left: ProfileSourceAccessCheckRun,
+  right: ProfileSourceAccessCheckRun,
+): number {
+  const requestedAtComparison =
+    Date.parse(left.requestedAt) - Date.parse(right.requestedAt);
+
+  if (requestedAtComparison !== 0) {
+    return requestedAtComparison;
+  }
+
+  const createdAtComparison =
+    Date.parse(left.createdAt) - Date.parse(right.createdAt);
+
+  if (createdAtComparison !== 0) {
+    return createdAtComparison;
+  }
+
+  return left.id.localeCompare(right.id);
 }

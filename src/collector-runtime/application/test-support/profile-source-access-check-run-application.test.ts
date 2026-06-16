@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   CancelProfileSourceAccessCheckRunUseCase,
+  ClaimNextProfileSourceAccessCheckRunUseCase,
+  ExecuteProfileSourceAccessCheckRunUseCase,
   GetProfileSourceAccessCheckRunUseCase,
   ListProfileSourceAccessCheckRunsUseCase,
   MarkProfileSourceAccessCheckRunFailedUseCase,
@@ -17,12 +19,24 @@ import {
 } from "../index";
 import type {
   Clock,
+  ProfileSourceAccessBrowserCheckPort,
+  ProfileSourceAccessBrowserCheckResult,
+  ProfileSourceAccessMutationPort,
+  ProfileSourceAccessMutationResult,
+  ProfileSourceAccessOutcomeClassifierPort,
   IdGenerator,
   SourceGroupLookupPort,
   SourceGroupLookupResult,
   ProfileReferencePort,
   ProfileReferenceResult,
 } from "../index";
+import type {
+  ProfileSourceAccessBrowserObservation,
+} from "../ports/profile-source-access-check-execution.port";
+import type {
+  ProfileSourceAccessCheckRun,
+  ProfileSourceAccessCheckRunOutcome,
+} from "../../domain";
 import { InMemoryProfileSourceAccessCheckRunRepository } from "./in-memory-profile-source-access-check-run-repository";
 
 const createdAt = "2026-05-01T10:00:00.000Z";
@@ -285,11 +299,141 @@ describe("collector runtime profile-source access check run application use case
     const succeeded = await new MarkProfileSourceAccessCheckRunSucceededUseCase(
       context.checkRuns,
       context.clock,
-    ).execute({ checkRunId: requested.id });
+    ).execute({
+      checkRunId: requested.id,
+      outcome: "PUBLIC_ACCESSIBLE",
+    });
 
     expect(succeeded.status).toBe("SUCCEEDED");
+    expect(succeeded.outcome).toBe("PUBLIC_ACCESSIBLE");
     expect(succeeded.finishedAt).toBe(updatedAt);
     expect(succeeded.updatedAt).toBe(updatedAt);
+  });
+
+  it("claims the oldest queued check run deterministically", async () => {
+    const context = createTestContext();
+    await context.checkRuns.save(createCheckRunFixture({
+      id: "newer-run",
+      requestedAt: "2026-05-01T10:02:00.000Z",
+      createdAt: "2026-05-01T10:02:00.000Z",
+    }));
+    await context.checkRuns.save(createCheckRunFixture({
+      id: "oldest-run",
+      requestedAt: "2026-05-01T10:00:00.000Z",
+      createdAt: "2026-05-01T10:01:00.000Z",
+    }));
+    await context.checkRuns.save(createCheckRunFixture({
+      id: "oldest-created-run",
+      requestedAt: "2026-05-01T10:00:00.000Z",
+      createdAt: "2026-05-01T10:00:00.000Z",
+    }));
+
+    context.clock.nowResult = new Date(updatedAt);
+
+    const claimed = await new ClaimNextProfileSourceAccessCheckRunUseCase(
+      context.checkRuns,
+      context.clock,
+    ).execute();
+
+    expect(claimed?.id).toBe("oldest-created-run");
+    expect(claimed?.status).toBe("RUNNING");
+    expect(claimed?.startedAt).toBe(updatedAt);
+  });
+
+  it("executes a running check run and persists the classified outcome", async () => {
+    const context = createExecutionContext();
+    const running = createCheckRunFixture({
+      status: "RUNNING",
+      startedAt: "2026-05-01T10:01:00.000Z",
+    });
+    await context.checkRuns.save(running);
+    context.browser.result = {
+      ok: true,
+      observation: {
+        pageKind: "FACEBOOK_GROUP",
+        groupContentVisible: true,
+        joinActionVisible: false,
+        joinedIndicatorVisible: false,
+        accessDeniedIndicatorVisible: false,
+      },
+    };
+    context.classifier.outcome = "PUBLIC_ACCESSIBLE";
+    context.clock.nowResult = new Date(updatedAt);
+
+    const completed = await new ExecuteProfileSourceAccessCheckRunUseCase(
+      context.checkRuns,
+      context.browser,
+      context.classifier,
+      context.mutation,
+      context.clock,
+    ).execute({ checkRunId: running.id });
+
+    expect(completed.status).toBe("SUCCEEDED");
+    expect(completed.outcome).toBe("PUBLIC_ACCESSIBLE");
+    expect(context.mutation.calls).toEqual([
+      {
+        profileId: "profile-1",
+        sourceGroupId: "source-group-1",
+        outcome: "PUBLIC_ACCESSIBLE",
+      },
+    ]);
+  });
+
+  it("does not mutate profile-source access when browser cleanup fails", async () => {
+    const context = createExecutionContext();
+    const running = createCheckRunFixture({
+      status: "RUNNING",
+      startedAt: "2026-05-01T10:01:00.000Z",
+    });
+    await context.checkRuns.save(running);
+    context.browser.result = {
+      ok: false,
+      failureReason: {
+        code: "ACCESS_CHECK_CLEANUP_FAILED",
+        message: "Profile-source access browser check failed.",
+      },
+    };
+
+    const completed = await new ExecuteProfileSourceAccessCheckRunUseCase(
+      context.checkRuns,
+      context.browser,
+      context.classifier,
+      context.mutation,
+      context.clock,
+    ).execute({ checkRunId: running.id });
+
+    expect(completed.status).toBe("FAILED");
+    expect(completed.failureReason?.code).toBe("ACCESS_CHECK_CLEANUP_FAILED");
+    expect(context.classifier.calls).toHaveLength(0);
+    expect(context.mutation.calls).toHaveLength(0);
+  });
+
+  it("marks the check run failed when mutation fails", async () => {
+    const context = createExecutionContext();
+    const running = createCheckRunFixture({
+      status: "RUNNING",
+      startedAt: "2026-05-01T10:01:00.000Z",
+    });
+    await context.checkRuns.save(running);
+    context.mutation.result = {
+      ok: false,
+      failureReason: {
+        code: "ACCESS_CHECK_MUTATION_FAILED",
+        message: "Profile-source access mutation failed.",
+      },
+    };
+
+    const completed = await new ExecuteProfileSourceAccessCheckRunUseCase(
+      context.checkRuns,
+      context.browser,
+      context.classifier,
+      context.mutation,
+      context.clock,
+    ).execute({ checkRunId: running.id });
+
+    expect(completed.status).toBe("FAILED");
+    expect(completed.failureReason?.code).toBe("ACCESS_CHECK_MUTATION_FAILED");
+    expect(completed.outcome).toBeUndefined();
   });
 
   it("marks a running check run as failed", async () => {
@@ -332,6 +476,22 @@ describe("collector runtime profile-source access check run application use case
     expect(failed.updatedAt).toBe(updatedAt);
   });
 });
+
+function createExecutionContext() {
+  const checkRuns = new InMemoryProfileSourceAccessCheckRunRepository();
+  const browser = new FakeBrowserCheckPort();
+  const classifier = new FakeOutcomeClassifierPort();
+  const mutation = new FakeMutationPort();
+  const clock = new FakeClock(new Date(updatedAt));
+
+  return {
+    checkRuns,
+    browser,
+    classifier,
+    mutation,
+    clock,
+  };
+}
 
 function createTestContext(idSequence: string[] = []) {
   const checkRuns = new InMemoryProfileSourceAccessCheckRunRepository();
@@ -400,4 +560,79 @@ class FakeProfileReferencePort implements ProfileReferencePort {
   public async getProfileAccountStage(): Promise<ProfileReferenceResult> {
     return this.result;
   }
+}
+
+class FakeBrowserCheckPort implements ProfileSourceAccessBrowserCheckPort {
+  public result: ProfileSourceAccessBrowserCheckResult = {
+    ok: true,
+    observation: {
+      pageKind: "FACEBOOK_GROUP",
+      groupContentVisible: true,
+      joinActionVisible: false,
+      joinedIndicatorVisible: false,
+      accessDeniedIndicatorVisible: false,
+    },
+  };
+
+  public async check(): Promise<ProfileSourceAccessBrowserCheckResult> {
+    return this.result;
+  }
+}
+
+class FakeOutcomeClassifierPort implements ProfileSourceAccessOutcomeClassifierPort {
+  public outcome: ProfileSourceAccessCheckRunOutcome = "PUBLIC_ACCESSIBLE";
+  public readonly calls: ProfileSourceAccessBrowserObservation[] = [];
+
+  public async classify(
+    observation: ProfileSourceAccessBrowserObservation,
+  ): Promise<ProfileSourceAccessCheckRunOutcome> {
+    this.calls.push(observation);
+    return this.outcome;
+  }
+}
+
+class FakeMutationPort implements ProfileSourceAccessMutationPort {
+  public result: ProfileSourceAccessMutationResult = { ok: true };
+  public readonly calls: Array<{
+    readonly profileId: string;
+    readonly sourceGroupId: string;
+    readonly outcome: ProfileSourceAccessCheckRunOutcome;
+  }> = [];
+
+  public async applyOutcome(input: {
+    readonly profileId: string;
+    readonly sourceGroupId: string;
+    readonly outcome: ProfileSourceAccessCheckRunOutcome;
+  }): Promise<ProfileSourceAccessMutationResult> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
+function createCheckRunFixture(
+  overrides: Partial<ProfileSourceAccessCheckRun> = {},
+): ProfileSourceAccessCheckRun {
+  return {
+    ...createBaseCheckRunFixture(),
+    ...overrides,
+  };
+}
+
+function createBaseCheckRunFixture(): ProfileSourceAccessCheckRun {
+  return {
+    id: "check-run-1",
+    profileId: "profile-1",
+    sourceGroupId: "source-group-1",
+    triggerType: "MANUAL" as const,
+    status: "QUEUED" as const,
+    accountStageAtRequest: "WARMING" as const,
+    target: {
+      platform: "FACEBOOK" as const,
+      routeType: "DIRECT_GROUP_URL" as const,
+      url: "https://www.facebook.com/groups/source-group-1",
+    },
+    requestedAt: createdAt,
+    createdAt,
+    updatedAt: createdAt,
+  };
 }

@@ -3,6 +3,7 @@ import type { ProfileSourceAccessCheckRunRepository } from "../ports/profile-sou
 import {
   loadValidatedProfileSourceAccessCheckRunById,
   toProfileSourceAccessCheckRunIsoDateTime,
+  validateProfileSourceAccessCheckRunFailureReasonForApplication,
   validateProfileSourceAccessCheckRunForApplication,
 } from "../profile-source-access-check-run-validation";
 import { assertValidProfileSourceAccessCheckRunStatusTransition } from "../../domain";
@@ -33,11 +34,16 @@ export class MarkProfileSourceAccessCheckRunFailedUseCase {
     );
 
     const now = toProfileSourceAccessCheckRunIsoDateTime(this.clock.now());
+    const failureReason =
+      validateProfileSourceAccessCheckRunFailureReasonForApplication(
+        input.failureReason,
+      );
+    const { outcome: _outcome, ...checkRunWithoutOutcome } = checkRun;
 
     const failed = validateProfileSourceAccessCheckRunForApplication({
-      ...checkRun,
+      ...checkRunWithoutOutcome,
       status: "FAILED",
-      failureReason: input.failureReason,
+      failureReason,
       finishedAt: now,
       updatedAt: now,
     });

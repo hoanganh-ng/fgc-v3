@@ -304,6 +304,7 @@ export function createProfileSourceAccessCheckRun(
       routeType: "DIRECT_GROUP_URL",
       url: "https://www.facebook.com/groups/source-group-1",
     },
+    ...(options.outcome !== undefined ? { outcome: options.outcome } : {}),
     ...(options.failureReason !== undefined
       ? { failureReason: options.failureReason }
       : {}),

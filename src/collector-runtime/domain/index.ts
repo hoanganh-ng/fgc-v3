@@ -12,6 +12,7 @@ export * from "./collection-run-trigger-type";
 export * from "./collection-run.schemas";
 export * from "./facebook-url";
 export * from "./profile-source-access-check-run";
+export * from "./profile-source-access-check-run-outcome";
 export * from "./profile-source-access-check-run-state-machine";
 export * from "./profile-source-access-check-run-status";
 export * from "./profile-source-access-check-run-trigger-type";

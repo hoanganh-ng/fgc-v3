@@ -13,6 +13,7 @@ import {
   ACCOUNT_EXERCISE_TYPES,
   COLLECTION_RUN_STATUSES,
   COLLECTION_RUN_TRIGGER_TYPES,
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_OUTCOMES,
   PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUSES,
   PROFILE_SOURCE_ACCESS_CHECK_RUN_TRIGGER_TYPES,
 } from "../../../collector-runtime/domain";
@@ -26,6 +27,7 @@ import type {
   CollectionRunSummary,
   ProfileSourceAccessCheckRunTarget,
   ProfileSourceAccessCheckRunFailureReason,
+  ProfileSourceAccessCheckRunOutcome,
 } from "../../../collector-runtime/domain";
 
 export const collectionRunStatusEnum = pgEnum(
@@ -56,6 +58,11 @@ export const profileSourceAccessCheckRunStatusEnum = pgEnum(
 export const profileSourceAccessCheckRunTriggerTypeEnum = pgEnum(
   "profile_source_access_check_run_trigger_type",
   PROFILE_SOURCE_ACCESS_CHECK_RUN_TRIGGER_TYPES,
+);
+
+export const profileSourceAccessCheckRunOutcomeEnum = pgEnum(
+  "profile_source_access_check_run_outcome",
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_OUTCOMES,
 );
 
 const timestampWithTimezone = (name: string) =>
@@ -130,6 +137,7 @@ export const collectorProfileSourceAccessCheckRuns = pgTable(
     status: profileSourceAccessCheckRunStatusEnum("status").notNull(),
     accountStageAtRequest: text("account_stage_at_request").notNull(),
     target: jsonb("target").$type<ProfileSourceAccessCheckRunTarget>().notNull(),
+    outcome: profileSourceAccessCheckRunOutcomeEnum("outcome").$type<ProfileSourceAccessCheckRunOutcome>(),
     failureReason:
       jsonb("failure_reason").$type<ProfileSourceAccessCheckRunFailureReason>(),
     requestedAt: timestampWithTimezone("requested_at").notNull(),

@@ -119,10 +119,14 @@ export type ProfileSourceAccessReportableState =
   | "LOGIN_REQUIRED"
   | "CHECKPOINT_REQUIRED";
 
+export type ProfileSourceAccessWritableState =
+  | ProfileSourceAccessReportableState
+  | "NEEDS_MANUAL_REVIEW";
+
 export interface UpsertProfileSourceAccessInput {
   readonly profileId: string;
   readonly sourceGroupId: string;
-  readonly accessState: ProfileSourceAccessReportableState;
+  readonly accessState: ProfileSourceAccessWritableState;
   readonly lastFailureReason: {
     readonly code: string;
     readonly message: string;
@@ -134,7 +138,7 @@ export type UpsertProfileSourceAccessResult =
       readonly ok: true;
       readonly profileId: string;
       readonly sourceGroupId: string;
-      readonly accessState: ProfileSourceAccessReportableState;
+      readonly accessState: ProfileSourceAccessWritableState;
     }
   | {
       readonly ok: false;
@@ -841,7 +845,7 @@ function toUpsertProfileSourceAccessSuccessResult(
     return undefined;
   }
 
-  if (!isProfileSourceAccessReportableState(accessState)) {
+  if (!isProfileSourceAccessWritableState(accessState)) {
     return undefined;
   }
 
@@ -1040,6 +1044,15 @@ function isProfileSourceAccessReportableState(
     value === "ACCESS_DENIED" ||
     value === "LOGIN_REQUIRED" ||
     value === "CHECKPOINT_REQUIRED"
+  );
+}
+
+function isProfileSourceAccessWritableState(
+  value: unknown,
+): value is ProfileSourceAccessWritableState {
+  return (
+    isProfileSourceAccessReportableState(value) ||
+    value === "NEEDS_MANUAL_REVIEW"
   );
 }
 

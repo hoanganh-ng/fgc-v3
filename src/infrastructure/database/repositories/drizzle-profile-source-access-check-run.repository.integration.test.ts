@@ -117,6 +117,8 @@ if (!shouldRunDbTests) {
           profileId: "profile-1",
           sourceGroupId: "group-1",
           status: "SUCCEEDED",
+          outcome: "PUBLIC_ACCESSIBLE",
+          finishedAt: "2026-05-01T10:05:00.000Z",
           createdAt: "2026-05-01T10:00:00.000Z",
         }),
       );
@@ -242,6 +244,39 @@ if (!shouldRunDbTests) {
       // Descending by createdAt: run3 is newest, run2 is second-newest, run1 is oldest.
       // Offset 1 skips run3, returns run2.
       expect(result.items[0]).toEqual(run2);
+    });
+
+    it("claims the oldest queued check run atomically", async () => {
+      const startedAt = "2026-05-01T11:00:00.000Z";
+      const run1 = trackCheckRun(
+        createCheckRun({
+          id: nextTestId("claim-newer"),
+          requestedAt: "2026-05-01T10:02:00.000Z",
+          createdAt: "2026-05-01T10:02:00.000Z",
+        }),
+      );
+      const run2 = trackCheckRun(
+        createCheckRun({
+          id: nextTestId("claim-oldest"),
+          requestedAt: "2026-05-01T10:00:00.000Z",
+          createdAt: "2026-05-01T10:00:00.000Z",
+        }),
+      );
+
+      await checkRuns.save(run1);
+      await checkRuns.save(run2);
+
+      const [claim1, claim2] = await Promise.all([
+        checkRuns.claimNextQueued(startedAt),
+        checkRuns.claimNextQueued(startedAt),
+      ]);
+
+      expect([claim1?.id, claim2?.id].sort()).toEqual(
+        [run1.id, run2.id].sort(),
+      );
+      expect(claim1?.status).toBe("RUNNING");
+      expect(claim2?.status).toBe("RUNNING");
+      expect((await checkRuns.findById(run2.id))?.startedAt).toBe(startedAt);
     });
 
     function nextTestId(prefix: string): string {

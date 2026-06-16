@@ -43,6 +43,7 @@ import type {
   ProfileSourceAccessCheckRun,
   ProfileSourceAccessCheckRunFailureReason,
   ProfileSourceAccessCheckRunId,
+  ProfileSourceAccessCheckRunOutcome,
   ProfileSourceAccessCheckRunStatus,
   ProfileSourceAccessCheckRunTarget,
   ProfileSourceAccessCheckRunTriggerType,
@@ -196,6 +197,7 @@ export interface ProfileSourceAccessCheckRunDto {
   readonly status: ProfileSourceAccessCheckRunStatus;
   readonly accountStageAtRequest: string;
   readonly target: ProfileSourceAccessCheckRunTarget;
+  readonly outcome?: ProfileSourceAccessCheckRunOutcome;
   readonly failureReason?: ProfileSourceAccessCheckRunFailureReason;
   readonly requestedAt: string;
   readonly startedAt?: string;
@@ -658,6 +660,7 @@ export function toProfileSourceAccessCheckRunDto(
     status: run.status,
     accountStageAtRequest: run.accountStageAtRequest,
     target: { ...run.target },
+    ...(run.outcome !== undefined ? { outcome: run.outcome } : {}),
     ...(run.failureReason !== undefined
       ? { failureReason: { ...run.failureReason } }
       : {}),

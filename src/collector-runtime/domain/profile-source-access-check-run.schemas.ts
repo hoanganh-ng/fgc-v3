@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { COLLECTOR_RUNTIME_ACCOUNT_STAGES } from "./account-stage";
+import { PROFILE_SOURCE_ACCESS_CHECK_RUN_OUTCOMES } from "./profile-source-access-check-run-outcome";
 import { PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUSES } from "./profile-source-access-check-run-status";
 import { PROFILE_SOURCE_ACCESS_CHECK_RUN_TRIGGER_TYPES } from "./profile-source-access-check-run-trigger-type";
 
@@ -18,6 +19,9 @@ export const ProfileSourceAccessCheckRunStatusSchema = z.enum(
 );
 export const ProfileSourceAccessCheckRunTriggerTypeSchema = z.enum(
   PROFILE_SOURCE_ACCESS_CHECK_RUN_TRIGGER_TYPES,
+);
+export const ProfileSourceAccessCheckRunOutcomeSchema = z.enum(
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_OUTCOMES,
 );
 
 /**
@@ -95,6 +99,7 @@ export const ProfileSourceAccessCheckRunSchema = z
     status: ProfileSourceAccessCheckRunStatusSchema,
     accountStageAtRequest: z.enum(COLLECTOR_RUNTIME_ACCOUNT_STAGES),
     target: ProfileSourceAccessCheckRunTargetSchema,
+    outcome: ProfileSourceAccessCheckRunOutcomeSchema.optional(),
     failureReason: ProfileSourceAccessCheckRunFailureReasonSchema.optional(),
     requestedAt: ProfileSourceAccessCheckRunIsoDateTimeSchema,
     startedAt: ProfileSourceAccessCheckRunIsoDateTimeSchema.optional(),
@@ -102,4 +107,62 @@ export const ProfileSourceAccessCheckRunSchema = z
     createdAt: ProfileSourceAccessCheckRunIsoDateTimeSchema,
     updatedAt: ProfileSourceAccessCheckRunIsoDateTimeSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((run, context) => {
+    if (run.status === "SUCCEEDED") {
+      if (run.outcome === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["outcome"],
+          message: "Succeeded check runs require an outcome.",
+        });
+      }
+
+      if (run.failureReason !== undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["failureReason"],
+          message: "Succeeded check runs must not contain a failure reason.",
+        });
+      }
+
+      return;
+    }
+
+    if (run.status === "FAILED") {
+      if (run.failureReason === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["failureReason"],
+          message: "Failed check runs require a failure reason.",
+        });
+      }
+
+      if (run.outcome !== undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["outcome"],
+          message: "Failed check runs must not contain an outcome.",
+        });
+      }
+
+      return;
+    }
+
+    if (run.outcome !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["outcome"],
+        message: "Queued, running, and canceled check runs must not contain an outcome.",
+      });
+    }
+
+    if (run.failureReason !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["failureReason"],
+        message:
+          "Queued, running, and canceled check runs must not contain a failure reason.",
+      });
+    }
+  });

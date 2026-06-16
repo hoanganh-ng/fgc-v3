@@ -1,3 +1,7 @@
 # Active Sprint
 
-Sprint 050A is complete. Awaiting architect definition for the next sprint.
+Sprint 051 is active.
+
+Implementation authority:
+
+- [Sprint 051 - Queued Profile-Source Access Check Worker](SPRINT-051-profile-source-access-check-worker.md)

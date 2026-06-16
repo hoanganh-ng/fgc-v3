@@ -1,6 +1,7 @@
 import type {
   ProfileSourceAccessCheckRun,
   ProfileSourceAccessCheckRunId,
+  ProfileSourceAccessCheckRunIsoDateTime,
   ProfileSourceAccessCheckRunStatus,
 } from "../../domain";
 
@@ -28,6 +29,10 @@ export interface ProfileSourceAccessCheckRunRepository {
   ): Promise<readonly ProfileSourceAccessCheckRun[]>;
 
   save(run: ProfileSourceAccessCheckRun): Promise<void>;
+
+  claimNextQueued(
+    startedAt: ProfileSourceAccessCheckRunIsoDateTime,
+  ): Promise<ProfileSourceAccessCheckRun | null>;
 
   list(
     query: ProfileSourceAccessCheckRunListQuery,

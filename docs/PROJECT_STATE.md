@@ -12,7 +12,7 @@ The current focus is the Content Collector stage. Collector Profile Manager is c
 
 ## Current Sprint
 
-Sprint 050A is complete. Awaiting architect definition for the next sprint.
+Sprint 051 is active: Queued Profile-Source Access Check Worker.
 
 ## Decided Items
 
@@ -83,6 +83,7 @@ Sprint 050A is complete. Awaiting architect definition for the next sprint.
 - Sprint 045 is complete. Collection runs can be requested, listed, filtered, monitored, and canceled through the Web UI with safe source-group enrichment and local cancellation-error handling.
 - Sprint 046 is complete. Ambient exercise runs can be requested, listed, filtered, monitored, canceled while queued, and inspected through the Web UI using existing safe Collector Runtime HTTP contracts.
 - Sprint 047 is complete. Queued Ambient Account Exercise runs are connected to a separate PostgreSQL-backed worker process that reuses the existing safe browser exercise flow.
+- Sprint 051 adds a separate PostgreSQL-backed Profile-Source Access Check worker. It atomically claims queued check runs, uses assisted group access checkout and lease-scoped runtime configuration to inspect only the frozen Facebook `DIRECT_GROUP_URL`, classifies sanitized browser evidence into a safe outcome, mutates Profile Manager profile-source access through an explicit HTTP adapter, and records only safe outcomes or sanitized failure reasons.
 - Sprint 047A is complete. The existing account exercise worker is available as a separate opt-in Docker Compose service beside the collection worker.
 - Sprint 040 introduces source group entry route metadata owned by Content Manager. Entry routes describe possible future paths toward a source group, but they do not grant access, imply profile eligibility, or mutate profile/source access state.
 - Sprint 040 treats source groups without explicit entry routes as having a derived default `DIRECT_GROUP_URL` route from the source group URL. The default direct route uses `MEDIUM` risk because a direct final group visit is valid metadata but should not be treated as the lowest-risk warm-up path by default.

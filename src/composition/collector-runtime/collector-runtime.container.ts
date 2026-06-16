@@ -4,6 +4,7 @@ import {
   AttachAccountExerciseRunLeaseUseCase,
   ClaimNextAccountExerciseRunUseCase,
   ClaimNextCollectionRunUseCase,
+  ClaimNextProfileSourceAccessCheckRunUseCase,
   GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
   ListAccountExerciseRunsUseCase,
@@ -70,6 +71,7 @@ export interface CollectorRuntimeContainer {
   readonly cancelProfileSourceAccessCheckRun: CancelProfileSourceAccessCheckRunUseCase;
   readonly claimNextAccountExerciseRun: ClaimNextAccountExerciseRunUseCase;
   readonly claimNextCollectionRun: ClaimNextCollectionRunUseCase;
+  readonly claimNextProfileSourceAccessCheckRun: ClaimNextProfileSourceAccessCheckRunUseCase;
   close(): Promise<void>;
 }
 
@@ -178,6 +180,10 @@ export function createCollectorRuntime(
     ),
     claimNextCollectionRun: new ClaimNextCollectionRunUseCase(
       collectionRuns,
+      clock,
+    ),
+    claimNextProfileSourceAccessCheckRun: new ClaimNextProfileSourceAccessCheckRunUseCase(
+      checkRuns,
       clock,
     ),
     close: dependencies.close ?? noopClose,

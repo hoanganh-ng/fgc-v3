@@ -3,3 +3,6 @@ export * from "./content-manager-http-client";
 export * from "./facebook-browser-payload-capture";
 export * from "./profile-manager-http-client";
 export * from "./profile-manager-profile-reference-adapter";
+export * from "./profile-source-access-browser-check";
+export * from "./profile-source-access-mutation-adapter";
+export * from "./profile-source-access-outcome-classifier";

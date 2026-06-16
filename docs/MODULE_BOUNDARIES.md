@@ -67,6 +67,7 @@ Owns:
 
 - Future execution of collection workflows.
 - Durable Collector Runtime run records for collection runs and ambient account exercise runs.
+- Durable Collector Runtime run records for profile-source access check runs.
 - Checking out eligible profiles from Collector Profile Manager.
 - Calling specified-profile ambient exercise checkout for read-only account exercise attempts.
 - Future consumption of assisted group access leases after Profile Manager checkout, when explicitly added by a later sprint.
@@ -90,6 +91,9 @@ Owns:
 - Profile lease release orchestration.
 - Returning profile usage outcomes and runtime metrics.
 - Recording safe ambient exercise summaries and sanitized failure reasons.
+- Browser-backed profile-source access check execution, including sanitized
+  observation, deterministic outcome classification, and safe Profile Manager
+  mutation through explicit ports.
 
 The Sprint 022 orchestration flow coordinates Profile Manager checkout/release behavior, captured payload collection, and Content Manager submission through Collector Runtime-owned ports and use cases. Payload capture is represented by a port only in Sprint 022; real browser automation, network interception, login, navigation, scheduling, queues, and database access remain out of scope.
 
@@ -116,6 +120,8 @@ Does not own:
 - Collector Profile Manager lease-purpose eligibility rules.
 - Collector Profile Manager account maturity/readiness stage rules.
 - Automatic account-stage promotion or demotion after exercise.
+- Automatic account-stage promotion or demotion after profile-source access
+  checks.
 - Public Profile Manager read DTO expansion for sensitive runtime material.
 - Authority over profile identity, session state, proxy configuration, or fingerprint configuration.
 - Content building.
