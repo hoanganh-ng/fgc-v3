@@ -145,14 +145,6 @@ export interface CollectorRuntimeHttpService {
     ListProfileSourceAccessCheckRunsInput,
     ListProfileSourceAccessCheckRunsOutput
   >;
-  readonly markProfileSourceAccessCheckRunRunning: ExecutableUseCase<
-    MarkProfileSourceAccessCheckRunRunningInput,
-    ProfileSourceAccessCheckRun
-  >;
-  readonly markProfileSourceAccessCheckRunSucceeded: ExecutableUseCase<
-    MarkProfileSourceAccessCheckRunSucceededInput,
-    ProfileSourceAccessCheckRun
-  >;
   readonly cancelProfileSourceAccessCheckRun: ExecutableUseCase<
     CancelProfileSourceAccessCheckRunInput,
     ProfileSourceAccessCheckRun

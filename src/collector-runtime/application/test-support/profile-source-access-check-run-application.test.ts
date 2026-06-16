@@ -111,6 +111,57 @@ describe("collector runtime profile-source access check run application use case
     ).rejects.toThrow(ProfileNotFoundError);
   });
 
+  it("rejects check run request if profile ID mismatches", async () => {
+    const context = createTestContext(["check-run-1"]);
+    context.profiles.result = {
+      ok: true,
+      profileId: "different-profile",
+      accountStage: "WARMING",
+    };
+
+    await expect(
+      new RequestProfileSourceAccessCheckRunUseCase(
+        context.checkRuns,
+        context.profiles,
+        context.sourceGroups,
+        context.ids,
+        context.clock,
+      ).execute({
+        profileId: "profile-1",
+        sourceGroupId: "source-group-1",
+      }),
+    ).rejects.toThrow(ProfileReferenceLookupFailedError);
+  });
+
+  it("rejects check run request if source group ID mismatches", async () => {
+    const context = createTestContext(["check-run-1"]);
+    context.sourceGroups.result = {
+      ok: true,
+      statusCode: 200,
+      sourceGroup: {
+        id: "different-source-group",
+        platform: "FACEBOOK",
+        status: "ACTIVE",
+        url: "https://www.facebook.com/groups/source-group-1",
+        categoryId: "category-1",
+        entryRoutes: [],
+      },
+    };
+
+    await expect(
+      new RequestProfileSourceAccessCheckRunUseCase(
+        context.checkRuns,
+        context.profiles,
+        context.sourceGroups,
+        context.ids,
+        context.clock,
+      ).execute({
+        profileId: "profile-1",
+        sourceGroupId: "source-group-1",
+      }),
+    ).rejects.toThrow(SourceGroupLookupFailedError);
+  });
+
   it("rejects check run request if source group is paused", async () => {
     const context = createTestContext(["check-run-1"]);
     context.sourceGroups.result = {

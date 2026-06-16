@@ -1,6 +1,7 @@
 import { inArray } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { ProfileSourceAccessCheckRun } from "../../../collector-runtime/domain";
+import { ProfileSourceAccessCheckRunConflictError } from "../../../collector-runtime/application";
 import { createDatabaseClient, type DatabaseClient } from "../client";
 import { collectorProfileSourceAccessCheckRuns } from "../schema/collector-runtime.schema";
 import { DrizzleProfileSourceAccessCheckRunRepository } from "./drizzle-profile-source-access-check-run.repository";
@@ -193,7 +194,37 @@ if (!shouldRunDbTests) {
 
       await checkRuns.save(run1);
 
-      await expect(checkRuns.save(run2)).rejects.toThrow();
+      await expect(checkRuns.save(run2)).rejects.toThrow(
+        ProfileSourceAccessCheckRunConflictError,
+      );
+    });
+
+    it("returns total and respects limit and offset when listing", async () => {
+      const run1 = trackCheckRun(
+        createCheckRun({ id: nextTestId("page-1"), createdAt: "2026-05-01T10:00:00.000Z" }),
+      );
+      const run2 = trackCheckRun(
+        createCheckRun({ id: nextTestId("page-2"), createdAt: "2026-05-01T10:01:00.000Z" }),
+      );
+      const run3 = trackCheckRun(
+        createCheckRun({ id: nextTestId("page-3"), createdAt: "2026-05-01T10:02:00.000Z" }),
+      );
+
+      await checkRuns.save(run1);
+      await checkRuns.save(run2);
+      await checkRuns.save(run3);
+
+      const result = await checkRuns.list({
+        limit: 2,
+        offset: 1,
+      });
+
+      expect(result.total).toBeGreaterThanOrEqual(3);
+      expect(result.items).toHaveLength(2);
+      // Assuming descending order by createdAt
+      // page-3 is newest, page-2 is next, page-1 is oldest
+      // if offset is 1, it should skip page-3 and return page-2, page-1
+      expect(result.items.map(i => i.id)).toEqual([run2.id, run1.id]);
     });
 
     function nextTestId(prefix: string): string {

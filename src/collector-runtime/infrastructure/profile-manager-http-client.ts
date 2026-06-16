@@ -6,12 +6,12 @@ import type {
   ProfileLeaseReleaseResult,
   RuntimeProfileConfigurationPort,
   RuntimeProfileConfigurationResult,
-  CollectorRuntimeAccountStage,
 } from "../application";
 import type {
   FetchLike,
   FetchLikeResponse,
 } from "./content-manager-http-client";
+import { CollectorRuntimeAccountStageSchema, type CollectorRuntimeAccountStage } from "../domain/account-stage";
 
 const CHECKOUT_PROFILE_PATH = "collector/profiles/checkout";
 const PROFILES_PATH = "collector/profiles";
@@ -737,10 +737,15 @@ function toSafeProfileAccountStageSuccessResult(
     return undefined;
   }
 
+  const parsedStage = CollectorRuntimeAccountStageSchema.safeParse(accountStage);
+  if (!parsedStage.success) {
+    return undefined;
+  }
+
   return {
     ok: true,
     profileId,
-    accountStage: accountStage as CollectorRuntimeAccountStage,
+    accountStage: parsedStage.data,
   };
 }
 

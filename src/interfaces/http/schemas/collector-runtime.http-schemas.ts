@@ -15,6 +15,8 @@ import {
   ProfileSourceAccessCheckRunFailureReasonSchema,
   ProfileSourceAccessCheckRunIdSchema,
   ProfileSourceAccessCheckRunStatusSchema,
+  COLLECTOR_RUNTIME_ACCOUNT_STAGES,
+  PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUSES,
 } from "../../../collector-runtime/domain";
 import {
   DEFAULT_ACCOUNT_EXERCISE_RUN_LIST_LIMIT,
@@ -837,6 +839,29 @@ const requestProfileSourceAccessCheckRunBodyJsonSchema = {
 
 
 
+const profileSourceAccessCheckRunTargetJsonSchema = {
+  type: "object",
+  required: ["platform", "routeType", "url"],
+  additionalProperties: false,
+  properties: {
+    platform: { type: "string", enum: ["FACEBOOK"] },
+    routeType: { type: "string", enum: ["DIRECT_GROUP_URL"] },
+    url: { type: "string", minLength: 1, format: "uri" },
+  },
+} as const;
+
+const profileSourceAccessCheckRunFailureReasonJsonSchema = {
+  type: "object",
+  required: ["code", "message"],
+  additionalProperties: false,
+  properties: {
+    code: nonEmptyStringJsonSchema,
+    message: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+const isoDateTimeJsonSchema = { type: "string", format: "date-time" } as const;
+
 const profileSourceAccessCheckRunJsonSchema = {
   type: "object",
   required: [
@@ -851,21 +876,21 @@ const profileSourceAccessCheckRunJsonSchema = {
     "createdAt",
     "updatedAt",
   ],
-  additionalProperties: true,
+  additionalProperties: false,
   properties: {
     id: nonEmptyStringJsonSchema,
     profileId: nonEmptyStringJsonSchema,
     sourceGroupId: nonEmptyStringJsonSchema,
-    triggerType: nonEmptyStringJsonSchema,
-    status: nonEmptyStringJsonSchema,
-    accountStageAtRequest: nonEmptyStringJsonSchema,
-    target: { type: "object", additionalProperties: true },
-    failureReason: { type: "object", additionalProperties: true },
-    requestedAt: nonEmptyStringJsonSchema,
-    startedAt: nonEmptyStringJsonSchema,
-    finishedAt: nonEmptyStringJsonSchema,
-    createdAt: nonEmptyStringJsonSchema,
-    updatedAt: nonEmptyStringJsonSchema,
+    triggerType: { type: "string", enum: ["MANUAL"] },
+    status: { type: "string", enum: PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUSES },
+    accountStageAtRequest: { type: "string", enum: COLLECTOR_RUNTIME_ACCOUNT_STAGES },
+    target: profileSourceAccessCheckRunTargetJsonSchema,
+    failureReason: profileSourceAccessCheckRunFailureReasonJsonSchema,
+    requestedAt: isoDateTimeJsonSchema,
+    startedAt: isoDateTimeJsonSchema,
+    finishedAt: isoDateTimeJsonSchema,
+    createdAt: isoDateTimeJsonSchema,
+    updatedAt: isoDateTimeJsonSchema,
   },
 } as const;
 
@@ -906,11 +931,20 @@ export const listProfileSourceAccessCheckRunsHttpRouteSchema = {
     type: "object",
     additionalProperties: false,
     properties: {
-      status: { type: "string" },
-      profileId: { type: "string" },
-      sourceGroupId: { type: "string" },
-      limit: { type: "integer" },
-      offset: { type: "integer" },
+      status: { type: "string", enum: PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUSES },
+      profileId: nonEmptyStringJsonSchema,
+      sourceGroupId: nonEmptyStringJsonSchema,
+      limit: {
+        type: "integer",
+        minimum: 1,
+        maximum: MAX_PROFILE_SOURCE_ACCESS_CHECK_RUN_LIST_LIMIT,
+        default: DEFAULT_PROFILE_SOURCE_ACCESS_CHECK_RUN_LIST_LIMIT,
+      },
+      offset: {
+        type: "integer",
+        minimum: 0,
+        default: 0,
+      },
     },
   },
   response: {

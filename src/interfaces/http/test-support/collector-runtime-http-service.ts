@@ -93,9 +93,6 @@ export interface FakeCollectorRuntimeHttpService
       };
     }
   >;
-  readonly markProfileSourceAccessCheckRunRunning: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
-  readonly markProfileSourceAccessCheckRunSucceeded: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
-  readonly markProfileSourceAccessCheckRunFailed: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
   readonly cancelProfileSourceAccessCheckRun: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
 }
 
@@ -190,9 +187,6 @@ export function createFakeCollectorRuntimeHttpService(): FakeCollectorRuntimeHtt
         total: 1,
       },
     }),
-    markProfileSourceAccessCheckRunRunning: new StubUseCase(createProfileSourceAccessCheckRun()),
-    markProfileSourceAccessCheckRunSucceeded: new StubUseCase(createProfileSourceAccessCheckRun()),
-    markProfileSourceAccessCheckRunFailed: new StubUseCase(createProfileSourceAccessCheckRun()),
     cancelProfileSourceAccessCheckRun: new StubUseCase(createProfileSourceAccessCheckRun()),
   } as unknown as FakeCollectorRuntimeHttpService;
 }
@@ -220,9 +214,6 @@ export function createUnusedCollectorRuntimeHttpService(): CollectorRuntimeHttpS
     requestProfileSourceAccessCheckRun: useCase,
     getProfileSourceAccessCheckRun: useCase,
     listProfileSourceAccessCheckRuns: useCase,
-    markProfileSourceAccessCheckRunRunning: useCase,
-    markProfileSourceAccessCheckRunSucceeded: useCase,
-    markProfileSourceAccessCheckRunFailed: useCase,
     cancelProfileSourceAccessCheckRun: useCase,
   } as unknown as CollectorRuntimeHttpService;
 }

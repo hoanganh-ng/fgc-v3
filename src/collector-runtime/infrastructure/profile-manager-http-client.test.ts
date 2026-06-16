@@ -226,6 +226,27 @@ describe("ProfileManagerHttpClient", () => {
     });
   });
 
+  it("rejects unknown account stages with safe error responses", async () => {
+    const fetch = new FakeFetch(
+      createResponse(200, {
+        profile: {
+          id: "profile-1",
+          accountStage: "UNKNOWN_STAGE",
+        },
+      }),
+    );
+    const client = createClient(fetch.fetch);
+
+    const result = await client.getSafeProfileAccountStage("profile-1");
+
+    expect(result).toEqual({
+      ok: false,
+      statusCode: 200,
+      errorCode: "PROFILE_MANAGER_RESPONSE_ERROR",
+      errorMessage: "Profile Manager profile response is invalid.",
+    });
+  });
+
   it.each([200, 201])(
     "upserts profile-source access and accepts HTTP %s",
     async (statusCode) => {

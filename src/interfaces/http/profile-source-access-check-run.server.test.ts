@@ -65,7 +65,8 @@ describe("ProfileSourceAccessCheckRun HTTP routes", () => {
     const { server, service } = createTestServer();
 
     try {
-      const response = await server.inject({
+      // Empty string violation
+      const response1 = await server.inject({
         method: "POST",
         url: "/collector/profile-source-access-check-runs",
         payload: {
@@ -74,9 +75,53 @@ describe("ProfileSourceAccessCheckRun HTTP routes", () => {
         },
       });
 
-      expect(response.statusCode).toBe(400);
-      expect(response.json().error.code).toBe("VALIDATION_ERROR");
+      expect(response1.statusCode).toBe(400);
+      expect(response1.json().error.code).toBe("VALIDATION_ERROR");
+
+      // Additional properties violation
+      const response2 = await server.inject({
+        method: "POST",
+        url: "/collector/profile-source-access-check-runs",
+        payload: {
+          profileId: "profile-1",
+          sourceGroupId: "source-group-1",
+          extraProperty: "not-allowed",
+        },
+      });
+
+      expect(response2.statusCode).toBe(400);
+      expect(response2.json().error.code).toBe("VALIDATION_ERROR");
+
       expect(service.requestProfileSourceAccessCheckRun.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 404 for removed routes", async () => {
+    const { server } = createTestServer();
+
+    try {
+      const response1 = await server.inject({
+        method: "POST",
+        url: "/collector/profile-source-access-check-runs/check-run-1/running",
+      });
+      expect(response1.statusCode).toBe(404);
+
+      const response2 = await server.inject({
+        method: "POST",
+        url: "/collector/profile-source-access-check-runs/check-run-1/succeed",
+      });
+      expect(response2.statusCode).toBe(404);
+
+      const response3 = await server.inject({
+        method: "POST",
+        url: "/collector/profile-source-access-check-runs/check-run-1/fail",
+        payload: {
+          failureReason: { code: "TEST", message: "fail" },
+        },
+      });
+      expect(response3.statusCode).toBe(404);
     } finally {
       await server.close();
     }

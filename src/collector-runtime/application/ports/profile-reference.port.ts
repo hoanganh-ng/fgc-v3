@@ -1,10 +1,4 @@
-export type CollectorRuntimeAccountStage =
-  | "NEW_ACCOUNT"
-  | "WARMING"
-  | "COLLECTION_READY"
-  | "LIMITED"
-  | "NEEDS_REVIEW"
-  | "RETIRED";
+import type { CollectorRuntimeAccountStage } from "../../domain/account-stage";
 
 export type ProfileReferenceResult =
   | {
