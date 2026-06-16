@@ -30,12 +30,20 @@ export const FACEBOOK_PAGE_STATE_OBSERVER_SCRIPT = `(() => {
   const marker = "__FGC_FB_PAGE_STATE_OBSERVER__";
   const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim().toLowerCase();
   const hostname = normalize(window.location?.hostname || "");
-  const pathname = normalize(window.location?.pathname || "");
+  const rawPathname = String(window.location?.pathname || "");
+  const pathname = normalize(rawPathname);
   const href = normalize(window.location?.href || "");
   const isFacebook =
     hostname === "facebook.com" ||
     hostname.endsWith(".facebook.com") ||
     href.includes("facebook.com/");
+
+  // Parsed pathname starts-with checks — no arbitrary substring matches
+  const pathnameStartsWith = (prefix) => {
+    const p = rawPathname.replace(/\\/+$/, "");
+    return p === prefix || p.startsWith(prefix + "/") || p.startsWith(prefix + "?");
+  };
+
   const elements = Array.from(document.querySelectorAll("*"));
 
   const readAttribute = (element, name) => normalize(element.getAttribute?.(name));
@@ -77,29 +85,30 @@ export const FACEBOOK_PAGE_STATE_OBSERVER_SCRIPT = `(() => {
       }
     }
 
-    if (typeof element.getClientRects === "function" && element.getClientRects().length > 0) {
-      return true;
+    // Require positive client rect — reject zero-size elements
+    if (typeof element.getClientRects === "function") {
+      if (element.getClientRects().length === 0) return false;
     }
 
     if (typeof element.getBoundingClientRect === "function") {
       const rect = element.getBoundingClientRect();
-      if ((rect?.width || 0) > 0 || (rect?.height || 0) > 0) {
-        return true;
-      }
+      if ((rect?.width || 0) === 0 && (rect?.height || 0) === 0) return false;
     }
 
     return true;
   };
 
   const visibleElements = elements.filter(isElementVisible);
-  const visibleText = normalize(visibleElements.map(readText).filter(Boolean).join(" "));
-  const hasVisibleText = (values) => values.some((value) => visibleText.includes(value));
 
   const containsAny = (value, candidates) =>
     candidates.some((candidate) => value.includes(candidate));
 
-  const visiblePasswordInputs = visibleElements.filter((element) => {
-    if (!isInput(element)) return false;
+  const elementContains = (container, candidate) =>
+    container === candidate || Boolean(container.contains?.(candidate));
+
+  // --- Input classification (reused inside containers) ---
+  const isVisiblePasswordInput = (element) => {
+    if (!isInput(element) || !isElementVisible(element)) return false;
     const metadata = normalize([
       inputType(element),
       readAttribute(element, "name"),
@@ -108,12 +117,11 @@ export const FACEBOOK_PAGE_STATE_OBSERVER_SCRIPT = `(() => {
       readAttribute(element, "aria-label"),
       readAttribute(element, "placeholder")
     ].join(" "));
-
     return inputType(element) === "password" || containsAny(metadata, ["password", "mật khẩu"]);
-  });
+  };
 
-  const visibleIdentityInputs = visibleElements.filter((element) => {
-    if (!isInput(element)) return false;
+  const isVisibleIdentityInput = (element) => {
+    if (!isInput(element) || !isElementVisible(element)) return false;
     const metadata = normalize([
       inputType(element),
       readAttribute(element, "name"),
@@ -122,7 +130,6 @@ export const FACEBOOK_PAGE_STATE_OBSERVER_SCRIPT = `(() => {
       readAttribute(element, "aria-label"),
       readAttribute(element, "placeholder")
     ].join(" "));
-
     return (
       inputType(element) === "email" ||
       inputType(element) === "tel" ||
@@ -136,43 +143,57 @@ export const FACEBOOK_PAGE_STATE_OBSERVER_SCRIPT = `(() => {
         "dien thoai"
       ])
     );
-  });
+  };
 
-  const formActionKind = (form) => {
-    const action = normalize(form.getAttribute?.("action") || form.action || "");
+  const isVisibleVerificationInput = (element) => {
+    if (!isInput(element) || !isElementVisible(element)) return false;
+    const metadata = normalize([
+      inputType(element),
+      readAttribute(element, "name"),
+      readAttribute(element, "id"),
+      readAttribute(element, "autocomplete"),
+      readAttribute(element, "aria-label"),
+      readAttribute(element, "placeholder")
+    ].join(" "));
+    // Codes, OTPs, phone, identity verification inputs
+    return (
+      isVisiblePasswordInput(element) ||
+      isVisibleIdentityInput(element) ||
+      containsAny(metadata, ["code", "verify", "otp", "xác nhận", "xac nhan"])
+    );
+  };
 
-    if (
-      containsAny(action, [
-        "/checkpoint",
-        "checkpoint",
-        "security",
-        "identity",
-        "confirm"
-      ])
-    ) {
-      return "CHECKPOINT";
+  // --- Global visible inputs (used for login detection) ---
+  const visiblePasswordInputs = visibleElements.filter(isVisiblePasswordInput);
+  const visibleIdentityInputs = visibleElements.filter(isVisibleIdentityInput);
+
+  // --- Form action classification ---
+  // Only checkpoint pathname prefix counts as independent checkpoint signal
+  const formActionPathname = (form) => {
+    const raw = String(form.getAttribute?.("action") || form.action || "");
+    try {
+      const url = new URL(raw, "https://www.facebook.com");
+      return url.pathname;
+    } catch (_) {
+      return raw.startsWith("/") ? raw : "/" + raw;
     }
+  };
 
-    if (containsAny(action, ["/login", "login", "authenticate", "auth/login"])) {
-      return "LOGIN";
-    }
+  const formActionIsCheckpoint = (form) => {
+    const p = formActionPathname(form);
+    return p === "/checkpoint" || p.startsWith("/checkpoint/") || p.startsWith("/checkpoint?");
+  };
 
-    return "NONE";
+  const formActionIsLogin = (form) => {
+    const p = normalize(formActionPathname(form));
+    return containsAny(p, ["/login", "authenticate", "auth/login"]);
   };
 
   const visibleForms = visibleElements.filter((element) => tagName(element) === "form");
-  const visibleLoginActionForms = visibleForms.filter(
-    (element) => formActionKind(element) === "LOGIN",
-  );
-  const visibleCheckpointForms = visibleForms.filter(
-    (element) => formActionKind(element) === "CHECKPOINT",
-  );
-  const elementContains = (container, candidate) =>
-    container === candidate || Boolean(container.contains?.(candidate));
-  const formHasPassword = (form) =>
-    visiblePasswordInputs.some((input) => elementContains(form, input));
-  const formHasIdentity = (form) =>
-    visibleIdentityInputs.some((input) => elementContains(form, input));
+  const visibleLoginActionForms = visibleForms.filter(formActionIsLogin);
+  const visibleCheckpointActionForms = visibleForms.filter(formActionIsCheckpoint);
+
+  // --- Control texts (global, used for login detection) ---
   const controlTexts = visibleElements
     .filter((element) => {
       const tag = tagName(element);
@@ -184,27 +205,32 @@ export const FACEBOOK_PAGE_STATE_OBSERVER_SCRIPT = `(() => {
       );
     })
     .map(readText);
+
   const visibleLoginControl = controlTexts.some((text) =>
     containsAny(text, ["log in", "login", "đăng nhập", "dang nhap"]),
   );
-  const visibleContinueControl = controlTexts.some((text) =>
-    containsAny(text, ["continue", "tiếp tục", "tiep tuc"]),
-  );
+
+  // --- Login detection (unchanged structure from Sprint 053) ---
+  const containerHasPasswordInput = (container) =>
+    visiblePasswordInputs.some((input) => elementContains(container, input));
+  const containerHasIdentityInput = (container) =>
+    visibleIdentityInputs.some((input) => elementContains(container, input));
+
   const visibleAuthenticationForm = visibleForms.some(
     (form) =>
-      formHasPassword(form) &&
-      (formHasIdentity(form) || visibleLoginControl || formActionKind(form) === "LOGIN"),
+      containerHasPasswordInput(form) &&
+      (containerHasIdentityInput(form) || visibleLoginControl || formActionIsLogin(form)),
   );
+
   const visibleAuthenticationDialog = visibleElements.some((element) => {
     const role = readAttribute(element, "role");
     const ariaModal = readAttribute(element, "aria-modal");
     if (role !== "dialog" && role !== "alertdialog" && ariaModal !== "true") {
       return false;
     }
-
     const dialogText = readText(element);
-    const hasPassword = visiblePasswordInputs.some((input) => elementContains(element, input));
-    const hasIdentity = visibleIdentityInputs.some((input) => elementContains(element, input));
+    const hasPassword = containerHasPasswordInput(element);
+    const hasIdentity = containerHasIdentityInput(element);
     const hasSupportingText = containsAny(dialogText, [
       "log in",
       "email or phone",
@@ -215,38 +241,23 @@ export const FACEBOOK_PAGE_STATE_OBSERVER_SCRIPT = `(() => {
       "đăng nhập",
       "tạo tài khoản mới"
     ]);
-
     return hasPassword && (hasIdentity || visibleLoginControl || hasSupportingText);
   });
 
-  const checkpointTextVisible = hasVisibleText([
-    "checkpoint",
-    "security check",
-    "confirm your identity",
-    "identity confirmation",
-    "xác minh danh tính",
-    "xac minh danh tinh",
-    "kiểm tra bảo mật",
-    "kiem tra bao mat"
-  ]);
-  const visibleCheckpointEvidence =
-    visibleCheckpointForms.length > 0 ||
-    (checkpointTextVisible &&
-      (visibleContinueControl ||
-        visibleForms.length > 0 ||
-        visibleIdentityInputs.length > 0 ||
-        visiblePasswordInputs.length > 0));
+  const loginTextVisible = (() => {
+    const visibleText = normalize(visibleElements.map(readText).filter(Boolean).join(" "));
+    return [
+      "log into facebook",
+      "log in to facebook",
+      "you must log in",
+      "xem thêm trên facebook",
+      "email hoặc số điện thoại",
+      "mật khẩu",
+      "đăng nhập",
+      "tạo tài khoản mới"
+    ].some((v) => visibleText.includes(v));
+  })();
 
-  const loginTextVisible = hasVisibleText([
-    "log into facebook",
-    "log in to facebook",
-    "you must log in",
-    "xem thêm trên facebook",
-    "email hoặc số điện thoại",
-    "mật khẩu",
-    "đăng nhập",
-    "tạo tài khoản mới"
-  ]);
   const visibleLoginEvidence =
     visibleLoginActionForms.length > 0 ||
     visibleAuthenticationForm ||
@@ -255,14 +266,92 @@ export const FACEBOOK_PAGE_STATE_OBSERVER_SCRIPT = `(() => {
       (visibleIdentityInputs.length > 0 || visibleLoginControl || loginTextVisible)) ||
     (visibleIdentityInputs.length > 0 && visibleLoginControl && loginTextVisible);
 
+  // --- Checkpoint detection: require co-located structural evidence ---
+  // A candidate container must itself contain checkpoint text AND a visible
+  // verification control/input. Text in one container + button elsewhere = no match.
+  const CHECKPOINT_TEXT_SIGNALS = [
+    "security check",
+    "confirm your identity",
+    "identity confirmation",
+    "verify your identity",
+    "xác minh danh tính",
+    "xac minh danh tinh",
+    "kiểm tra bảo mật",
+    "kiem tra bao mat"
+  ];
+
+  const containerHasCheckpointText = (container) =>
+    containsAny(readText(container), CHECKPOINT_TEXT_SIGNALS);
+
+  const containerHasVerificationControl = (container) => {
+    // Visible button/link with verification intent inside container
+    const hasVerifyButton = visibleElements.some((el) => {
+      if (!elementContains(container, el)) return false;
+      const tag = tagName(el);
+      const role = readAttribute(el, "role");
+      if (tag !== "button" && tag !== "a" && role !== "button") return false;
+      const text = readText(el);
+      return containsAny(text, [
+        "continue", "tiếp tục", "tiep tuc",
+        "confirm", "verify", "next", "submit",
+        "xác nhận", "xac nhan"
+      ]);
+    });
+    // Visible verification input inside container
+    const hasVerifyInput = visibleElements.some(
+      (el) => elementContains(container, el) && isVisibleVerificationInput(el)
+    );
+    return hasVerifyButton || hasVerifyInput;
+  };
+
+  // Checkpoint container candidates: form, dialog, aria-modal
+  const checkpointContainerCandidates = visibleElements.filter((el) => {
+    const tag = tagName(el);
+    const role = readAttribute(el, "role");
+    const ariaModal = readAttribute(el, "aria-modal");
+    return (
+      tag === "form" ||
+      role === "dialog" ||
+      role === "alertdialog" ||
+      ariaModal === "true"
+    );
+  });
+
+  const visibleCheckpointDialog = checkpointContainerCandidates.some(
+    (container) =>
+      containerHasCheckpointText(container) &&
+      containerHasVerificationControl(container),
+  );
+
+  // Evidence codes for internal diagnostics only — never persisted or returned raw
+  let evidenceCode = "NONE";
+  if (pathnameStartsWith("/checkpoint")) {
+    evidenceCode = "CHECKPOINT_URL";
+  } else if (visibleCheckpointActionForms.length > 0) {
+    evidenceCode = "CHECKPOINT_FORM_ACTION";
+  } else if (visibleCheckpointDialog) {
+    evidenceCode = "CHECKPOINT_DIALOG";
+  } else if (pathnameStartsWith("/login")) {
+    evidenceCode = "LOGIN_URL";
+  } else if (visibleLoginActionForms.length > 0) {
+    evidenceCode = "LOGIN_FORM";
+  } else if (visibleLoginEvidence) {
+    evidenceCode = "LOGIN_DIALOG";
+  }
+
+  const visibleCheckpointEvidence =
+    evidenceCode === "CHECKPOINT_URL" ||
+    evidenceCode === "CHECKPOINT_FORM_ACTION" ||
+    evidenceCode === "CHECKPOINT_DIALOG";
+
   const pageLoaded =
     document.readyState === "interactive" || document.readyState === "complete";
 
-  if (isFacebook && (pathname.includes("/checkpoint") || visibleCheckpointEvidence)) {
+  if (isFacebook && visibleCheckpointEvidence) {
     return { marker, pageLoaded, blockingState: "CHECKPOINT_REQUIRED" };
   }
 
-  if (isFacebook && (pathname.includes("/login") || visibleLoginEvidence)) {
+  if (isFacebook && (pathnameStartsWith("/login") || visibleLoginEvidence)) {
     return { marker, pageLoaded, blockingState: "LOGIN_REQUIRED" };
   }
 

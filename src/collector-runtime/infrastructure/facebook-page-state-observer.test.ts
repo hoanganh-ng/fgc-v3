@@ -8,6 +8,8 @@ import {
 } from "./facebook-page-state-observer";
 
 describe("facebook page state observer", () => {
+  // --- URL detection ---
+
   it("detects /login URL without returning page text", () => {
     const result = runObserverScript({
       pathname: "/login",
@@ -32,6 +34,14 @@ describe("facebook page state observer", () => {
       blockingState: "CHECKPOINT_REQUIRED",
     });
   });
+
+  it("detects bare /checkpoint pathname", () => {
+    expect(
+      runObserverScript({ pathname: "/checkpoint", elements: [] }),
+    ).toMatchObject({ blockingState: "CHECKPOINT_REQUIRED" });
+  });
+
+  // --- Login modal detection ---
 
   it("detects an English login modal structurally", () => {
     const result = runObserverScript({
@@ -155,7 +165,292 @@ describe("facebook page state observer", () => {
       blockingState: "CHECKPOINT_REQUIRED",
     });
   });
+
+  // --- Healthy-feed false-positive cases (Sprint 053B) ---
+
+  it("healthy feed with visible forms returns NONE_DETECTED", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element("main", "Recent posts"),
+          element("form", "Search", { action: "/search/results/" }, [
+            element("input", "", { type: "search", placeholder: "Search" }),
+            element("button", "Search"),
+          ]),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "NONE_DETECTED" });
+  });
+
+  it("healthy feed with a Continue button returns NONE_DETECTED", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element("main", "Recent posts"),
+          element("button", "Continue"),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "NONE_DETECTED" });
+  });
+
+  it("healthy feed with generic 'security' text returns NONE_DETECTED", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element("main", "Recent posts about security topics"),
+          element("div", "Security best practices"),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "NONE_DETECTED" });
+  });
+
+  it("healthy feed with 'confirm' form action returns NONE_DETECTED", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element("main", "Recent posts"),
+          element("form", "Subscribe", { action: "/confirm/subscription/" }, [
+            element("input", "", { type: "email", placeholder: "Email" }),
+            element("button", "Confirm"),
+          ]),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "NONE_DETECTED" });
+  });
+
+  it("healthy feed with 'identity' form action returns NONE_DETECTED", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element("main", "Recent posts"),
+          element("form", "Update info", { action: "/identity/update/" }, [
+            element("input", "", { type: "text", name: "username" }),
+            element("button", "Save"),
+          ]),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "NONE_DETECTED" });
+  });
+
+  // --- Hidden/zero-size checkpoint forms should not trigger ---
+
+  it("hidden checkpoint form does not trigger CHECKPOINT_REQUIRED", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element("main", "Recent posts"),
+          element(
+            "form",
+            "Security check",
+            { action: "/checkpoint/", hidden: true },
+            [element("button", "Continue")],
+          ),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "NONE_DETECTED" });
+  });
+
+  it("zero-size checkpoint-like template element does not trigger CHECKPOINT_REQUIRED", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element("main", "Recent posts"),
+          zeroSizeElement("form", "Security check confirm your identity", {
+            action: "/checkpoint/",
+          }),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "NONE_DETECTED" });
+  });
+
+  // --- Co-location requirement ---
+
+  it("checkpoint text in one container and Continue button in another returns NONE_DETECTED", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element("div", "Security check — confirm your identity"),
+          element("div", "", {}, [element("button", "Continue")]),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "NONE_DETECTED" });
+  });
+
+  // --- Real checkpoint detection ---
+
+  it("detects visible /checkpoint form action", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element("form", "Verify your identity", { action: "/checkpoint/" }, [
+            element("input", "", { type: "text", name: "code" }),
+            element("button", "Continue"),
+          ]),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "CHECKPOINT_REQUIRED" });
+  });
+
+  it("detects visible checkpoint dialog with co-located verification control", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element(
+            "div",
+            "Security check",
+            { role: "dialog" },
+            [
+              element("p", "Confirm your identity to continue"),
+              element("input", "", {
+                type: "text",
+                "aria-label": "Verification code",
+                name: "code",
+              }),
+              element("button", "Continue"),
+            ],
+          ),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "CHECKPOINT_REQUIRED" });
+  });
+
+  it("checkpoint dialog takes precedence over co-present login evidence", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element(
+            "div",
+            "Security check",
+            { role: "dialog" },
+            [
+              element("p", "Confirm your identity"),
+              element("input", "", { type: "password" }),
+              element("button", "Continue"),
+            ],
+          ),
+          element("form", "", { action: "/login/" }, [
+            element("input", "", { type: "email" }),
+            element("input", "", { type: "password" }),
+          ]),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "CHECKPOINT_REQUIRED" });
+  });
+
+  it("healthy feed returns NONE_DETECTED (evidence code NONE)", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element("main", "Welcome to the group"),
+          element("div", "See all posts"),
+          element("button", "Continue reading"),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "NONE_DETECTED" });
+  });
 });
+
+// ---------------------------------------------------------------------------
+// Consumer regression stubs — verify healthy feed does not false-positive
+// and genuine checkpoint/login still detected via SequencePage
+// ---------------------------------------------------------------------------
+
+describe("consumer regression: exerciser", () => {
+  it("healthy feed page state returns NONE_DETECTED (exerciser)", async () => {
+    const page = new SequencePage([
+      { pageLoaded: true, blockingState: "NONE_DETECTED" },
+    ]);
+    const result = await observeFacebookPageState(page, {
+      settleMs: 0,
+      pollIntervalMs: 1,
+    });
+    expect(result.blockingState).toBe("NONE_DETECTED");
+  });
+
+  it("genuine checkpoint stops exerciser flow", async () => {
+    const page = new SequencePage([
+      { pageLoaded: true, blockingState: "CHECKPOINT_REQUIRED" },
+    ]);
+    const result = await observeFacebookPageState(page, {
+      settleMs: 50,
+      pollIntervalMs: 1,
+    });
+    expect(result.blockingState).toBe("CHECKPOINT_REQUIRED");
+  });
+});
+
+describe("consumer regression: collector", () => {
+  it("healthy feed page state returns NONE_DETECTED (collector)", async () => {
+    const page = new SequencePage([
+      { pageLoaded: true, blockingState: "NONE_DETECTED" },
+    ]);
+    const result = await observeFacebookPageState(page, {
+      settleMs: 0,
+      pollIntervalMs: 1,
+    });
+    expect(result.blockingState).toBe("NONE_DETECTED");
+  });
+
+  it("genuine checkpoint stops collector flow", async () => {
+    const page = new SequencePage([
+      { pageLoaded: true, blockingState: "CHECKPOINT_REQUIRED" },
+    ]);
+    const result = await observeFacebookPageState(page, {
+      settleMs: 0,
+      pollIntervalMs: 1,
+    });
+    expect(result.blockingState).toBe("CHECKPOINT_REQUIRED");
+  });
+});
+
+describe("consumer regression: access check", () => {
+  it("normal group/feed does not return CHECKPOINT_REQUIRED", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element("main", "Recent posts"),
+          element("div", "Members · 1.2k"),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "NONE_DETECTED" });
+  });
+
+  it("genuine checkpoint on group URL returns CHECKPOINT_REQUIRED", () => {
+    expect(
+      runObserverScript({
+        pathname: "/groups/source-group-1",
+        elements: [
+          element(
+            "div",
+            "Security check",
+            { role: "dialog" },
+            [
+              element("p", "Confirm your identity to continue"),
+              element("button", "Continue"),
+            ],
+          ),
+        ],
+      }),
+    ).toMatchObject({ blockingState: "CHECKPOINT_REQUIRED" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function runObserverScript(input: {
   readonly pathname: string;
@@ -180,6 +475,7 @@ function runObserverScript(input: {
       readyState: input.readyState ?? "complete",
       querySelectorAll: () => flattenElements(documentElement),
     },
+    URL,
   };
 
   return vm.runInNewContext(FACEBOOK_PAGE_STATE_OBSERVER_SCRIPT, sandbox);
@@ -248,6 +544,25 @@ function element(
   };
 
   return fakeElement;
+}
+
+/** Element that always returns zero client rects and zero bounding box — simulates off-screen template nodes */
+function zeroSizeElement(
+  tagName: string,
+  text: string,
+  attributes: Record<string, string | boolean> = {},
+  children: readonly FakeElement[] = [],
+): FakeElement {
+  const base = element(tagName, text, attributes, children);
+  return {
+    ...base,
+    getClientRects() {
+      return [];
+    },
+    getBoundingClientRect() {
+      return { width: 0, height: 0 };
+    },
+  };
 }
 
 function flattenElements(root: FakeElement): readonly FakeElement[] {
