@@ -233,6 +233,13 @@ export const ProfileSummarySchema = z
     dailyUsage: DailyUsageSchema,
     hasHardwareFingerprint: z.boolean(),
     hasAuthenticationState: z.boolean(),
+    authenticationHealth: z.enum([
+      "NOT_PROVISIONED",
+      "HEALTHY",
+      "REAUTH_REQUIRED",
+      "CHECKPOINT_REVIEW_REQUIRED",
+    ]),
+    authenticationHealthUpdatedAt: NonEmptyStringSchema,
     externalReference: NonEmptyStringSchema.optional(),
     labels: z.array(NonEmptyStringSchema).optional(),
   })
@@ -253,6 +260,13 @@ export const ProfileMutationSummarySchema = z
     hasHardwareFingerprint: z.boolean(),
     hasAuthenticationState: z.boolean(),
     provisioningTokenStatus: ProvisioningTokenStatusSchema,
+    authenticationHealth: z.enum([
+      "NOT_PROVISIONED",
+      "HEALTHY",
+      "REAUTH_REQUIRED",
+      "CHECKPOINT_REVIEW_REQUIRED",
+    ]),
+    authenticationHealthUpdatedAt: NonEmptyStringSchema,
   })
   .strict();
 

@@ -300,6 +300,8 @@ const profileSummaryJsonSchema = {
     "hasHardwareFingerprint",
     "hasAuthenticationState",
     "provisioningTokenStatus",
+    "authenticationHealth",
+    "authenticationHealthUpdatedAt",
   ],
   additionalProperties: false,
   properties: {
@@ -415,6 +417,8 @@ const profileDetailJsonSchema = {
     "dailyUsage",
     "hasHardwareFingerprint",
     "hasAuthenticationState",
+    "authenticationHealth",
+    "authenticationHealthUpdatedAt",
     "networkContext",
     "hardwareFingerprint",
     "behavioralPersona",

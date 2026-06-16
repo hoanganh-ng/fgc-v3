@@ -39,6 +39,7 @@ import type {
   IsoDateTime,
   NetworkContext,
   ProfileId,
+  ProfileAuthenticationHealth,
   ProfileAccountStage,
   ProfileStatus,
   ProfileSourceAccessSourceGroupId,
@@ -171,6 +172,8 @@ interface ProfileSummary {
   readonly hasHardwareFingerprint: boolean;
   readonly hasAuthenticationState: boolean;
   readonly provisioningTokenStatus: ProvisioningTokenStatus;
+  readonly authenticationHealth: ProfileAuthenticationHealth;
+  readonly authenticationHealthUpdatedAt: IsoDateTime;
 }
 
 export function registerCollectorProfileManagerRoutes(
@@ -631,6 +634,8 @@ function toProfileSummary(profile: CollectorProfile): ProfileSummary {
       profile.authenticationState.cookies.length > 0 ||
       profile.authenticationState.localStorage.length > 0,
     provisioningTokenStatus: profile.provisioningToken.status,
+    authenticationHealth: profile.authenticationHealth,
+    authenticationHealthUpdatedAt: profile.authenticationHealthUpdatedAt,
   };
 }
 
