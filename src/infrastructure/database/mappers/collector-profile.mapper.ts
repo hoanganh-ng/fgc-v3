@@ -8,7 +8,9 @@ import { validateCollectorProfile } from "../../../collector-profile-manager/dom
 import {
   toPersistedProvisioningTokenHash,
 } from "../provisioning-token-hashing";
-import { collectorProfiles } from "../schema/collector-profile-manager.schema";
+import {
+  collectorProfiles,
+} from "../schema/collector-profile-manager.schema";
 
 export type CollectorProfileRow = typeof collectorProfiles.$inferSelect;
 export type CollectorProfileInsert = typeof collectorProfiles.$inferInsert;
@@ -79,6 +81,8 @@ export function toCollectorProfileRow(
     temporalRoutine: validProfile.temporalRoutine,
     safetyThresholds: validProfile.safetyThresholds,
     contentAffinities: validProfile.contentAffinities,
+    authenticationHealth: validProfile.authenticationHealth,
+    authenticationHealthUpdatedAt: validProfile.authenticationHealthUpdatedAt,
   };
 }
 
@@ -127,6 +131,10 @@ export function toCollectorProfileDomain(
       expiresAt: normalizeNullableIsoDateTime(row.provisioningTokenExpiresAt),
       consumedAt: normalizeNullableIsoDateTime(row.provisioningTokenConsumedAt),
     },
+    authenticationHealth: row.authenticationHealth ?? "NOT_PROVISIONED",
+    authenticationHealthUpdatedAt: normalizeIsoDateTime(
+      row.authenticationHealthUpdatedAt ?? row.updatedAt,
+    ),
   };
   const result = validateCollectorProfile(candidate);
 

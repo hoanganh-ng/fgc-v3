@@ -1,4 +1,5 @@
 export * from "./checkout-eligibility";
+export * from "./profile-authentication-health";
 export * from "./profile";
 export * from "./profile-account-stage";
 export * from "./profile-account-stage-state-machine";

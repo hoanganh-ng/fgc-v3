@@ -24,6 +24,7 @@ import type {
   SafetyThresholds,
   TemporalRoutine,
 } from "./profile-properties";
+import type { ProfileAuthenticationHealth } from "./profile-authentication-health";
 
 export type CollectorProfile = zInfer<typeof CollectorProfileSchema>;
 
@@ -67,6 +68,32 @@ export function createPendingCollectorProfile(
     contentAffinities:
       input.contentAffinities ?? createUnconfiguredContentAffinities(),
     provisioningToken: createNotIssuedProvisioningTokenState(),
+    authenticationHealth: "NOT_PROVISIONED" as ProfileAuthenticationHealth,
+    authenticationHealthUpdatedAt: input.createdAt,
+  };
+}
+
+export function markCollectorProfileSessionIngested(
+  profile: CollectorProfile,
+  sessionCapturedAt: IsoDateTime,
+  sessionState: {
+    readonly cookies: readonly AuthenticationState["cookies"][number][];
+    readonly localStorage: readonly AuthenticationState["localStorage"][number][];
+    readonly sessionExpiresAt: IsoDateTime | null;
+  },
+  provisioningToken: ProvisioningTokenState,
+): CollectorProfile {
+  return {
+    ...profile,
+    authenticationState: {
+      cookies: [...sessionState.cookies],
+      localStorage: [...sessionState.localStorage],
+      sessionCapturedAt,
+      sessionExpiresAt: sessionState.sessionExpiresAt,
+    },
+    provisioningToken,
+    authenticationHealth: "HEALTHY",
+    authenticationHealthUpdatedAt: sessionCapturedAt,
   };
 }
 

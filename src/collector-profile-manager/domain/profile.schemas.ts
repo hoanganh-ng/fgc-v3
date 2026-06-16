@@ -8,6 +8,7 @@ import {
 } from "./profile-lease";
 import { PROFILE_ACCOUNT_STAGES } from "./profile-account-stage";
 import { PROFILE_STATUSES } from "./profile-status";
+import { PROFILE_AUTHENTICATION_HEALTH_VALUES } from "./profile-authentication-health";
 import {
   CHRONOTYPES,
   COOKIE_SAME_SITE_VALUES,
@@ -36,6 +37,9 @@ const ProbabilitySchema = z.number().finite().min(0).max(1);
 
 export const ProfileStatusSchema = z.enum(PROFILE_STATUSES);
 export const ProfileAccountStageSchema = z.enum(PROFILE_ACCOUNT_STAGES);
+export const ProfileAuthenticationHealthSchema = z.enum(
+  PROFILE_AUTHENTICATION_HEALTH_VALUES,
+);
 export const ProfileSourceAccessStateSchema = z.enum(
   PROFILE_SOURCE_ACCESS_STATES,
 );
@@ -419,6 +423,8 @@ export const CollectorProfilePropertyGroupsSchema = z
 
 export const CollectorProfileSchema = CollectorProfilePropertyGroupsSchema.extend({
   provisioningToken: ProvisioningTokenStateSchema,
+  authenticationHealth: ProfileAuthenticationHealthSchema,
+  authenticationHealthUpdatedAt: IsoDateTimeSchema,
 }).strict();
 
 function addProvisioningTokenIssue(

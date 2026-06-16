@@ -92,6 +92,13 @@
       "when": 1781664000001,
       "tag": "0012_profile_source_access_check_outcome_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1781664000002,
+      "tag": "0013_profile_authentication_health",
+      "breakpoints": true
     }
   ]
 }

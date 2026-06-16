@@ -21,7 +21,10 @@ import type {
   SafetyThresholds,
   TemporalRoutine,
 } from "../../../collector-profile-manager/domain";
-import { PROFILE_SOURCE_ACCESS_STATES } from "../../../collector-profile-manager/domain";
+import {
+  PROFILE_AUTHENTICATION_HEALTH_VALUES,
+  PROFILE_SOURCE_ACCESS_STATES,
+} from "../../../collector-profile-manager/domain";
 
 type IdentityMetadataJson = Pick<
   IdentityMetadata,
@@ -67,6 +70,11 @@ export const collectorProfileLeasePurposeEnum = pgEnum(
 export const collectorProfileSourceAccessStateEnum = pgEnum(
   "collector_profile_source_access_state",
   PROFILE_SOURCE_ACCESS_STATES,
+);
+
+export const collectorProfileAuthenticationHealthEnum = pgEnum(
+  "collector_profile_authentication_health",
+  PROFILE_AUTHENTICATION_HEALTH_VALUES,
 );
 
 const timestampWithTimezone = (name: string) =>
@@ -126,6 +134,14 @@ export const collectorProfiles = pgTable(
       jsonb("safety_thresholds").$type<SafetyThresholds>().notNull(),
     contentAffinities:
       jsonb("content_affinities").$type<ContentAffinities>().notNull(),
+    authenticationHealth: collectorProfileAuthenticationHealthEnum(
+      "authentication_health",
+    )
+      .notNull()
+      .default("NOT_PROVISIONED"),
+    authenticationHealthUpdatedAt: timestampWithTimezone(
+      "authentication_health_updated_at",
+    ).notNull(),
   },
   (table) => [
     index("collector_profiles_status_idx").on(table.status),

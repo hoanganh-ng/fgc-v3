@@ -9,7 +9,10 @@ import {
   toIsoDateTime,
 } from "../provisioning-token-policy";
 import { validateProfileForApplication } from "../profile-validation";
-import { transitionCollectorProfileStatus } from "../../domain";
+import {
+  markCollectorProfileSessionIngested,
+  transitionCollectorProfileStatus,
+} from "../../domain";
 import type {
   BrowserCookie,
   CollectorProfile,
@@ -53,22 +56,23 @@ export class IngestProfileSessionUseCase {
     assertUsableProvisioningToken(validProfile, input.provisioningToken, now);
 
     const capturedAt = toIsoDateTime(now);
-    const profileWithSession: CollectorProfile = {
-      ...validProfile,
-      authenticationState: {
-        cookies: [...input.cookies],
-        localStorage: [...input.localStorage],
-        sessionCapturedAt: capturedAt,
+    const consumedToken = {
+      status: "CONSUMED" as const,
+      tokenHash: null,
+      issuedAt: validProfile.provisioningToken.issuedAt,
+      expiresAt: validProfile.provisioningToken.expiresAt,
+      consumedAt: capturedAt,
+    };
+    const profileWithSession = markCollectorProfileSessionIngested(
+      validProfile,
+      capturedAt,
+      {
+        cookies: input.cookies,
+        localStorage: input.localStorage,
         sessionExpiresAt: input.sessionExpiresAt ?? null,
       },
-      provisioningToken: {
-        status: "CONSUMED",
-        tokenHash: null,
-        issuedAt: validProfile.provisioningToken.issuedAt,
-        expiresAt: validProfile.provisioningToken.expiresAt,
-        consumedAt: capturedAt,
-      },
-    };
+      consumedToken,
+    );
     const readyProfile = transitionCollectorProfileStatus(
       profileWithSession,
       "READY",

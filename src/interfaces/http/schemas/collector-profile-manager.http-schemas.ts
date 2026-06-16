@@ -332,6 +332,16 @@ const profileSummaryJsonSchema = {
       type: "string",
       enum: ["NOT_ISSUED", "ISSUED", "CONSUMED", "EXPIRED"],
     },
+    authenticationHealth: {
+      type: "string",
+      enum: [
+        "NOT_PROVISIONED",
+        "HEALTHY",
+        "REAUTH_REQUIRED",
+        "CHECKPOINT_REVIEW_REQUIRED",
+      ],
+    },
+    authenticationHealthUpdatedAt: nonEmptyStringJsonSchema,
   },
 } as const;
 
@@ -351,6 +361,8 @@ const profileReadSummaryJsonSchema = {
     "dailyUsage",
     "hasHardwareFingerprint",
     "hasAuthenticationState",
+    "authenticationHealth",
+    "authenticationHealthUpdatedAt",
   ],
   additionalProperties: false,
   properties: {
@@ -370,6 +382,16 @@ const profileReadSummaryJsonSchema = {
     dailyUsage: dailyUsageJsonSchema,
     hasHardwareFingerprint: { type: "boolean" },
     hasAuthenticationState: { type: "boolean" },
+    authenticationHealth: {
+      type: "string",
+      enum: [
+        "NOT_PROVISIONED",
+        "HEALTHY",
+        "REAUTH_REQUIRED",
+        "CHECKPOINT_REVIEW_REQUIRED",
+      ],
+    },
+    authenticationHealthUpdatedAt: nonEmptyStringJsonSchema,
     externalReference: nonEmptyStringJsonSchema,
     labels: {
       type: "array",

@@ -7,6 +7,7 @@ import type {
   IanaTimezone,
   IsoDateTime,
   NetworkKillswitch,
+  ProfileAuthenticationHealth,
   ProfileId,
   ProfileAccountStage,
   ProfileStatus,
@@ -36,6 +37,8 @@ export interface ProfileSummary {
   readonly dailyUsage: DailySafetyUsage;
   readonly hasHardwareFingerprint: boolean;
   readonly hasAuthenticationState: boolean;
+  readonly authenticationHealth: ProfileAuthenticationHealth;
+  readonly authenticationHealthUpdatedAt: IsoDateTime;
   readonly externalReference?: string;
   readonly labels?: readonly string[];
 }
@@ -69,6 +72,8 @@ export function toProfileSummaryDto(
       profile.authenticationState.sessionCapturedAt !== null ||
       profile.authenticationState.cookies.length > 0 ||
       profile.authenticationState.localStorage.length > 0,
+    authenticationHealth: profile.authenticationHealth,
+    authenticationHealthUpdatedAt: profile.authenticationHealthUpdatedAt,
     ...(profile.identity.externalReference !== undefined
       ? { externalReference: profile.identity.externalReference }
       : {}),

@@ -67,6 +67,8 @@ export class DrizzleProfileRepository implements ProfileRepository {
           temporalRoutine: row.temporalRoutine,
           safetyThresholds: row.safetyThresholds,
           contentAffinities: row.contentAffinities,
+          authenticationHealth: row.authenticationHealth,
+          authenticationHealthUpdatedAt: row.authenticationHealthUpdatedAt,
         },
       });
   }
