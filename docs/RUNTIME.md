@@ -275,10 +275,23 @@ pnpm operator:profile:provision -- --token <provisioning-token> --base-url http:
 
 If `--base-url` is omitted, the CLI uses `PROFILE_PROVISIONING_BASE_URL`, then `PROFILE_MANAGER_BASE_URL`, then `http://localhost:3000`.
 
+Select the browser provider explicitly:
+
+```bash
+pnpm operator:profile:provision -- --token <provisioning-token> --base-url http://localhost:8081 --browser-provider playwright
+pnpm operator:profile:provision -- --token <provisioning-token> --base-url http://localhost:8081 --browser-provider cloakbrowser
+```
+
+If `--browser-provider` is omitted, the CLI uses `BROWSER_PROVIDER`, then
+`playwright`. Supported values are `playwright` and `cloakbrowser`.
+`playwright` maps to `PLAYWRIGHT_CHROMIUM` and remains the default.
+`cloakbrowser` maps to `CLOAK_BROWSER` and remains experimental.
+
 Expected operator flow:
 
 1. The CLI fetches provisioning configuration from `GET /collector/provisioning/:token/configuration`.
-2. A headed Chromium browser opens at `https://www.facebook.com/login`.
+2. A headed browser opens at the Facebook login entrypoint through the selected
+   provider.
 3. The operator logs in manually in the browser.
 4. The operator returns to the terminal and presses Enter.
 5. The CLI captures context cookies and localStorage snapshots for Facebook origins.
@@ -287,7 +300,12 @@ Expected operator flow:
 
 The CLI does not automate credentials, store passwords, solve CAPTCHAs, add stealth tooling, capture Facebook content, capture GraphQL responses, implement collection runtime behavior, or write cookies/localStorage to disk.
 
-The CLI prints only operational progress and counts. It must not print cookies, localStorage values, proxy passwords, token hashes, raw session material, or trusted runtime secrets. The one-time provisioning configuration route may include proxy credentials so Playwright can use the configured proxy, but public profile list/detail reads continue to omit proxy credentials and captured session state.
+The CLI prints only operational progress and counts. It must not print cookies, localStorage values, proxy passwords, token hashes, raw session material, or trusted runtime secrets. The one-time provisioning configuration route may include proxy credentials so the selected provider can use the configured proxy, but public profile list/detail reads continue to omit proxy credentials and captured session state.
+
+Provisioning never automatically falls back from CloakBrowser to Playwright,
+from a configured proxy to a direct connection, or from one proxy protocol to
+another. Provider and proxy launch failures stop the command with sanitized
+output. Empty or incomplete authentication-state capture is not submitted.
 
 ## Ambient Profile Exercise Command
 
@@ -564,6 +582,11 @@ The safe summary prints counts only:
 ## Browser Provider Selection And Probe
 
 Sprint 037A adds a Collector Runtime browser provider boundary. Browser-provider hardening is allowed only inside Collector Runtime infrastructure. Profile Manager remains the authority for profile identity, session state, proxy configuration, and fingerprint configuration.
+
+Sprint 053A applies the same operator selection values to the profile
+provisioning CLI through a provisioning-specific boundary because provisioning
+must export cookies and localStorage after manual login. That export capability
+is not exposed through the unrelated Collector Runtime browser provider port.
 
 Default provider:
 

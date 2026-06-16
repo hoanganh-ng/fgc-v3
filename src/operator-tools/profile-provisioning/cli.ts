@@ -7,7 +7,10 @@ import {
   getProfileProvisioningCliUsage,
   parseProfileProvisioningCliArgs,
 } from "./cli-args";
-import { PlaywrightProvisioningBrowserLauncher } from "./playwright-provisioning-browser";
+import {
+  ResolvedProvisioningBrowserLauncher,
+  resolveProvisioningBrowserProvider,
+} from "./provisioning-browser-provider";
 import { ProfileProvisioningHttpClient } from "./provisioning-http-client";
 import {
   runProfileProvisioning,
@@ -40,6 +43,18 @@ async function main(): Promise<void> {
     throw error;
   }
 
+  const providerResolution = resolveProvisioningBrowserProvider({
+    browserProvider: parsedArgs.browserProvider,
+  });
+
+  if (!providerResolution.ok) {
+    process.exitCode = 1;
+    console.error(providerResolution.message);
+    console.error("");
+    console.error(getProfileProvisioningCliUsage());
+    return;
+  }
+
   const abortController = new AbortController();
   let interrupted = false;
   const onInterrupt = (): void => {
@@ -58,7 +73,9 @@ async function main(): Promise<void> {
       client: new ProfileProvisioningHttpClient({
         baseUrl: parsedArgs.baseUrl,
       }),
-      browserLauncher: new PlaywrightProvisioningBrowserLauncher(),
+      browserLauncher: new ResolvedProvisioningBrowserLauncher(
+        providerResolution.provider,
+      ),
       waitForOperatorConfirmation: createReadlineOperatorConfirmation(
         process.stdin,
         process.stdout,

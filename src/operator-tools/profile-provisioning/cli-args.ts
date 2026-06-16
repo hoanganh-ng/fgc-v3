@@ -1,11 +1,16 @@
+import type { ProvisioningBrowserProviderCliValue } from "./provisioning-browser-provider";
+import { normalizeProvisioningBrowserProviderValue } from "./provisioning-browser-provider";
+
 export interface ProfileProvisioningCliArgs {
   readonly token: string;
   readonly baseUrl: string;
+  readonly browserProvider: ProvisioningBrowserProviderCliValue;
 }
 
 export interface ProfileProvisioningCliEnvironment {
   readonly PROFILE_PROVISIONING_BASE_URL?: string;
   readonly PROFILE_MANAGER_BASE_URL?: string;
+  readonly BROWSER_PROVIDER?: string;
 }
 
 export const DEFAULT_PROFILE_PROVISIONING_BASE_URL = "http://localhost:3000";
@@ -32,6 +37,7 @@ export function parseProfileProvisioningCliArgs(
 ): ProfileProvisioningCliArgs {
   let token: string | undefined;
   let baseUrl: string | undefined;
+  let browserProvider: string | undefined;
 
   for (let index = 0; index < argv.length; index += 1) {
     const rawArg = argv[index];
@@ -74,6 +80,23 @@ export function parseProfileProvisioningCliArgs(
       continue;
     }
 
+    if (rawArg === "--browser-provider") {
+      assertOptionNotProvided(browserProvider, "--browser-provider");
+      browserProvider = readSeparatedOptionValue(
+        argv,
+        index,
+        "--browser-provider",
+      );
+      index += 1;
+      continue;
+    }
+
+    if (rawArg.startsWith("--browser-provider=")) {
+      assertOptionNotProvided(browserProvider, "--browser-provider");
+      browserProvider = readInlineOptionValue(rawArg, "--browser-provider");
+      continue;
+    }
+
     if (rawArg.startsWith("-")) {
       throw new ProfileProvisioningCliArgumentError(
         `Unknown option ${rawArg}.`,
@@ -93,6 +116,9 @@ export function parseProfileProvisioningCliArgs(
         environment.PROFILE_MANAGER_BASE_URL ??
         DEFAULT_PROFILE_PROVISIONING_BASE_URL,
     ),
+    browserProvider: normalizeBrowserProviderOption(
+      browserProvider ?? environment.BROWSER_PROVIDER,
+    ),
   };
 }
 
@@ -104,9 +130,11 @@ export function getProfileProvisioningCliUsage(): string {
     "Options:",
     "  --token      Required one-time provisioning token from the Web UI success state.",
     "  --base-url   Profile Manager API or gateway base URL.",
+    "  --browser-provider   Browser provider: playwright or cloakbrowser. Default: playwright.",
     "",
     "Defaults:",
     "  --base-url uses PROFILE_PROVISIONING_BASE_URL, then PROFILE_MANAGER_BASE_URL, then http://localhost:3000.",
+    "  --browser-provider uses BROWSER_PROVIDER, then playwright.",
     "",
     "The browser opens headed for manual login. Cookies and localStorage are submitted to Profile Manager but never printed.",
   ].join("\n");
@@ -194,4 +222,16 @@ function normalizeBaseUrl(value: string): string {
   }
 
   return normalizedValue;
+}
+
+function normalizeBrowserProviderOption(
+  value: string | undefined,
+): ProvisioningBrowserProviderCliValue {
+  const result = normalizeProvisioningBrowserProviderValue(value);
+
+  if (!result.ok) {
+    throw new ProfileProvisioningCliArgumentError(result.message);
+  }
+
+  return result.value;
 }

@@ -229,6 +229,60 @@ describe("runProfileProvisioning", () => {
     });
     expect(browserLauncher.sessions[0]?.closeCalls).toBe(1);
   });
+
+  it("closes the browser when navigation fails before operator confirmation", async () => {
+    const client = new FakeProfileProvisioningClient();
+    const browserLauncher = new FakeProvisioningBrowserLauncher();
+    let promptCalls = 0;
+
+    browserLauncher.nextSession.openLoginPageError = new Error(
+      "Navigation failed through proxy-password.",
+    );
+
+    const result = await runProfileProvisioning({
+      token: "provisioning-token-1",
+      client,
+      browserLauncher,
+      waitForOperatorConfirmation: async () => {
+        promptCalls += 1;
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errorCode: "PROFILE_PROVISIONING_BROWSER_FLOW_FAILED",
+      errorMessage: "Navigation failed through [redacted].",
+    });
+    expect(promptCalls).toBe(0);
+    expect(browserLauncher.sessions[0]?.closeCalls).toBe(1);
+    expect(client.ingestionCalls).toEqual([]);
+  });
+
+  it("does not submit empty or incomplete captured authentication state", async () => {
+    const client = new FakeProfileProvisioningClient();
+    const browserLauncher = new FakeProvisioningBrowserLauncher();
+
+    browserLauncher.nextSession.sessionState = {
+      cookies: [],
+      localStorage: [],
+    };
+
+    const result = await runProfileProvisioning({
+      token: "provisioning-token-1",
+      client,
+      browserLauncher,
+      waitForOperatorConfirmation: async () => {},
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errorCode: "PROFILE_PROVISIONING_BROWSER_FLOW_FAILED",
+      errorMessage:
+        "Captured authentication state was empty or incomplete. Session state was not submitted.",
+    });
+    expect(client.ingestionCalls).toEqual([]);
+    expect(browserLauncher.sessions[0]?.closeCalls).toBe(1);
+  });
 });
 
 class FakeProfileProvisioningClient implements ProfileProvisioningClient {
@@ -297,10 +351,16 @@ class FakeProvisioningBrowserSession implements ProvisioningBrowserSession {
   public openLoginPageCalls = 0;
   public captureSessionStateCalls = 0;
   public closeCalls = 0;
+  public openLoginPageError: unknown;
   public captureError: unknown;
+  public sessionState: ProvisioningCapturedSessionState = createSessionState();
 
   public async openLoginPage(): Promise<void> {
     this.openLoginPageCalls += 1;
+
+    if (this.openLoginPageError !== undefined) {
+      throw this.openLoginPageError;
+    }
   }
 
   public async captureSessionState(): Promise<ProvisioningCapturedSessionState> {
@@ -310,7 +370,7 @@ class FakeProvisioningBrowserSession implements ProvisioningBrowserSession {
       throw this.captureError;
     }
 
-    return createSessionState();
+    return this.sessionState;
   }
 
   public async close(): Promise<void> {

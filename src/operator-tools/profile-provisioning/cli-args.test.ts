@@ -19,6 +19,7 @@ describe("parseProfileProvisioningCliArgs", () => {
     ).toEqual({
       token: "provisioning-token-1",
       baseUrl: "http://localhost:8081",
+      browserProvider: "playwright",
     });
   });
 
@@ -31,6 +32,7 @@ describe("parseProfileProvisioningCliArgs", () => {
     ).toEqual({
       token: "provisioning-token-1",
       baseUrl: "https://profile-manager.test/api",
+      browserProvider: "playwright",
     });
   });
 
@@ -46,6 +48,7 @@ describe("parseProfileProvisioningCliArgs", () => {
     ).toEqual({
       token: "provisioning-token-1",
       baseUrl: "http://localhost:8081",
+      browserProvider: "playwright",
     });
   });
 
@@ -58,6 +61,7 @@ describe("parseProfileProvisioningCliArgs", () => {
     ).toEqual({
       token: "token-1",
       baseUrl: "http://localhost:8081",
+      browserProvider: "playwright",
     });
 
     expect(
@@ -67,12 +71,67 @@ describe("parseProfileProvisioningCliArgs", () => {
     ).toEqual({
       token: "token-1",
       baseUrl: "http://localhost:3000",
+      browserProvider: "playwright",
     });
 
     expect(parseProfileProvisioningCliArgs(["--token", "token-1"])).toEqual({
       token: "token-1",
       baseUrl: DEFAULT_PROFILE_PROVISIONING_BASE_URL,
+      browserProvider: "playwright",
     });
+  });
+
+  it("uses CLI browser provider before BROWSER_PROVIDER and the Playwright default", () => {
+    expect(
+      parseProfileProvisioningCliArgs(
+        [
+          "--token",
+          "token-1",
+          "--browser-provider",
+          " cloakbrowser ",
+        ],
+        {
+          BROWSER_PROVIDER: "playwright",
+        },
+      ),
+    ).toEqual({
+      token: "token-1",
+      baseUrl: DEFAULT_PROFILE_PROVISIONING_BASE_URL,
+      browserProvider: "cloakbrowser",
+    });
+
+    expect(
+      parseProfileProvisioningCliArgs(["--token", "token-1"], {
+        BROWSER_PROVIDER: " cloakbrowser ",
+      }),
+    ).toEqual({
+      token: "token-1",
+      baseUrl: DEFAULT_PROFILE_PROVISIONING_BASE_URL,
+      browserProvider: "cloakbrowser",
+    });
+
+    expect(parseProfileProvisioningCliArgs(["--token", "token-1"])).toEqual({
+      token: "token-1",
+      baseUrl: DEFAULT_PROFILE_PROVISIONING_BASE_URL,
+      browserProvider: "playwright",
+    });
+  });
+
+  it("rejects invalid browser providers", () => {
+    expect(() =>
+      parseProfileProvisioningCliArgs([
+        "--token",
+        "token-1",
+        "--browser-provider",
+        "unknown",
+      ]),
+    ).toThrow("Unknown browser provider. Use playwright or cloakbrowser.");
+
+    expect(() =>
+      parseProfileProvisioningCliArgs(["--token", "token-1"], {
+        BROWSER_PROVIDER: "unknown",
+      }),
+    ).toThrow("Unknown browser provider. Use playwright or cloakbrowser.");
   });
 
   it("fails fast when the token is missing or empty", () => {
@@ -127,6 +186,7 @@ describe("parseProfileProvisioningCliArgs", () => {
       ProfileProvisioningCliHelpRequested,
     );
     expect(getProfileProvisioningCliUsage()).toContain("pnpm profile:provision");
+    expect(getProfileProvisioningCliUsage()).toContain("--browser-provider");
     expect(getProfileProvisioningCliUsage()).not.toContain("secret");
   });
 });

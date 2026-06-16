@@ -38,6 +38,14 @@ without redirecting to `/login` or `/checkpoint`.
 - [x] Use only synthetic sanitized DOM fixtures in tests.
 - [x] Update narrowly relevant runtime and project documentation.
 
+## Live Validation Note
+
+Sprint 053 live acceptance depends on reprovisioning the affected Facebook
+profile before rerunning Account Exercise, Facebook collection, and
+Profile-Source Access Check validation. Sprint 053A adds CloakBrowser support
+to the provisioning CLI as a prerequisite correction for that live validation.
+Sprint 053 remains active until the live validation is completed and accepted.
+
 ## Out Of Scope
 
 - Automatic login.

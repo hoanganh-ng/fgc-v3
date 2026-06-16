@@ -93,7 +93,7 @@ pnpm stack:dev:workers:logs
 
 ### Operator Tools
 
-- `pnpm operator:profile:provision -- --token <token> --base-url http://localhost:8081`
+- `pnpm operator:profile:provision -- --token <token> --base-url http://localhost:8081 --browser-provider playwright`
 - `pnpm operator:profile:assisted-access -- --profile-id <profile-id> --source-group-id <source-group-id> --base-url http://localhost:8081`
 - `pnpm operator:collector:facebook -- --source-group-id <source-group-id> --base-url http://localhost:8081`
 - `pnpm operator:collector:worker -- --base-url http://localhost:8081 --once`
@@ -101,6 +101,8 @@ pnpm stack:dev:workers:logs
 - `pnpm operator:profile-source-access-check-worker -- --base-url http://localhost:8081 --once`
 - `pnpm operator:browser:probe -- --browser-provider playwright`
 - Backward-compatible aliases: `pnpm profile:provision`, `pnpm profile:assisted-access:run`, `pnpm collector:facebook:run`, `pnpm collector:worker:run`, `pnpm profile:exercise-worker:run`, `pnpm profile-source-access-check-worker:run`, `pnpm collector:browser:probe`.
+
+Operator browser-backed commands that accept `--browser-provider` use `BROWSER_PROVIDER`, then `playwright` when the option is omitted. Supported values are `playwright` and experimental `cloakbrowser`.
 
 ### Docker Stacks
 

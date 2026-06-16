@@ -23,6 +23,7 @@ export interface ProvisioningBrowserSession {
 }
 
 export interface ProvisioningBrowserLauncher {
+  readonly providerLabel?: string;
   launch(
     configuration: ProvisioningConfiguration,
   ): Promise<ProvisioningBrowserSession>;
@@ -98,7 +99,9 @@ export async function runProfileProvisioning(
     logger.info(
       `Provisioning configuration loaded for profile ${configurationResult.configuration.profileId}.`,
     );
-    logger.info("Opening headed Chromium for manual Facebook login.");
+    logger.info(
+      `Opening headed ${input.browserLauncher.providerLabel ?? "browser"} for manual Facebook login.`,
+    );
 
     browserSession = await input.browserLauncher.launch(
       configurationResult.configuration,
@@ -115,16 +118,11 @@ export async function runProfileProvisioning(
     logger.info("Capturing browser session state.");
     const sessionState = await browserSession.captureSessionState();
     addSessionSensitiveValues(sensitiveValues, sessionState);
+    assertCapturedSessionStateIsComplete(sessionState);
 
     logger.info(
       `Captured ${sessionState.cookies.length} cookies and ${sessionState.localStorage.length} localStorage entries.`,
     );
-
-    if (sessionState.cookies.length === 0) {
-      logger.warn?.(
-        "No cookies were captured. Profile Manager may accept the submission, but checkout eligibility can still fail without an authenticated session.",
-      );
-    }
 
     logger.info("Submitting captured session state to Profile Manager.");
     const ingestionResult = await input.client.ingestSessionState(
@@ -169,6 +167,30 @@ export async function runProfileProvisioning(
     if (browserSession !== undefined) {
       await closeBrowserSession(browserSession, logger);
     }
+  }
+}
+
+function assertCapturedSessionStateIsComplete(
+  sessionState: ProvisioningCapturedSessionState,
+): void {
+  if (sessionState.cookies.length === 0) {
+    throw new ProfileProvisioningIncompleteSessionStateError();
+  }
+
+  const hasInvalidCookie = sessionState.cookies.some(
+    (cookie) =>
+      cookie.name.trim().length === 0 ||
+      cookie.value.trim().length === 0 ||
+      cookie.domain.trim().length === 0 ||
+      cookie.path.trim().length === 0,
+  );
+  const hasInvalidLocalStorageEntry = sessionState.localStorage.some(
+    (entry) =>
+      entry.origin.trim().length === 0 || entry.key.trim().length === 0,
+  );
+
+  if (hasInvalidCookie || hasInvalidLocalStorageEntry) {
+    throw new ProfileProvisioningIncompleteSessionStateError();
   }
 }
 
@@ -217,6 +239,16 @@ class ProfileProvisioningInterruptedError extends Error {
   public constructor() {
     super("Profile provisioning was interrupted.");
     this.name = "ProfileProvisioningInterruptedError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+class ProfileProvisioningIncompleteSessionStateError extends Error {
+  public constructor() {
+    super(
+      "Captured authentication state was empty or incomplete. Session state was not submitted.",
+    );
+    this.name = "ProfileProvisioningIncompleteSessionStateError";
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
