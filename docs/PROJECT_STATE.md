@@ -14,10 +14,11 @@ The current focus is the Content Collector stage. Collector Profile Manager is c
 
 Sprint 053 is active: Facebook Authentication Wall Detection Hardening.
 Sprint 053A is a prerequisite correction under Sprint 053 live validation: the
-profile provisioning CLI now supports the same `playwright` and experimental
+profile provisioning CLI now supports the same `playwright` and
 `cloakbrowser` provider selection values used by browser-backed runtime tools,
-while keeping Playwright as the default and preserving the existing
-manual-login/session-ingestion contracts.
+while keeping Playwright as the default, using the concrete CloakBrowser
+`launchContext` Node API, and preserving the existing manual-login and
+session-ingestion contracts.
 
 ## Decided Items
 
@@ -91,7 +92,7 @@ manual-login/session-ingestion contracts.
 - Sprint 051 adds a separate PostgreSQL-backed Profile-Source Access Check worker. It atomically claims queued check runs, uses assisted group access checkout and lease-scoped runtime configuration to inspect only the frozen Facebook `DIRECT_GROUP_URL`, classifies sanitized browser evidence into a safe outcome, mutates Profile Manager profile-source access through an explicit HTTP adapter, and records only safe outcomes or sanitized failure reasons.
 - Sprint 052 is complete. Profile-source access check runs can be requested, listed, filtered, monitored, canceled while queued, and inspected through the Web UI using existing safe Collector Runtime HTTP contracts.
 - Sprint 053 introduces a shared safe Facebook page-state observer under Collector Runtime infrastructure. Account Exercise, Facebook payload capture, and Profile-Source Access browser checks use it to detect login and checkpoint walls, including localized authentication modals rendered over group pages without URL redirects.
-- Sprint 053A keeps Sprint 053 active and adds a provisioning-specific browser-provider boundary for headed manual login and normalized authentication-state export. It supports `--browser-provider playwright`, `--browser-provider cloakbrowser`, and `BROWSER_PROVIDER`, with CLI option precedence over environment and no automatic provider, proxy, or proxy-protocol fallback.
+- Sprint 053A keeps Sprint 053 active and adds a provisioning-specific browser-provider boundary for headed manual login and normalized authentication-state export. It supports `--browser-provider playwright`, `--browser-provider cloakbrowser`, and `BROWSER_PROVIDER`, with CLI option precedence over environment and no automatic provider, proxy, or proxy-protocol fallback. The production CloakBrowser provisioning adapter uses the `cloakbrowser` Node package's `launchContext` API with `playwright-core`, and `pnpm operator:profile:provision:cloakbrowser-probe --` reports sanitized package/API/binary availability reason codes.
 - Sprint 047A is complete. The existing account exercise worker is available as a separate opt-in Docker Compose service beside the collection worker.
 - Sprint 040 introduces source group entry route metadata owned by Content Manager. Entry routes describe possible future paths toward a source group, but they do not grant access, imply profile eligibility, or mutate profile/source access state.
 - Sprint 040 treats source groups without explicit entry routes as having a derived default `DIRECT_GROUP_URL` route from the source group URL. The default direct route uses `MEDIUM` risk because a direct final group visit is valid metadata but should not be treated as the lowest-risk warm-up path by default.

@@ -153,9 +153,32 @@ interface CloakBrowserProvisioningProviderOptions {
 }
 
 interface CloakBrowserLaunchResult {
-  readonly browser: ProvisioningPlaywrightLikeBrowser;
+  readonly browser?: ProvisioningPlaywrightLikeBrowser;
   readonly context: ProvisioningPlaywrightLikeContext;
 }
+
+export type CloakBrowserProvisioningAvailabilityReasonCode =
+  | "CLOAK_BROWSER_AVAILABLE"
+  | "CLOAK_BROWSER_MODULE_NOT_FOUND"
+  | "CLOAK_BROWSER_UNSUPPORTED_API"
+  | "CLOAK_BROWSER_BINARY_INFO_FAILED"
+  | "CLOAK_BROWSER_BINARY_NOT_INSTALLED";
+
+export type CloakBrowserProvisioningAvailabilityResult =
+  | {
+      readonly ok: true;
+      readonly reasonCode: "CLOAK_BROWSER_AVAILABLE";
+      readonly binaryInstalled?: boolean;
+      readonly binaryVersion?: string;
+    }
+  | {
+      readonly ok: false;
+      readonly reasonCode: Exclude<
+        CloakBrowserProvisioningAvailabilityReasonCode,
+        "CLOAK_BROWSER_AVAILABLE"
+      >;
+      readonly message: string;
+    };
 
 export class ResolvedProvisioningBrowserLauncher
   implements ProvisioningBrowserLauncher {
@@ -205,7 +228,7 @@ export class PlaywrightProvisioningBrowserProvider
       });
       const context = await browser.newContext(toPlaywrightContextOptions(config));
 
-      return new ProvisioningPlaywrightLikeSession(browser, context);
+      return new ProvisioningPlaywrightLikeSession(context, browser);
     } catch (error) {
       if (browser !== undefined) {
         await closeIgnoringErrors(browser);
@@ -236,7 +259,7 @@ export class CloakBrowserProvisioningProvider
       moduleValue = await this.importModule("cloakbrowser");
     } catch {
       throw new Error(
-        "CloakBrowser provider is experimental and is not available locally. Install and configure CloakBrowser for this workspace, or use BROWSER_PROVIDER=playwright.",
+        "CloakBrowser package is not available locally. Install cloakbrowser and playwright-core for this workspace, or use BROWSER_PROVIDER=playwright.",
       );
     }
 
@@ -246,9 +269,83 @@ export class CloakBrowserProvisioningProvider
     );
 
     return new ProvisioningPlaywrightLikeSession(
-      launchResult.browser,
       launchResult.context,
+      launchResult.browser,
     );
+  }
+}
+
+export async function probeCloakBrowserProvisioningAvailability(
+  options: CloakBrowserProvisioningProviderOptions = {},
+): Promise<CloakBrowserProvisioningAvailabilityResult> {
+  const importModule = options.importModule ?? importUnknownModule;
+  let moduleValue: unknown;
+
+  try {
+    moduleValue = await importModule("cloakbrowser");
+  } catch {
+    return {
+      ok: false,
+      reasonCode: "CLOAK_BROWSER_MODULE_NOT_FOUND",
+      message:
+        "CloakBrowser package is not available locally. Install cloakbrowser and playwright-core for this workspace.",
+    };
+  }
+
+  const moduleRecord = toRecord(moduleValue);
+  const defaultExport = toRecord(moduleRecord?.default);
+  const launchContext =
+    readFunction(moduleRecord, "launchContext") ??
+    readFunction(defaultExport, "launchContext");
+
+  if (launchContext === undefined) {
+    return {
+      ok: false,
+      reasonCode: "CLOAK_BROWSER_UNSUPPORTED_API",
+      message:
+        "CloakBrowser is available, but its launchContext API is not available.",
+    };
+  }
+
+  const binaryInfo =
+    readSyncOrAsyncFunction(moduleRecord, "binaryInfo") ??
+    readSyncOrAsyncFunction(defaultExport, "binaryInfo");
+
+  if (binaryInfo === undefined) {
+    return {
+      ok: true,
+      reasonCode: "CLOAK_BROWSER_AVAILABLE",
+    };
+  }
+
+  try {
+    const info = toRecord(await binaryInfo());
+    const installed = info?.installed === true;
+
+    if (!installed) {
+      return {
+        ok: false,
+        reasonCode: "CLOAK_BROWSER_BINARY_NOT_INSTALLED",
+        message:
+          "CloakBrowser package is available, but the local Chromium binary is not installed. Run pnpm exec cloakbrowser install.",
+      };
+    }
+
+    return {
+      ok: true,
+      reasonCode: "CLOAK_BROWSER_AVAILABLE",
+      binaryInstalled: installed,
+      ...(typeof info.version === "string"
+        ? { binaryVersion: info.version }
+        : {}),
+    };
+  } catch {
+    return {
+      ok: false,
+      reasonCode: "CLOAK_BROWSER_BINARY_INFO_FAILED",
+      message:
+        "CloakBrowser package is available, but binary status could not be inspected.",
+    };
   }
 }
 
@@ -395,8 +492,8 @@ class ProvisioningBrowserProviderBackedSession
 class ProvisioningPlaywrightLikeSession
   implements ProvisioningBrowserProviderSession {
   public constructor(
-    private readonly browser: ProvisioningPlaywrightLikeBrowser,
     private readonly context: ProvisioningPlaywrightLikeContext,
+    private readonly browser?: ProvisioningPlaywrightLikeBrowser,
   ) {}
 
   public async newPage(): Promise<ProvisioningBrowserProviderPage> {
@@ -418,10 +515,12 @@ class ProvisioningPlaywrightLikeSession
       closeError = error;
     }
 
-    try {
-      await this.browser.close();
-    } catch (error) {
-      closeError ??= error;
+    if (this.browser !== undefined) {
+      try {
+        await this.browser.close();
+      } catch (error) {
+        closeError ??= error;
+      }
     }
 
     if (closeError !== undefined) {
@@ -439,27 +538,37 @@ async function launchCloakBrowserForProvisioning(
   const launch =
     readFunction(moduleRecord, "launch") ??
     readFunction(defaultExport, "launch");
-  const chromium =
-    toRecord(moduleRecord?.chromium) ?? toRecord(defaultExport?.chromium);
-  const chromiumLaunch = readFunction(chromium, "launch");
+  const launchContext =
+    readFunction(moduleRecord, "launchContext") ??
+    readFunction(defaultExport, "launchContext");
   const launchOptions = toCloakBrowserProvisioningLaunchOptions(config);
 
-  if (launch !== undefined) {
-    return normalizeCloakBrowserLaunchResult(await launch(launchOptions));
+  if (launchContext !== undefined) {
+    const context = await launchContext(launchOptions);
+
+    if (!isProvisioningPlaywrightLikeContext(context)) {
+      await closeIfPossibleIgnoringErrors(context);
+      throw unsupportedCloakBrowserProvisioningApiError();
+    }
+
+    return {
+      context,
+    };
   }
 
-  if (chromiumLaunch !== undefined) {
-    const browser = await chromiumLaunch({
-      headless: config.headless,
-      cloak: launchOptions,
-    });
+  if (launch !== undefined) {
+    const browser = await launch(
+      toCloakBrowserProvisioningBrowserLaunchOptions(config),
+    );
 
     if (!isProvisioningPlaywrightLikeBrowser(browser)) {
       throw unsupportedCloakBrowserProvisioningApiError();
     }
 
     try {
-      const context = await browser.newContext(toPlaywrightContextOptions(config));
+      const context = await browser.newContext(
+        toCloakBrowserProvisioningContextOptions(config),
+      );
 
       if (!isProvisioningPlaywrightLikeContext(context)) {
         await closeIgnoringErrors(context);
@@ -506,42 +615,54 @@ function toCloakBrowserProvisioningLaunchOptions(
 ): Record<string, unknown> {
   return {
     headless: config.headless,
-    profileId: config.profileId,
     ...(config.proxy !== undefined ? { proxy: config.proxy } : {}),
+    ...(config.viewport !== undefined ? { viewport: config.viewport } : {}),
+    ...(config.userAgent !== undefined ? { userAgent: config.userAgent } : {}),
+    ...(config.locale !== undefined ? { locale: config.locale } : {}),
+    ...(config.timezoneId !== undefined ? { timezone: config.timezoneId } : {}),
+    contextOptions: {
+      ...(config.deviceScaleFactor !== undefined
+        ? { deviceScaleFactor: config.deviceScaleFactor }
+        : {}),
+      ...(config.acceptLanguageHeader !== undefined
+        ? {
+            extraHTTPHeaders: {
+              "Accept-Language": config.acceptLanguageHeader,
+            },
+          }
+        : {}),
+    },
+  };
+}
+
+function toCloakBrowserProvisioningBrowserLaunchOptions(
+  config: ProvisioningBrowserProviderLaunchConfig,
+): Record<string, unknown> {
+  return {
+    headless: config.headless,
+    ...(config.proxy !== undefined ? { proxy: config.proxy } : {}),
+    ...(config.locale !== undefined ? { locale: config.locale } : {}),
+    ...(config.timezoneId !== undefined ? { timezone: config.timezoneId } : {}),
+  };
+}
+
+function toCloakBrowserProvisioningContextOptions(
+  config: ProvisioningBrowserProviderLaunchConfig,
+): Record<string, unknown> {
+  return {
+    ...(config.userAgent !== undefined ? { userAgent: config.userAgent } : {}),
     ...(config.viewport !== undefined ? { viewport: config.viewport } : {}),
     ...(config.deviceScaleFactor !== undefined
       ? { deviceScaleFactor: config.deviceScaleFactor }
       : {}),
-    ...(config.userAgent !== undefined ? { userAgent: config.userAgent } : {}),
-    ...(config.locale !== undefined ? { locale: config.locale } : {}),
     ...(config.acceptLanguageHeader !== undefined
-      ? { acceptLanguageHeader: config.acceptLanguageHeader }
-      : {}),
-    ...(config.timezoneId !== undefined ? { timezoneId: config.timezoneId } : {}),
-    ...(config.fingerprint !== undefined
-      ? { fingerprint: config.fingerprint }
+      ? {
+          extraHTTPHeaders: {
+            "Accept-Language": config.acceptLanguageHeader,
+          },
+        }
       : {}),
   };
-}
-
-function normalizeCloakBrowserLaunchResult(
-  value: unknown,
-): CloakBrowserLaunchResult {
-  const record = toRecord(value);
-  const browser = record?.browser;
-  const context = record?.context;
-
-  if (
-    isProvisioningPlaywrightLikeBrowser(browser) &&
-    isProvisioningPlaywrightLikeContext(context)
-  ) {
-    return {
-      browser,
-      context,
-    };
-  }
-
-  throw unsupportedCloakBrowserProvisioningApiError();
 }
 
 async function captureLocalStorageForOrigins(
@@ -726,6 +847,17 @@ function readFunction(
     : undefined;
 }
 
+function readSyncOrAsyncFunction(
+  value: Record<string, unknown> | undefined,
+  key: string,
+): (() => unknown | Promise<unknown>) | undefined {
+  const rawValue = value?.[key];
+
+  return typeof rawValue === "function"
+    ? (rawValue as () => unknown | Promise<unknown>)
+    : undefined;
+}
+
 function toRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -737,6 +869,18 @@ async function closeIgnoringErrors(value: {
 }): Promise<void> {
   try {
     await value.close();
+  } catch {}
+}
+
+async function closeIfPossibleIgnoringErrors(value: unknown): Promise<void> {
+  const close = readFunction(toRecord(value), "close");
+
+  if (close === undefined) {
+    return;
+  }
+
+  try {
+    await close();
   } catch {}
 }
 

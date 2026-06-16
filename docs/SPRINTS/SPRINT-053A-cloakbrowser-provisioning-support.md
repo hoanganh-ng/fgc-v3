@@ -29,6 +29,14 @@ Sprint 053 remains active. Sprint 053A is a prerequisite correction for Sprint
 - Implement provisioning adapters for:
   - Playwright Chromium.
   - CloakBrowser.
+- Use the concrete CloakBrowser Node package:
+  - Source and documentation: `https://github.com/CloakHQ/CloakBrowser`.
+  - Package: `cloakbrowser`.
+  - Peer/runtime dependency: `playwright-core`.
+  - Runtime API: `launchContext` from `cloakbrowser`, returning a
+    Playwright-style browser context.
+  - Binary installation: `pnpm exec cloakbrowser install`, or first launch
+    downloads the binary into the CloakBrowser cache.
 - Reuse existing safe launch configuration behavior where applicable:
   - proxy protocol, host, port, and credentials.
   - user agent.
@@ -42,7 +50,35 @@ Sprint 053 remains active. Sprint 053A is a prerequisite correction for Sprint
   authentication state.
 - Preserve safe CLI output and redaction for token, proxy, cookie, and
   localStorage material.
+- Add a provisioning-specific CloakBrowser availability probe with sanitized
+  reason codes plus an opt-in headed launch smoke that does not visit Facebook
+  or submit session state.
 - Update provisioning help and runtime/project docs.
+
+## Installation Prerequisites
+
+The workspace includes `cloakbrowser` and `playwright-core` as root
+dependencies. Operators should run:
+
+```bash
+pnpm install
+pnpm exec cloakbrowser install
+```
+
+CloakBrowser's Node package requires Node.js 20 or newer. The package exposes a
+CLI binary as `cloakbrowser` and the JavaScript Playwright API through
+`import { launchContext } from "cloakbrowser"`.
+
+Provisioning setup can be checked without Facebook login:
+
+```bash
+pnpm operator:profile:provision:cloakbrowser-probe --
+pnpm operator:profile:provision:cloakbrowser-probe -- --launch-headed
+```
+
+The first command reports package/API/binary availability. The second command
+launches a headed synthetic page and closes it; it does not log in, capture
+cookies/localStorage, or submit anything to Profile Manager.
 
 ## No-Fallback Guarantees
 
@@ -76,6 +112,8 @@ Required:
 - `pnpm web:typecheck`
 - `pnpm web:build`
 - `pnpm test`
+- `pnpm operator:profile:provision:cloakbrowser-probe --`
+- `pnpm operator:profile:provision:cloakbrowser-probe -- --launch-headed`
 - `git diff --check`
 
 Coverage targets:
@@ -85,6 +123,9 @@ Coverage targets:
 - Invalid provider rejection.
 - Provider resolution.
 - Headed launch config for Playwright and CloakBrowser.
+- Real CloakBrowser package/API/binary availability probe with sanitized reason
+  codes.
+- Opt-in real headed CloakBrowser smoke launch without Facebook login.
 - Exact proxy forwarding.
 - No proxy or provider fallback.
 - Matching normalized session DTOs.

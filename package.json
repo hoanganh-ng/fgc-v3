@@ -11,6 +11,7 @@
     "web:build": "pnpm --filter @fgc/web build",
     "web:typecheck": "pnpm --filter @fgc/web typecheck",
     "operator:profile:provision": "tsx src/operator-tools/profile-provisioning/cli.ts",
+    "operator:profile:provision:cloakbrowser-probe": "tsx src/operator-tools/profile-provisioning/cloakbrowser-probe-cli.ts",
     "operator:collector:facebook": "tsx src/operator-tools/facebook-collector/cli.ts",
     "operator:collector:worker": "tsx src/operator-tools/collector-worker/cli.ts",
     "operator:profile:exercise": "tsx src/operator-tools/profile-exercise/cli.ts",
@@ -26,6 +27,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:web": "pnpm --filter @fgc/web typecheck",
     "profile:provision": "tsx src/operator-tools/profile-provisioning/cli.ts",
+    "profile:provision:cloakbrowser-probe": "tsx src/operator-tools/profile-provisioning/cloakbrowser-probe-cli.ts",
     "collector:facebook:run": "tsx src/operator-tools/facebook-collector/cli.ts",
     "collector:worker:run": "tsx src/operator-tools/collector-worker/cli.ts",
     "profile:exercise:run": "tsx src/operator-tools/profile-exercise/cli.ts",
@@ -69,10 +71,12 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
+    "cloakbrowser": "^0.3.31",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.8.5",
     "pg": "^8.21.0",
     "playwright": "^1.56.1",
+    "playwright-core": "^1.60.0",
     "zod": "^4.4.3"
   }
 }

@@ -316,6 +316,7 @@ function addSensitiveValue(
 
   if (normalizedValue.length >= 3) {
     sensitiveValues.add(normalizedValue);
+    sensitiveValues.add(encodeURIComponent(normalizedValue));
   }
 }
 

@@ -182,6 +182,48 @@ describe("runProfileProvisioning", () => {
     expect(JSON.stringify(result)).not.toContain("proxy-password");
   });
 
+  it("redacts URL-encoded proxy credentials from browser-flow failures", async () => {
+    const client = new FakeProfileProvisioningClient();
+    const browserLauncher = new FakeProvisioningBrowserLauncher();
+
+    client.configurationResult = {
+      ok: true,
+      configuration: {
+        ...createConfiguration(),
+        networkContext: {
+          ...createConfiguration().networkContext,
+          proxy: {
+            protocol: "HTTPS",
+            host: "proxy.example.test",
+            port: 443,
+            credentials: {
+              username: "proxy-user@example",
+              password: "proxy-password=",
+            },
+          },
+        },
+      },
+    };
+    browserLauncher.launchError = new Error(
+      "Could not launch with proxy-user%40example:proxy-password%3D.",
+    );
+
+    const result = await runProfileProvisioning({
+      token: "provisioning-token-1",
+      client,
+      browserLauncher,
+      waitForOperatorConfirmation: async () => {},
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errorCode: "PROFILE_PROVISIONING_BROWSER_FLOW_FAILED",
+      errorMessage: "Could not launch with [redacted]:[redacted].",
+    });
+    expect(JSON.stringify(result)).not.toContain("proxy-user%40example");
+    expect(JSON.stringify(result)).not.toContain("proxy-password%3D");
+  });
+
   it("closes the browser when the operator interrupts before capture", async () => {
     const client = new FakeProfileProvisioningClient();
     const browserLauncher = new FakeProvisioningBrowserLauncher();

@@ -287,6 +287,40 @@ If `--browser-provider` is omitted, the CLI uses `BROWSER_PROVIDER`, then
 `playwright` maps to `PLAYWRIGHT_CHROMIUM` and remains the default.
 `cloakbrowser` maps to `CLOAK_BROWSER` and remains experimental.
 
+Provisioning CloakBrowser prerequisites:
+
+- Source/package: `cloakbrowser` from
+  `https://github.com/CloakHQ/CloakBrowser`, npm package `cloakbrowser`.
+- Installed dependencies: root package dependencies include `cloakbrowser` and
+  `playwright-core`.
+- Runtime API: the provisioning adapter imports `launchContext` from
+  `cloakbrowser`, passes headed launch options plus profile-owned context
+  options, then exports cookies and localStorage from the returned
+  Playwright-style context.
+- Binary setup: run `pnpm exec cloakbrowser install` to pre-download the
+  CloakBrowser Chromium binary, or allow the first CloakBrowser launch to
+  download it into the local CloakBrowser cache.
+- Runtime requirement: CloakBrowser's Node package requires Node.js 20 or
+  newer.
+
+Probe the provisioning CloakBrowser installation without opening Facebook:
+
+```bash
+pnpm operator:profile:provision:cloakbrowser-probe --
+```
+
+Run an opt-in real headed smoke launch without Facebook login or session
+submission:
+
+```bash
+pnpm operator:profile:provision:cloakbrowser-probe -- --launch-headed
+```
+
+The probe reports sanitized reason codes such as
+`CLOAK_BROWSER_AVAILABLE`, `CLOAK_BROWSER_MODULE_NOT_FOUND`,
+`CLOAK_BROWSER_UNSUPPORTED_API`, `CLOAK_BROWSER_BINARY_INFO_FAILED`, and
+`CLOAK_BROWSER_BINARY_NOT_INSTALLED`.
+
 Expected operator flow:
 
 1. The CLI fetches provisioning configuration from `GET /collector/provisioning/:token/configuration`.
@@ -298,7 +332,7 @@ Expected operator flow:
 6. The CLI submits the captured session to `POST /collector/provisioning/:token/session`.
 7. Profile Manager consumes the token and returns the profile in `READY` status.
 
-The CLI does not automate credentials, store passwords, solve CAPTCHAs, add stealth tooling, capture Facebook content, capture GraphQL responses, implement collection runtime behavior, or write cookies/localStorage to disk.
+The CLI does not automate credentials, store passwords, solve CAPTCHAs, capture Facebook content, capture GraphQL responses, implement collection runtime behavior, or write cookies/localStorage to disk.
 
 The CLI prints only operational progress and counts. It must not print cookies, localStorage values, proxy passwords, token hashes, raw session material, or trusted runtime secrets. The one-time provisioning configuration route may include proxy credentials so the selected provider can use the configured proxy, but public profile list/detail reads continue to omit proxy credentials and captured session state.
 
@@ -587,6 +621,9 @@ Sprint 053A applies the same operator selection values to the profile
 provisioning CLI through a provisioning-specific boundary because provisioning
 must export cookies and localStorage after manual login. That export capability
 is not exposed through the unrelated Collector Runtime browser provider port.
+Provisioning CloakBrowser support uses the documented Node `launchContext`
+API from `cloakbrowser`; runtime collection providers remain behind the
+Collector Runtime provider boundary.
 
 Default provider:
 
@@ -616,7 +653,13 @@ pnpm operator:browser:probe -- --browser-provider cloakbrowser
 
 The probe builds a synthetic safe runtime profile configuration, launches the selected provider, creates one page, and verifies init-script plus binding instrumentation. It does not check out a profile, visit Facebook, automate credentials, or persist session material.
 
-CloakBrowser is optional. If it is not installed or does not expose a supported launch/context/page API locally, the probe should fail with sanitized setup guidance and the collector should continue to use Playwright by default.
+CloakBrowser is installed through the `cloakbrowser` Node package and its
+`playwright-core` peer. Pre-download the binary with
+`pnpm exec cloakbrowser install` when operators need deterministic setup. If it
+is not installed or does not expose a supported launch/context/page API locally,
+the probe should fail with sanitized setup guidance and browser-backed commands
+should continue to use Playwright only when Playwright is explicitly selected or
+defaulted. No selected CloakBrowser command falls back to Playwright.
 
 Provider safety boundaries:
 

@@ -5,6 +5,7 @@ import {
   PlaywrightProvisioningBrowserProvider,
   ResolvedProvisioningBrowserLauncher,
   buildProvisioningBrowserProviderLaunchConfig,
+  probeCloakBrowserProvisioningAvailability,
   resolveProvisioningBrowserProvider,
   type ProvisioningBrowserProviderPage,
   type ProvisioningCookieShape,
@@ -144,16 +145,13 @@ describe("provisioning browser provider boundary", () => {
 
   it("launches CloakBrowser headed and does not fall back when unavailable", async () => {
     const browser = new FakeBrowser();
-    const cloakLaunchCalls: unknown[] = [];
+    const cloakLaunchContextCalls: unknown[] = [];
     const provider = new CloakBrowserProvisioningProvider({
       importModule: async () => ({
-        launch: async (options: unknown) => {
-          cloakLaunchCalls.push(options);
+        launchContext: async (options: unknown) => {
+          cloakLaunchContextCalls.push(options);
 
-          return {
-            browser,
-            context: browser.context,
-          };
+          return browser.context;
         },
       }),
     });
@@ -165,10 +163,9 @@ describe("provisioning browser provider boundary", () => {
       }),
     );
 
-    expect(cloakLaunchCalls).toEqual([
+    expect(cloakLaunchContextCalls).toEqual([
       {
         headless: false,
-        profileId: "profile-1",
         proxy: {
           server: "https://proxy.example.test:443",
           username: "REDACTED_PROXY_USERNAME",
@@ -178,15 +175,14 @@ describe("provisioning browser provider boundary", () => {
           width: 1440,
           height: 900,
         },
-        deviceScaleFactor: 2,
         userAgent: "Synthetic Browser",
         locale: "en-US",
-        acceptLanguageHeader: "en-US,en",
-        timezoneId: "America/Los_Angeles",
-        fingerprint: {
-          seed: "profile-1",
-          source: "PROFILE_ID",
-          profileOwnedConfig: createConfiguration().hardwareFingerprint,
+        timezone: "America/Los_Angeles",
+        contextOptions: {
+          deviceScaleFactor: 2,
+          extraHTTPHeaders: {
+            "Accept-Language": "en-US,en",
+          },
         },
       },
     ]);
@@ -205,8 +201,53 @@ describe("provisioning browser provider boundary", () => {
         }),
       ),
     ).rejects.toThrow(
-      "CloakBrowser provider is experimental and is not available locally.",
+      "CloakBrowser package is not available locally.",
     );
+  });
+
+  it("reports sanitized CloakBrowser availability reason codes", async () => {
+    await expect(
+      probeCloakBrowserProvisioningAvailability({
+        importModule: async () => {
+          throw new Error("Cannot find package with proxy-password");
+        },
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      reasonCode: "CLOAK_BROWSER_MODULE_NOT_FOUND",
+      message:
+        "CloakBrowser package is not available locally. Install cloakbrowser and playwright-core for this workspace.",
+    });
+
+    await expect(
+      probeCloakBrowserProvisioningAvailability({
+        importModule: async () => ({
+          launch: async () => new FakeBrowser(),
+        }),
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      reasonCode: "CLOAK_BROWSER_UNSUPPORTED_API",
+      message:
+        "CloakBrowser is available, but its launchContext API is not available.",
+    });
+
+    await expect(
+      probeCloakBrowserProvisioningAvailability({
+        importModule: async () => ({
+          launchContext: async () => new FakeContext(),
+          binaryInfo: () => ({
+            installed: true,
+            version: "146.0.7680.177.5",
+          }),
+        }),
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      reasonCode: "CLOAK_BROWSER_AVAILABLE",
+      binaryInstalled: true,
+      binaryVersion: "146.0.7680.177.5",
+    });
   });
 
   it("normalizes Playwright and CloakBrowser sessions into the provisioning auth payload", async () => {
@@ -216,13 +257,10 @@ describe("provisioning browser provider boundary", () => {
       }),
       new CloakBrowserProvisioningProvider({
         importModule: async () => ({
-          launch: async () => {
+          launchContext: async () => {
             const browser = new FakeBrowser();
 
-            return {
-              browser,
-              context: browser.context,
-            };
+            return browser.context;
           },
         }),
       }),
