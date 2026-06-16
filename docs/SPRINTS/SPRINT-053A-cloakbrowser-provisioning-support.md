@@ -104,6 +104,32 @@ operator can fix the selected provider or profile configuration.
 - Sprint 054 definition.
 - Commits or pushes.
 
+## Collector Runtime CloakBrowser API Alignment
+
+The Collector Runtime `CloakBrowserProvider` (Sprint 037A) has been updated to
+use the same `launchContext` API as the provisioning adapter:
+
+- `launchContext` (named or default export) is the primary and only supported
+  path. Legacy speculative `module.launch` and `module.chromium.launch` paths
+  have been removed.
+- `launchContext` returns a Playwright-compatible `BrowserContext` directly.
+  The session abstraction uses a context-only close (single `context.close()`
+  call, guarded against double-close) with no separate `browser.close()`.
+- `BrowserProviderLaunchConfig` fields are mapped to `launchContext` options
+  using the same shape as the provisioning adapter: `headless`, `proxy`,
+  `viewport`, `userAgent`, `locale`, `timezone`, with `contextOptions` carrying
+  `storageState`, `deviceScaleFactor`, and `extraHTTPHeaders`
+  (`Accept-Language`).
+- Unsupported module shapes still return `CLOAK_BROWSER_UNSUPPORTED_API`.
+- Import failures still return `CLOAK_BROWSER_UNAVAILABLE`.
+- No Playwright or direct fallback.
+- The existing `collector:browser:probe` CLI (`pnpm collector:browser:probe --
+  --browser-provider cloakbrowser`) tests the same Collector Runtime
+  `CloakBrowserProvider` used by the worker.
+
+Both provisioning and Collector Runtime now support the real `launchContext`
+API.
+
 ## Verification
 
 Required:
@@ -114,6 +140,7 @@ Required:
 - `pnpm test`
 - `pnpm operator:profile:provision:cloakbrowser-probe --`
 - `pnpm operator:profile:provision:cloakbrowser-probe -- --launch-headed`
+- `pnpm collector:browser:probe -- --browser-provider cloakbrowser`
 - `git diff --check`
 
 Coverage targets:

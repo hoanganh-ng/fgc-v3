@@ -60,6 +60,35 @@ export function createPlaywrightLikeBrowserProviderSession(
   );
 }
 
+export function createPlaywrightLikeContextOnlySession(
+  providerName: BrowserProviderName,
+  context: PlaywrightLikeBrowserContext,
+): BrowserProviderSession {
+  return new PlaywrightLikeContextOnlySession(providerName, context);
+}
+
+class PlaywrightLikeContextOnlySession implements BrowserProviderSession {
+  private closed = false;
+
+  public constructor(
+    public readonly providerName: BrowserProviderName,
+    private readonly context: PlaywrightLikeBrowserContext,
+  ) {}
+
+  public async newPage(): Promise<BrowserProviderPage> {
+    return new PlaywrightLikeBrowserProviderPage(await this.context.newPage());
+  }
+
+  public async close(): Promise<void> {
+    if (this.closed) {
+      return;
+    }
+
+    this.closed = true;
+    await this.context.close();
+  }
+}
+
 class PlaywrightLikeBrowserProviderSession implements BrowserProviderSession {
   public constructor(
     public readonly providerName: BrowserProviderName,
