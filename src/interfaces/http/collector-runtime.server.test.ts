@@ -1252,7 +1252,7 @@ describe("Collector Runtime HTTP routes", () => {
     }
   });
 
-  it("omits empty parameters from the upsert DTO", async () => {
+  it("accepts an empty parameters object on upsert and keeps the safe DTO empty", async () => {
     const { server, service } = createTestServer();
 
     service.upsertCollectionSchedule.setOutput(
@@ -1275,6 +1275,7 @@ describe("Collector Runtime HTTP routes", () => {
           enabled: false,
           intervalMinutes: 30,
           nextRunAt: "2026-04-01T14:00:00.000Z",
+          parameters: {},
         },
       });
 
@@ -1351,6 +1352,30 @@ describe("Collector Runtime HTTP routes", () => {
     }
   });
 
+  it("returns 400 when the upsert body omits parameters", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/collection-schedules/source-group-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(service.upsertCollectionSchedule.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("returns 400 with structured issues on collection-schedule validation errors", async () => {
     const { server, service } = createTestServer();
 
@@ -1368,6 +1393,7 @@ describe("Collector Runtime HTTP routes", () => {
           enabled: true,
           intervalMinutes: 30,
           nextRunAt: "2026-04-01T14:00:00.000Z",
+          parameters: {},
         },
       });
 
@@ -1403,6 +1429,7 @@ describe("Collector Runtime HTTP routes", () => {
           enabled: true,
           intervalMinutes: 30,
           nextRunAt: "2026-04-01T14:00:00.000Z",
+          parameters: {},
         },
       });
 
@@ -1430,6 +1457,7 @@ describe("Collector Runtime HTTP routes", () => {
           enabled: true,
           intervalMinutes: 30,
           nextRunAt: "2026-04-01T14:00:00.000Z",
+          parameters: {},
         },
       });
 
@@ -1460,6 +1488,7 @@ describe("Collector Runtime HTTP routes", () => {
           enabled: true,
           intervalMinutes: 30,
           nextRunAt: "2026-04-01T14:00:00.000Z",
+          parameters: {},
         },
       });
 
@@ -1490,6 +1519,7 @@ describe("Collector Runtime HTTP routes", () => {
           enabled: true,
           intervalMinutes: 30,
           nextRunAt: "2026-04-01T14:00:00.000Z",
+          parameters: {},
         },
       });
 

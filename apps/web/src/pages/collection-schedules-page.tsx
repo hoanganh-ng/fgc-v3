@@ -15,6 +15,7 @@ import { useUpsertCollectionScheduleMutation } from "@/features/collector-runtim
 import {
   UpsertCollectionScheduleFormSchema,
   emptyScheduleFormValues,
+  excludeScheduledSourceGroups,
   filterSchedulableSourceGroups,
   findSourceGroupById,
   formatLocalDateTimeSeconds,
@@ -58,6 +59,11 @@ interface EditorState {
 
 const EMPTY_EDITOR: EditorState | null = null;
 
+const SOURCE_GROUPS_QUERY = {
+  limit: 100,
+  offset: 0,
+} as const;
+
 export function CollectionSchedulesPage(): JSX.Element {
   const [editor, setEditor] = useState<EditorState | null>(EMPTY_EDITOR);
   const [offset, setOffset] = useState(0);
@@ -66,7 +72,7 @@ export function CollectionSchedulesPage(): JSX.Element {
     limit: DEFAULT_COLLECTION_SCHEDULE_LIST_LIMIT,
     offset,
   });
-  const sourceGroupsQuery = useSourceGroupsQuery({ limit: 200, offset: 0 });
+  const sourceGroupsQuery = useSourceGroupsQuery(SOURCE_GROUPS_QUERY);
 
   const schedules = schedulesQuery.data?.items ?? [];
   const total = schedulesQuery.data?.page.total;
@@ -77,6 +83,27 @@ export function CollectionSchedulesPage(): JSX.Element {
     () => filterSchedulableSourceGroups(sourceGroups),
     [sourceGroups],
   );
+
+  const scheduledSourceGroupIds = useMemo(() => {
+    return new Set(schedules.map((schedule) => schedule.sourceGroupId));
+  }, [schedules]);
+
+  const createCandidateSourceGroups = useMemo(
+    () =>
+      excludeScheduledSourceGroups(
+        schedulableSourceGroups,
+        scheduledSourceGroupIds,
+      ),
+    [schedulableSourceGroups, scheduledSourceGroupIds],
+  );
+
+  const hasPartialSourceGroupInventory = useMemo(() => {
+    if (!sourceGroupsQuery.data) {
+      return false;
+    }
+    const total = sourceGroupsQuery.data.page.total;
+    return total !== undefined && total > sourceGroupsQuery.data.items.length;
+  }, [sourceGroupsQuery.data]);
 
   useEffect(() => {
     setOffset(0);
@@ -112,13 +139,16 @@ export function CollectionSchedulesPage(): JSX.Element {
             variant="secondary"
             onClick={() => {
               void schedulesQuery.refetch();
+              void sourceGroupsQuery.refetch();
             }}
-            disabled={schedulesQuery.isFetching}
+            disabled={schedulesQuery.isFetching || sourceGroupsQuery.isFetching}
           >
             <RefreshCw
               aria-hidden="true"
               className={
-                schedulesQuery.isFetching ? "size-4 animate-spin" : "size-4"
+                schedulesQuery.isFetching || sourceGroupsQuery.isFetching
+                  ? "size-4 animate-spin"
+                  : "size-4"
               }
             />
             <span>Refresh</span>
@@ -246,6 +276,16 @@ export function CollectionSchedulesPage(): JSX.Element {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {hasPartialSourceGroupInventory ? (
+              <div
+                role="status"
+                className="mb-4 rounded border border-[#dfc36e] bg-[#fff7dc] px-4 py-3 text-sm font-medium text-[#76591a]"
+                data-testid="source-group-partial-warning"
+              >
+                The selector contains only a partial source-group inventory.
+                Some source groups may be missing.
+              </div>
+            ) : null}
             {editor === null ? (
               <p className="text-sm text-muted-foreground">
                 No schedule selected.
@@ -254,7 +294,8 @@ export function CollectionSchedulesPage(): JSX.Element {
               <ScheduleEditor
                 key={editor.sourceGroupId || "new"}
                 state={editor}
-                sourceGroups={schedulableSourceGroups}
+                createCandidates={createCandidateSourceGroups}
+                allSchedulableSourceGroups={schedulableSourceGroups}
                 onCancel={cancelEditor}
               />
             )}
@@ -358,16 +399,19 @@ function sourceGroupStatusTone(status: string): StatusBadgeTone {
 
 interface ScheduleEditorProps {
   readonly state: EditorState;
-  readonly sourceGroups: readonly SourceGroup[];
+  readonly createCandidates: readonly SourceGroup[];
+  readonly allSchedulableSourceGroups: readonly SourceGroup[];
   readonly onCancel: () => void;
 }
 
 function ScheduleEditor({
   state,
-  sourceGroups,
+  createCandidates,
+  allSchedulableSourceGroups,
   onCancel,
 }: ScheduleEditorProps): JSX.Element {
   const isEdit = state.mode === "edit";
+  const sourceGroupsQuery = useSourceGroupsQuery(SOURCE_GROUPS_QUERY);
   const detailQuery = useCollectionScheduleQuery(
     isEdit ? state.sourceGroupId : "",
   );
@@ -389,6 +433,60 @@ function ScheduleEditor({
     }
     form.reset(emptyScheduleFormValues(state.sourceGroupId));
   }, [detailQuery.data, form, isEdit, state.sourceGroupId]);
+
+  if (isEdit && detailQuery.isPending) {
+    return (
+      <div
+        className="flex flex-col gap-3"
+        role="status"
+        aria-live="polite"
+        data-testid="schedule-detail-loading"
+      >
+        <p className="text-sm font-medium text-foreground">
+          Loading existing schedule…
+        </p>
+        <div className="h-16 animate-pulse rounded border border-border bg-muted" />
+        <div className="h-16 animate-pulse rounded border border-border bg-muted" />
+        <div className="h-16 animate-pulse rounded border border-border bg-muted" />
+      </div>
+    );
+  }
+
+  if (isEdit && detailQuery.isError) {
+    const detailMessage =
+      getErrorMessage(detailQuery.error) ||
+      (isApiResultError(detailQuery.error)
+        ? detailQuery.error.message
+        : "Failed to load the existing schedule.");
+    return (
+      <div className="flex flex-col gap-3" data-testid="schedule-detail-error">
+        <div className="rounded border border-[#e4a0a0] bg-[#fff5f5] px-4 py-3 text-sm text-[#7f1d1d]">
+          <p className="font-semibold">{detailMessage}</p>
+        </div>
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCancel}
+            disabled={mutation.isPending}
+          >
+            <X aria-hidden="true" className="size-4" />
+            <span>Cancel</span>
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              void detailQuery.refetch();
+            }}
+          >
+            <RefreshCw aria-hidden="true" className="size-4" />
+            <span>Retry</span>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   function submit(raw: UpsertCollectionScheduleFormValues): void {
     setValidationSummary(undefined);
@@ -432,6 +530,8 @@ function ScheduleEditor({
   };
 
   const submitError = mutation.error;
+  const sourceGroupsQueryUnavailable =
+    sourceGroupsQuery.isError || sourceGroupsQuery.isPending;
 
   return (
     <form className="flex flex-col gap-3" onSubmit={onSubmit} noValidate>
@@ -461,23 +561,79 @@ function ScheduleEditor({
           htmlFor="schedule-source-group"
           error={form.formState.errors.sourceGroupId?.message}
         >
-          <Select
-            id="schedule-source-group"
-            value={form.watch("sourceGroupId")}
-            onChange={(event) => {
-              form.setValue("sourceGroupId", event.target.value, {
-                shouldDirty: true,
-              });
-            }}
-            disabled={sourceGroups.length === 0}
-          >
-            <option value="">Select a Facebook source group…</option>
-            {sourceGroups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name} · {group.status} · {group.id}
-              </option>
-            ))}
-          </Select>
+          {sourceGroupsQuery.isPending ? (
+            <div
+              className="space-y-2"
+              role="status"
+              aria-live="polite"
+              data-testid="source-group-loading"
+            >
+              <div className="h-9 animate-pulse rounded border border-border bg-muted" />
+              <p className="text-xs text-muted-foreground">
+                Loading source groups…
+              </p>
+            </div>
+          ) : sourceGroupsQuery.isError ? (
+            <div
+              className="space-y-2"
+              data-testid="source-group-error"
+            >
+              <div className="rounded border border-[#e4a0a0] bg-[#fff5f5] px-4 py-3 text-sm text-[#7f1d1d]">
+                <p className="font-semibold">
+                  {getErrorMessage(sourceGroupsQuery.error) ||
+                    "Failed to load source groups."}
+                </p>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    void sourceGroupsQuery.refetch();
+                  }}
+                >
+                  <RefreshCw aria-hidden="true" className="size-4" />
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : createCandidates.length === 0 &&
+            allSchedulableSourceGroups.length > 0 ? (
+            <div
+              className="rounded border border-[#dfc36e] bg-[#fff7dc] px-4 py-3 text-sm font-medium text-[#76591a]"
+              data-testid="source-group-all-scheduled"
+            >
+              Every loaded eligible source group already has a schedule.
+              Edit an existing schedule instead.
+            </div>
+          ) : createCandidates.length === 0 ? (
+            <div
+              className="rounded border border-border bg-muted px-4 py-3 text-sm text-muted-foreground"
+              data-testid="source-group-empty"
+            >
+              No eligible source groups are available. Create one from the
+              Content Manager before adding a schedule.
+            </div>
+          ) : (
+            <Select
+              id="schedule-source-group"
+              value={form.watch("sourceGroupId")}
+              onChange={(event) => {
+                form.setValue("sourceGroupId", event.target.value, {
+                  shouldDirty: true,
+                });
+              }}
+              disabled={sourceGroupsQueryUnavailable}
+            >
+              <option value="">Select a Facebook source group…</option>
+              {createCandidates.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name} · {group.status} · {group.id}
+                </option>
+              ))}
+            </Select>
+          )}
         </FormField>
       )}
 
@@ -596,7 +752,14 @@ function ScheduleEditor({
           <X aria-hidden="true" className="size-4" />
           <span>Cancel</span>
         </Button>
-        <Button type="submit" disabled={mutation.isPending}>
+        <Button
+          type="submit"
+          disabled={
+            mutation.isPending ||
+            (isEdit &&
+              (detailQuery.isPending || detailQuery.isError))
+          }
+        >
           {mutation.isPending ? (
             <RefreshCw aria-hidden="true" className="size-4 animate-spin" />
           ) : (
@@ -605,13 +768,6 @@ function ScheduleEditor({
           <span>{isEdit ? "Save changes" : "Create schedule"}</span>
         </Button>
       </div>
-      {isEdit && detailQuery.error !== null && detailQuery.error !== undefined ? (
-        <p className="text-xs text-[#7f1d1d]">
-          {isApiResultError(detailQuery.error)
-            ? getErrorMessage(detailQuery.error)
-            : "Failed to load the existing schedule."}
-        </p>
-      ) : null}
     </form>
   );
 }

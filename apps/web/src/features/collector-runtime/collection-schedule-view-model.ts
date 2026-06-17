@@ -16,7 +16,11 @@ const IntervalStringSchema = z
   .trim()
   .transform((value, ctx) => {
     if (value.length === 0) {
-      return undefined;
+      ctx.addIssue({
+        code: "custom",
+        message: "Interval is required.",
+      });
+      return z.NEVER;
     }
     if (!/^\d+$/.test(value)) {
       ctx.addIssue({
@@ -39,7 +43,7 @@ const IntervalStringSchema = z
     }
     return parsed;
   })
-  .pipe(z.number().int().min(MIN_INTERVAL_MINUTES).max(MAX_INTERVAL_MINUTES).optional());
+  .pipe(z.number().int().min(MIN_INTERVAL_MINUTES).max(MAX_INTERVAL_MINUTES));
 
 const PositiveIntegerStringSchema = z
   .string()
@@ -171,7 +175,7 @@ export function toUpsertCollectionScheduleRequest(
 ): UpsertCollectionScheduleRequest {
   return {
     enabled: values.enabled,
-    intervalMinutes: values.intervalMinutes ?? MIN_INTERVAL_MINUTES,
+    intervalMinutes: values.intervalMinutes,
     nextRunAt: toIsoDateTimeWithOffset(values.nextRunAtLocal),
     parameters: buildParameters(values),
   };
@@ -222,6 +226,16 @@ export function filterSchedulableSourceGroups(
     )
     .slice()
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+export function excludeScheduledSourceGroups(
+  sourceGroups: readonly SourceGroup[],
+  scheduledSourceGroupIds: ReadonlySet<string>,
+): SourceGroup[] {
+  if (scheduledSourceGroupIds.size === 0) {
+    return sourceGroups.slice();
+  }
+  return sourceGroups.filter((group) => !scheduledSourceGroupIds.has(group.id));
 }
 
 export function findSourceGroupById<

@@ -257,7 +257,7 @@ When no account exercise jobs exist, the polling account exercise worker logs sa
 
 ## Containerized Collection Scheduler
 
-Sprint 060 adds an opt-in Docker Compose service named `collection-scheduler`. It runs the Sprint 059 scheduled dispatch poller inside a lightweight `scheduler-runtime` image derived from the existing `app-deps` build stage. The scheduler does not open a browser, so the image installs no Playwright runtime, no Chromium, and no Xvfb, and the container entrypoint starts no display server.
+Sprint 060 adds an opt-in Docker Compose service named `collection-scheduler`. It runs the Sprint 059 scheduled dispatch poller inside a lightweight `scheduler-runtime` image derived from the existing `app-deps` build stage. scheduler-runtime inherits workspace Node packages installed by app-deps, but it does not provision browser executables, Playwright browser downloads, Xvfb, browser-specific system packages, or a runnable CloakBrowser browser/system runtime, and the scheduler does not launch a browser.
 
 Start the development stack and collection scheduler:
 

@@ -19,7 +19,11 @@ existing Collector Runtime composition root. The container image
 therefore uses `app-deps` (a slim Node runtime with workspace
 dependencies installed) instead of the Playwright `worker-runtime` base
 image, and the container entrypoint does not start Xvfb or manage any
-browser process.
+browser process. scheduler-runtime inherits workspace Node packages
+installed by app-deps, but it does not provision browser executables,
+Playwright browser downloads, Xvfb, browser-specific system packages,
+or a runnable CloakBrowser browser/system runtime, and the scheduler
+does not launch a browser.
 
 ## Capability Summary
 
@@ -75,7 +79,11 @@ The new `scheduler-runtime` target is built from the existing
 `app-deps` stage. `app-deps` already installs all workspace
 dependencies and the Node toolchain via Corepack. The scheduler needs
 no Playwright runtime, no Chromium, no Xvfb, and no CloakBrowser, so
-the lighter base is sufficient.
+the lighter base is sufficient. scheduler-runtime inherits workspace
+Node packages installed by app-deps, but it does not provision browser
+executables, Playwright browser downloads, Xvfb, browser-specific
+system packages, or a runnable CloakBrowser browser/system runtime, and
+the scheduler does not launch a browser.
 
 The scheduler only consumes the full `src/` tree at runtime: the
 existing `createCollectorRuntimeFromEnv` composition root imports the
@@ -87,8 +95,12 @@ The image therefore copies the full `src/` tree (matching the
 `api-runtime` source set), plus `tsconfig.json`, `drizzle.config.ts`,
 `drizzle/`, and the `scripts/` entrypoint. It does not install
 Playwright, Chromium, Xvfb, or CloakBrowser, and it does not pull
-Playwright system dependencies. The image's default `CMD` is the new
-entrypoint script.
+Playwright system dependencies. scheduler-runtime inherits workspace
+Node packages installed by app-deps, but it does not provision browser
+executables, Playwright browser downloads, Xvfb, browser-specific
+system packages, or a runnable CloakBrowser browser/system runtime, and
+the scheduler does not launch a browser. The image's default `CMD` is
+the new entrypoint script.
 
 `api-runtime` is unchanged. The Playwright-based `worker-runtime`
 remains the base for the existing collector and account-exercise

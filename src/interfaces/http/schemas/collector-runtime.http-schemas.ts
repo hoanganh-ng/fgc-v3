@@ -231,8 +231,7 @@ export const UpsertCollectionScheduleHttpBodySchema = z
         maxScrolls: z.number().int().min(0).optional(),
         maxDurationMs: z.number().int().min(1).optional(),
       })
-      .strict()
-      .optional(),
+      .strict(),
   })
   .strict();
 
@@ -1085,7 +1084,7 @@ const collectionScheduleJsonSchema = {
 
 const upsertCollectionScheduleBodyJsonSchema = {
   type: "object",
-  required: ["enabled", "intervalMinutes", "nextRunAt"],
+  required: ["enabled", "intervalMinutes", "nextRunAt", "parameters"],
   additionalProperties: false,
   properties: {
     enabled: {

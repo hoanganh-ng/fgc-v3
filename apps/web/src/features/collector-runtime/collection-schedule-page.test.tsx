@@ -109,27 +109,46 @@ interface PageInitialData {
   readonly sourceGroups: SourceGroup[];
 }
 
-function wrapWithProviders(node: ReactNode, initial: PageInitialData): JSX.Element {
-  const client = new QueryClient({
+function buildQueryClient(): QueryClient {
+  return new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },
     },
   });
+}
 
+function seedSchedules(
+  client: QueryClient,
+  schedules: CollectionSchedule[],
+  total: number,
+): void {
   client.setQueryData(
     ["collection-schedules", "list", { limit: 50, offset: 0 }],
     {
-      items: initial.schedules,
-      page: { limit: 50, offset: 0, total: initial.total },
+      items: schedules,
+      page: { limit: 50, offset: 0, total },
     },
   );
+}
+
+function seedSourceGroups(
+  client: QueryClient,
+  groups: SourceGroup[],
+  total: number,
+): void {
   client.setQueryData(
-    ["content-manager", "source-groups", { limit: 200, offset: 0 }],
+    ["content-manager", "source-groups", { limit: 100, offset: 0 }],
     {
-      items: initial.sourceGroups,
-      page: { limit: 200, offset: 0, total: initial.sourceGroups.length },
+      items: groups,
+      page: { limit: 100, offset: 0, total },
     },
   );
+}
+
+function wrapWithProviders(node: ReactNode, initial: PageInitialData): JSX.Element {
+  const client = buildQueryClient();
+  seedSchedules(client, initial.schedules, initial.total);
+  seedSourceGroups(client, initial.sourceGroups, initial.sourceGroups.length);
 
   return (
     <QueryClientProvider client={client}>
@@ -203,5 +222,30 @@ describe("CollectionSchedulesPage", () => {
     expect(markup).toContain("Paused Group");
     expect(markup).toContain("Disabled");
     expect(markup).toContain("PAUSED");
+  });
+
+  it("renders a partial source-group inventory warning when total exceeds loaded items (regression: supported limit 100, not 200)", () => {
+    // Only seed the supported `limit: 100` key. The partial-inventory warning
+    // is derived from `useSourceGroupsQuery(...)`, which is called with
+    // `{ limit: 100, offset: 0 }`. If the page ever switched back to
+    // `limit: 200`, the seeded data would not match the active query key
+    // and the warning would not render.
+    const client = buildQueryClient();
+    seedSchedules(client, [], 0);
+    seedSourceGroups(
+      client,
+      [createSourceGroup({ id: "sg-1", name: "Group One", status: "ACTIVE" })],
+      150,
+    );
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <CollectionSchedulesPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain("partial source-group inventory");
   });
 });

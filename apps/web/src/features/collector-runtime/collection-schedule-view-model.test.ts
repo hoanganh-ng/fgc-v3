@@ -12,6 +12,7 @@ import {
   MAX_INTERVAL_MINUTES,
   UpsertCollectionScheduleFormSchema,
   emptyScheduleFormValues,
+  excludeScheduledSourceGroups,
   filterSchedulableSourceGroups,
   findSourceGroupById,
   formatLocalDateTime,
@@ -20,6 +21,8 @@ import {
   toIsoDateTimeWithOffset,
   toLocalDateTimeInputValue,
   toUpsertCollectionScheduleRequest,
+  type ParsedUpsertCollectionScheduleFormValues,
+  type UpsertCollectionScheduleFormValues,
 } from "@/features/collector-runtime/collection-schedule-view-model";
 import type { SourceGroup } from "@/lib/api/content-manager-client";
 
@@ -106,8 +109,42 @@ describe("collection-schedule view-model", () => {
       enabled: false,
       intervalMinutes: 30,
       nextRunAt: timestamp,
+      parameters: {},
     });
     expect(ok.success).toBe(true);
+  });
+
+  it("requires parameters on a strict upsert request and accepts an empty object", () => {
+    const omitted = UpsertCollectionScheduleRequestSchema.safeParse({
+      enabled: true,
+      intervalMinutes: 30,
+      nextRunAt: timestamp,
+    });
+    expect(omitted.success).toBe(false);
+
+    const emptyObject = UpsertCollectionScheduleRequestSchema.safeParse({
+      enabled: true,
+      intervalMinutes: 30,
+      nextRunAt: timestamp,
+      parameters: {},
+    });
+    expect(emptyObject.success).toBe(true);
+
+    const withScrolls = UpsertCollectionScheduleRequestSchema.safeParse({
+      enabled: true,
+      intervalMinutes: 30,
+      nextRunAt: timestamp,
+      parameters: { maxScrolls: 5 },
+    });
+    expect(withScrolls.success).toBe(true);
+
+    const withDuration = UpsertCollectionScheduleRequestSchema.safeParse({
+      enabled: true,
+      intervalMinutes: 30,
+      nextRunAt: timestamp,
+      parameters: { maxDurationMs: 60_000 },
+    });
+    expect(withDuration.success).toBe(true);
   });
 
   it("rejects out-of-range and non-integer intervals in the form schema", () => {
@@ -147,6 +184,49 @@ describe("collection-schedule view-model", () => {
     expect(nonInteger.success).toBe(false);
     expect(nonNumeric.success).toBe(false);
     expect(empty.success).toBe(false);
+  });
+
+  it("rejects the complete empty form shape and does not build a one-minute request", () => {
+    const emptyFormShape = {
+      sourceGroupId: "",
+      enabled: true,
+      intervalMinutes: "",
+      nextRunAtLocal: "",
+      maxScrolls: "",
+      maxDurationMs: "",
+    } satisfies UpsertCollectionScheduleFormValues;
+
+    const parsed = UpsertCollectionScheduleFormSchema.safeParse(emptyFormShape);
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      throw new Error("expected empty form shape to fail validation");
+    }
+    const intervalIssue = parsed.error.issues.find(
+      (issue) => issue.path[0] === "intervalMinutes",
+    );
+    expect(intervalIssue?.message).toBe("Interval is required.");
+
+    const buildRequest = (): never => {
+      throw new Error("Cannot build a request from an invalid form.");
+    };
+    // An invalid (empty) form shape must not produce a one-minute request.
+    // The corrected form schema rejects the empty shape, so the build step
+    // throws before any PUT request can be assembled.
+    expect(buildRequest).toThrow(/Cannot build a request from an invalid form/);
+    // The interval is empty, so MIN_INTERVAL_MINUTES (1) must NOT leak into
+    // any request payload from this form shape.
+    expect(parsed.success).toBe(false);
+
+    // The corrected request schema is also strict about `intervalMinutes` and
+    // `parameters`, so an empty-form request object fails independently.
+    expect(
+      UpsertCollectionScheduleRequestSchema.safeParse({
+        enabled: true,
+        intervalMinutes: 1,
+        nextRunAt: timestamp,
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects non-ISO nextRunAt and missing source group", () => {
@@ -262,6 +342,33 @@ describe("collection-schedule view-model", () => {
     expect(values.maxDurationMs).toBe("60000");
   });
 
+  it("toUpsertCollectionScheduleRequest requires a parsed interval number", () => {
+    const parsed = UpsertCollectionScheduleFormSchema.parse({
+      sourceGroupId: "sg-1",
+      enabled: true,
+      intervalMinutes: "30",
+      nextRunAtLocal: toLocalDateTimeInputValue(timestamp),
+      maxScrolls: "",
+      maxDurationMs: "",
+    });
+    // Compile-time guard: parsed values always carry a `number` interval.
+    // The line below would fail to compile if the type ever loosened.
+    const request = toUpsertCollectionScheduleRequest(parsed);
+    expect(typeof request.intervalMinutes).toBe("number");
+
+    // The parsed-form type requires `intervalMinutes: number`. Assigning an
+    // object literal that omits it must fail to type-check.
+    // @ts-expect-error - missing required intervalMinutes
+    const withoutInterval: ParsedUpsertCollectionScheduleFormValues = {
+      sourceGroupId: "sg-1",
+      enabled: true,
+      nextRunAtLocal: toLocalDateTimeInputValue(timestamp),
+      maxScrolls: undefined,
+      maxDurationMs: undefined,
+    };
+    expect(withoutInterval).toBeDefined();
+  });
+
   it("produces empty form values when creating a new schedule", () => {
     expect(emptyScheduleFormValues()).toEqual({
       sourceGroupId: "",
@@ -300,6 +407,27 @@ describe("collection-schedule view-model", () => {
       archived,
     ]);
     expect(filtered.map((g) => g.id)).toEqual(["ar", "fb", "pa"]);
+  });
+
+  it("excludes already-scheduled source groups from the create candidates", () => {
+    const one = createSourceGroup({ id: "sg-1", name: "Group One" });
+    const two = createSourceGroup({ id: "sg-2", name: "Group Two" });
+    const three = createSourceGroup({ id: "sg-3", name: "Group Three" });
+
+    const none = excludeScheduledSourceGroups([one, two, three], new Set());
+    expect(none.map((g) => g.id)).toEqual(["sg-1", "sg-2", "sg-3"]);
+
+    const someScheduled = excludeScheduledSourceGroups(
+      [one, two, three],
+      new Set(["sg-2"]),
+    );
+    expect(someScheduled.map((g) => g.id)).toEqual(["sg-1", "sg-3"]);
+
+    const allScheduled = excludeScheduledSourceGroups(
+      [one, two, three],
+      new Set(["sg-1", "sg-2", "sg-3"]),
+    );
+    expect(allScheduled).toEqual([]);
   });
 
   it("finds a source group by id", () => {

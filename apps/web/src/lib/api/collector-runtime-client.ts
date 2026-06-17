@@ -541,7 +541,7 @@ export const UpsertCollectionScheduleRequestSchema = z
     enabled: z.boolean(),
     intervalMinutes: z.number().int().min(1).max(10080),
     nextRunAt: z.string().datetime({ offset: true }),
-    parameters: CollectionScheduleParametersSchema.optional(),
+    parameters: CollectionScheduleParametersSchema,
   })
   .strict();
 

@@ -104,11 +104,13 @@ Web UI (apps/web/src/)
     useUpsertCollectionScheduleMutation (invalidates schedule keys
       and collection-run keys on success)
   features/collector-runtime/collection-schedule-view-model.ts
-    toUpsertCollectionScheduleRequest (form -> API)
-    formatScheduleForDisplay (renders local timezone)
+    toUpsertCollectionScheduleRequest (form -> API, requires parsed intervalMinutes)
+    formatLocalDateTimeSeconds (renders local timezone for next-run/updated)
     toLocalDateTimeInputValue (ISO -> datetime-local)
     toIsoDateTimeWithOffset (datetime-local -> ISO with offset)
     filterSchedulableSourceGroups (FACEBOOK + ACTIVE/PAUSED/ARCHIVED)
+    excludeScheduledSourceGroups (hides already-scheduled groups from the
+      create selector)
   pages/collection-schedules-page.tsx (new)
   app/router.tsx (adds the /collection-schedules route)
   app/navigation.ts (adds the "Schedules" entry)
@@ -227,15 +229,23 @@ container image are untouched.
 | `GET /collector/collection-schedules` lists and paginates                   | `src/interfaces/http/collector-runtime.server.test.ts`                                          |
 | `GET /collector/collection-schedules/:sourceGroupId` 404s when missing     | `src/interfaces/http/collector-runtime.server.test.ts`                                          |
 | `PUT /collector/collection-schedules/:sourceGroupId` happy path; safe DTO    | `src/interfaces/http/collector-runtime.server.test.ts`                                          |
+| `PUT` accepts an empty `parameters` object and the safe DTO stays empty    | `src/interfaces/http/collector-runtime.server.test.ts`                                          |
+| `PUT` 400 when the body omits `parameters`                                 | `src/interfaces/http/collector-runtime.server.test.ts`                                          |
 | `PUT` 400 on invalid body (interval out of range, non-ISO nextRunAt)        | `src/interfaces/http/collector-runtime.server.test.ts`                                          |
 | `PUT` 404 on missing source group; 409 on PAUSED+enabled; 409 on non-FB     | `src/interfaces/http/collector-runtime.server.test.ts`                                          |
 | `PUT` 502 on unexpected source group lookup failure                         | `src/interfaces/http/collector-runtime.server.test.ts`                                          |
 | `CollectionRunTriggerTypeSchema` accepts `SCHEDULED`                       | `apps/web/src/features/collector-runtime/collection-run-client.test.ts`                         |
 | `CollectionSchedule` request / response schemas are strict                  | `apps/web/src/features/collector-runtime/collection-schedule-view-model.test.ts`                 |
+| `UpsertCollectionScheduleRequestSchema` requires `parameters` and accepts `parameters: {}` | `apps/web/src/features/collector-runtime/collection-schedule-view-model.test.ts` |
+| Form schema rejects the complete empty form shape (no one-minute fallback) | `apps/web/src/features/collector-runtime/collection-schedule-view-model.test.ts`                 |
+| `toUpsertCollectionScheduleRequest` requires a parsed `intervalMinutes` number | `apps/web/src/features/collector-runtime/collection-schedule-view-model.test.ts`                |
 | Datetime conversion (local -> ISO with offset; ISO -> local input)          | `apps/web/src/features/collector-runtime/collection-schedule-view-model.test.ts`                 |
 | `toUpsertCollectionScheduleRequest` omits empty optionals                   | `apps/web/src/features/collector-runtime/collection-schedule-view-model.test.ts`                 |
-| Schedules page lists, creates, edits, enables, disables                    | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                      |
-| Schedules page invalidates schedule queries on save                        | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                      |
+| `excludeScheduledSourceGroups` filters already-scheduled groups             | `apps/web/src/features/collector-runtime/collection-schedule-view-model.test.ts`                 |
+| Schedules page renders list with source-group metadata (smoke render)       | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
+| Schedules page does not issue an unsupported source-group `limit: 200`     | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
+| Schedules page renders a partial source-group inventory warning             | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
+| Collection-schedule mutation invalidates `collectionScheduleQueryKeys.all` and `collectionRunQueryKeys.all` | `apps/web/src/features/collector-runtime/collection-schedule-mutations.test.ts`     |
 
 ## Out Of Scope
 
@@ -301,3 +311,32 @@ list / create / edit / enable / disable, a `SCHEDULED` regression
 fix in the Web UI Collector Runtime client, and a small schedule
 view-model that converts operator-local datetimes to absolute ISO
 datetimes with offset. It does not advance beyond its declared scope.
+
+### Sprint 061 Corrections
+
+A correction pass was applied to Sprint 061 without advancing the
+sprint scope. The corrections:
+
+- Replace the unsupported `limit: 200` source-group query with the
+  Content Manager default `limit: 100`. Surface loading, error,
+  retry, and unavailable states for `useSourceGroupsQuery`, and add
+  a partial-inventory warning when `page.total > items.length`,
+  mirroring the existing `source-group-profile-access-panel`
+  pattern.
+- Make `intervalMinutes` truly required. Empty input now fails form
+  validation and the `?? MIN_INTERVAL_MINUTES` request fallback is
+  removed.
+- Exclude source groups that already have a schedule from the create
+  selector; surface an explicit "every loaded eligible source group
+  already has a schedule" state when the filtered list is empty.
+- Render an edit-mode loading state until the schedule detail query
+  resolves and an error/retry state on detail failure. Disable
+  submission until the detail query loads successfully.
+- Restore the approved complete PUT contract: `parameters` required
+  (with `{}` valid) and `maxScrolls` / `maxDurationMs` individually
+  optional — applied to the Zod body schema, the Fastify JSON schema
+  `required` list, and the Web UI client request schema.
+- Update Sprint 060 wording to the precise scheduler-runtime scope.
+- Correct the Sprint 061 Test Matrix to match the real coverage
+  (and remove the nonexistent `formatScheduleForDisplay`
+  reference).
