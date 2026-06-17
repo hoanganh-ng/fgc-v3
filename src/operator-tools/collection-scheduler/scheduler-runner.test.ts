@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Clock, IdGenerator } from "../../collector-runtime/application";
 import {
   DispatchNextDueCollectionScheduleUseCase,
@@ -21,6 +21,14 @@ const defaultOptions = {
 } as const;
 
 describe("collection scheduler runner", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("completes one drain cycle in --once mode when no schedule is due", async () => {
     const dispatch = vi.fn(async () => null);
     let closeCount = 0;
@@ -59,31 +67,81 @@ describe("collection scheduler runner", () => {
     expect(dispatch).toHaveBeenCalledTimes(4);
   });
 
-  it("runs multiple continuous cycles and stops when aborted during a sleep", async () => {
+  it("does not delay between dispatches inside a single drain cycle", async () => {
     const dispatch = createFakeDispatch([
       makeResult("source-group-1", "run-1"),
       makeResult("source-group-2", "run-2"),
       null,
-      makeResult("source-group-3", "run-3"),
-      makeResult("source-group-4", "run-4"),
+    ]);
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
+    const result = await runCollectionSchedulerCommand({
+      options: { ...defaultOptions, once: true, pollIntervalMs: 1_000 },
+      logger: new MemoryLogger(),
+      dependencies: { dispatch, close: async () => {} },
+    });
+
+    expect(result).toEqual({ cyclesCompleted: 1, dispatchedRuns: 2 });
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+    setTimeoutSpy.mockRestore();
+  });
+
+  it("schedules exactly one delay between the first and second completed continuous cycles", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const dispatch = createFakeDispatch([
+      makeResult("source-group-1", "run-1"),
       null,
     ]);
     const abortController = new AbortController();
-    let dispatchedCount = 0;
 
-    const wrappedDispatch = vi.fn(async () => {
-      const result = await dispatch();
-      if (result !== null) {
-        dispatchedCount += 1;
-        if (dispatchedCount === 4) {
-          abortController.abort();
-        }
-      }
-      return result;
+    const promise = runCollectionSchedulerCommand({
+      options: { ...defaultOptions, pollIntervalMs: 750 },
+      logger: new MemoryLogger(),
+      dependencies: { dispatch, close: async () => {} },
+      abortSignal: abortController.signal,
     });
 
-    const result = await runCollectionSchedulerCommand({
-      options: { ...defaultOptions, pollIntervalMs: 50 },
+    await flushMicrotasks();
+
+    // Cycle 1 drained, cyclesCompleted=1, the only setTimeout is the delay.
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 750);
+
+    // Advance just under the timeout boundary — still no second delay.
+    await vi.advanceTimersByTimeAsync(749);
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+
+    // Cross the boundary — the first delay resolves, then cycle 2 begins.
+    // Cycle 2 has the same queue [r, null]; it drains completely. The
+    // inter-cycle delay #2 is then scheduled. setTimeout count is now 2.
+    await vi.advanceTimersByTimeAsync(1);
+    await flushMicrotasks();
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(2);
+
+    abortController.abort();
+    await flushMicrotasks();
+
+    const result = await promise;
+    expect(result).toEqual({ cyclesCompleted: 2, dispatchedRuns: 1 });
+    setTimeoutSpy.mockRestore();
+  });
+
+  it("does not begin or count a new cycle when aborted during the delay", async () => {
+    const dispatch = createFakeDispatch([
+      makeResult("source-group-1", "run-1"),
+      null,
+    ]);
+    const abortController = new AbortController();
+    let dispatchCalls = 0;
+
+    const wrappedDispatch = vi.fn(async (): Promise<DispatchNextDueResult | null> => {
+      dispatchCalls += 1;
+      const entry = dispatch();
+      return entry;
+    });
+
+    const promise = runCollectionSchedulerCommand({
+      options: { ...defaultOptions, pollIntervalMs: 1_000 },
       logger: new MemoryLogger(),
       dependencies: {
         dispatch: wrappedDispatch,
@@ -92,37 +150,194 @@ describe("collection scheduler runner", () => {
       abortSignal: abortController.signal,
     });
 
-    expect(result.cyclesCompleted).toBe(2);
-    expect(result.dispatchedRuns).toBe(4);
-    expect(wrappedDispatch).toHaveBeenCalledTimes(5);
+    await flushMicrotasks();
+    // Cycle 1 drained (one non-null + one null = two dispatches).
+    expect(dispatchCalls).toBe(2);
+    expect(wrappedDispatch).toHaveBeenCalledTimes(2);
+
+    // Abort while in the inter-cycle delay.
+    abortController.abort();
+    await flushMicrotasks();
+
+    const result = await promise;
+
+    // No second cycle is started, no further dispatch is issued.
+    expect(result).toEqual({ cyclesCompleted: 1, dispatchedRuns: 1 });
+    expect(wrappedDispatch).toHaveBeenCalledTimes(2);
   });
 
-  it("counts one cycle and never calls dispatch when the signal is already aborted", async () => {
-    const dispatch = vi.fn(async () => null);
+  it("aborts the delay promptly and removes the abort listener", async () => {
+    const dispatch = createFakeDispatch([
+      makeResult("source-group-1", "run-1"),
+      null,
+    ]);
     const abortController = new AbortController();
-    abortController.abort();
+    const removeListenerSpy = vi.spyOn(
+      abortController.signal,
+      "removeEventListener",
+    );
+    const addListenerSpy = vi.spyOn(
+      abortController.signal,
+      "addEventListener",
+    );
 
-    const result = await runCollectionSchedulerCommand({
-      options: { ...defaultOptions, pollIntervalMs: 50 },
+    const promise = runCollectionSchedulerCommand({
+      options: { ...defaultOptions, pollIntervalMs: 10_000 },
       logger: new MemoryLogger(),
       dependencies: { dispatch, close: async () => {} },
       abortSignal: abortController.signal,
     });
 
-    expect(result).toEqual({ cyclesCompleted: 1, dispatchedRuns: 0 });
+    await flushMicrotasks();
+
+    // The runner installed an abort listener with { once: true }.
+    expect(addListenerSpy).toHaveBeenCalledWith(
+      "abort",
+      expect.anything(),
+      expect.objectContaining({ once: true }),
+    );
+    expect(removeListenerSpy).not.toHaveBeenCalled();
+
+    const start = Date.now();
+    abortController.abort();
+    const result = await promise;
+    const elapsed = Date.now() - start;
+
+    expect(result).toEqual({ cyclesCompleted: 1, dispatchedRuns: 1 });
+    expect(elapsed).toBeLessThan(50);
+    expect(removeListenerSpy).toHaveBeenCalledWith("abort", expect.anything());
+
+    addListenerSpy.mockRestore();
+    removeListenerSpy.mockRestore();
+  });
+
+  it("removes the abort listener after a normal delay completes", async () => {
+    const dispatch = createFakeDispatch([
+      makeResult("source-group-1", "run-1"),
+      null,
+    ]);
+    const abortController = new AbortController();
+    const removeListenerSpy = vi.spyOn(
+      abortController.signal,
+      "removeEventListener",
+    );
+    const addListenerSpy = vi.spyOn(
+      abortController.signal,
+      "addEventListener",
+    );
+
+    const promise = runCollectionSchedulerCommand({
+      options: { ...defaultOptions, pollIntervalMs: 200 },
+      logger: new MemoryLogger(),
+      dependencies: { dispatch, close: async () => {} },
+      abortSignal: abortController.signal,
+    });
+
+    await flushMicrotasks();
+    expect(removeListenerSpy).not.toHaveBeenCalled();
+
+    // Cross the first delay — the runner must remove its own listener.
+    await vi.advanceTimersByTimeAsync(200);
+    await flushMicrotasks();
+    expect(removeListenerSpy).toHaveBeenCalledTimes(1);
+    expect(addListenerSpy).toHaveBeenCalledTimes(2);
+
+    // Abort during the second delay.
+    abortController.abort();
+    await flushMicrotasks();
+
+    const result = await promise;
+
+    // Each registered listener is removed exactly once, total 2 removes.
+    expect(result).toEqual({ cyclesCompleted: 2, dispatchedRuns: 1 });
+    expect(removeListenerSpy).toHaveBeenCalledTimes(2);
+
+    addListenerSpy.mockRestore();
+    removeListenerSpy.mockRestore();
+  });
+
+  it("removes every abort listener across multiple completed normal delays", async () => {
+    const dispatch = createFakeDispatch([
+      makeResult("source-group-1", "run-1"),
+      null,
+    ]);
+    const abortController = new AbortController();
+    const removeListenerSpy = vi.spyOn(
+      abortController.signal,
+      "removeEventListener",
+    );
+    const addListenerSpy = vi.spyOn(
+      abortController.signal,
+      "addEventListener",
+    );
+
+    const promise = runCollectionSchedulerCommand({
+      options: { ...defaultOptions, pollIntervalMs: 100 },
+      logger: new MemoryLogger(),
+      dependencies: { dispatch, close: async () => {} },
+      abortSignal: abortController.signal,
+    });
+
+    await flushMicrotasks();
+    expect(addListenerSpy).toHaveBeenCalledTimes(1);
+
+    // First normal delay completes.
+    await vi.advanceTimersByTimeAsync(100);
+    await flushMicrotasks();
+    expect(removeListenerSpy).toHaveBeenCalledTimes(1);
+    expect(addListenerSpy).toHaveBeenCalledTimes(2);
+
+    // Second normal delay completes.
+    await vi.advanceTimersByTimeAsync(100);
+    await flushMicrotasks();
+    expect(removeListenerSpy).toHaveBeenCalledTimes(2);
+    expect(addListenerSpy).toHaveBeenCalledTimes(3);
+
+    abortController.abort();
+    await flushMicrotasks();
+
+    const result = await promise;
+    expect(result).toEqual({ cyclesCompleted: 3, dispatchedRuns: 1 });
+    // Every listener the runner added was removed.
+    expect(removeListenerSpy.mock.calls.length).toBe(addListenerSpy.mock.calls.length);
+
+    addListenerSpy.mockRestore();
+    removeListenerSpy.mockRestore();
+  });
+
+  it("performs zero dispatches and completes zero cycles when the signal is already aborted", async () => {
+    const dispatch = vi.fn(async () => null);
+    const abortController = new AbortController();
+    abortController.abort();
+    let closeCount = 0;
+
+    const result = await runCollectionSchedulerCommand({
+      options: { ...defaultOptions, pollIntervalMs: 50 },
+      logger: new MemoryLogger(),
+      dependencies: {
+        dispatch,
+        close: async () => {
+          closeCount += 1;
+        },
+      },
+      abortSignal: abortController.signal,
+    });
+
+    expect(result).toEqual({ cyclesCompleted: 0, dispatchedRuns: 0 });
     expect(dispatch).not.toHaveBeenCalled();
+    expect(closeCount).toBe(1);
   });
 
   it("aborts a drain mid-cycle without dispatching further", async () => {
+    const abortController = new AbortController();
     const dispatch = vi.fn(async (): Promise<DispatchNextDueResult | null> => {
       const result = makeResult("source-group-1", "run-1");
       abortController.abort();
       return result;
     });
-    const abortController = new AbortController();
 
     const result = await runCollectionSchedulerCommand({
-      options: { ...defaultOptions, pollIntervalMs: 50 },
+      options: { ...defaultOptions, once: true, pollIntervalMs: 50 },
       logger: new MemoryLogger(),
       dependencies: { dispatch, close: async () => {} },
       abortSignal: abortController.signal,
@@ -364,4 +579,10 @@ class FixedIdGenerator implements IdGenerator {
   public async generateId(): Promise<string> {
     return this.id;
   }
+}
+
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
 }

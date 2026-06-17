@@ -95,6 +95,17 @@ use cases, no schema or migration changes.
 `--once` exits after exactly one cycle; `cyclesCompleted === 1`.
 Continuous mode increments `cyclesCompleted` per outer iteration.
 
+Final-state rules:
+
+- A pre-aborted signal performs **zero** dispatches and reports
+  **zero** completed cycles.
+- An abort that lands during the inter-cycle delay does not begin
+  or count a new cycle; the previous cycle is unchanged.
+- An abort that lands between two dispatches inside a drain may
+  count that drain as one completed cycle (the inner drain exits
+  with a non-zero `dispatchedRuns` and the counter increments once
+  on the way out of the inner loop).
+
 ## Dependency Contract
 
 The runner accepts a narrow dependency contract:
@@ -132,14 +143,21 @@ usage, sets `process.exitCode = 2`, and returns.
 ## Error And Shutdown Semantics
 
 - A throw from `dispatch()` propagates out of the runner. The `finally`
-  block awaits `close()` exactly once; if `close` also throws, the
-  runner re-raises the dispatch error by standard JS semantics.
+  block awaits `close()` exactly once. Whether the dispatch error or
+  the close error reaches the caller is governed by normal JavaScript
+  `try/finally` semantics; the runner does not swallow either one.
 - The CLI catches the re-raised error, prints its message, and sets
   `process.exitCode = 1`.
 - SIGINT and SIGTERM trigger `abortController.abort()`. The runner
   observes the abort between dispatches and inside the delay, drains
   the current cycle (which is counted), then exits the outer loop.
-- The CLI detaches its signal handlers in its own `finally`.
+- The CLI detaches its signal handlers in its own `finally`, even if
+  runtime composition throws after handlers are installed.
+- `close()` is invoked by the runner, not by the CLI; the CLI never
+  double-closes. The CLI never calls `close()` on a runtime that was
+  never constructed.
+- The CLI never instantiates the Drizzle dispatch repository; it
+  always wires through `createCollectorRuntimeFromEnv()`.
 
 ## Logging Policy
 
@@ -162,6 +180,7 @@ usage, sets `process.exitCode = 2`, and returns.
 - `src/operator-tools/collection-scheduler/cli.ts`
 - `src/operator-tools/collection-scheduler/cli-args.test.ts`
 - `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`
+- `src/operator-tools/collection-scheduler/cli.test.ts`
 - `docs/SPRINTS/SPRINT-059-scheduled-collection-dispatch-poller.md`
 
 ### Modify
@@ -184,8 +203,9 @@ usage, sets `process.exitCode = 2`, and returns.
 - **Cycle counter on partial drain**: an aborted drain still counts
   as one cycle. This keeps `cyclesCompleted` monotonic and the test
   assertions simple.
-- **Abort-aware delay**: the local `delay()` resolves early on
-  abort, mirroring the collector-worker's helper.
+- **Abort-aware delay**: the local `delay()` resolves early on abort
+  and removes the AbortSignal listener on both normal completion
+  and abort paths, so listeners never accumulate across cycles.
 - **Exit codes**: argument error → 2; runtime error → 1; help → 0.
 
 ## Test Matrix
@@ -194,16 +214,25 @@ usage, sets `process.exitCode = 2`, and returns.
 |--------------------------------------------------------------------------|---------------------------------------------------------------------------------|
 | Defaults, --once, --poll-interval-ms parsing                             | `src/operator-tools/collection-scheduler/cli-args.test.ts`                      |
 | Duplicate, unknown, positional, missing, nonnumeric, fractional, zero, negative, empty inline | `src/operator-tools/collection-scheduler/cli-args.test.ts`                      |
-| Help text mentions every flag                                             | `src/operator-tools/collection-scheduler/cli-args.test.ts`                      |
+| Help text mentions every flag + DATABASE_URL requirement                  | `src/operator-tools/collection-scheduler/cli-args.test.ts`                      |
 | `--once` exits after one drain                                            | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Inner drain loop dispatches until null                                    | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
-| Continuous mode runs multiple cycles until aborted                        | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
-| Pre-aborted signal counts one cycle without dispatching                   | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
+| No `setTimeout` call between dispatches inside one drain                  | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
+| Exactly one delay between two completed continuous cycles                 | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
+| Abort during the delay resolves promptly with no phantom cycle            | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
+| Abort listener is removed on abort and on normal delay completion         | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
+| Repeated normal delays do not retain abort listeners                      | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
+| Pre-aborted signal performs zero dispatches and zero cycles               | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Abort mid-drain stops further dispatching                                 | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Dispatch errors propagate and close still runs once                      | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Close errors propagate                                                    | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Logger emits safe info lines and no warns/errors on happy path            | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Real use case + in-memory repository integration                          | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
+| `--help` returns without constructing the runtime                         | `src/operator-tools/collection-scheduler/cli.test.ts`                           |
+| Argument errors return without constructing the runtime                   | `src/operator-tools/collection-scheduler/cli.test.ts`                           |
+| Signal handlers are installed and the AbortController path is exercised   | `src/operator-tools/collection-scheduler/cli.test.ts`                           |
+| Signal handlers are detached when runtime composition throws              | `src/operator-tools/collection-scheduler/cli.test.ts`                           |
+| Runtime `close()` is invoked exactly once (runner is sole closer)         | `src/operator-tools/collection-scheduler/cli.test.ts`                           |
 
 ## Out Of Scope
 

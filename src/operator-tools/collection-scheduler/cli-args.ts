@@ -97,6 +97,11 @@ export function getCollectionSchedulerCliUsage(): string {
     "Defaults:",
     "  --poll-interval-ms defaults to 5000 milliseconds when not provided.",
     "",
+    "Environment:",
+    "  DATABASE_URL is required for production composition; the scheduler",
+    "  resolves it through the existing Collector Runtime composition root.",
+    "  Other module base URLs follow the Collector Runtime configuration.",
+    "",
     "The scheduler invokes the existing DispatchNextDueCollectionScheduleUseCase on each cycle, draining every enabled due CollectionSchedule. It never executes collection runs; execution is left to the collector worker.",
   ].join("\n");
 }

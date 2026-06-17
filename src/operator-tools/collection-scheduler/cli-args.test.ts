@@ -143,4 +143,11 @@ describe("collection scheduler CLI args", () => {
     expect(usage).toContain("--help");
     expect(usage).toContain("-h");
   });
+
+  it("states that DATABASE_URL is required for production composition", () => {
+    const usage = getCollectionSchedulerCliUsage();
+
+    expect(usage).toContain("DATABASE_URL");
+    expect(usage).toContain("required");
+  });
 });

@@ -47,7 +47,28 @@ export async function runCollectionSchedulerCommand(
   logger.info("Collection scheduler started.");
 
   try {
+    if (input.abortSignal?.aborted) {
+      logger.info("Collection scheduler aborted before first cycle.");
+      return {
+        cyclesCompleted: result.cyclesCompleted,
+        dispatchedRuns: result.dispatchedRuns,
+      };
+    }
+
+    let cycleBegan = false;
+    let cycleCompleted = false;
+
     while (true) {
+      cycleBegan = false;
+      cycleCompleted = false;
+
+      if (input.abortSignal?.aborted) {
+        break;
+      }
+
+      cycleBegan = true;
+      let cycleDispatched = 0;
+
       while (true) {
         if (input.abortSignal?.aborted) {
           break;
@@ -59,6 +80,7 @@ export async function runCollectionSchedulerCommand(
           break;
         }
 
+        cycleDispatched += 1;
         result.dispatchedRuns += 1;
         logger.info(
           `Dispatched schedule ${dispatched.schedule.sourceGroupId} ` +
@@ -66,6 +88,7 @@ export async function runCollectionSchedulerCommand(
         );
       }
 
+      cycleCompleted = true;
       result.cyclesCompleted += 1;
       logger.info(
         `Cycle ${result.cyclesCompleted} complete ` +
@@ -83,6 +106,12 @@ export async function runCollectionSchedulerCommand(
       await delay(input.options.pollIntervalMs, input.abortSignal);
     }
 
+    if (!cycleBegan) {
+      logger.info("Collection scheduler aborted before first cycle.");
+    } else if (!cycleCompleted) {
+      logger.info("Collection scheduler aborted mid-cycle.");
+    }
+
     return {
       cyclesCompleted: result.cyclesCompleted,
       dispatchedRuns: result.dispatchedRuns,
@@ -91,11 +120,6 @@ export async function runCollectionSchedulerCommand(
     await input.dependencies.close();
     logger.info("Collection scheduler stopped.");
   }
-
-  return {
-    cyclesCompleted: result.cyclesCompleted,
-    dispatchedRuns: result.dispatchedRuns,
-  };
 }
 
 function delay(
@@ -106,18 +130,32 @@ function delay(
     return Promise.resolve();
   }
 
-  return new Promise((resolve) => {
-    const timeout = setTimeout(resolve, milliseconds);
+  if (milliseconds <= 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const settle = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (abortSignal !== undefined) {
+        abortSignal.removeEventListener("abort", onAbort);
+      }
+      resolve();
+    };
+
+    const timeout = setTimeout(settle, milliseconds);
+
+    const onAbort = (): void => {
+      clearTimeout(timeout);
+      settle();
+    };
 
     if (abortSignal !== undefined) {
-      abortSignal.addEventListener(
-        "abort",
-        () => {
-          clearTimeout(timeout);
-          resolve();
-        },
-        { once: true },
-      );
+      abortSignal.addEventListener("abort", onAbort, { once: true });
     }
   });
 }
