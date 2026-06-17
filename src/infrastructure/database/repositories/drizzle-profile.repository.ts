@@ -87,32 +87,19 @@ export class DrizzleProfileRepository implements ProfileRepository {
     query: ProfileListQuery,
   ): Promise<ProfileListResult> {
     const offset = query.offset ?? 0;
-
-    if (query.status === undefined) {
-      const rows = await this.db
-        .select()
-        .from(collectorProfiles)
-        .orderBy(asc(collectorProfiles.createdAt), asc(collectorProfiles.id))
-        .limit(query.limit)
-        .offset(offset);
-      const [totalRow] = await this.db
-        .select({ total: sql<number>`count(*)::int` })
-        .from(collectorProfiles);
-
-      return toProfileListResult(rows, totalRow?.total);
-    }
+    const where = buildProfileListWhere(query);
 
     const rows = await this.db
       .select()
       .from(collectorProfiles)
-      .where(eq(collectorProfiles.status, query.status))
+      .where(where)
       .orderBy(asc(collectorProfiles.createdAt), asc(collectorProfiles.id))
       .limit(query.limit)
       .offset(offset);
     const [totalRow] = await this.db
       .select({ total: sql<number>`count(*)::int` })
       .from(collectorProfiles)
-      .where(eq(collectorProfiles.status, query.status));
+      .where(where);
 
     return toProfileListResult(rows, totalRow?.total);
   }
@@ -198,4 +185,26 @@ function toProfileListResult(
     items,
     total: Number(totalValue),
   };
+}
+
+function buildProfileListWhere(
+  query: ProfileListQuery,
+): ReturnType<typeof and> | undefined {
+  const conditions = [] as Array<ReturnType<typeof eq>>;
+
+  if (query.status !== undefined) {
+    conditions.push(eq(collectorProfiles.status, query.status));
+  }
+
+  if (query.authenticationHealth !== undefined) {
+    conditions.push(
+      eq(collectorProfiles.authenticationHealth, query.authenticationHealth),
+    );
+  }
+
+  if (conditions.length === 0) {
+    return undefined;
+  }
+
+  return and(...conditions);
 }

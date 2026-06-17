@@ -275,6 +275,88 @@ if (!shouldRunDbTests) {
       expect(page.total).toBe(2);
     });
 
+    it("lists profiles with combined status and authenticationHealth filters", async () => {
+      const readyReauth = trackProfile(
+        withAuthenticationHealth(
+          createReadyProfile(nextTestId("list-reauth-ready"), {
+            createdAt: "2026-01-05T18:00:00.000Z",
+          }),
+          "REAUTH_REQUIRED",
+        ),
+      );
+      const readyHealthy = trackProfile(
+        withAuthenticationHealth(
+          createReadyProfile(nextTestId("list-healthy-ready"), {
+            createdAt: "2026-01-05T18:01:00.000Z",
+          }),
+          "HEALTHY",
+        ),
+      );
+      const busyReauth = trackProfile(
+        withAuthenticationHealth(
+          createBusyProfile(nextTestId("list-reauth-busy")),
+          "REAUTH_REQUIRED",
+        ),
+      );
+
+      await profiles.save(readyReauth);
+      await profiles.save(readyHealthy);
+      await profiles.save(busyReauth);
+
+      const page = await profiles.listProfiles({
+        status: "READY",
+        authenticationHealth: "REAUTH_REQUIRED",
+        limit: 25,
+      });
+
+      expect(page.items.map((profile) => profile.identity.id)).toEqual([
+        readyReauth.identity.id,
+      ]);
+      expect(page.total).toBe(1);
+    });
+
+    it("returns deterministic ordering and totals with offset pagination over authenticationHealth", async () => {
+      const first = trackProfile(
+        withAuthenticationHealth(
+          createReadyProfile(nextTestId("list-reauth-paged-0"), {
+            createdAt: "2026-01-05T18:00:00.000Z",
+          }),
+          "REAUTH_REQUIRED",
+        ),
+      );
+      const second = trackProfile(
+        withAuthenticationHealth(
+          createReadyProfile(nextTestId("list-reauth-paged-1"), {
+            createdAt: "2026-01-05T18:01:00.000Z",
+          }),
+          "REAUTH_REQUIRED",
+        ),
+      );
+      const third = trackProfile(
+        withAuthenticationHealth(
+          createReadyProfile(nextTestId("list-reauth-paged-2"), {
+            createdAt: "2026-01-05T18:02:00.000Z",
+          }),
+          "REAUTH_REQUIRED",
+        ),
+      );
+
+      await profiles.save(first);
+      await profiles.save(second);
+      await profiles.save(third);
+
+      const page = await profiles.listProfiles({
+        authenticationHealth: "REAUTH_REQUIRED",
+        limit: 1,
+        offset: 1,
+      });
+
+      expect(page.items.map((profile) => profile.identity.id)).toEqual([
+        second.identity.id,
+      ]);
+      expect(page.total).toBe(3);
+    });
+
     it("rejects invalid persisted JSONB profile data on read", async () => {
       const profile = trackProfile(
         createPersistableProfile(nextTestId("profile-invalid-jsonb")),
@@ -851,4 +933,15 @@ function createLocalStorage(): LocalStorageEntry[] {
       value: "stored-value",
     },
   ];
+}
+
+function withAuthenticationHealth(
+  profile: CollectorProfile,
+  authenticationHealth: CollectorProfile["authenticationHealth"],
+): CollectorProfile {
+  return {
+    ...profile,
+    authenticationHealth,
+    authenticationHealthUpdatedAt: defaultCreatedAt,
+  };
 }

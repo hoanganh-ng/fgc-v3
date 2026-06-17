@@ -384,3 +384,64 @@ describe("StartProfileProvisioningResponseSchema", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// listProfiles query serialization
+// ---------------------------------------------------------------------------
+
+import { createHttpClient } from "@/lib/api/http-client";
+import { createProfileManagerClient } from "@/lib/api/profile-manager-client";
+
+describe("createProfileManagerClient.listProfiles query serialization", () => {
+  it("serializes status, authenticationHealth, limit, and offset", async () => {
+    let observedUrl: string | undefined;
+    const httpClient = createHttpClient({
+      baseUrl: "http://api.test",
+      fetchImpl: async (input) => {
+        observedUrl = String(input);
+        return new Response(
+          JSON.stringify({
+            items: [],
+            page: { limit: 25, offset: 0, total: 0 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    });
+    const client = createProfileManagerClient(httpClient);
+
+    await client.listProfiles({
+      status: "READY",
+      authenticationHealth: "REAUTH_REQUIRED",
+      limit: 25,
+      offset: 50,
+    });
+
+    expect(observedUrl).toBe(
+      "http://api.test/collector/profiles?status=READY&authenticationHealth=REAUTH_REQUIRED&limit=25&offset=50",
+    );
+  });
+
+  it("omits undefined filter values from the query string", async () => {
+    let observedUrl: string | undefined;
+    const httpClient = createHttpClient({
+      baseUrl: "http://api.test",
+      fetchImpl: async (input) => {
+        observedUrl = String(input);
+        return new Response(
+          JSON.stringify({
+            items: [],
+            page: { limit: 25, offset: 0, total: 0 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    });
+    const client = createProfileManagerClient(httpClient);
+
+    await client.listProfiles({ limit: 25, offset: 0 });
+
+    expect(observedUrl).toBe(
+      "http://api.test/collector/profiles?limit=25&offset=0",
+    );
+  });
+});

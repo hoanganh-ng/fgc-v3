@@ -446,6 +446,7 @@ export type UpsertProfileSourceAccessRequest = z.infer<
 
 export interface ListProfilesQuery {
   readonly status?: KnownProfileStatus;
+  readonly authenticationHealth?: KnownProfileAuthenticationHealth;
   readonly limit?: number;
   readonly offset?: number;
 }
@@ -568,6 +569,9 @@ function toListProfilesQueryParams(
 
   return {
     ...(query.status !== undefined ? { status: query.status } : {}),
+    ...(query.authenticationHealth !== undefined
+      ? { authenticationHealth: query.authenticationHealth }
+      : {}),
     ...(query.limit !== undefined ? { limit: query.limit } : {}),
     ...(query.offset !== undefined ? { offset: query.offset } : {}),
   };

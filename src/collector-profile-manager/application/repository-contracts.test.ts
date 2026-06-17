@@ -7,6 +7,7 @@ import {
 import type {
   CollectorProfile,
   IsoDateTime,
+  ProfileAuthenticationHealth,
   ProfileStatus,
   ProvisioningTokenState,
 } from "../domain";
@@ -120,6 +121,34 @@ describe("collector profile repository contract", () => {
     ]);
     expect(page.total).toBe(2);
   });
+
+  it("lists profiles by combined status and authenticationHealth filters", async () => {
+    const repository = new InMemoryProfileRepository();
+    const readyReauth = createProfile("ready-reauth", "READY", undefined, null, {
+      authenticationHealth: "REAUTH_REQUIRED",
+    });
+    const readyHealthy = createProfile("ready-healthy", "READY", undefined, null, {
+      authenticationHealth: "HEALTHY",
+    });
+    const busyReauth = createProfile("busy-reauth", "BUSY", undefined, null, {
+      authenticationHealth: "REAUTH_REQUIRED",
+    });
+
+    await repository.save(readyReauth);
+    await repository.save(readyHealthy);
+    await repository.save(busyReauth);
+
+    const page = await repository.listProfiles({
+      status: "READY",
+      authenticationHealth: "REAUTH_REQUIRED",
+      limit: 25,
+    });
+
+    expect(page.items.map((profile) => profile.identity.id)).toEqual([
+      "ready-reauth",
+    ]);
+    expect(page.total).toBe(1);
+  });
 });
 
 describe("profile lease repository contract", () => {
@@ -158,6 +187,9 @@ function createProfile(
   status: ProfileStatus = "PENDING_CONFIG",
   provisioningToken?: ProvisioningTokenState,
   nextAvailableAt: IsoDateTime | null = null,
+  options: {
+    readonly authenticationHealth?: ProfileAuthenticationHealth;
+  } = {},
 ): CollectorProfile {
   const profile = createPendingCollectorProfile({
     id,
@@ -173,5 +205,7 @@ function createProfile(
       nextAvailableAt,
     },
     provisioningToken: provisioningToken ?? profile.provisioningToken,
+    authenticationHealth:
+      options.authenticationHealth ?? profile.authenticationHealth,
   };
 }

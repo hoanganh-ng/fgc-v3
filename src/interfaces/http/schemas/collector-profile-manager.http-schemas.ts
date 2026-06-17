@@ -9,6 +9,7 @@ import {
   NetworkContextSchema,
   ProfileAccountStageSchema,
   ProfileAuthenticationHealthObservationSchema,
+  ProfileAuthenticationHealthSchema,
   ProfileIdSchema,
   ProfileLeaseIdSchema,
   ProfileSourceAccessSourceGroupIdSchema,
@@ -70,6 +71,7 @@ export const ProfileLeaseIdHttpParamsSchema = z
 export const ListProfilesHttpQuerySchema = z
   .object({
     status: ProfileStatusSchema.optional(),
+    authenticationHealth: ProfileAuthenticationHealthSchema.optional(),
     limit: z.coerce
       .number()
       .int()
@@ -435,6 +437,15 @@ const listProfilesQueryJsonSchema = {
     status: {
       type: "string",
       enum: ["PENDING_CONFIG", "PENDING_LOGIN", "READY", "BUSY"],
+    },
+    authenticationHealth: {
+      type: "string",
+      enum: [
+        "NOT_PROVISIONED",
+        "HEALTHY",
+        "REAUTH_REQUIRED",
+        "CHECKPOINT_REVIEW_REQUIRED",
+      ],
     },
     limit: {
       type: "integer",

@@ -34,11 +34,7 @@ export class InMemoryProfileRepository implements ProfileRepository {
   ): Promise<ProfileListResult> {
     const offset = query.offset ?? 0;
     const matchingProfiles = [...this.profiles.values()]
-      .filter(
-        (profile) =>
-          query.status === undefined ||
-          profile.identity.status === query.status,
-      )
+      .filter((profile) => matchesProfileListQuery(profile, query))
       .sort(compareProfilesByCreatedAt);
     const items = matchingProfiles.slice(offset, offset + query.limit);
 
@@ -113,6 +109,27 @@ function compareProfilesByCreatedAt(
   }
 
   return left.identity.id.localeCompare(right.identity.id);
+}
+
+function matchesProfileListQuery(
+  profile: CollectorProfile,
+  query: ProfileListQuery,
+): boolean {
+  if (
+    query.status !== undefined &&
+    profile.identity.status !== query.status
+  ) {
+    return false;
+  }
+
+  if (
+    query.authenticationHealth !== undefined &&
+    profile.authenticationHealth !== query.authenticationHealth
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export class InMemoryProfileLeaseRepository implements ProfileLeaseRepository {

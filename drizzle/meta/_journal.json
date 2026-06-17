@@ -99,6 +99,13 @@
       "when": 1781664000002,
       "tag": "0013_profile_authentication_health",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1781664000003,
+      "tag": "0014_collector_profiles_authentication_health_index",
+      "breakpoints": true
     }
   ]
 }

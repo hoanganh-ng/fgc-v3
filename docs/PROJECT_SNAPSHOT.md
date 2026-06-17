@@ -4,7 +4,8 @@
 The product is currently in the **Content Collector** stage (Stage 1 of 3, preceding Builder and Publisher). The core focus is collecting normalized content from configured Facebook sources while maintaining strict isolation between profile management, collection orchestration, and content storage.
 
 ## Current Active Sprint
-Sprint 055: Operator Authentication Recovery and Reprovisioning (Active).
+Sprint 056: Operator Authentication Health Filtering and Profile Inventory Pagination (Active).
+Sprint 055: Operator Authentication Recovery and Reprovisioning (Accepted).
 Sprint 054B: Runtime Authentication Health Reporting and Checkout Enforcement (Accepted).
 Sprint 054A: Profile Authentication Health Foundation (Accepted).
 
@@ -13,7 +14,7 @@ Sprint 054A: Profile Authentication Health Foundation (Accepted).
 - **Content Management**: Storage of normalized Facebook knowledge group text posts and top comments.
 - **Collection Execution**: Headless browser extraction using Playwright (or experimental CloakBrowser). Worker processes automatically consume queued collection runs, ambient exercise runs, and access-check runs.
 - **Operator Tools**: CLI tools for profile provisioning, manual collection, worker execution, browser probing, and the same provisioning CLI used for first-time and recovery login.
-- **Web UI**: Dashboard for managing profiles, source groups, categories, content items, and reviewing run status. The profile detail page now displays `authenticationHealth` and a generalized provisioning card for `Start Provisioning`, `Issue New Provisioning Token`, `Start Reauthentication`, and `Start Manual Checkpoint Recovery`.
+- **Web UI**: Dashboard for managing profiles, source groups, categories, content items, and reviewing run status. The profile detail page now displays `authenticationHealth` and a generalized provisioning card for `Start Provisioning`, `Issue New Provisioning Token`, `Start Reauthentication`, and `Start Manual Checkpoint Recovery`. The profile inventory page now supports URL-backed Status and Authentication Health filters, a `Health Updated` column, and 25-item pagination with Previous / Next navigation.
 
 ## Current Modules
 - **Collector Profile Manager**: Identity, sessions, provisioning, readiness, leases.
@@ -42,7 +43,10 @@ pnpm web:build
 ```
 
 ## Immediate Next Expected Work
-Sprint 055 closes the operator recovery loop over the runtime
-authentication health reporting and checkout enforcement surface
-area established by Sprint 054B. Future sprint work after Sprint 055
-will build on the closed recovery and reprovisioning flow.
+Sprint 056 makes the Sprint 055 recovery surface operational at
+realistic profile counts by adding server-side
+`authenticationHealth` filtering, URL-backed inventory controls, a
+`Health Updated` column, and 25-item pagination to the existing
+profile inventory. Future sprint work after Sprint 056 will build
+on the closed recovery, reprovisioning, and inventory navigation
+flow.

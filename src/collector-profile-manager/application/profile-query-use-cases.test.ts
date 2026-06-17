@@ -15,6 +15,7 @@ import type {
   ContentAffinities,
   HardwareFingerprint,
   NetworkContext,
+  ProfileAuthenticationHealth,
   ProfileStatus,
   ProvisioningTokenState,
   SafetyThresholds,
@@ -139,6 +140,126 @@ describe("collector profile query use cases", () => {
     ]);
   });
 
+  it("filters profile summaries by authenticationHealth", async () => {
+    const repository = new InMemoryProfileRepository();
+
+    await repository.save(
+      createProfile("ready-healthy", {
+        status: "READY",
+        authenticationHealth: "HEALTHY",
+      }),
+    );
+    await repository.save(
+      createProfile("ready-reauth", {
+        status: "READY",
+        authenticationHealth: "REAUTH_REQUIRED",
+      }),
+    );
+    await repository.save(
+      createProfile("ready-checkpoint", {
+        status: "READY",
+        authenticationHealth: "CHECKPOINT_REVIEW_REQUIRED",
+      }),
+    );
+    await repository.save(
+      createProfile("ready-not-provisioned", {
+        status: "READY",
+        authenticationHealth: "NOT_PROVISIONED",
+      }),
+    );
+
+    const output = await new ListProfilesUseCase(repository).execute({
+      authenticationHealth: "REAUTH_REQUIRED",
+    });
+
+    expect(output.items.map((profile) => profile.id)).toEqual(["ready-reauth"]);
+    expect(output.page.total).toBe(1);
+  });
+
+  it("combines status and authenticationHealth filters with AND", async () => {
+    const repository = new InMemoryProfileRepository();
+
+    await repository.save(
+      createProfile("ready-reauth", {
+        status: "READY",
+        authenticationHealth: "REAUTH_REQUIRED",
+      }),
+    );
+    await repository.save(
+      createProfile("ready-healthy", {
+        status: "READY",
+        authenticationHealth: "HEALTHY",
+      }),
+    );
+    await repository.save(
+      createProfile("busy-reauth", {
+        status: "BUSY",
+        authenticationHealth: "REAUTH_REQUIRED",
+      }),
+    );
+
+    const output = await new ListProfilesUseCase(repository).execute({
+      status: "READY",
+      authenticationHealth: "REAUTH_REQUIRED",
+    });
+
+    expect(output.items.map((profile) => profile.id)).toEqual(["ready-reauth"]);
+    expect(output.page.total).toBe(1);
+  });
+
+  it("returns deterministic ordering and totals with offset pagination over health filter", async () => {
+    const repository = new InMemoryProfileRepository();
+
+    for (let i = 0; i < 5; i += 1) {
+      await repository.save(
+        createProfile(`reauth-${i}`, {
+          createdAt: `2026-01-05T18:0${i}:00.000Z`,
+          authenticationHealth: "REAUTH_REQUIRED",
+        }),
+      );
+    }
+    await repository.save(
+      createProfile("healthy-marker", {
+        authenticationHealth: "HEALTHY",
+      }),
+    );
+
+    const first = await new ListProfilesUseCase(repository).execute({
+      authenticationHealth: "REAUTH_REQUIRED",
+      limit: 2,
+      offset: 0,
+    });
+    const second = await new ListProfilesUseCase(repository).execute({
+      authenticationHealth: "REAUTH_REQUIRED",
+      limit: 2,
+      offset: 2,
+    });
+
+    expect(first.items.map((profile) => profile.id)).toEqual([
+      "reauth-0",
+      "reauth-1",
+    ]);
+    expect(first.page).toEqual({ limit: 2, offset: 0, total: 5 });
+    expect(second.items.map((profile) => profile.id)).toEqual([
+      "reauth-2",
+      "reauth-3",
+    ]);
+    expect(second.page).toEqual({ limit: 2, offset: 2, total: 5 });
+  });
+
+  it("rejects unknown authenticationHealth values", async () => {
+    const repository = new InMemoryProfileRepository();
+
+    await repository.save(createProfile("profile-1"));
+
+    await expect(
+      new ListProfilesUseCase(repository).execute({
+        // @ts-expect-error - intentional invalid value
+        authenticationHealth: "COMPROMISED",
+      }),
+    ).rejects.toThrow(InvalidProfileQueryError);
+  });
+
   it("omits authentication and provisioning state from list summaries", async () => {
     const repository = new InMemoryProfileRepository();
 
@@ -173,6 +294,8 @@ interface CreateProfileOptions {
   readonly createdAt?: string;
   readonly authenticationState?: AuthenticationState;
   readonly provisioningToken?: ProvisioningTokenState;
+  readonly authenticationHealth?: ProfileAuthenticationHealth;
+  readonly authenticationHealthUpdatedAt?: string;
 }
 
 function createProfile(
@@ -202,6 +325,11 @@ function createProfile(
     authenticationState:
       options.authenticationState ?? profile.authenticationState,
     provisioningToken: options.provisioningToken ?? profile.provisioningToken,
+    authenticationHealth:
+      options.authenticationHealth ?? profile.authenticationHealth,
+    authenticationHealthUpdatedAt:
+      options.authenticationHealthUpdatedAt ??
+      profile.authenticationHealthUpdatedAt,
   };
 }
 

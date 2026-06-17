@@ -12,7 +12,7 @@ import {
 } from "@/lib/api/http-client";
 
 const defaultProfilesQuery = {
-  limit: 100,
+  limit: 25,
   offset: 0,
 } satisfies ListProfilesQuery;
 

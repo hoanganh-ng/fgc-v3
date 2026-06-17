@@ -191,6 +191,112 @@ describe("HTTP server", () => {
     }
   });
 
+  it("filters profiles by authenticationHealth through the API", async () => {
+    const { server, service } = createTestServer();
+
+    service.listProfiles.setOutput({
+      items: [
+        toProfileSummaryDto(
+          createProfile({
+            status: "READY",
+            authenticationHealth: "REAUTH_REQUIRED",
+            authenticationState: createAuthenticationState(),
+            provisioningTokenStatus: "CONSUMED",
+          }),
+        ),
+      ],
+      page: {
+        limit: 25,
+        offset: 0,
+        total: 1,
+      },
+    });
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles?authenticationHealth=REAUTH_REQUIRED",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.listProfiles.calls).toEqual([
+        {
+          authenticationHealth: "REAUTH_REQUIRED",
+          limit: undefined,
+          offset: undefined,
+        },
+      ]);
+      expect(response.json()).toMatchObject({
+        items: [
+          {
+            id: "profile-1",
+            authenticationHealth: "REAUTH_REQUIRED",
+          },
+        ],
+        page: {
+          limit: 25,
+          offset: 0,
+          total: 1,
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("combines status and authenticationHealth filters through the API", async () => {
+    const { server, service } = createTestServer();
+
+    service.listProfiles.setOutput({
+      items: [],
+      page: {
+        limit: 25,
+        offset: 0,
+        total: 0,
+      },
+    });
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles?status=READY&authenticationHealth=CHECKPOINT_REVIEW_REQUIRED&limit=25&offset=0",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.listProfiles.calls).toEqual([
+        {
+          status: "READY",
+          authenticationHealth: "CHECKPOINT_REVIEW_REQUIRED",
+          limit: 25,
+          offset: 0,
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 for invalid profile list authenticationHealth query", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/profiles?authenticationHealth=COMPROMISED",
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "VALIDATION_ERROR",
+        },
+      });
+      expect(service.listProfiles.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("gets a profile detail through the Collector Profile Manager service", async () => {
     const { server, service } = createTestServer();
 

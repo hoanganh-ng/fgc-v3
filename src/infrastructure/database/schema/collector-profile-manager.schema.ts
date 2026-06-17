@@ -156,6 +156,11 @@ export const collectorProfiles = pgTable(
       table.accountStage,
       table.nextAvailableAt,
     ),
+    index("collector_profiles_authentication_health_created_at_idx").on(
+      table.authenticationHealth,
+      table.createdAt,
+      table.id,
+    ),
   ],
 );
 

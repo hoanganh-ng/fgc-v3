@@ -1,6 +1,7 @@
 import type {
   CollectorProfile,
   IsoDateTime,
+  ProfileAuthenticationHealth,
   ProfileId,
   ProfileStatus,
 } from "../../domain";
@@ -13,6 +14,7 @@ export interface ProfileCheckoutCandidateQuery {
 
 export interface ProfileListQuery {
   readonly status?: ProfileStatus;
+  readonly authenticationHealth?: ProfileAuthenticationHealth;
   readonly limit: number;
   readonly offset?: number;
 }

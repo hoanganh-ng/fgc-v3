@@ -3,13 +3,19 @@ import { validateProfileForApplication } from "../profile-validation";
 import { toProfileSummaryDto } from "../profile-read-dtos";
 import type { ProfileSummary } from "../profile-read-dtos";
 import type { ProfileRepository } from "../ports/profile-repository.port";
-import type { ProfileStatus, ValidationIssue } from "../../domain";
+import {
+  ProfileAuthenticationHealthSchema,
+  type ProfileAuthenticationHealth,
+  type ProfileStatus,
+  type ValidationIssue,
+} from "../../domain";
 
 export const DEFAULT_PROFILE_LIST_LIMIT = 25;
 export const MAX_PROFILE_LIST_LIMIT = 100;
 
 export interface ListProfilesInput {
   readonly status?: ProfileStatus;
+  readonly authenticationHealth?: ProfileAuthenticationHealth;
   readonly limit?: number;
   readonly offset?: number;
 }
@@ -57,6 +63,7 @@ export class ListProfilesUseCase {
 
 function normalizeListProfilesInput(input: ListProfilesInput): {
   readonly status?: ProfileStatus;
+  readonly authenticationHealth?: ProfileAuthenticationHealth;
   readonly limit: number;
   readonly offset: number;
 } {
@@ -78,12 +85,27 @@ function normalizeListProfilesInput(input: ListProfilesInput): {
     });
   }
 
+  if (
+    input.authenticationHealth !== undefined &&
+    !ProfileAuthenticationHealthSchema.options.includes(
+      input.authenticationHealth,
+    )
+  ) {
+    issues.push({
+      path: "authenticationHealth",
+      message: "authenticationHealth must be a known health value.",
+    });
+  }
+
   if (issues.length > 0) {
     throw new InvalidProfileQueryError(issues);
   }
 
   return {
     ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.authenticationHealth !== undefined
+      ? { authenticationHealth: input.authenticationHealth }
+      : {}),
     limit: Math.min(limit, MAX_PROFILE_LIST_LIMIT),
     offset,
   };

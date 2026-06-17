@@ -192,6 +192,9 @@ export function registerCollectorProfileManagerRoutes(
       );
       const input = {
         ...(query.status !== undefined ? { status: query.status } : {}),
+        ...(query.authenticationHealth !== undefined
+          ? { authenticationHealth: query.authenticationHealth }
+          : {}),
         ...(query.limit !== undefined ? { limit: query.limit } : {}),
         ...(query.offset !== undefined ? { offset: query.offset } : {}),
       } satisfies ListProfilesInput;
