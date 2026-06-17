@@ -37,6 +37,7 @@
     "collector:browser:probe": "tsx src/operator-tools/browser-probe/cli.ts",
     "test": "vitest run",
     "test:db": "RUN_DB_TESTS=true vitest run src/infrastructure",
+    "test:db:dispatch:isolated": "RUN_DB_TESTS=true SPRINT_058_DATABASE_URL=${SPRINT_058_DATABASE_URL:?SPRINT_058_DATABASE_URL must be set to a sprint_058_isolated database} vitest run src/infrastructure/database/repositories/drizzle-dispatch-next-due-collection-schedule.repository.integration.test.ts",
     "test:http:db": "RUN_HTTP_DB_TESTS=true vitest run src/interfaces/http",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

@@ -89,10 +89,64 @@ describe("collection schedule cadence policy", () => {
     );
   });
 
+  it("rejects a date-only previousNextRunAt without a time component", () => {
+    expect(() => nextDispatchBoundary("2026-06-17", 30, T0)).toThrow(
+      CollectionScheduleCadencePolicyError,
+    );
+  });
+
+  it("rejects an offsetless ISO previousNextRunAt without a zone designator", () => {
+    expect(() => nextDispatchBoundary("2026-06-17T10:00:00", 30, T0)).toThrow(
+      CollectionScheduleCadencePolicyError,
+    );
+  });
+
+  it("rejects an offsetless ISO dispatchTime without a zone designator", () => {
+    expect(() => nextDispatchBoundary(T0, 30, "2026-06-17T10:00:00")).toThrow(
+      CollectionScheduleCadencePolicyError,
+    );
+  });
+
+  it("accepts a dispatchTime with a numeric UTC offset", () => {
+    expect(
+      nextDispatchBoundary(T0, 30, "2026-06-17T10:00:01.000+00:00"),
+    ).toBe("2026-06-17T10:30:00.000Z");
+  });
+
+  it("accepts a previousNextRunAt with a numeric non-UTC offset", () => {
+    expect(
+      nextDispatchBoundary("2026-06-17T12:00:00.000+02:00", 30, T0),
+    ).toBe("2026-06-17T10:30:00.000Z");
+  });
+
   it("throws when dispatchTime is not a valid ISO datetime", () => {
     expect(() => nextDispatchBoundary(T0, 30, "not-a-date")).toThrow(
       CollectionScheduleCadencePolicyError,
     );
+  });
+
+  it("throws when dispatchTime is earlier than previousNextRunAt", () => {
+    expect(() =>
+      nextDispatchBoundary(
+        "2026-06-17T11:00:00.000Z",
+        30,
+        "2026-06-17T10:30:00.000Z",
+      ),
+    ).toThrow(CollectionScheduleCadencePolicyError);
+  });
+
+  it("throws when dispatchTime is earlier by a millisecond", () => {
+    expect(() =>
+      nextDispatchBoundary(
+        "2026-06-17T10:00:00.001Z",
+        30,
+        "2026-06-17T10:00:00.000Z",
+      ),
+    ).toThrow(CollectionScheduleCadencePolicyError);
+  });
+
+  it("accepts dispatchTime exactly equal to previousNextRunAt", () => {
+    expect(nextDispatchBoundary(T0, 30, T0)).toBe("2026-06-17T10:30:00.000Z");
   });
 
   it("does not mutate the input ISO datetime strings", () => {

@@ -8,8 +8,19 @@ import { createDatabaseClient, type DatabaseClient } from "../client";
 import { collectorCollectionRuns, collectorCollectionSchedules } from "../schema/collector-runtime.schema";
 import { DrizzleDispatchNextDueCollectionScheduleRepository } from "./drizzle-dispatch-next-due-collection-schedule.repository";
 import { DrizzleCollectionScheduleRepository } from "./drizzle-collection-schedule.repository";
+import {
+  resolveIsolatedSprint058DatabaseUrl,
+  Sprint058IsolatedDatabaseGuardError,
+} from "./sprint-058-isolated-database.guard";
 
 const shouldRunDbTests = process.env.RUN_DB_TESTS === "true";
+
+const FORCE_UPDATE_TRIGGER_NAME =
+  "sprint_058_force_schedule_update_failure";
+const FORCE_UPDATE_FUNCTION_NAME =
+  "public.sprint_058_force_schedule_update_failure";
+
+let isolatedDatabaseUrl: string | undefined;
 
 if (!shouldRunDbTests) {
   describe.skip(
@@ -19,6 +30,15 @@ if (!shouldRunDbTests) {
     },
   );
 } else {
+  try {
+    isolatedDatabaseUrl = resolveIsolatedSprint058DatabaseUrl();
+  } catch (error) {
+    if (error instanceof Sprint058IsolatedDatabaseGuardError) {
+      throw error;
+    }
+    throw error;
+  }
+
   describe(
     "Collector Runtime PostgreSQL dispatch-next-due schedule repository integration",
     () => {
@@ -30,7 +50,13 @@ if (!shouldRunDbTests) {
       const trackedRunIds = new Set<string>();
 
       beforeAll(async () => {
+        if (isolatedDatabaseUrl === undefined) {
+          throw new Error(
+            "Sprint 058 dispatch test reached beforeAll without a resolved isolated database URL.",
+          );
+        }
         const databaseClient = createDatabaseClient({
+          databaseUrl: isolatedDatabaseUrl,
           poolConfig: {
             max: 4,
           },
@@ -45,9 +71,8 @@ if (!shouldRunDbTests) {
           .where(like(collectorCollectionRuns.id, "dispatch-run-%"));
         await client.db
           .delete(collectorCollectionSchedules)
-          .where(
-            sql`${collectorCollectionSchedules.sourceGroupId} LIKE 'dispatch-it-%' OR ${collectorCollectionSchedules.sourceGroupId} LIKE 'schedule-db-it-%'`,
-          );
+          .where(like(collectorCollectionSchedules.sourceGroupId, "dispatch-it-%"));
+        await dropForceUpdateTrigger(client);
       });
 
       afterEach(async () => {
@@ -73,9 +98,12 @@ if (!shouldRunDbTests) {
             );
           trackedSourceGroupIds.clear();
         }
+
+        await dropForceUpdateTrigger(client);
       });
 
       afterAll(async () => {
+        await dropForceUpdateTrigger(client);
         await client?.close();
       });
 
@@ -313,6 +341,51 @@ if (!shouldRunDbTests) {
         expect(runs[0]?.triggerType).toBe("MANUAL_API");
       });
 
+      it("rolls back the run insert and schedule update when the post-insert UPDATE fails", async () => {
+        const schedule = track(
+          await seedSchedule({
+            sourceGroupId: nextSourceGroupId("update-fail"),
+            enabled: true,
+            intervalMinutes: 30,
+            nextRunAt: "2030-01-01T10:00:00.000Z",
+            createdAt: "2030-01-01T09:00:00.000Z",
+            updatedAt: "2030-01-01T09:00:00.000Z",
+          }),
+        );
+
+        await installForceUpdateTrigger(client!, schedule.sourceGroupId);
+
+        const attemptedRunId = nextRunId("update-fail");
+        trackedRunIds.add(attemptedRunId);
+
+        await expect(
+          dispatcher.dispatchNextDue({
+            dispatchAt: "2030-01-01T10:30:00.000Z",
+            collectionRunId: attemptedRunId,
+          }),
+        ).rejects.toBeDefined();
+
+        const stored = await schedules.findBySourceGroupId(
+          schedule.sourceGroupId,
+        );
+        expect(stored?.nextRunAt).toBe("2030-01-01T10:00:00.000Z");
+        expect(stored?.updatedAt).toBe("2030-01-01T09:00:00.000Z");
+
+        const scheduledRuns = await client!.db
+          .select()
+          .from(collectorCollectionRuns)
+          .where(
+            sql`${collectorCollectionRuns.sourceGroupId} = ${schedule.sourceGroupId} AND ${collectorCollectionRuns.triggerType} = 'SCHEDULED'`,
+          );
+        expect(scheduledRuns).toHaveLength(0);
+
+        const attemptedRuns = await client!.db
+          .select()
+          .from(collectorCollectionRuns)
+          .where(inArray(collectorCollectionRuns.id, [attemptedRunId]));
+        expect(attemptedRuns).toHaveLength(0);
+      });
+
       it("concurrent dispatchers against one due schedule create exactly one run", async () => {
         const schedule = track(
           await seedSchedule({
@@ -344,15 +417,30 @@ if (!shouldRunDbTests) {
 
         const winners = [first, second].filter((value) => value !== null);
         expect(winners).toHaveLength(1);
-        expect(winners[0]?.collectionRun.id).toBe(firstRunId);
+        const winningRunId = winners[0]?.collectionRun.id;
+        expect(winningRunId).toBeDefined();
+        expect([firstRunId, secondRunId]).toContain(winningRunId);
         expect(winners[0]?.schedule.sourceGroupId).toBe(
           schedule.sourceGroupId,
         );
+
+        const persistedRuns = await client!.db
+          .select()
+          .from(collectorCollectionRuns)
+          .where(inArray(collectorCollectionRuns.id, [firstRunId, secondRunId]));
+        const persistedIds = new Set(persistedRuns.map((row) => row.id));
+        expect(persistedIds.size).toBe(1);
+        expect(persistedIds.has(winningRunId ?? "")).toBe(true);
+        for (const row of persistedRuns) {
+          expect(row.triggerType).toBe("SCHEDULED");
+          expect(row.sourceGroupId).toBe(schedule.sourceGroupId);
+        }
 
         const stored = await schedules.findBySourceGroupId(
           schedule.sourceGroupId,
         );
         expect(stored?.nextRunAt).toBe("2030-01-01T11:00:00.000Z");
+        expect(stored?.updatedAt).toBe(dispatchAt);
       });
 
       it("concurrent dispatchers claim separate due schedules", async () => {
@@ -390,12 +478,28 @@ if (!shouldRunDbTests) {
           }),
         ]);
 
-        expect(resultA?.collectionRun.sourceGroupId).toBe(
+        const nonNull = [resultA, resultB].filter((value) => value !== null);
+        expect(nonNull).toHaveLength(2);
+
+        const claimedSourceGroupIds = new Set(
+          nonNull.map((result) => result!.collectionRun.sourceGroupId),
+        );
+        const seededSourceGroupIds = new Set([
           first.sourceGroupId,
-        );
-        expect(resultB?.collectionRun.sourceGroupId).toBe(
           second.sourceGroupId,
-        );
+        ]);
+        expect(claimedSourceGroupIds).toEqual(seededSourceGroupIds);
+
+        const persistedRuns = await client!.db
+          .select()
+          .from(collectorCollectionRuns)
+          .where(inArray(collectorCollectionRuns.id, [runA, runB]));
+        const persistedIds = new Set(persistedRuns.map((row) => row.id));
+        expect(persistedIds.size).toBe(2);
+        for (const row of persistedRuns) {
+          expect(row.triggerType).toBe("SCHEDULED");
+          expect(seededSourceGroupIds.has(row.sourceGroupId)).toBe(true);
+        }
       });
 
       async function seedSchedule(
@@ -437,4 +541,47 @@ if (!shouldRunDbTests) {
       }
     },
   );
+}
+
+async function installForceUpdateTrigger(
+  client: DatabaseClient,
+  sourceGroupId: string,
+): Promise<void> {
+  await client.db.execute(sql`
+    CREATE OR REPLACE FUNCTION ${sql.raw(FORCE_UPDATE_FUNCTION_NAME)}()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+      RAISE EXCEPTION 'sprint-058 forced schedule update failure for %', OLD.source_group_id
+        USING ERRCODE = 'P0001';
+    END;
+    $$
+  `);
+  await client.db.execute(sql`
+    DROP TRIGGER IF EXISTS ${sql.raw(FORCE_UPDATE_TRIGGER_NAME)}
+      ON "collector_collection_schedules"
+  `);
+  await client.db.execute(
+    sql.raw(
+      `CREATE TRIGGER "${FORCE_UPDATE_TRIGGER_NAME}"
+        BEFORE UPDATE ON "collector_collection_schedules"
+        FOR EACH ROW
+        WHEN (OLD.source_group_id = '${sourceGroupId.replace(/'/g, "''")}')
+        EXECUTE FUNCTION ${FORCE_UPDATE_FUNCTION_NAME}()`,
+    ),
+  );
+}
+
+async function dropForceUpdateTrigger(client: DatabaseClient | undefined): Promise<void> {
+  if (client === undefined) {
+    return;
+  }
+  await client.db.execute(sql`
+    DROP TRIGGER IF EXISTS ${sql.raw(FORCE_UPDATE_TRIGGER_NAME)}
+      ON "collector_collection_schedules"
+  `);
+  await client.db.execute(sql`
+    DROP FUNCTION IF EXISTS ${sql.raw(FORCE_UPDATE_FUNCTION_NAME)}()
+  `);
 }

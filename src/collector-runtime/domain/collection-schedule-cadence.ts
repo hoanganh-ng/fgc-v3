@@ -1,4 +1,5 @@
 import type { CollectionScheduleIsoDateTime } from "./collection-schedule";
+import { CollectionScheduleIsoDateTimeSchema } from "./collection-schedule.schemas";
 
 export class CollectionScheduleCadencePolicyError extends Error {
   public constructor(message: string) {
@@ -15,20 +16,17 @@ export function nextDispatchBoundary(
   intervalMinutes: number,
   dispatchTime: CollectionScheduleIsoDateTime,
 ): CollectionScheduleIsoDateTime {
+  assertIsoDateTime("previousNextRunAt", previousNextRunAt);
+  assertIsoDateTime("dispatchTime", dispatchTime);
+
   assertIntervalMinutes(intervalMinutes);
 
   const previousMs = Date.parse(previousNextRunAt);
   const dispatchMs = Date.parse(dispatchTime);
 
-  if (Number.isNaN(previousMs)) {
+  if (dispatchMs < previousMs) {
     throw new CollectionScheduleCadencePolicyError(
-      `previousNextRunAt is not a valid ISO datetime: ${previousNextRunAt}.`,
-    );
-  }
-
-  if (Number.isNaN(dispatchMs)) {
-    throw new CollectionScheduleCadencePolicyError(
-      `dispatchTime is not a valid ISO datetime: ${dispatchTime}.`,
+      `dispatchTime (${dispatchTime}) is earlier than previousNextRunAt (${previousNextRunAt}).`,
     );
   }
 
@@ -36,6 +34,16 @@ export function nextDispatchBoundary(
   const k = Math.floor((dispatchMs - previousMs) / intervalMs) + 1;
 
   return new Date(previousMs + k * intervalMs).toISOString();
+}
+
+function assertIsoDateTime(label: string, value: string): void {
+  const result = CollectionScheduleIsoDateTimeSchema.safeParse(value);
+
+  if (!result.success) {
+    throw new CollectionScheduleCadencePolicyError(
+      `${label} is not a valid ISO datetime with offset: ${value}.`,
+    );
+  }
 }
 
 function assertIntervalMinutes(intervalMinutes: number): void {

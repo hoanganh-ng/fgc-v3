@@ -11,6 +11,7 @@ export * from "./collection-run-status";
 export * from "./collection-run-trigger-type";
 export * from "./collection-run.schemas";
 export * from "./collection-schedule";
+export * from "./collection-schedule-cadence";
 export * from "./collection-schedule.schemas";
 export * from "./facebook-url";
 export * from "./profile-source-access-check-run";
