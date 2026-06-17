@@ -37,8 +37,11 @@ adding the polling process that drives that use case on an interval.
 ## Architecture
 
 ```
-CLI (src/operator-tools/collection-scheduler/cli.ts)
-  ├── parse args
+Bootstrap (src/operator-tools/collection-scheduler/cli.ts)
+  └── delegates to runCollectionSchedulerCli() and propagates the exit code
+
+Command (src/operator-tools/collection-scheduler/cli-command.ts)
+  ├── parse args (parseCollectionSchedulerCliArgs)
   ├── SIGINT/SIGTERM → AbortController.abort()
   ├── createCollectorRuntimeFromEnv() → CollectorRuntimeContainer
   │     ├── dispatchNextDueCollectionSchedule.execute
@@ -64,24 +67,29 @@ use cases, no schema or migration changes.
 
 ## Lifecycle
 
-1. CLI parses CLI options and prints usage on `--help`/`-h` or argument
-   errors.
-2. CLI installs `SIGINT` and `SIGTERM` handlers that abort an
+1. Bootstrap (`cli.ts`) forwards `process.argv.slice(2)` to
+   `runCollectionSchedulerCli()` and propagates the returned exit
+   code to `process.exitCode`. The bootstrap never parses arguments
+   or composes runtime; it only translates uncaught errors and the
+   returned `CollectionSchedulerCliRunResult` into a process exit.
+2. Command (`cli-command.ts`) parses CLI options and prints usage on
+   `--help`/`-h` or argument errors.
+3. Command installs `SIGINT` and `SIGTERM` handlers that abort an
    `AbortController`. The handlers are installed **before** runtime
    composition so they can be detached in a `finally` if composition
    throws.
-3. CLI builds a `CollectorRuntimeContainer` via
+4. Command builds a `CollectorRuntimeContainer` via
    `createCollectorRuntimeFromEnv()`. The container owns the
    `DatabaseClient` and the Drizzle dispatch repository through the
    existing composition root.
-4. Runner starts. Each outer iteration is one cycle. Each cycle calls
+5. Runner starts. Each outer iteration is one cycle. Each cycle calls
    the dispatch use case until it returns `null`, increments
    `cyclesCompleted`, and — unless `--once` was requested or the
    signal is set — sleeps for `pollIntervalMs` with an abort-aware
    delay.
-5. On exit (normal or error), the runner's `finally` block awaits
-   `dependencies.close()` exactly once. The CLI detaches its signal
-   handlers in its own `finally`.
+6. On exit (normal or error), the runner's `finally` block awaits
+   `dependencies.close()` exactly once. The command detaches its
+   signal handlers in its own `finally`.
 
 ## Counting Semantics
 
@@ -123,7 +131,8 @@ interface CollectionSchedulerDependencies {
 }
 ```
 
-Production wiring in `cli.ts` binds:
+Production wiring in `cli-command.ts` binds (via
+`buildCollectionSchedulerDependencies`):
 
 - `dispatch = container.dispatchNextDueCollectionSchedule.execute.bind(container.dispatchNextDueCollectionSchedule)`
 - `close = () => container.close()`

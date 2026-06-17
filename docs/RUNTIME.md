@@ -1,6 +1,6 @@
 # Full-Stack Runtime
 
-Sprint 027 provides two Docker Compose runtimes for the current Content Collector management surface. Sprint 037B adds an opt-in containerized worker service for consuming queued collection runs from those stacks. Sprint 047A adds a separate opt-in containerized worker service for queued Account Exercise runs.
+Sprint 027 provides two Docker Compose runtimes for the current Content Collector management surface. Sprint 037B adds an opt-in containerized worker service for consuming queued collection runs from those stacks. Sprint 047A adds a separate opt-in containerized worker service for queued Account Exercise runs. Sprint 060 adds an opt-in containerized collection scheduler service that drives scheduled dispatch from those stacks.
 
 ## Command Groups
 
@@ -48,6 +48,7 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | `pnpm operator:profile:assisted-access` | Open one assisted group access browser session for manual operator inspection. | `pnpm profile:assisted-access:run` |
 | `pnpm operator:collector:facebook` | Run one manual Facebook collection for a source group. | `pnpm collector:facebook:run` |
 | `pnpm operator:collector:worker` | Claim and execute queued collection runs. | `pnpm collector:worker:run` |
+| `pnpm operator:collector:scheduler` | Poll `DispatchNextDueCollectionScheduleUseCase` and dispatch due schedules. | `pnpm collector:scheduler:run` |
 | `pnpm operator:browser:probe` | Probe a browser provider without backend or Facebook login. | `pnpm collector:browser:probe` |
 
 ### Docker Stacks
@@ -61,8 +62,11 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | `pnpm stack:dev:exercise-worker:start` | Start the development stack account exercise worker service in polling mode. |
 | `pnpm stack:dev:exercise-worker:once` | Run one development stack account exercise worker iteration in a disposable container. |
 | `pnpm stack:dev:exercise-worker:logs` | Follow development stack account exercise worker logs. |
-| `pnpm stack:dev:workers:start` | Start both development stack worker services. |
-| `pnpm stack:dev:workers:logs` | Follow logs for both development stack worker services. |
+| `pnpm stack:dev:scheduler:start` | Start the development stack collection scheduler service in polling mode. |
+| `pnpm stack:dev:scheduler:once` | Run one development stack collection scheduler iteration in a disposable container. |
+| `pnpm stack:dev:scheduler:logs` | Follow development stack collection scheduler logs. |
+| `pnpm stack:dev:workers:start` | Start all development stack opt-in worker services. |
+| `pnpm stack:dev:workers:logs` | Follow logs for all development stack opt-in worker services. |
 | `pnpm stack:dev:stop` | Stop the development Compose stack. |
 | `pnpm stack:dev:reset` | Stop the development stack and remove volumes. |
 | `pnpm stack:preview:start` | Start the production-like preview Compose stack. |
@@ -72,8 +76,11 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | `pnpm stack:preview:exercise-worker:start` | Start the preview stack account exercise worker service in polling mode. |
 | `pnpm stack:preview:exercise-worker:once` | Run one preview stack account exercise worker iteration in a disposable container. |
 | `pnpm stack:preview:exercise-worker:logs` | Follow preview stack account exercise worker logs. |
-| `pnpm stack:preview:workers:start` | Start both preview stack worker services. |
-| `pnpm stack:preview:workers:logs` | Follow logs for both preview stack worker services. |
+| `pnpm stack:preview:scheduler:start` | Start the preview stack collection scheduler service in polling mode. |
+| `pnpm stack:preview:scheduler:once` | Run one preview stack collection scheduler iteration in a disposable container. |
+| `pnpm stack:preview:scheduler:logs` | Follow preview stack collection scheduler logs. |
+| `pnpm stack:preview:workers:start` | Start all preview stack opt-in worker services. |
+| `pnpm stack:preview:workers:logs` | Follow logs for all preview stack opt-in worker services. |
 | `pnpm stack:preview:stop` | Stop the preview Compose stack. |
 | `pnpm stack:preview:reset` | Stop the preview stack and remove volumes. |
 
@@ -165,7 +172,7 @@ In preview, `apps/web` is built into static files and served by Nginx. The brows
 
 ## Containerized Worker Services
 
-Sprint 037B adds an opt-in Docker Compose service named `collector-worker`. Sprint 047A adds a separate opt-in Docker Compose service named `account-exercise-worker`. Both services are behind the Compose `worker` profile, expose no ports, and are not started by normal stack boot commands.
+Sprint 037B adds an opt-in Docker Compose service named `collector-worker`. Sprint 047A adds a separate opt-in Docker Compose service named `account-exercise-worker`. Sprint 060 adds a third opt-in Docker Compose service named `collection-scheduler` that drives the scheduled dispatch poller described in Sprint 059. All three services are behind the Compose `worker` profile, expose no ports, and are not started by normal stack boot commands.
 
 Start the development stack and collection worker:
 
@@ -236,6 +243,8 @@ docker compose -f docker-compose.dev.yml stop collector-worker
 docker compose -f docker-compose.preview.yml stop collector-worker
 docker compose -f docker-compose.dev.yml stop account-exercise-worker
 docker compose -f docker-compose.preview.yml stop account-exercise-worker
+docker compose -f docker-compose.dev.yml stop collection-scheduler
+docker compose -f docker-compose.preview.yml stop collection-scheduler
 ```
 
 Inside Docker, both workers use `http://api:3000` as their API base URL and `postgres:5432` through `DATABASE_URL`. Do not use `http://localhost:8081` or `http://localhost:3000` from inside worker containers; those are host entrypoints for browser/operator commands running on the host. The preview gateway remains the host browser entrypoint, while service-to-service Compose traffic goes directly to the `api` service.
@@ -245,6 +254,53 @@ The worker image uses the Playwright runtime base image aligned to the locked Pl
 When no jobs exist, the polling worker logs safe operational lines such as `Collector worker started.` and `No queued collection run found.`. The one-shot worker exits after a single no-job check. When a queued run exists, the worker claims the oldest `QUEUED` run, marks it `RUNNING`, executes the existing Facebook collector orchestration, and records either `SUCCEEDED` with safe summary counts or `FAILED` with a sanitized failure reason. Profile leases should be released by the existing collector flow when a profile was checked out.
 
 When no account exercise jobs exist, the polling account exercise worker logs safe operational lines such as `Account exercise worker started.` and `No queued account exercise run found.`. The one-shot account exercise worker exits after a single no-job check. When a queued run exists, the worker claims the oldest `QUEUED` run, marks it `RUNNING`, executes the Ambient Account or Category Browse Exercise flow with the persisted profile id and action budget, and records either `SUCCEEDED` with safe summary counts or `FAILED` with sanitized failure data. Profile leases should be released by the existing ambient exercise executor when a profile was checked out.
+
+## Containerized Collection Scheduler
+
+Sprint 060 adds an opt-in Docker Compose service named `collection-scheduler`. It runs the Sprint 059 scheduled dispatch poller inside a lightweight `scheduler-runtime` image derived from the existing `app-deps` build stage. The scheduler does not open a browser, so the image installs no Playwright runtime, no Chromium, and no Xvfb, and the container entrypoint starts no display server.
+
+Start the development stack and collection scheduler:
+
+```bash
+pnpm stack:dev:start
+pnpm stack:dev:scheduler:start
+pnpm stack:dev:scheduler:logs
+```
+
+Start the preview stack and collection scheduler:
+
+```bash
+pnpm stack:preview:start
+pnpm stack:preview:scheduler:start
+pnpm stack:preview:scheduler:logs
+```
+
+Start every dev opt-in worker service:
+
+```bash
+pnpm stack:dev:start
+pnpm stack:dev:workers:start
+pnpm stack:dev:workers:logs
+```
+
+Start every preview opt-in worker service:
+
+```bash
+pnpm stack:preview:start
+pnpm stack:preview:workers:start
+pnpm stack:preview:workers:logs
+```
+
+Run one disposable scheduler iteration through Docker:
+
+```bash
+pnpm stack:dev:scheduler:once
+pnpm stack:preview:scheduler:once
+```
+
+The container entrypoint is `scripts/run-collection-scheduler-container.sh`. It polls the configured `COLLECTION_SCHEDULER_READINESS_URL` (default `http://api:3000/collector/collection-runs?limit=1`) until the API returns an HTTP status below 500, then `exec`s the scheduler CLI. Default scheduler mode is `--poll-interval-ms 5000`; override `COLLECTION_SCHEDULER_MODE_ARGS` to run `--once` or a different poll interval. The scheduler talks to PostgreSQL through the existing Collector Runtime composition root, so it needs `DATABASE_URL` and no other module base URL. It never logs `DATABASE_URL`, credentials, base URLs, or any other environment variable.
+
+The scheduler container does not start Xvfb and does not manage a browser process. Compose `init: true` makes the small init process PID 1 of the container. The entrypoint script's final operation is `exec node --import tsx … cli.ts`, which replaces the shell with the Node process so there is no shell intermediary between init and Node; init forwards `SIGINT`/`SIGTERM` (e.g. from `docker compose stop collection-scheduler`) to the Node process, and the existing Sprint 059 CLI signal handlers perform the clean shutdown.
 
 ## Profile Provisioning CLI
 

@@ -81,5 +81,25 @@ services:
       api:
         condition: service_started
 
+  collection-scheduler:
+    profiles:
+      - worker
+    build:
+      context: .
+      target: scheduler-runtime
+    init: true
+    command:
+      - sh
+      - scripts/run-collection-scheduler-container.sh
+    environment:
+      DATABASE_URL: postgres://content_pipeline:content_pipeline@postgres:5432/content_pipeline
+      COLLECTION_SCHEDULER_MODE_ARGS: "--poll-interval-ms 5000"
+      COLLECTION_SCHEDULER_READINESS_URL: http://api:3000/collector/collection-runs?limit=1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+
 volumes:
   fgc_preview_postgres_data:

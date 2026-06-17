@@ -19,8 +19,10 @@ The current focus is the Content Collector: collecting normalized content from c
 - A collector worker exists for claiming and executing queued collection runs.
 - An account exercise worker exists for claiming and executing queued Account Exercise runs (Ambient and Category Browse).
 - A profile-source access check worker exists for claiming and executing queued browser-backed access checks.
+- A collection scheduler exists for polling `DispatchNextDueCollectionScheduleUseCase` and dispatching due schedules.
 - The collector worker is available as an opt-in Docker Compose service for dev and preview stacks.
 - The account exercise worker is available as a separate opt-in Docker Compose service for dev and preview stacks.
+- The collection scheduler is available as a separate opt-in Docker Compose service for dev and preview stacks.
 - A Collector Runtime browser provider boundary exists.
 - CloakBrowser support is experimental and not yet production-proven; Playwright Chromium remains the default provider.
 
@@ -98,10 +100,11 @@ pnpm stack:dev:workers:logs
 - `pnpm operator:profile:assisted-access -- --profile-id <profile-id> --source-group-id <source-group-id> --base-url http://localhost:8081`
 - `pnpm operator:collector:facebook -- --source-group-id <source-group-id> --base-url http://localhost:8081`
 - `pnpm operator:collector:worker -- --base-url http://localhost:8081 --once`
+- `pnpm operator:collector:scheduler -- --once`
 - `pnpm operator:profile:exercise-worker -- --base-url http://localhost:8081 --once`
 - `pnpm operator:profile-source-access-check-worker -- --base-url http://localhost:8081 --once`
 - `pnpm operator:browser:probe -- --browser-provider playwright`
-- Backward-compatible aliases: `pnpm profile:provision`, `pnpm profile:provision:cloakbrowser-probe`, `pnpm profile:assisted-access:run`, `pnpm collector:facebook:run`, `pnpm collector:worker:run`, `pnpm profile:exercise-worker:run`, `pnpm profile-source-access-check-worker:run`, `pnpm collector:browser:probe`.
+- Backward-compatible aliases: `pnpm profile:provision`, `pnpm profile:provision:cloakbrowser-probe`, `pnpm profile:assisted-access:run`, `pnpm collector:facebook:run`, `pnpm collector:worker:run`, `pnpm collector:scheduler:run`, `pnpm profile:exercise-worker:run`, `pnpm profile-source-access-check-worker:run`, `pnpm collector:browser:probe`.
 
 Operator browser-backed commands that accept `--browser-provider` use `BROWSER_PROVIDER`, then `playwright` when the option is omitted. Supported values are `playwright` and experimental `cloakbrowser`.
 
@@ -112,13 +115,15 @@ CloakBrowser provisioning uses the Node package `cloakbrowser` from `CloakHQ/Clo
 - `pnpm stack:dev:start`, `pnpm stack:dev:stop`, `pnpm stack:dev:reset`
 - `pnpm stack:dev:worker:start`, `pnpm stack:dev:worker:once`, `pnpm stack:dev:worker:logs`
 - `pnpm stack:dev:exercise-worker:start`, `pnpm stack:dev:exercise-worker:once`, `pnpm stack:dev:exercise-worker:logs`
+- `pnpm stack:dev:scheduler:start`, `pnpm stack:dev:scheduler:once`, `pnpm stack:dev:scheduler:logs`
 - `pnpm stack:dev:workers:start`, `pnpm stack:dev:workers:logs`
 - `pnpm stack:preview:start`, `pnpm stack:preview:stop`, `pnpm stack:preview:reset`
 - `pnpm stack:preview:worker:start`, `pnpm stack:preview:worker:once`, `pnpm stack:preview:worker:logs`
 - `pnpm stack:preview:exercise-worker:start`, `pnpm stack:preview:exercise-worker:once`, `pnpm stack:preview:exercise-worker:logs`
+- `pnpm stack:preview:scheduler:start`, `pnpm stack:preview:scheduler:once`, `pnpm stack:preview:scheduler:logs`
 - `pnpm stack:preview:workers:start`, `pnpm stack:preview:workers:logs`
 
-The `collector-worker` and `account-exercise-worker` Compose services are behind the `worker` profile and expose no ports. Inside Docker they talk to the API at `http://api:3000`; host commands still use `http://localhost:8081` for preview gateway access or `http://localhost:3000` for direct API access.
+The `collector-worker`, `account-exercise-worker`, and `collection-scheduler` Compose services are behind the `worker` profile and expose no ports. Inside Docker they talk to the API at `http://api:3000`; host commands still use `http://localhost:8081` for preview gateway access or `http://localhost:3000` for direct API access. The `collection-scheduler` service does not open a browser and uses a lightweight `scheduler-runtime` image that installs no Playwright runtime or Xvfb.
 
 ## Deeper Docs
 

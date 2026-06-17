@@ -19,6 +19,15 @@ EXPOSE 3000
 
 CMD ["pnpm", "start"]
 
+FROM app-deps AS scheduler-runtime
+
+COPY tsconfig.json drizzle.config.ts ./
+COPY drizzle drizzle
+COPY scripts scripts
+COPY src src
+
+CMD ["sh", "scripts/run-collection-scheduler-container.sh"]
+
 # Keep this image tag aligned with the Playwright version in pnpm-lock.yaml.
 FROM mcr.microsoft.com/playwright:v1.60.0-noble AS worker-runtime
 

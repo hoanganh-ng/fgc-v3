@@ -1,8 +1,13 @@
 # Active Sprint
 
-Sprint 059 is active.
+Sprint 060 is active.
 
 Implementation authority:
+
+- [Sprint 060 - Collection Scheduler Containerization and Stack Integration](SPRINT-060-collection-scheduler-containerization.md)
+
+Sprint 059 is accepted and recorded as the scheduled dispatch poller
+foundation for Sprint 060:
 
 - [Sprint 059 - Scheduled Collection Dispatch Poller](SPRINT-059-scheduled-collection-dispatch-poller.md)
 
