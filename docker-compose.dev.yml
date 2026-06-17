@@ -72,7 +72,7 @@ services:
       DATABASE_URL: postgres://content_pipeline:content_pipeline@postgres:5432/content_pipeline
       COLLECTOR_WORKER_BASE_URL: http://api:3000
       COLLECTOR_WORKER_MODE_ARGS: "--poll-interval-ms 5000"
-      BROWSER_PROVIDER: playwright
+      BROWSER_PROVIDER: cloakbrowser
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,7 +95,7 @@ services:
       ACCOUNT_EXERCISE_WORKER_MODE_ARGS: "--poll-interval-ms 5000"
       ACCOUNT_EXERCISE_WORKER_DISPLAY: ":99"
       ACCOUNT_EXERCISE_WORKER_XVFB_SCREEN: 1280x720x24
-      BROWSER_PROVIDER: playwright
+      BROWSER_PROVIDER: cloakbrowser
     depends_on:
       postgres:
         condition: service_healthy

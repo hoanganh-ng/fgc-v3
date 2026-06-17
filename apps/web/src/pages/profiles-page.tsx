@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Link,
   useNavigate,
@@ -27,6 +27,24 @@ import { ProfileAccountStageBadge } from "@/features/profiles/profile-account-st
 import { ProfileAuthenticationHealthBadge } from "@/features/profiles/profile-authentication-health-badge";
 import { ProfileStatusBadge } from "@/features/profiles/profile-status-badge";
 import { useProfilesQuery } from "@/features/profiles/profile-queries";
+import {
+  PROFILE_INVENTORY_AUTHENTICATION_HEALTH_OPTIONS,
+  PROFILE_INVENTORY_PAGE_SIZE,
+  PROFILE_INVENTORY_STATUS_OPTIONS,
+  applyProfileInventoryFilterChange,
+  applyProfileInventoryOffsetChange,
+  applyProfileInventoryResetFilters,
+  formatProfileInventoryRangeText,
+  getProfileAuthenticationHealthLabel,
+  getProfileInventoryPaginationModel,
+  getProfileStatusLabel,
+  hasActiveProfileInventoryFilters,
+  parseProfileInventoryOffset,
+  pickKnownValue,
+  resolveProfileInventoryEmptyState,
+  type ProfileInventoryEmptyState,
+  type ProfileInventoryFilters,
+} from "@/features/profiles/profile-inventory-view-model";
 import { isApiResultError } from "@/lib/api/http-client";
 import {
   KnownProfileAuthenticationHealthSchema,
@@ -37,21 +55,19 @@ import {
 } from "@/lib/api/profile-manager-client";
 import { PageShell } from "@/pages/page-shell";
 
-const PROFILE_INVENTORY_PAGE_SIZE = 25;
-const STATUS_VALUES = KnownProfileStatusSchema.options;
-const AUTHENTICATION_HEALTH_VALUES =
-  KnownProfileAuthenticationHealthSchema.options;
-
-interface ResolvedFilters {
-  readonly status: KnownProfileStatus | undefined;
-  readonly authenticationHealth: KnownProfileAuthenticationHealth | undefined;
-  readonly limit: number;
-  readonly offset: number;
-}
-
 export function ProfilesPage(): JSX.Element {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const navigateReplace = useCallback(
+    (next: URLSearchParams) => {
+      const search = next.toString();
+      navigate(
+        { search: search.length > 0 ? `?${search}` : "" },
+        { replace: true },
+      );
+    },
+    [navigate],
+  );
   const filters = useMemo(
     () => resolveFiltersFromSearchParams(searchParams),
     [searchParams],
@@ -64,43 +80,103 @@ export function ProfilesPage(): JSX.Element {
     limit: filters.limit,
     offset: filters.offset,
   });
-  const isFiltered = hasActiveFilters(filters);
+  const isFiltered = hasActiveProfileInventoryFilters(filters);
+  const responsePage =
+    profilesQuery.data?.page ?? {
+      limit: filters.limit,
+      offset: filters.offset,
+    };
+  const responseTotal = responsePage.total;
+  const itemCount = profilesQuery.data?.items.length ?? 0;
+  const emptyState = resolveProfileInventoryEmptyState({
+    itemCount,
+    total: responseTotal,
+    offset: filters.offset,
+    hasActiveFilters: isFiltered,
+  });
+  const paginationModel = getProfileInventoryPaginationModel({
+    offset: filters.offset,
+    limit: filters.limit,
+    itemCount,
+    total: responseTotal,
+  });
 
-  const updateSearchParams = useCallback(
+  const navigateWithParams = useCallback(
     (next: URLSearchParams) => {
-      navigate({ search: `?${next.toString()}` }, { replace: false });
+      const search = next.toString();
+      navigate({ search: search.length > 0 ? `?${search}` : "" }, { replace: false });
     },
     [navigate],
   );
 
   const handleStatusChange = (value: string) => {
-    setFilterParam(updateSearchParams, searchParams, "status", value);
+    navigateWithParams(
+      applyProfileInventoryFilterChange({
+        searchParams,
+        key: "status",
+        value,
+      }),
+    );
   };
 
   const handleAuthHealthChange = (value: string) => {
-    setFilterParam(
-      updateSearchParams,
-      searchParams,
-      "authenticationHealth",
-      value,
+    navigateWithParams(
+      applyProfileInventoryFilterChange({
+        searchParams,
+        key: "authenticationHealth",
+        value,
+      }),
     );
   };
 
   const handleResetFilters = () => {
-    const next = new URLSearchParams(searchParams);
-    next.delete("status");
-    next.delete("authenticationHealth");
-    next.delete("offset");
-    updateSearchParams(next);
+    navigateWithParams(applyProfileInventoryResetFilters(searchParams));
   };
 
   const handlePreviousPage = () => {
-    goToOffset(updateSearchParams, searchParams, filters, filters.offset - filters.limit);
+    navigateWithParams(
+      applyProfileInventoryOffsetChange({
+        searchParams,
+        filters,
+        nextOffset: filters.offset - filters.limit,
+      }),
+    );
   };
 
   const handleNextPage = () => {
-    goToOffset(updateSearchParams, searchParams, filters, filters.offset + filters.limit);
+    navigateWithParams(
+      applyProfileInventoryOffsetChange({
+        searchParams,
+        filters,
+        nextOffset: filters.offset + filters.limit,
+      }),
+    );
   };
+
+  // Stale out-of-range offset recovery: when items are empty but total is
+  // present and > 0, normalize the URL to offset 0 using replace navigation,
+  // preserving active filters.
+  const lastNormalizedOffsetRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!profilesQuery.isSuccess) {
+      return;
+    }
+    if (emptyState !== "OUT_OF_RANGE") {
+      lastNormalizedOffsetRef.current = null;
+      return;
+    }
+    if (lastNormalizedOffsetRef.current === filters.offset) {
+      return;
+    }
+    lastNormalizedOffsetRef.current = filters.offset;
+    navigateReplace(
+      applyProfileInventoryOffsetChange({
+        searchParams,
+        filters,
+        nextOffset: 0,
+      }),
+    );
+  }, [emptyState, filters, navigateReplace, profilesQuery.isSuccess, searchParams]);
 
   return (
     <PageShell
@@ -142,17 +218,16 @@ export function ProfilesPage(): JSX.Element {
           }}
         />
       ) : null}
-      {profilesQuery.isSuccess && profilesQuery.data.items.length === 0 ? (
-        isFiltered ? (
-          <ProfilesNoMatchesState onReset={handleResetFilters} />
-        ) : (
-          <ProfilesEmptyState />
-        )
+      {profilesQuery.isSuccess && emptyState === "FILTERED_NO_MATCH" ? (
+        <ProfilesNoMatchesState onReset={handleResetFilters} />
       ) : null}
-      {profilesQuery.isSuccess && profilesQuery.data.items.length > 0 ? (
+      {profilesQuery.isSuccess && emptyState === "GLOBAL_NO_PROFILES" ? (
+        <ProfilesEmptyState />
+      ) : null}
+      {profilesQuery.isSuccess && itemCount > 0 ? (
         <ProfilesTable
-          page={profilesQuery.data.page}
-          profiles={profilesQuery.data.items}
+          page={responsePage}
+          profiles={profilesQuery.data?.items ?? []}
           onPreviousPage={handlePreviousPage}
           onNextPage={handleNextPage}
         />
@@ -188,9 +263,9 @@ function ProfilesFilterBar({
               aria-label="Filter by status"
             >
               <option value="">All</option>
-              {STATUS_VALUES.map((value) => (
+              {PROFILE_INVENTORY_STATUS_OPTIONS.map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {getProfileStatusLabel(value)}
                 </option>
               ))}
             </Select>
@@ -203,9 +278,9 @@ function ProfilesFilterBar({
               aria-label="Filter by authentication health"
             >
               <option value="">All</option>
-              {AUTHENTICATION_HEALTH_VALUES.map((value) => (
+              {PROFILE_INVENTORY_AUTHENTICATION_HEALTH_OPTIONS.map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {getProfileAuthenticationHealthLabel(value)}
                 </option>
               ))}
             </Select>
@@ -238,12 +313,18 @@ function ProfilesTable({
   readonly onPreviousPage: () => void;
   readonly onNextPage: () => void;
 }): JSX.Element {
-  const total = page.total ?? profiles.length;
-  const limit = page.limit;
-  const offset = page.offset;
-  const range = computeVisibleRange(limit, offset, profiles.length);
-  const hasPrevious = offset > 0;
-  const hasNext = total > 0 && offset + profiles.length < total;
+  const paginationModel = getProfileInventoryPaginationModel({
+    offset: page.offset,
+    limit: page.limit,
+    itemCount: profiles.length,
+    total: page.total,
+  });
+  const rangeText = formatProfileInventoryRangeText({
+    limit: page.limit,
+    offset: page.offset,
+    itemCount: profiles.length,
+    total: page.total,
+  });
 
   return (
     <Card>
@@ -251,9 +332,9 @@ function ProfilesTable({
         <div className="min-w-0">
           <CardTitle>Profile Inventory</CardTitle>
           <CardDescription>
-            {formatProfileRange(range, total)}
-            {" of "}
-            {formatProfileCount(total)}
+            {rangeText.rangeText}
+            {" "}
+            {rangeText.totalText}
           </CardDescription>
         </div>
         <div className="grid size-11 place-items-center rounded border border-border bg-muted text-primary">
@@ -336,12 +417,12 @@ function ProfilesTable({
         </div>
         <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
-            Page size {limit} items.
+            Page size {page.limit} items.
           </p>
           <div className="flex items-center gap-2">
             <Button
               variant="secondary"
-              disabled={!hasPrevious}
+              disabled={!paginationModel.canGoBack}
               onClick={onPreviousPage}
             >
               <ChevronLeft aria-hidden="true" className="size-4" />
@@ -349,7 +430,7 @@ function ProfilesTable({
             </Button>
             <Button
               variant="secondary"
-              disabled={!hasNext}
+              disabled={!paginationModel.canGoNext}
               onClick={onNextPage}
             >
               Next
@@ -451,28 +532,9 @@ function ProfilesNoMatchesState({
           <ArrowLeft aria-hidden="true" className="size-4" />
           Reset filters
         </Button>
-        <Link className={buttonVariants({ variant: "primary" })} to="/profiles/new">
-          <Plus aria-hidden="true" className="size-4" />
-          New Profile
-        </Link>
       </CardContent>
     </Card>
   );
-}
-
-function formatProfileCount(count: number): string {
-  return count === 1 ? "1 profile" : `${count} profiles`;
-}
-
-function formatProfileRange(
-  range: { readonly start: number; readonly end: number },
-  total: number,
-): string {
-  if (total === 0) {
-    return "Showing 0";
-  }
-
-  return `Showing ${range.start}-${range.end}`;
 }
 
 function formatApiError(error: unknown): string {
@@ -498,19 +560,19 @@ function formatDateTime(value: string): string {
 
 function resolveFiltersFromSearchParams(
   searchParams: URLSearchParams,
-): ResolvedFilters {
+): ProfileInventoryFilters {
   const rawStatus = searchParams.get("status");
   const rawAuthHealth = searchParams.get("authenticationHealth");
   const rawOffset = searchParams.get("offset");
-  const status = pickKnown(
+  const status = pickKnownValue(
     rawStatus,
     KnownProfileStatusSchema.options,
   ) as KnownProfileStatus | undefined;
-  const authenticationHealth = pickKnown(
+  const authenticationHealth = pickKnownValue(
     rawAuthHealth,
     KnownProfileAuthenticationHealthSchema.options,
   ) as KnownProfileAuthenticationHealth | undefined;
-  const offset = parseOffset(rawOffset);
+  const offset = parseProfileInventoryOffset(rawOffset);
 
   return {
     status,
@@ -520,91 +582,5 @@ function resolveFiltersFromSearchParams(
   };
 }
 
-function pickKnown<T extends string>(
-  value: string | null,
-  options: readonly T[],
-): T | undefined {
-  if (value === null) {
-    return undefined;
-  }
-
-  return options.includes(value as T) ? (value as T) : undefined;
-}
-
-function parseOffset(rawOffset: string | null): number {
-  if (rawOffset === null) {
-    return 0;
-  }
-
-  const parsed = Number.parseInt(rawOffset, 10);
-
-  if (!Number.isInteger(parsed) || parsed < 0) {
-    return 0;
-  }
-
-  return parsed;
-}
-
-function hasActiveFilters(filters: ResolvedFilters): boolean {
-  return (
-    filters.status !== undefined ||
-    filters.authenticationHealth !== undefined
-  );
-}
-
-function setFilterParam(
-  updateSearchParams: (next: URLSearchParams) => void,
-  searchParams: URLSearchParams,
-  key: "status" | "authenticationHealth",
-  value: string,
-): void {
-  const next = new URLSearchParams(searchParams);
-  if (value === "") {
-    next.delete(key);
-  } else {
-    next.set(key, value);
-  }
-  // Changing a filter resets offset to zero.
-  next.delete("offset");
-  updateSearchParams(next);
-}
-
-function goToOffset(
-  updateSearchParams: (next: URLSearchParams) => void,
-  searchParams: URLSearchParams,
-  filters: ResolvedFilters,
-  nextOffset: number,
-): void {
-  if (nextOffset < 0) {
-    return;
-  }
-
-  const next = new URLSearchParams(searchParams);
-  if (nextOffset === 0) {
-    next.delete("offset");
-  } else {
-    next.set("offset", String(nextOffset));
-  }
-  if (filters.status !== undefined) {
-    next.set("status", filters.status);
-  }
-  if (filters.authenticationHealth !== undefined) {
-    next.set("authenticationHealth", filters.authenticationHealth);
-  }
-  updateSearchParams(next);
-}
-
-function computeVisibleRange(
-  limit: number,
-  offset: number,
-  visibleCount: number,
-): { readonly start: number; readonly end: number } {
-  if (visibleCount === 0) {
-    return { start: 0, end: 0 };
-  }
-
-  return {
-    start: offset + 1,
-    end: offset + visibleCount,
-  };
-}
+// Re-exported for tests that may want to import the empty-state markers.
+export type { ProfileInventoryEmptyState };
