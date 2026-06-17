@@ -1,8 +1,10 @@
 # Active Sprint
 
-Sprint 058 is active.
+Sprint 058 is complete and accepted.
 
-Implementation authority:
+No sprint is currently active. Awaiting Sprint 059 definition.
+
+Recently completed:
 
 - [Sprint 058 - Atomic Scheduled Collection Dispatch](SPRINT-058-atomic-scheduled-collection-dispatch.md)
 
