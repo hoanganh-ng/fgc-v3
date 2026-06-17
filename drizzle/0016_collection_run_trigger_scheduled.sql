@@ -1,0 +1,1 @@
+ALTER TYPE "public"."collection_run_trigger_type" ADD VALUE IF NOT EXISTS 'SCHEDULED';

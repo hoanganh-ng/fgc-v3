@@ -13,6 +13,7 @@ import {
   DrizzleAccountExerciseRunRepository,
   DrizzleCollectionRunRepository,
   DrizzleCollectionScheduleRepository,
+  DrizzleDispatchNextDueCollectionScheduleRepository,
   DrizzleProfileSourceAccessCheckRunRepository,
   createDatabaseClient,
 } from "../../infrastructure/database";
@@ -110,6 +111,8 @@ export function createCollectorRuntimeFromDatabaseClient(
   const collectionSchedules = new DrizzleCollectionScheduleRepository(
     databaseClient.db,
   );
+  const dispatchNextDueCollectionSchedules =
+    new DrizzleDispatchNextDueCollectionScheduleRepository(databaseClient.db);
   const accountExerciseRuns = new DrizzleAccountExerciseRunRepository(
     databaseClient.db,
   );
@@ -133,6 +136,7 @@ export function createCollectorRuntimeFromDatabaseClient(
     accountExerciseRuns,
     collectionRuns,
     collectionSchedules,
+    dispatchNextDueCollectionSchedules,
     checkRuns,
     profiles,
     sourceGroups,

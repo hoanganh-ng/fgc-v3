@@ -1,8 +1,13 @@
 # Active Sprint
 
-Sprint 057 is active.
+Sprint 058 is active.
 
 Implementation authority:
+
+- [Sprint 058 - Atomic Scheduled Collection Dispatch](SPRINT-058-atomic-scheduled-collection-dispatch.md)
+
+Sprint 057 is accepted and recorded as the schedule persistence foundation
+for Sprint 058:
 
 - [Sprint 057 - Collection Schedule Domain and Persistence Foundation](SPRINT-057-collection-schedule-domain-and-persistence-foundation.md)
 

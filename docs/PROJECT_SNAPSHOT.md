@@ -4,7 +4,9 @@
 The product is currently in the **Content Collector** stage (Stage 1 of 3, preceding Builder and Publisher). The core focus is collecting normalized content from configured Facebook sources while maintaining strict isolation between profile management, collection orchestration, and content storage.
 
 ## Current Active Sprint
-Sprint 056: Operator Authentication Health Filtering and Profile Inventory Pagination (Active).
+Sprint 058: Atomic Scheduled Collection Dispatch (Active).
+Sprint 057: Collection Schedule Domain and Persistence Foundation (Accepted).
+Sprint 056: Operator Authentication Health Filtering and Profile Inventory Pagination (Accepted).
 Sprint 055: Operator Authentication Recovery and Reprovisioning (Accepted).
 Sprint 054B: Runtime Authentication Health Reporting and Checkout Enforcement (Accepted).
 Sprint 054A: Profile Authentication Health Foundation (Accepted).

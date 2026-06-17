@@ -57,7 +57,7 @@ describe("collector runtime database schema", () => {
       "FAILED",
       "CANCELED",
     ]);
-    expect(collectionRunTriggerTypeEnum.enumValues).toEqual(["MANUAL_API"]);
+    expect(collectionRunTriggerTypeEnum.enumValues).toEqual(["MANUAL_API", "SCHEDULED"]);
     expect(accountExerciseRunStatusEnum.enumValues).toEqual([
       "QUEUED",
       "RUNNING",

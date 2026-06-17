@@ -113,6 +113,13 @@
       "when": 1781685287737,
       "tag": "0015_magical_princess_powerful",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1781685287738,
+      "tag": "0016_collection_run_trigger_scheduled",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,7 @@ import {
   AttachAccountExerciseRunLeaseUseCase,
   ClaimNextAccountExerciseRunUseCase,
   ClaimNextCollectionRunUseCase,
+  DispatchNextDueCollectionScheduleUseCase,
   GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
   GetCollectionScheduleUseCase,
@@ -17,8 +18,8 @@ import {
   MarkCollectionRunFailedUseCase,
   MarkCollectionRunRunningUseCase,
   MarkCollectionRunSucceededUseCase,
-  RequestAccountExerciseRunUseCase,
   RequestCollectionRunUseCase,
+  RequestAccountExerciseRunUseCase,
   UpsertCollectionScheduleUseCase,
 } from "../../collector-runtime/application";
 import type {
@@ -32,6 +33,7 @@ import type {
 import { InMemoryCollectionRunRepository } from "../../collector-runtime/application/test-support/in-memory-collection-run-repository";
 import { InMemoryAccountExerciseRunRepository } from "../../collector-runtime/application/test-support/in-memory-account-exercise-run-repository";
 import { InMemoryCollectionScheduleRepository } from "../../collector-runtime/application/test-support/in-memory-collection-schedule-repository";
+import { InMemoryDispatchNextDueCollectionScheduleRepository } from "../../collector-runtime/application/test-support/in-memory-dispatch-next-due-collection-schedule.repository";
 import { InMemoryProfileSourceAccessCheckRunRepository } from "../../collector-runtime/application/test-support/in-memory-profile-source-access-check-run-repository";
 import { createCollectorRuntime } from "./collector-runtime.container";
 
@@ -42,6 +44,8 @@ describe("collector runtime composition container", () => {
       accountExerciseRuns: new InMemoryAccountExerciseRunRepository(),
       collectionRuns: new InMemoryCollectionRunRepository(),
       collectionSchedules: new InMemoryCollectionScheduleRepository(),
+      dispatchNextDueCollectionSchedules:
+        new InMemoryDispatchNextDueCollectionScheduleRepository(),
       checkRuns: new InMemoryProfileSourceAccessCheckRunRepository(),
       sourceGroups: new FakeSourceGroupLookupPort(),
       profiles: new FakeProfileReferencePort(),
@@ -109,6 +113,9 @@ describe("collector runtime composition container", () => {
     );
     expect(services.listCollectionSchedules).toBeInstanceOf(
       ListCollectionSchedulesUseCase,
+    );
+    expect(services.dispatchNextDueCollectionSchedule).toBeInstanceOf(
+      DispatchNextDueCollectionScheduleUseCase,
     );
 
     await services.close();

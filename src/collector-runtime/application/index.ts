@@ -11,6 +11,7 @@ export * from "./ports/account-exercise-run-repository.port";
 export * from "./ports/collection-run-executor.port";
 export * from "./ports/collection-run-repository.port";
 export * from "./ports/collection-schedule-repository.port";
+export * from "./ports/dispatch-next-due-collection-schedule-repository.port";
 export * from "./ports/id-generator.port";
 export * from "./ports/source-group-lookup.port";
 export * from "./ports/profile-reference.port";
@@ -45,7 +46,9 @@ export * from "./use-cases/mark-profile-source-access-check-run-succeeded.use-ca
 export * from "./use-cases/request-account-exercise-run.use-case";
 export * from "./use-cases/request-collection-run.use-case";
 export * from "./use-cases/request-profile-source-access-check-run.use-case";
+export * from "./use-cases/dispatch-next-due-collection-schedule.use-case";
 export * from "./use-cases/upsert-collection-schedule.use-case";
 export * from "./run-facebook-group-collection";
 export * from "./submit-captured-facebook-payload";
 export * from "./test-support/in-memory-collection-schedule-repository";
+export * from "./test-support/in-memory-dispatch-next-due-collection-schedule.repository";

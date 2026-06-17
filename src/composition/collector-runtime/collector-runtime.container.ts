@@ -5,6 +5,7 @@ import {
   ClaimNextAccountExerciseRunUseCase,
   ClaimNextCollectionRunUseCase,
   ClaimNextProfileSourceAccessCheckRunUseCase,
+  DispatchNextDueCollectionScheduleUseCase,
   GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
   GetCollectionScheduleUseCase,
@@ -33,6 +34,7 @@ import type {
   Clock,
   CollectionRunRepository,
   CollectionScheduleRepository,
+  DispatchNextDueCollectionScheduleRepositoryPort,
   IdGenerator,
   SourceGroupLookupPort,
   ProfileSourceAccessCheckRunRepository,
@@ -43,6 +45,7 @@ export interface CollectorRuntimeDependencies {
   readonly accountExerciseRuns: AccountExerciseRunRepository;
   readonly collectionRuns: CollectionRunRepository;
   readonly collectionSchedules: CollectionScheduleRepository;
+  readonly dispatchNextDueCollectionSchedules: DispatchNextDueCollectionScheduleRepositoryPort;
   readonly checkRuns: ProfileSourceAccessCheckRunRepository;
   readonly profiles: ProfileReferencePort;
   readonly sourceGroups: SourceGroupLookupPort;
@@ -70,6 +73,7 @@ export interface CollectorRuntimeContainer {
   readonly upsertCollectionSchedule: UpsertCollectionScheduleUseCase;
   readonly getCollectionSchedule: GetCollectionScheduleUseCase;
   readonly listCollectionSchedules: ListCollectionSchedulesUseCase;
+  readonly dispatchNextDueCollectionSchedule: DispatchNextDueCollectionScheduleUseCase;
   readonly requestProfileSourceAccessCheckRun: RequestProfileSourceAccessCheckRunUseCase;
   readonly getProfileSourceAccessCheckRun: GetProfileSourceAccessCheckRunUseCase;
   readonly listProfileSourceAccessCheckRuns: ListProfileSourceAccessCheckRunsUseCase;
@@ -90,6 +94,7 @@ export function createCollectorRuntime(
     accountExerciseRuns,
     collectionRuns,
     collectionSchedules,
+    dispatchNextDueCollectionSchedules,
     checkRuns,
     profiles,
     sourceGroups,
@@ -164,6 +169,11 @@ export function createCollectorRuntime(
     ),
     listCollectionSchedules: new ListCollectionSchedulesUseCase(
       collectionSchedules,
+    ),
+    dispatchNextDueCollectionSchedule: new DispatchNextDueCollectionScheduleUseCase(
+      dispatchNextDueCollectionSchedules,
+      clock,
+      idGenerator,
     ),
     requestProfileSourceAccessCheckRun: new RequestProfileSourceAccessCheckRunUseCase(
       checkRuns,

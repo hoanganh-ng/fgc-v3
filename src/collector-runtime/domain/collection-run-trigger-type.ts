@@ -1,7 +1,7 @@
 import type { infer as zInfer } from "zod";
 import type { CollectionRunTriggerTypeSchema } from "./collection-run.schemas";
 
-export const COLLECTION_RUN_TRIGGER_TYPES = ["MANUAL_API"] as const;
+export const COLLECTION_RUN_TRIGGER_TYPES = ["MANUAL_API", "SCHEDULED"] as const;
 
 export type CollectionRunTriggerType = zInfer<
   typeof CollectionRunTriggerTypeSchema
