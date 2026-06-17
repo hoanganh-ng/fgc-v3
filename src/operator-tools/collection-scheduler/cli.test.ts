@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   runCollectionSchedulerCli,
-} from "./cli";
+} from "./cli-command";
 import type { CollectionSchedulerLogger } from "./scheduler-runner";
 import type { CollectorRuntimeService } from "../../composition/collector-runtime/create-collector-runtime";
 

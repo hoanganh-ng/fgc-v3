@@ -66,12 +66,14 @@ use cases, no schema or migration changes.
 
 1. CLI parses CLI options and prints usage on `--help`/`-h` or argument
    errors.
-2. CLI builds a `CollectorRuntimeContainer` via
+2. CLI installs `SIGINT` and `SIGTERM` handlers that abort an
+   `AbortController`. The handlers are installed **before** runtime
+   composition so they can be detached in a `finally` if composition
+   throws.
+3. CLI builds a `CollectorRuntimeContainer` via
    `createCollectorRuntimeFromEnv()`. The container owns the
    `DatabaseClient` and the Drizzle dispatch repository through the
    existing composition root.
-3. CLI registers `SIGINT` and `SIGTERM` handlers that abort an
-   `AbortController`.
 4. Runner starts. Each outer iteration is one cycle. Each cycle calls
    the dispatch use case until it returns `null`, increments
    `cyclesCompleted`, and — unless `--once` was requested or the
@@ -98,13 +100,17 @@ Continuous mode increments `cyclesCompleted` per outer iteration.
 Final-state rules:
 
 - A pre-aborted signal performs **zero** dispatches and reports
-  **zero** completed cycles.
+  **zero** completed cycles. The runner emits one info line for the
+  pre-aborted startup so operators can see why nothing happened.
 - An abort that lands during the inter-cycle delay does not begin
-  or count a new cycle; the previous cycle is unchanged.
-- An abort that lands between two dispatches inside a drain may
-  count that drain as one completed cycle (the inner drain exits
-  with a non-zero `dispatchedRuns` and the counter increments once
-  on the way out of the inner loop).
+  or count a new cycle; the previous cycle is unchanged. The runner
+  does **not** emit a final-state log line — the previously emitted
+  per-cycle completion line is the operator-visible record.
+- An abort that lands between two dispatches inside a drain stops the
+  drain immediately; the runner does **not** continue draining until
+  `null`. The drain may still be counted as one completed cycle (the
+  counter increments once on the way out of the inner loop), but no
+  extra log line is emitted beyond the per-cycle completion line.
 
 ## Dependency Contract
 
@@ -149,15 +155,18 @@ usage, sets `process.exitCode = 2`, and returns.
 - The CLI catches the re-raised error, prints its message, and sets
   `process.exitCode = 1`.
 - SIGINT and SIGTERM trigger `abortController.abort()`. The runner
-  observes the abort between dispatches and inside the delay, drains
-  the current cycle (which is counted), then exits the outer loop.
-- The CLI detaches its signal handlers in its own `finally`, even if
-  runtime composition throws after handlers are installed.
+  observes the abort between dispatches — when an abort lands between
+  dispatches, the current drain stops immediately and is not continued
+  to the null terminator — and inside the inter-cycle delay. The
+  completed cycle (if any) is counted; the outer loop then exits
+  before the next cycle begins.
+- The CLI installs signal handlers **before** runtime composition so
+  it can detach them in its own `finally` if composition throws. The
+  CLI never instantiates the Drizzle dispatch repository; it always
+  wires through `createCollectorRuntimeFromEnv()`.
 - `close()` is invoked by the runner, not by the CLI; the CLI never
   double-closes. The CLI never calls `close()` on a runtime that was
   never constructed.
-- The CLI never instantiates the Drizzle dispatch repository; it
-  always wires through `createCollectorRuntimeFromEnv()`.
 
 ## Logging Policy
 
@@ -177,6 +186,7 @@ usage, sets `process.exitCode = 2`, and returns.
 
 - `src/operator-tools/collection-scheduler/cli-args.ts`
 - `src/operator-tools/collection-scheduler/scheduler-runner.ts`
+- `src/operator-tools/collection-scheduler/cli-command.ts`
 - `src/operator-tools/collection-scheduler/cli.ts`
 - `src/operator-tools/collection-scheduler/cli-args.test.ts`
 - `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`
@@ -223,7 +233,10 @@ usage, sets `process.exitCode = 2`, and returns.
 | Abort listener is removed on abort and on normal delay completion         | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Repeated normal delays do not retain abort listeners                      | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Pre-aborted signal performs zero dispatches and zero cycles               | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
+| Pre-aborted signal logs "aborted before first cycle" once                 | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
+| Abort during delay does not log "aborted before first cycle"              | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Abort mid-drain stops further dispatching                                 | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
+| Abort mid-drain does not log a final-state "aborted mid-cycle" line       | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Dispatch errors propagate and close still runs once                      | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Close errors propagate                                                    | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |
 | Logger emits safe info lines and no warns/errors on happy path            | `src/operator-tools/collection-scheduler/scheduler-runner.test.ts`              |

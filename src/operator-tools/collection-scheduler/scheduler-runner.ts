@@ -49,24 +49,14 @@ export async function runCollectionSchedulerCommand(
   try {
     if (input.abortSignal?.aborted) {
       logger.info("Collection scheduler aborted before first cycle.");
-      return {
-        cyclesCompleted: result.cyclesCompleted,
-        dispatchedRuns: result.dispatchedRuns,
-      };
+      return result;
     }
 
-    let cycleBegan = false;
-    let cycleCompleted = false;
-
     while (true) {
-      cycleBegan = false;
-      cycleCompleted = false;
-
       if (input.abortSignal?.aborted) {
         break;
       }
 
-      cycleBegan = true;
       let cycleDispatched = 0;
 
       while (true) {
@@ -88,7 +78,6 @@ export async function runCollectionSchedulerCommand(
         );
       }
 
-      cycleCompleted = true;
       result.cyclesCompleted += 1;
       logger.info(
         `Cycle ${result.cyclesCompleted} complete ` +
@@ -106,16 +95,7 @@ export async function runCollectionSchedulerCommand(
       await delay(input.options.pollIntervalMs, input.abortSignal);
     }
 
-    if (!cycleBegan) {
-      logger.info("Collection scheduler aborted before first cycle.");
-    } else if (!cycleCompleted) {
-      logger.info("Collection scheduler aborted mid-cycle.");
-    }
-
-    return {
-      cyclesCompleted: result.cyclesCompleted,
-      dispatchedRuns: result.dispatchedRuns,
-    };
+    return result;
   } finally {
     await input.dependencies.close();
     logger.info("Collection scheduler stopped.");

@@ -310,10 +310,11 @@ describe("collection scheduler runner", () => {
     const abortController = new AbortController();
     abortController.abort();
     let closeCount = 0;
+    const logger = new MemoryLogger();
 
     const result = await runCollectionSchedulerCommand({
       options: { ...defaultOptions, pollIntervalMs: 50 },
-      logger: new MemoryLogger(),
+      logger,
       dependencies: {
         dispatch,
         close: async () => {
@@ -326,6 +327,48 @@ describe("collection scheduler runner", () => {
     expect(result).toEqual({ cyclesCompleted: 0, dispatchedRuns: 0 });
     expect(dispatch).not.toHaveBeenCalled();
     expect(closeCount).toBe(1);
+    expect(logger.messages).toContain(
+      "Collection scheduler aborted before first cycle.",
+    );
+    expect(logger.messages).toContain("Collection scheduler stopped.");
+  });
+
+  it("does not log 'aborted before first cycle' when abort lands after a completed cycle", async () => {
+    const dispatch = createFakeDispatch([
+      makeResult("source-group-1", "run-1"),
+      null,
+    ]);
+    const abortController = new AbortController();
+    const logger = new MemoryLogger();
+
+    const promise = runCollectionSchedulerCommand({
+      options: { ...defaultOptions, pollIntervalMs: 1_000 },
+      logger,
+      dependencies: { dispatch, close: async () => {} },
+      abortSignal: abortController.signal,
+    });
+
+    await flushMicrotasks();
+    // Cycle 1 already drained and logged "Cycle 1 complete ...".
+    expect(logger.messages).toContain(
+      "Cycle 1 complete (dispatched 1 total).",
+    );
+
+    // Abort while the runner sits in the inter-cycle delay.
+    abortController.abort();
+    await flushMicrotasks();
+
+    const result = await promise;
+    expect(result).toEqual({ cyclesCompleted: 1, dispatchedRuns: 1 });
+
+    // No false "before first cycle" line.
+    expect(logger.messages).not.toContain(
+      "Collection scheduler aborted before first cycle.",
+    );
+    expect(logger.messages).not.toContain(
+      "Collection scheduler aborted mid-cycle.",
+    );
+    expect(logger.messages).toContain("Collection scheduler stopped.");
   });
 
   it("aborts a drain mid-cycle without dispatching further", async () => {
@@ -335,16 +378,29 @@ describe("collection scheduler runner", () => {
       abortController.abort();
       return result;
     });
+    const logger = new MemoryLogger();
 
     const result = await runCollectionSchedulerCommand({
       options: { ...defaultOptions, once: true, pollIntervalMs: 50 },
-      logger: new MemoryLogger(),
+      logger,
       dependencies: { dispatch, close: async () => {} },
       abortSignal: abortController.signal,
     });
 
     expect(result).toEqual({ cyclesCompleted: 1, dispatchedRuns: 1 });
     expect(dispatch).toHaveBeenCalledTimes(1);
+    // The abort landed between dispatches; the drain does not resume to
+    // the null terminator, and there is no false final-state log.
+    expect(logger.messages).not.toContain(
+      "Collection scheduler aborted before first cycle.",
+    );
+    expect(logger.messages).not.toContain(
+      "Collection scheduler aborted mid-cycle.",
+    );
+    expect(logger.messages).toContain(
+      "Cycle 1 complete (dispatched 1 total).",
+    );
+    expect(logger.messages).toContain("Collection scheduler stopped.");
   });
 
   it("propagates dispatch errors and still closes dependencies once", async () => {
