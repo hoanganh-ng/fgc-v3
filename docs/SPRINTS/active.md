@@ -1,10 +1,13 @@
 # Active Sprint
 
-Sprint 058 is complete and accepted.
+Sprint 059 is active.
 
-No sprint is currently active. Awaiting Sprint 059 definition.
+Implementation authority:
 
-Recently completed:
+- [Sprint 059 - Scheduled Collection Dispatch Poller](SPRINT-059-scheduled-collection-dispatch-poller.md)
+
+Sprint 058 is accepted and recorded as the atomic scheduled dispatch
+foundation for Sprint 059:
 
 - [Sprint 058 - Atomic Scheduled Collection Dispatch](SPRINT-058-atomic-scheduled-collection-dispatch.md)
 

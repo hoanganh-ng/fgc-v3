@@ -11,6 +11,7 @@
 - Detecting authentication walls (login, checkpoints).
 - Owns the `CollectionSchedule` aggregate (one schedule per source group; persisted schedule, not yet driving dispatch).
 - Atomic scheduled dispatch: `DispatchNextDueCollectionScheduleUseCase` selects one enabled due schedule with `FOR UPDATE SKIP LOCKED`, inserts a `QUEUED` `SCHEDULED` `CollectionRun`, and advances the schedule's `next_run_at` per the cadence policy, all in a single PostgreSQL transaction. Missed intervals produce one run only. See [Sprint 058](../SPRINTS/SPRINT-058-atomic-scheduled-collection-dispatch.md).
+- Scheduled dispatch poller: the **collection scheduler** (`src/operator-tools/collection-scheduler/`) is a sibling CLI that polls `DispatchNextDueCollectionScheduleUseCase` on an interval; it dispatches due schedules into runs but never executes them — execution remains the collector worker's job. See [Sprint 059](../SPRINTS/SPRINT-059-scheduled-collection-dispatch-poller.md).
 
 ## Does Not Own
 - Profile property invariants, session ingestion rules, or checkout eligibility.
