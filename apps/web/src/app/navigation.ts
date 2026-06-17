@@ -1,5 +1,6 @@
 import {
   Activity,
+  CalendarClock,
   ClipboardList,
   FileText,
   FolderKanban,
@@ -40,6 +41,11 @@ export const primaryNavigation: readonly NavigationItem[] = [
     label: "Collection Runs",
     path: "/collection-runs",
     icon: ClipboardList,
+  },
+  {
+    label: "Schedules",
+    path: "/collection-schedules",
+    icon: CalendarClock,
   },
   {
     label: "Exercise Runs",

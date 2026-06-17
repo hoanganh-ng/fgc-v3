@@ -32,6 +32,16 @@ function createCollectionRun(
   };
 }
 
+function createScheduledCollectionRun(
+  overrides: Partial<CollectionRun> = {},
+): CollectionRun {
+  return createCollectionRun({
+    id: "run-scheduled",
+    triggerType: "SCHEDULED",
+    ...overrides,
+  });
+}
+
 describe("collector runtime collection-run client", () => {
   it("uses strict collection-run response schemas", () => {
     const listWithExtraTopLevelField = CollectionRunsListResponseSchema.safeParse({
@@ -102,5 +112,17 @@ describe("collector runtime collection-run client", () => {
     expect(capturedPath).toBe(
       "/collector/collection-runs/run%2Fwith%20space/cancel",
     );
+  });
+
+  it("accepts a collection-run list response containing a scheduled run", () => {
+    const parsed = CollectionRunsListResponseSchema.safeParse({
+      items: [
+        createCollectionRun(),
+        createScheduledCollectionRun(),
+      ],
+      page: { limit: 50, offset: 0 },
+    });
+
+    expect(parsed.success).toBe(true);
   });
 });

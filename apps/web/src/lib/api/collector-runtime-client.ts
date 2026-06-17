@@ -14,7 +14,10 @@ export const CollectionRunStatusSchema = z.enum([
   "CANCELED",
 ]);
 
-export const CollectionRunTriggerTypeSchema = z.enum(["MANUAL_API"]);
+export const CollectionRunTriggerTypeSchema = z.enum([
+  "MANUAL_API",
+  "SCHEDULED",
+]);
 
 export const AccountExerciseRunStatusSchema = z.enum([
   "QUEUED",
@@ -498,6 +501,63 @@ export const DEFAULT_ACCOUNT_EXERCISE_RUN_LIST_LIMIT = 50;
 export const MAX_ACCOUNT_EXERCISE_RUN_LIST_LIMIT = 100;
 export const DEFAULT_PROFILE_SOURCE_ACCESS_CHECK_RUN_LIST_LIMIT = 50;
 export const MAX_PROFILE_SOURCE_ACCESS_CHECK_RUN_LIST_LIMIT = 100;
+export const DEFAULT_COLLECTION_SCHEDULE_LIST_LIMIT = 50;
+export const MAX_COLLECTION_SCHEDULE_LIST_LIMIT = 100;
+
+export const CollectionScheduleParametersSchema = z
+  .object({
+    maxScrolls: z.number().int().min(0).optional(),
+    maxDurationMs: z.number().int().min(1).optional(),
+  })
+  .strict();
+
+export const CollectionScheduleSchema = z
+  .object({
+    sourceGroupId: NonEmptyStringSchema,
+    enabled: z.boolean(),
+    intervalMinutes: z.number().int().min(1).max(10080),
+    nextRunAt: z.string().datetime({ offset: true }),
+    parameters: CollectionScheduleParametersSchema,
+    createdAt: z.string().datetime({ offset: true }),
+    updatedAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+
+export const CollectionScheduleListResponseSchema = z
+  .object({
+    items: z.array(CollectionScheduleSchema),
+    page: PageSchema,
+  })
+  .strict();
+
+export const CollectionScheduleResponseSchema = z
+  .object({
+    collectionSchedule: CollectionScheduleSchema,
+  })
+  .strict();
+
+export const UpsertCollectionScheduleRequestSchema = z
+  .object({
+    enabled: z.boolean(),
+    intervalMinutes: z.number().int().min(1).max(10080),
+    nextRunAt: z.string().datetime({ offset: true }),
+    parameters: CollectionScheduleParametersSchema.optional(),
+  })
+  .strict();
+
+export type CollectionScheduleParameters = z.infer<
+  typeof CollectionScheduleParametersSchema
+>;
+export type CollectionSchedule = z.infer<typeof CollectionScheduleSchema>;
+export type CollectionScheduleListResponse = z.infer<
+  typeof CollectionScheduleListResponseSchema
+>;
+export type CollectionScheduleResponse = z.infer<
+  typeof CollectionScheduleResponseSchema
+>;
+export type UpsertCollectionScheduleRequest = z.infer<
+  typeof UpsertCollectionScheduleRequestSchema
+>;
 
 export interface ListCollectionRunsQuery {
   readonly status?: CollectionRunStatus;
@@ -517,6 +577,11 @@ export interface ListProfileSourceAccessCheckRunsQuery {
   readonly status?: ProfileSourceAccessCheckRunStatus;
   readonly profileId?: string;
   readonly sourceGroupId?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListCollectionSchedulesQuery {
   readonly limit?: number;
   readonly offset?: number;
 }
@@ -555,6 +620,16 @@ export interface CollectorRuntimeClient {
   readonly cancelProfileSourceAccessCheckRun: (
     checkRunId: string,
   ) => Promise<ApiResult<ProfileSourceAccessCheckRunResponse>>;
+  readonly listCollectionSchedules: (
+    query?: ListCollectionSchedulesQuery,
+  ) => Promise<ApiResult<CollectionScheduleListResponse>>;
+  readonly getCollectionSchedule: (
+    sourceGroupId: string,
+  ) => Promise<ApiResult<CollectionScheduleResponse>>;
+  readonly upsertCollectionSchedule: (
+    sourceGroupId: string,
+    request: UpsertCollectionScheduleRequest,
+  ) => Promise<ApiResult<CollectionScheduleResponse>>;
 }
 
 export function createCollectorRuntimeClient(
@@ -641,6 +716,27 @@ export function createCollectorRuntimeClient(
         responseSchema: ProfileSourceAccessCheckRunResponseSchema,
       });
     },
+    listCollectionSchedules(query) {
+      return httpClient.request({
+        path: "/collector/collection-schedules",
+        query: toListCollectionSchedulesQueryParams(query),
+        responseSchema: CollectionScheduleListResponseSchema,
+      });
+    },
+    getCollectionSchedule(sourceGroupId) {
+      return httpClient.request({
+        path: `/collector/collection-schedules/${encodeURIComponent(sourceGroupId)}`,
+        responseSchema: CollectionScheduleResponseSchema,
+      });
+    },
+    upsertCollectionSchedule(sourceGroupId, request) {
+      return httpClient.request({
+        path: `/collector/collection-schedules/${encodeURIComponent(sourceGroupId)}`,
+        method: "PUT",
+        body: request,
+        responseSchema: CollectionScheduleResponseSchema,
+      });
+    },
   };
 }
 
@@ -691,6 +787,19 @@ export function toListProfileSourceAccessCheckRunsQueryParams(
     ...(query.sourceGroupId !== undefined
       ? { sourceGroupId: query.sourceGroupId }
       : {}),
+    ...(query.limit !== undefined ? { limit: query.limit } : {}),
+    ...(query.offset !== undefined ? { offset: query.offset } : {}),
+  };
+}
+
+export function toListCollectionSchedulesQueryParams(
+  query: ListCollectionSchedulesQuery | undefined,
+): Readonly<Record<string, string | number>> | undefined {
+  if (query === undefined) {
+    return undefined;
+  }
+
+  return {
     ...(query.limit !== undefined ? { limit: query.limit } : {}),
     ...(query.offset !== undefined ? { offset: query.offset } : {}),
   };

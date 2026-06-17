@@ -1,8 +1,13 @@
 # Active Sprint
 
-Sprint 060 is active.
+Sprint 061 is active.
 
 Implementation authority:
+
+- [Sprint 061 - Operator Collection Schedule Management Surface](SPRINT-061-operator-collection-schedule-management-surface.md)
+
+Sprint 060 is accepted and recorded as the containerized scheduler
+foundation for Sprint 061:
 
 - [Sprint 060 - Collection Scheduler Containerization and Stack Integration](SPRINT-060-collection-scheduler-containerization.md)
 

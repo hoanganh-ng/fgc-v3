@@ -11,6 +11,11 @@ import {
   CategoryBrowseEntryRouteNotEligibleError,
   CategoryBrowseEntryRouteNotFoundError,
   SourceGroupLookupFailedError,
+  CollectionScheduleNotFoundError,
+  CollectionScheduleSourceGroupNotActiveError,
+  CollectionScheduleSourceGroupNotFoundError,
+  CollectionScheduleSourceGroupPlatformUnsupportedError,
+  CollectionScheduleValidationError,
 } from "../../collector-runtime/application";
 import { createHttpServer } from "./server";
 import {
@@ -19,6 +24,7 @@ import {
 import {
   createAccountExerciseRun,
   createCollectionRun,
+  createCollectionSchedule,
   createFakeCollectorRuntimeHttpService,
 } from "./test-support/collector-runtime-http-service";
 import {
@@ -1042,6 +1048,458 @@ describe("Collector Runtime HTTP routes", () => {
           code: "INVALID_COLLECTION_RUN_STATUS_TRANSITION",
         },
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("lists collection schedules with default paging", async () => {
+    const { server, service } = createTestServer();
+
+    service.listCollectionSchedules.setOutput({
+      items: [
+        createCollectionSchedule({
+          sourceGroupId: "source-group-1",
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T11:00:00.000Z",
+          parameters: { maxScrolls: 5, maxDurationMs: 60_000 },
+        }),
+      ],
+      page: { limit: 50, offset: 0, total: 1 },
+    });
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/collection-schedules",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.listCollectionSchedules.calls).toEqual([
+        { limit: 50, offset: 0 },
+      ]);
+      expect(response.json()).toMatchObject({
+        items: [
+          {
+            sourceGroupId: "source-group-1",
+            enabled: true,
+            intervalMinutes: 30,
+            nextRunAt: "2026-04-01T11:00:00.000Z",
+            parameters: { maxScrolls: 5, maxDurationMs: 60_000 },
+          },
+        ],
+        page: { limit: 50, offset: 0, total: 1 },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("coerces collection-schedule limit and offset querystrings", async () => {
+    const { server, service } = createTestServer();
+
+    service.listCollectionSchedules.setOutput({
+      items: [],
+      page: { limit: 25, offset: 50, total: 0 },
+    });
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/collection-schedules?limit=25&offset=50",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.listCollectionSchedules.calls).toEqual([
+        { limit: 25, offset: 50 },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 for invalid collection-schedule list query", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/collection-schedules?limit=abc",
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(service.listCollectionSchedules.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("gets a single collection schedule by source group id", async () => {
+    const { server, service } = createTestServer();
+
+    service.getCollectionSchedule.setOutput(
+      createCollectionSchedule({
+        sourceGroupId: "source-group-1",
+        enabled: true,
+        intervalMinutes: 60,
+        nextRunAt: "2026-04-01T12:00:00.000Z",
+        parameters: { maxDurationMs: 90_000 },
+        createdAt: "2026-03-31T12:00:00.000Z",
+        updatedAt: "2026-04-01T08:00:00.000Z",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/collection-schedules/source-group-1",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.getCollectionSchedule.calls).toEqual([
+        { sourceGroupId: "source-group-1" },
+      ]);
+      expect(response.json()).toMatchObject({
+        collectionSchedule: {
+          sourceGroupId: "source-group-1",
+          enabled: true,
+          intervalMinutes: 60,
+          nextRunAt: "2026-04-01T12:00:00.000Z",
+          parameters: { maxDurationMs: 90_000 },
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps missing collection schedule to 404", async () => {
+    const { server, service } = createTestServer();
+
+    service.getCollectionSchedule.setError(
+      new CollectionScheduleNotFoundError("source-group-1"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/collection-schedules/source-group-1",
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: { code: "COLLECTION_SCHEDULE_NOT_FOUND" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("upserts a collection schedule happy path with a safe DTO", async () => {
+    const { server, service } = createTestServer();
+
+    service.upsertCollectionSchedule.setOutput(
+      createCollectionSchedule({
+        sourceGroupId: "source-group-1",
+        enabled: true,
+        intervalMinutes: 120,
+        nextRunAt: "2026-04-01T14:00:00.000Z",
+        parameters: { maxScrolls: 3 },
+        createdAt: "2026-03-31T12:00:00.000Z",
+        updatedAt: "2026-04-01T08:00:00.000Z",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/collection-schedules/source-group-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 120,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+          parameters: { maxScrolls: 3 },
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.upsertCollectionSchedule.calls).toEqual([
+        {
+          sourceGroupId: "source-group-1",
+          enabled: true,
+          intervalMinutes: 120,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+          parameters: { maxScrolls: 3 },
+        },
+      ]);
+      expect(response.json()).toMatchObject({
+        collectionSchedule: {
+          sourceGroupId: "source-group-1",
+          enabled: true,
+          intervalMinutes: 120,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+          parameters: { maxScrolls: 3 },
+          createdAt: "2026-03-31T12:00:00.000Z",
+          updatedAt: "2026-04-01T08:00:00.000Z",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("omits empty parameters from the upsert DTO", async () => {
+    const { server, service } = createTestServer();
+
+    service.upsertCollectionSchedule.setOutput(
+      createCollectionSchedule({
+        sourceGroupId: "source-group-1",
+        enabled: false,
+        intervalMinutes: 30,
+        nextRunAt: "2026-04-01T14:00:00.000Z",
+        parameters: {},
+        createdAt: "2026-03-31T12:00:00.000Z",
+        updatedAt: "2026-04-01T08:00:00.000Z",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/collection-schedules/source-group-1",
+        payload: {
+          enabled: false,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.upsertCollectionSchedule.calls).toEqual([
+        {
+          sourceGroupId: "source-group-1",
+          enabled: false,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+          parameters: {},
+        },
+      ]);
+      const body = response.json();
+      expect(body.collectionSchedule.parameters).toEqual({});
+      expect(Object.prototype.hasOwnProperty.call(
+        body.collectionSchedule.parameters,
+        "maxScrolls",
+      )).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(
+        body.collectionSchedule.parameters,
+        "maxDurationMs",
+      )).toBe(false);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 when the upsert body has an out-of-range interval", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/collection-schedules/source-group-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 0,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(service.upsertCollectionSchedule.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 when the upsert body has a non-ISO nextRunAt", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/collection-schedules/source-group-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "tomorrow",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(service.upsertCollectionSchedule.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 with structured issues on collection-schedule validation errors", async () => {
+    const { server, service } = createTestServer();
+
+    service.upsertCollectionSchedule.setError(
+      new CollectionScheduleValidationError([
+        { path: "intervalMinutes", message: "intervalMinutes must be an integer between 1 and 10080." },
+      ]),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/collection-schedules/source-group-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "COLLECTION_SCHEDULE_VALIDATION_ERROR",
+          issues: [
+            {
+              path: "intervalMinutes",
+              message: "intervalMinutes must be an integer between 1 and 10080.",
+            },
+          ],
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps missing source group on upsert to 404", async () => {
+    const { server, service } = createTestServer();
+
+    service.upsertCollectionSchedule.setError(
+      new CollectionScheduleSourceGroupNotFoundError("source-group-1"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/collection-schedules/source-group-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: { code: "COLLECTION_SCHEDULE_SOURCE_GROUP_NOT_FOUND" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps PAUSED+enabled upsert to 409", async () => {
+    const { server, service } = createTestServer();
+
+    service.upsertCollectionSchedule.setError(
+      new CollectionScheduleSourceGroupNotActiveError("source-group-1", "PAUSED"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/collection-schedules/source-group-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: { code: "COLLECTION_SCHEDULE_SOURCE_GROUP_NOT_ACTIVE" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps non-Facebook platform upsert to 409", async () => {
+    const { server, service } = createTestServer();
+
+    service.upsertCollectionSchedule.setError(
+      new CollectionScheduleSourceGroupPlatformUnsupportedError(
+        "source-group-1",
+        "TIKTOK",
+      ),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/collection-schedules/source-group-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: { code: "COLLECTION_SCHEDULE_SOURCE_GROUP_PLATFORM_UNSUPPORTED" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps unexpected source group lookup failure on upsert to sanitized 502", async () => {
+    const { server, service } = createTestServer();
+
+    service.upsertCollectionSchedule.setError(
+      new SourceGroupLookupFailedError("source-group-1", "upstream timeout", {
+        causeCode: "UPSTREAM_TIMEOUT",
+        statusCode: 504,
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/collection-schedules/source-group-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+        },
+      });
+
+      expect(response.statusCode).toBe(502);
+      expect(response.json()).toMatchObject({
+        error: { code: "SOURCE_GROUP_LOOKUP_FAILED" },
+      });
+      const serialized = JSON.stringify(response.json());
+      expect(serialized).not.toContain("upstream timeout");
+      expect(serialized).not.toContain("source-group-1");
     } finally {
       await server.close();
     }

@@ -1,6 +1,7 @@
 import type {
   AccountExerciseRun,
   CollectionRun,
+  CollectionSchedule,
   ProfileSourceAccessCheckRun,
 } from "../../../collector-runtime/domain";
 import type {
@@ -94,6 +95,19 @@ export interface FakeCollectorRuntimeHttpService
     }
   >;
   readonly cancelProfileSourceAccessCheckRun: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
+  readonly upsertCollectionSchedule: StubUseCase<unknown, CollectionSchedule>;
+  readonly getCollectionSchedule: StubUseCase<unknown, CollectionSchedule>;
+  readonly listCollectionSchedules: StubUseCase<
+    unknown,
+    {
+      readonly items: readonly CollectionSchedule[];
+      readonly page: {
+        readonly limit: number;
+        readonly offset: number;
+        readonly total: number;
+      };
+    }
+  >;
 }
 
 export function createFakeCollectorRuntimeHttpService(): FakeCollectorRuntimeHttpService {
@@ -188,6 +202,16 @@ export function createFakeCollectorRuntimeHttpService(): FakeCollectorRuntimeHtt
       },
     }),
     cancelProfileSourceAccessCheckRun: new StubUseCase(createProfileSourceAccessCheckRun()),
+    upsertCollectionSchedule: new StubUseCase(createCollectionSchedule()),
+    getCollectionSchedule: new StubUseCase(createCollectionSchedule()),
+    listCollectionSchedules: new StubUseCase({
+      items: [createCollectionSchedule()],
+      page: {
+        limit: 50,
+        offset: 0,
+        total: 1,
+      },
+    }),
   } as unknown as FakeCollectorRuntimeHttpService;
 }
 
@@ -215,6 +239,9 @@ export function createUnusedCollectorRuntimeHttpService(): CollectorRuntimeHttpS
     getProfileSourceAccessCheckRun: useCase,
     listProfileSourceAccessCheckRuns: useCase,
     cancelProfileSourceAccessCheckRun: useCase,
+    upsertCollectionSchedule: useCase,
+    getCollectionSchedule: useCase,
+    listCollectionSchedules: useCase,
   } as unknown as CollectorRuntimeHttpService;
 }
 
@@ -311,6 +338,20 @@ export function createProfileSourceAccessCheckRun(
     requestedAt: options.requestedAt ?? collectorRuntimeHttpTestNow,
     ...(options.startedAt !== undefined ? { startedAt: options.startedAt } : {}),
     ...(options.finishedAt !== undefined ? { finishedAt: options.finishedAt } : {}),
+    createdAt: options.createdAt ?? collectorRuntimeHttpTestNow,
+    updatedAt: options.updatedAt ?? collectorRuntimeHttpTestNow,
+  };
+}
+
+export function createCollectionSchedule(
+  options: Partial<CollectionSchedule> = {},
+): CollectionSchedule {
+  return {
+    sourceGroupId: options.sourceGroupId ?? "source-group-1",
+    enabled: options.enabled ?? true,
+    intervalMinutes: options.intervalMinutes ?? 60,
+    nextRunAt: options.nextRunAt ?? collectorRuntimeHttpTestNow,
+    parameters: options.parameters ?? {},
     createdAt: options.createdAt ?? collectorRuntimeHttpTestNow,
     updatedAt: options.updatedAt ?? collectorRuntimeHttpTestNow,
   };

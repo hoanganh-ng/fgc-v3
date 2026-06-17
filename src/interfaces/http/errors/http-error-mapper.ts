@@ -24,6 +24,7 @@ import {
   CollectionRunValidationError,
   AccountExerciseRunValidationError,
   ProfileSourceAccessCheckRunValidationError,
+  CollectionScheduleValidationError,
   CollectorRuntimeApplicationError,
   SourceGroupLookupFailedError,
   ProfileReferenceLookupFailedError,
@@ -164,6 +165,19 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
     error instanceof AccountExerciseRunValidationError ||
     error instanceof ProfileSourceAccessCheckRunValidationError
   ) {
+    return {
+      statusCode: 400,
+      body: {
+        error: {
+          code: error.code,
+          message: error.message,
+          issues: error.issues,
+        },
+      },
+    };
+  }
+
+  if (error instanceof CollectionScheduleValidationError) {
     return {
       statusCode: 400,
       body: {
@@ -350,10 +364,10 @@ const collectorRuntimeApplicationErrorStatus: Record<
   PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_FOUND: 404,
   PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_ACTIVE: 409,
   PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED: 409,
-  // COLLECTION_SCHEDULE_* entries are required because
-  // `CollectorRuntimeApplicationErrorCode` is exhaustive; the surrounding
-  // Record type forces every code to be mapped even though no Sprint 057
-  // HTTP routes ship in this sprint.
+  // Collection schedule errors are mapped here for the Sprint 061
+  // /collector/collection-schedules routes. The validation error is also
+  // handled explicitly above so the structured issues list reaches the
+  // client.
   COLLECTION_SCHEDULE_VALIDATION_ERROR: 400,
   COLLECTION_SCHEDULE_NOT_FOUND: 404,
   COLLECTION_SCHEDULE_SOURCE_GROUP_NOT_FOUND: 404,

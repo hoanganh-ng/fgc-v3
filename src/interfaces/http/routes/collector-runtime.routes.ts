@@ -5,10 +5,13 @@ import type {
   AttachAccountExerciseRunLeaseInput,
   GetAccountExerciseRunInput,
   GetCollectionRunInput,
+  GetCollectionScheduleInput,
   ListAccountExerciseRunsInput,
   ListAccountExerciseRunsOutput,
   ListCollectionRunsInput,
   ListCollectionRunsOutput,
+  ListCollectionSchedulesInput,
+  ListCollectionSchedulesOutput,
   MarkAccountExerciseRunFailedInput,
   MarkAccountExerciseRunRunningInput,
   MarkAccountExerciseRunSucceededInput,
@@ -21,6 +24,7 @@ import type {
   CancelProfileSourceAccessCheckRunInput,
   MarkProfileSourceAccessCheckRunRunningInput,
   MarkProfileSourceAccessCheckRunSucceededInput,
+  UpsertCollectionScheduleUseCaseInput,
 } from "../../../collector-runtime/application";
 import type {
   AccountExerciseRun,
@@ -40,6 +44,8 @@ import type {
   CollectionRunStatus,
   CollectionRunSummary,
   CollectionRunTriggerType,
+  CollectionSchedule,
+  CollectionScheduleIsoDateTime,
   ProfileSourceAccessCheckRun,
   ProfileSourceAccessCheckRunFailureReason,
   ProfileSourceAccessCheckRunId,
@@ -79,6 +85,12 @@ import {
   ProfileSourceAccessCheckRunIdHttpParamsSchema,
   RequestProfileSourceAccessCheckRunHttpBodySchema,
   ListProfileSourceAccessCheckRunsHttpQuerySchema,
+  CollectionScheduleSourceGroupIdHttpParamsSchema,
+  UpsertCollectionScheduleHttpBodySchema,
+  ListCollectionSchedulesHttpQuerySchema,
+  listCollectionSchedulesHttpRouteSchema,
+  getCollectionScheduleHttpRouteSchema,
+  upsertCollectionScheduleHttpRouteSchema,
 } from "../schemas/collector-runtime.http-schemas";
 
 interface ExecutableUseCase<Input, Output> {
@@ -150,6 +162,18 @@ export interface CollectorRuntimeHttpService {
     CancelProfileSourceAccessCheckRunInput,
     ProfileSourceAccessCheckRun
   >;
+  readonly upsertCollectionSchedule: ExecutableUseCase<
+    UpsertCollectionScheduleUseCaseInput,
+    CollectionSchedule
+  >;
+  readonly getCollectionSchedule: ExecutableUseCase<
+    GetCollectionScheduleInput,
+    CollectionSchedule
+  >;
+  readonly listCollectionSchedules: ExecutableUseCase<
+    ListCollectionSchedulesInput,
+    ListCollectionSchedulesOutput
+  >;
 }
 
 export interface RegisterCollectorRuntimeRoutesOptions {
@@ -204,6 +228,19 @@ export interface ProfileSourceAccessCheckRunDto {
   readonly finishedAt?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+export interface CollectionScheduleDto {
+  readonly sourceGroupId: string;
+  readonly enabled: boolean;
+  readonly intervalMinutes: number;
+  readonly nextRunAt: CollectionScheduleIsoDateTime;
+  readonly parameters: {
+    readonly maxScrolls?: number;
+    readonly maxDurationMs?: number;
+  };
+  readonly createdAt: CollectionScheduleIsoDateTime;
+  readonly updatedAt: CollectionScheduleIsoDateTime;
 }
 
 export function registerCollectorRuntimeRoutes(
@@ -586,6 +623,81 @@ export function registerCollectorRuntimeRoutes(
     },
   );
 
+  server.get(
+    "/collector/collection-schedules",
+    { schema: listCollectionSchedulesHttpRouteSchema },
+    async (request) => {
+      const query = parseHttpInput(
+        ListCollectionSchedulesHttpQuerySchema,
+        request.query,
+      );
+      const input: ListCollectionSchedulesInput = {
+        limit: query.limit,
+        offset: query.offset,
+      };
+      const output = await collectorRuntime.listCollectionSchedules.execute(input);
+
+      return {
+        items: output.items.map(toCollectionScheduleDto),
+        page: output.page,
+      };
+    },
+  );
+
+  server.get(
+    "/collector/collection-schedules/:sourceGroupId",
+    { schema: getCollectionScheduleHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        CollectionScheduleSourceGroupIdHttpParamsSchema,
+        request.params,
+      );
+      const collectionSchedule =
+        await collectorRuntime.getCollectionSchedule.execute({
+          sourceGroupId: params.sourceGroupId,
+        });
+
+      return {
+        collectionSchedule: toCollectionScheduleDto(collectionSchedule),
+      };
+    },
+  );
+
+  server.put(
+    "/collector/collection-schedules/:sourceGroupId",
+    { schema: upsertCollectionScheduleHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        CollectionScheduleSourceGroupIdHttpParamsSchema,
+        request.params,
+      );
+      const body = parseHttpInput(
+        UpsertCollectionScheduleHttpBodySchema,
+        request.body,
+      );
+      const input: UpsertCollectionScheduleUseCaseInput = {
+        sourceGroupId: params.sourceGroupId,
+        enabled: body.enabled,
+        intervalMinutes: body.intervalMinutes,
+        nextRunAt: body.nextRunAt,
+        parameters: {
+          ...(body.parameters?.maxScrolls !== undefined
+            ? { maxScrolls: body.parameters.maxScrolls }
+            : {}),
+          ...(body.parameters?.maxDurationMs !== undefined
+            ? { maxDurationMs: body.parameters.maxDurationMs }
+            : {}),
+        },
+      };
+      const collectionSchedule =
+        await collectorRuntime.upsertCollectionSchedule.execute(input);
+
+      return {
+        collectionSchedule: toCollectionScheduleDto(collectionSchedule),
+      };
+    },
+  );
+
 }
 
 export function toAccountExerciseRunDto(
@@ -669,5 +781,26 @@ export function toProfileSourceAccessCheckRunDto(
     ...(run.finishedAt !== undefined ? { finishedAt: run.finishedAt } : {}),
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
+  };
+}
+
+export function toCollectionScheduleDto(
+  collectionSchedule: CollectionSchedule,
+): CollectionScheduleDto {
+  return {
+    sourceGroupId: collectionSchedule.sourceGroupId,
+    enabled: collectionSchedule.enabled,
+    intervalMinutes: collectionSchedule.intervalMinutes,
+    nextRunAt: collectionSchedule.nextRunAt,
+    parameters: {
+      ...(collectionSchedule.parameters.maxScrolls !== undefined
+        ? { maxScrolls: collectionSchedule.parameters.maxScrolls }
+        : {}),
+      ...(collectionSchedule.parameters.maxDurationMs !== undefined
+        ? { maxDurationMs: collectionSchedule.parameters.maxDurationMs }
+        : {}),
+    },
+    createdAt: collectionSchedule.createdAt,
+    updatedAt: collectionSchedule.updatedAt,
   };
 }
