@@ -945,6 +945,183 @@ if (!shouldRunHttpDbTests) {
       expect(releasedRuntimeConfigurationResponse.statusCode).toBe(409);
     });
 
+    // Sprint 055 review finding 3: DB-backed round trip proving
+    // recovery start persists PENDING_LOGIN, retains the unhealthy
+    // health value, rotates the provisioning token, and that
+    // successful session ingestion restores READY + HEALTHY.
+    it("rotates provisioning token on recovery start and restores READY+HEALTHY after successful ingestion (Sprint 055)", async () => {
+      const profileId = trackProfileId(nextTestId("sprint055-profile"));
+      const displayName = `Sprint 055 Recovery ${profileId}`;
+
+      // 1. Create + configure profile.
+      const createResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/profiles",
+        payload: { id: profileId, displayName },
+      });
+      expect(createResponse.statusCode).toBe(201);
+
+      const configureResponse = await getServer().inject({
+        method: "PATCH",
+        url: `/collector/profiles/${profileId}/configuration`,
+        payload: createConfiguration(),
+      });
+      expect(configureResponse.statusCode).toBe(200);
+
+      // 2. Start initial provisioning (PENDING_CONFIG -> PENDING_LOGIN).
+      const initialStartResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/profiles/${profileId}/provisioning/start`,
+      });
+      expect(initialStartResponse.statusCode).toBe(200);
+      const initialStartBody = initialStartResponse.json() as {
+        readonly provisioningToken: string;
+        readonly expiresAt: string;
+        readonly profile: { readonly status: string };
+      };
+      expect(initialStartBody.profile.status).toBe("PENDING_LOGIN");
+      const initialToken = initialStartBody.provisioningToken;
+      expect(typeof initialToken).toBe("string");
+      expect(initialToken.length).toBeGreaterThan(0);
+
+      // 3. Ingest session to reach READY + HEALTHY.
+      const initialIngestResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/provisioning/${encodeURIComponent(
+          initialToken,
+        )}/session`,
+        payload: createSessionPayload(),
+      });
+      expect(initialIngestResponse.statusCode).toBe(200);
+
+      const readyReadResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/profiles/${profileId}`,
+      });
+      const readyReadBody = readyReadResponse.json() as {
+        readonly profile: {
+          readonly status: string;
+          readonly authenticationHealth: string;
+          readonly authenticationHealthUpdatedAt: string;
+        };
+      };
+      expect(readyReadBody.profile.status).toBe("READY");
+      expect(readyReadBody.profile.authenticationHealth).toBe("HEALTHY");
+      const healthUpdatedAt = readyReadBody.profile.authenticationHealthUpdatedAt;
+
+      // 4. Simulate the runtime observation pathway: set
+      // authenticationHealth to REAUTH_REQUIRED in the database
+      // (mirrors the runtime observation pathway; no API for manual
+      // health editing).
+      const reauthObservedAt = "2026-06-17T09:30:00.000Z";
+      await getClient()
+        .db.update(collectorProfiles)
+        .set({
+          authenticationHealth: "REAUTH_REQUIRED",
+          authenticationHealthUpdatedAt: reauthObservedAt,
+        })
+        .where(eq(collectorProfiles.id, profileId));
+
+      // 5. Start recovery provisioning: READY + REAUTH_REQUIRED ->
+      // PENDING_LOGIN, token rotated, health retained.
+      const recoveryStartResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/profiles/${profileId}/provisioning/start`,
+      });
+      expect(recoveryStartResponse.statusCode).toBe(200);
+      const recoveryStartBody = recoveryStartResponse.json() as {
+        readonly provisioningToken: string;
+        readonly expiresAt: string;
+        readonly profile: {
+          readonly status: string;
+          readonly authenticationHealth: string;
+          readonly authenticationHealthUpdatedAt: string;
+        };
+      };
+      expect(recoveryStartBody.profile.status).toBe("PENDING_LOGIN");
+      expect(recoveryStartBody.profile.authenticationHealth).toBe(
+        "REAUTH_REQUIRED",
+      );
+      expect(recoveryStartBody.profile.authenticationHealthUpdatedAt).toBe(
+        reauthObservedAt,
+      );
+      const recoveryToken = recoveryStartBody.provisioningToken;
+      expect(recoveryToken).not.toBe(initialToken);
+
+      // 6. The previous (consumed) token is no longer findable
+      // through the provisioning configuration route. The existing
+      // HTTP error mapping returns 401 with the
+      // INVALID_PROVISIONING_TOKEN code (the contract exercised by
+      // the replay-token test in this file).
+      const oldConfigResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/provisioning/${encodeURIComponent(
+          initialToken,
+        )}/configuration`,
+      });
+      expect(oldConfigResponse.statusCode).toBe(401);
+      expect(oldConfigResponse.json()).toMatchObject({
+        error: {
+          code: "INVALID_PROVISIONING_TOKEN",
+        },
+      });
+
+      // 7. GET profile shows PENDING_LOGIN with REAUTH_REQUIRED
+      // retained and the new provisioningTokenStatus.
+      const pendingLoginReadResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/profiles/${profileId}`,
+      });
+      const pendingLoginReadBody = pendingLoginReadResponse.json() as {
+        readonly profile: {
+          readonly status: string;
+          readonly authenticationHealth: string;
+          readonly authenticationHealthUpdatedAt: string;
+        };
+      };
+      expect(pendingLoginReadBody.profile.status).toBe("PENDING_LOGIN");
+      expect(pendingLoginReadBody.profile.authenticationHealth).toBe(
+        "REAUTH_REQUIRED",
+      );
+      expect(pendingLoginReadBody.profile.authenticationHealthUpdatedAt).toBe(
+        reauthObservedAt,
+      );
+
+      // 8. Ingest the recovery session: PENDING_LOGIN -> READY +
+      // HEALTHY, token consumed.
+      const recoveryIngestResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/provisioning/${encodeURIComponent(
+          recoveryToken,
+        )}/session`,
+        payload: createSessionPayload(),
+      });
+      expect(recoveryIngestResponse.statusCode).toBe(200);
+
+      const finalReadResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/profiles/${profileId}`,
+      });
+      const finalReadBody = finalReadResponse.json() as {
+        readonly profile: {
+          readonly status: string;
+          readonly authenticationHealth: string;
+          readonly authenticationHealthUpdatedAt: string;
+        };
+      };
+      expect(finalReadBody.profile.status).toBe("READY");
+      expect(finalReadBody.profile.authenticationHealth).toBe("HEALTHY");
+      expect(finalReadBody.profile.authenticationHealthUpdatedAt).not.toBe(
+        reauthObservedAt,
+      );
+      expect(
+        Date.parse(finalReadBody.profile.authenticationHealthUpdatedAt),
+      ).toBeGreaterThan(Date.parse(healthUpdatedAt));
+
+      // 9. The recovery token must not leak into subsequent reads.
+      expectReadPayloadIsSafe(finalReadResponse.json(), recoveryToken);
+    });
+
     function nextTestId(label: string): string {
       nextId += 1;
 

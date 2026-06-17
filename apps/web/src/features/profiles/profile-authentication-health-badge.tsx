@@ -12,7 +12,7 @@ import type {
  * closed enum string is preserved so the operator can correlate the
  * display with the backend value.
  */
-const healthMeta = {
+export const healthMeta = {
   NOT_PROVISIONED: {
     label: "NOT_PROVISIONED",
     tone: "neutral" as const,

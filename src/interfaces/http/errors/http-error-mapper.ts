@@ -304,6 +304,7 @@ const domainErrorStatus: Record<CollectorProfileDomainErrorCode, number> = {
   MISSING_REQUIRED_PROFILE_CONFIGURATION: 400,
   INVALID_PROVISIONING_TOKEN_STATE: 400,
   IMMUTABLE_FINGERPRINT_VIOLATION: 409,
+  INVALID_PROVISIONING_RECOVERY_TRANSITION: 409,
 };
 
 const contentApplicationErrorStatus: Record<

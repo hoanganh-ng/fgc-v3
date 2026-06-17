@@ -3,12 +3,16 @@ import {
   ImmutableFingerprintViolationError,
   InvalidProfileAccountStageTransitionError,
   InvalidProfileStateTransitionError,
+  InvalidProvisioningRecoveryTransitionError,
+  MissingRequiredProfileConfigurationError,
   assignHardwareFingerprint,
   createProfileSourceAccess,
   createPendingCollectorProfile,
-  updateProfileSourceAccess,
+  markCollectorProfileSessionIngested,
+  transitionCollectorProfileStatusForProvisioning,
   transitionProfileAccountStage,
   transitionProfileStatus,
+  updateProfileSourceAccess,
   validateCollectorProfile,
   validateProfileSourceAccess,
 } from "./index";
@@ -16,6 +20,7 @@ import type {
   CollectorProfile,
   HardwareFingerprint,
   ProfileAccountStage,
+  ProfileAuthenticationHealth,
   ProfileSourceAccess,
   ProfileStatus,
   ValidationIssue,
@@ -413,4 +418,290 @@ function expectValidationIssue(
       expect.arrayContaining([expect.objectContaining({ path })]),
     );
   }
+}
+
+describe("transitionCollectorProfileStatusForProvisioning domain backstop", () => {
+  // Sprint 055 review finding 1: the full-profile mutation boundary
+  // for the recovery transition must refuse to bypass the health
+  // guard even if a direct caller (e.g. another use case) skips the
+  // application precheck.
+
+  it("rejects READY + HEALTHY -> PENDING_LOGIN", () => {
+    const profile = createReadyProfileWithHealth("HEALTHY");
+
+    expect(() =>
+      transitionCollectorProfileStatusForProvisioning(
+        profile,
+        "PENDING_LOGIN",
+        updatedAt,
+      ),
+    ).toThrow(InvalidProvisioningRecoveryTransitionError);
+  });
+
+  it("rejects READY + NOT_PROVISIONED -> PENDING_LOGIN", () => {
+    const profile = createReadyProfileWithHealth("NOT_PROVISIONED");
+
+    expect(() =>
+      transitionCollectorProfileStatusForProvisioning(
+        profile,
+        "PENDING_LOGIN",
+        updatedAt,
+      ),
+    ).toThrow(InvalidProvisioningRecoveryTransitionError);
+  });
+
+  it("includes the current health in the thrown domain error", () => {
+    const profile = createReadyProfileWithHealth("HEALTHY");
+
+    try {
+      transitionCollectorProfileStatusForProvisioning(
+        profile,
+        "PENDING_LOGIN",
+        updatedAt,
+      );
+      throw new Error("expected InvalidProvisioningRecoveryTransitionError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(
+        InvalidProvisioningRecoveryTransitionError as unknown as new (
+          health: ProfileAuthenticationHealth,
+        ) => Error,
+      );
+      const domainError = error as InstanceType<
+        typeof InvalidProvisioningRecoveryTransitionError
+      >;
+      expect(domainError.currentHealth).toBe("HEALTHY");
+      expect(domainError.code).toBe("INVALID_PROVISIONING_RECOVERY_TRANSITION");
+      expect(domainError.profileId).toBe(profile.identity.id);
+    }
+  });
+
+  it("permits READY + REAUTH_REQUIRED -> PENDING_LOGIN", () => {
+    const profile = createReadyProfileWithHealth("REAUTH_REQUIRED");
+
+    const next = transitionCollectorProfileStatusForProvisioning(
+      profile,
+      "PENDING_LOGIN",
+      updatedAt,
+    );
+
+    expect(next.identity.status).toBe("PENDING_LOGIN");
+    expect(next.identity.updatedAt).toBe(updatedAt);
+    expect(next.authenticationHealth).toBe("REAUTH_REQUIRED");
+  });
+
+  it("permits READY + CHECKPOINT_REVIEW_REQUIRED -> PENDING_LOGIN", () => {
+    const profile = createReadyProfileWithHealth("CHECKPOINT_REVIEW_REQUIRED");
+
+    const next = transitionCollectorProfileStatusForProvisioning(
+      profile,
+      "PENDING_LOGIN",
+      updatedAt,
+    );
+
+    expect(next.identity.status).toBe("PENDING_LOGIN");
+    expect(next.identity.updatedAt).toBe(updatedAt);
+    expect(next.authenticationHealth).toBe("CHECKPOINT_REVIEW_REQUIRED");
+  });
+
+  it("preserves health, health timestamp, and authentication state on the recovery transition", () => {
+    const profile = createReadyProfileWithHealth(
+      "REAUTH_REQUIRED",
+      "2026-01-01T00:30:00.000Z",
+    );
+    const originalAuthState = profile.authenticationState;
+    const originalAccountStage = profile.identity.accountStage;
+    const originalHardwareFingerprint = profile.hardwareFingerprint;
+    const originalNetworkContext = profile.networkContext;
+
+    const next = transitionCollectorProfileStatusForProvisioning(
+      profile,
+      "PENDING_LOGIN",
+      updatedAt,
+    );
+
+    expect(next.authenticationHealth).toBe("REAUTH_REQUIRED");
+    expect(next.authenticationHealthUpdatedAt).toBe(
+      "2026-01-01T00:30:00.000Z",
+    );
+    expect(next.authenticationState).toEqual(originalAuthState);
+    expect(next.identity.accountStage).toBe(originalAccountStage);
+    expect(next.hardwareFingerprint).toEqual(originalHardwareFingerprint);
+    expect(next.networkContext).toEqual(originalNetworkContext);
+  });
+
+  it("permits PENDING_CONFIG -> PENDING_LOGIN with required configuration", () => {
+    const profile = createPendingConfigProfile();
+
+    const next = transitionCollectorProfileStatusForProvisioning(
+      profile,
+      "PENDING_LOGIN",
+      updatedAt,
+    );
+
+    expect(next.identity.status).toBe("PENDING_LOGIN");
+    expect(next.identity.updatedAt).toBe(updatedAt);
+  });
+
+  it("rejects PENDING_CONFIG -> PENDING_LOGIN when required configuration is missing", () => {
+    const profile = createMinimalProfile();
+
+    expect(() =>
+      transitionCollectorProfileStatusForProvisioning(
+        profile,
+        "PENDING_LOGIN",
+        updatedAt,
+      ),
+    ).toThrow(MissingRequiredProfileConfigurationError);
+  });
+
+  it("preserves status and updates updatedAt on PENDING_LOGIN restart", () => {
+    const profile = createPendingLoginProfile("REAUTH_REQUIRED");
+
+    const next = transitionCollectorProfileStatusForProvisioning(
+      profile,
+      "PENDING_LOGIN",
+      updatedAt,
+    );
+
+    expect(next.identity.status).toBe("PENDING_LOGIN");
+    expect(next.identity.updatedAt).toBe(updatedAt);
+    expect(next.authenticationHealth).toBe("REAUTH_REQUIRED");
+  });
+
+  it("rejects BUSY -> PENDING_LOGIN via the state machine", () => {
+    const profile = createReadyProfileWithHealth("REAUTH_REQUIRED");
+    const busy: CollectorProfile = {
+      ...profile,
+      identity: { ...profile.identity, status: "BUSY" },
+    };
+
+    expect(() =>
+      transitionCollectorProfileStatusForProvisioning(
+        busy,
+        "PENDING_LOGIN",
+        updatedAt,
+      ),
+    ).toThrow(InvalidProfileStateTransitionError);
+  });
+});
+
+function createReadyProfileWithHealth(
+  health: ProfileAuthenticationHealth,
+  healthUpdatedAt: string = createdAt,
+): CollectorProfile {
+  const base = createPendingConfigProfile();
+  const pendingLogin: CollectorProfile = {
+    ...base,
+    identity: { ...base.identity, status: "PENDING_LOGIN", updatedAt: createdAt },
+    provisioningToken: {
+      status: "ISSUED",
+      tokenHash: "initial-token",
+      issuedAt: createdAt,
+      expiresAt: "2026-01-01T00:15:00.000Z",
+      consumedAt: null,
+    },
+    authenticationHealth: "NOT_PROVISIONED",
+    authenticationHealthUpdatedAt: createdAt,
+  };
+  const ingested = markCollectorProfileSessionIngested(
+    pendingLogin,
+    "2026-01-01T00:10:00.000Z",
+    {
+      cookies: [],
+      localStorage: [],
+      sessionExpiresAt: null,
+    },
+    {
+      status: "CONSUMED",
+      tokenHash: null,
+      issuedAt: createdAt,
+      expiresAt: "2026-01-01T00:15:00.000Z",
+      consumedAt: "2026-01-01T00:10:00.000Z",
+    },
+  );
+  return {
+    ...ingested,
+    identity: { ...ingested.identity, status: "READY", updatedAt: "2026-01-01T00:10:00.000Z" },
+    authenticationHealth: health,
+    authenticationHealthUpdatedAt: healthUpdatedAt,
+  };
+}
+
+function createPendingConfigProfile(): CollectorProfile {
+  return createPendingCollectorProfile({
+    id: "profile-1",
+    displayName: "Profile 1",
+    createdAt,
+    networkContext: {
+      proxy: {
+        protocol: "HTTPS",
+        host: "proxy.example.test",
+        port: 443,
+        credentials: { username: "collector", password: "secret" },
+        countryCode: "US",
+        region: "CA",
+      },
+      killswitch: { enabled: true, failClosed: true },
+    },
+    hardwareFingerprint: {
+      userAgent:
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
+      viewport: { width: 1366, height: 768, deviceScaleFactor: 1 },
+      languages: ["en-US", "en"],
+      hardwareConcurrency: 8,
+      platform: "Linux x86_64",
+      deviceMemoryGb: 8,
+      timezone: "America/Los_Angeles",
+    },
+    behavioralPersona: {
+      scrollStyle: "STEADY",
+      microDelayMs: { min: 200, max: 1200 },
+      reverseScrollProbability: 0.1,
+      dwellTimeMs: { min: 2000, max: 8000 },
+    },
+    temporalRoutine: {
+      timezone: "America/Los_Angeles",
+      chronotype: "MORNING",
+      activeWindows: [
+        { days: [1, 2, 3, 4, 5], startsAt: "09:00", endsAt: "17:00" },
+      ],
+      cooldownMinutes: 30,
+    },
+    safetyThresholds: {
+      maxSessionsPerDay: 3,
+      maxSessionDurationMinutes: 45,
+      maxMacroActionsPerDay: 150,
+      minCooldownMinutes: 30,
+    },
+    contentAffinities: {
+      primaryTopics: [{ topic: "travel", weight: 1 }],
+      secondaryTopics: [{ topic: "food", weight: 0.5 }],
+      interactionWeights: {
+        view: 1,
+        like: 0.4,
+        save: 0.2,
+        comment: 0.1,
+        share: 0.05,
+      },
+    },
+  });
+}
+
+function createPendingLoginProfile(
+  health: ProfileAuthenticationHealth,
+): CollectorProfile {
+  const base = createPendingConfigProfile();
+  return {
+    ...base,
+    identity: { ...base.identity, status: "PENDING_LOGIN", updatedAt: createdAt },
+    provisioningToken: {
+      status: "ISSUED",
+      tokenHash: "restart-token",
+      issuedAt: createdAt,
+      expiresAt: "2026-01-01T00:15:00.000Z",
+      consumedAt: null,
+    },
+    authenticationHealth: health,
+    authenticationHealthUpdatedAt: createdAt,
+  };
 }

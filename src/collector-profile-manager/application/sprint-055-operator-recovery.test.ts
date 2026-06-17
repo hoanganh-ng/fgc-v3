@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   CreateProfileUseCase,
+  GetProvisioningConfigurationUseCase,
   IngestProfileSessionUseCase,
   InvalidApplicationOperationError,
+  InvalidProvisioningTokenError,
+  ProvisioningTokenConsumedError,
   StartProfileProvisioningUseCase,
   UpdateProfileConfigurationUseCase,
   type Clock,
@@ -14,7 +17,9 @@ import {
   canStartProvisioning,
   createPendingCollectorProfile,
   explainStartProvisioningRejection,
+  InvalidProvisioningRecoveryTransitionError,
   markCollectorProfileSessionIngested,
+  transitionCollectorProfileStatusForProvisioning,
   type CollectorProfile,
   type HardwareFingerprint,
   type NetworkContext,
@@ -422,6 +427,166 @@ describe("Sprint 055 recovery token supersede", () => {
     expect(ingested.authenticationHealth).toBe("HEALTHY");
     expect(ingested.authenticationHealthUpdatedAt).toBe(evenLater);
     expect(ingested.identity.status).toBe("READY");
+  });
+});
+
+describe("Sprint 055 domain backstop direct-caller tests", () => {
+  // These tests prove the domain-level backstop closes the bypass
+  // opportunity. They call `transitionCollectorProfileStatusForProvisioning`
+  // directly (not through `StartProfileProvisioningUseCase`) and
+  // construct profiles that the application precheck would normally
+  // reject, demonstrating that the domain layer still enforces the
+  // health guard.
+
+  it("directly rejects READY + HEALTHY -> PENDING_LOGIN", () => {
+    const profile = createReadyProfile("HEALTHY", later);
+
+    expect(() =>
+      transitionCollectorProfileStatusForProvisioning(
+        profile,
+        "PENDING_LOGIN",
+        evenLater,
+      ),
+    ).toThrow(InvalidProvisioningRecoveryTransitionError);
+  });
+
+  it("directly rejects READY + NOT_PROVISIONED -> PENDING_LOGIN", () => {
+    const profile = createReadyProfile("NOT_PROVISIONED", later);
+
+    expect(() =>
+      transitionCollectorProfileStatusForProvisioning(
+        profile,
+        "PENDING_LOGIN",
+        evenLater,
+      ),
+    ).toThrow(InvalidProvisioningRecoveryTransitionError);
+  });
+
+  it("directly permits READY + REAUTH_REQUIRED -> PENDING_LOGIN", () => {
+    const profile = createReadyProfile("REAUTH_REQUIRED", later);
+
+    const next = transitionCollectorProfileStatusForProvisioning(
+      profile,
+      "PENDING_LOGIN",
+      evenLater,
+    );
+
+    expect(next.identity.status).toBe("PENDING_LOGIN");
+    expect(next.authenticationHealth).toBe("REAUTH_REQUIRED");
+    expect(next.authenticationHealthUpdatedAt).toBe(later);
+  });
+});
+
+describe("Sprint 055 superseded token use case failures", () => {
+  // These tests prove the superseded token is not just unfindable in
+  // the repository, but actually causes the application use cases to
+  // fail with the documented token errors.
+
+  it("superseded token fails GetProvisioningConfigurationUseCase after recovery restart", async () => {
+    const profiles = new InMemoryProfileRepository();
+    const profile = createReadyProfile("REAUTH_REQUIRED", later);
+    await profiles.save(profile);
+
+    const started = await new StartProfileProvisioningUseCase(
+      profiles,
+      makeTokenGenerator(["recovery-token"]),
+      makeClock(evenLater),
+    ).execute({ profileId: profile.identity.id });
+
+    expect(started.provisioningToken).toBe("recovery-token");
+
+    // The previously consumed "initial-token" is no longer findable
+    // through the repository, so the use case throws.
+    await expect(
+      new GetProvisioningConfigurationUseCase(
+        profiles,
+        makeClock(evenLater),
+      ).execute({ provisioningToken: "initial-token" }),
+    ).rejects.toThrow(InvalidProvisioningTokenError);
+
+    // The new token works.
+    await expect(
+      new GetProvisioningConfigurationUseCase(
+        profiles,
+        makeClock(evenLater),
+      ).execute({ provisioningToken: started.provisioningToken }),
+    ).resolves.toMatchObject({ profileId: profile.identity.id });
+  });
+
+  it("superseded token fails IngestProfileSessionUseCase after recovery restart", async () => {
+    const profiles = new InMemoryProfileRepository();
+    const profile = createReadyProfile("CHECKPOINT_REVIEW_REQUIRED", later);
+    await profiles.save(profile);
+
+    const started = await new StartProfileProvisioningUseCase(
+      profiles,
+      makeTokenGenerator(["recovery-token"]),
+      makeClock(evenLater),
+    ).execute({ profileId: profile.identity.id });
+
+    // The previously consumed "initial-token" was used by the prior
+    // session ingestion, so it is now in the CONSUMED state. The
+    // repository's `findByProvisioningToken` only returns profiles
+    // whose token status is ISSUED, so the use case throws
+    // `InvalidProvisioningTokenError` for the superseded token.
+    await expect(
+      new IngestProfileSessionUseCase(profiles, makeClock(evenLater)).execute({
+        provisioningToken: "initial-token",
+        cookies: createCookies(),
+        localStorage: createLocalStorage(),
+      }),
+    ).rejects.toThrow(InvalidProvisioningTokenError);
+
+    // The new token allows a successful session ingestion.
+    const ingested = await new IngestProfileSessionUseCase(
+      profiles,
+      makeClock(evenLater),
+    ).execute({
+      provisioningToken: started.provisioningToken,
+      cookies: createCookies(),
+      localStorage: createLocalStorage(),
+    });
+
+    expect(ingested.identity.status).toBe("READY");
+    expect(ingested.authenticationHealth).toBe("HEALTHY");
+  });
+
+  it("superseded token fails GetProvisioningConfigurationUseCase after PENDING_LOGIN restart", async () => {
+    const profiles = new InMemoryProfileRepository();
+    const profile: CollectorProfile = {
+      ...createReadyProfile("REAUTH_REQUIRED", later),
+      identity: {
+        ...createReadyProfile("REAUTH_REQUIRED", later).identity,
+        status: "PENDING_LOGIN",
+        updatedAt: later,
+      },
+      provisioningToken: {
+        status: "ISSUED",
+        tokenHash: "pre-restart-token",
+        issuedAt: later,
+        expiresAt: tokenExpiry,
+        consumedAt: null,
+      },
+      authenticationHealth: "REAUTH_REQUIRED",
+      authenticationHealthUpdatedAt: later,
+    };
+    await profiles.save(profile);
+
+    const started = await new StartProfileProvisioningUseCase(
+      profiles,
+      makeTokenGenerator(["post-restart-token"]),
+      makeClock(evenLater),
+    ).execute({ profileId: profile.identity.id });
+
+    expect(started.provisioningToken).toBe("post-restart-token");
+
+    // The previous PENDING_LOGIN token is no longer findable.
+    await expect(
+      new GetProvisioningConfigurationUseCase(
+        profiles,
+        makeClock(evenLater),
+      ).execute({ provisioningToken: "pre-restart-token" }),
+    ).rejects.toThrow(InvalidProvisioningTokenError);
   });
 });
 

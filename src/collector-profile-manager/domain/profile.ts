@@ -1,6 +1,7 @@
 import type { infer as zInfer } from "zod";
 import {
   ImmutableFingerprintViolationError,
+  InvalidProvisioningRecoveryTransitionError,
   InvalidProvisioningTokenStateError,
   MissingRequiredProfileConfigurationError,
 } from "./profile-errors";
@@ -124,6 +125,75 @@ export function transitionCollectorProfileStatus(
 ): CollectorProfile {
   if (profile.identity.status === "PENDING_CONFIG" && to === "PENDING_LOGIN") {
     assertRequiredProfileConfiguration(profile);
+  }
+
+  const nextStatus = transitionProfileStatus(profile.identity.status, to);
+
+  return {
+    ...profile,
+    identity: {
+      ...profile.identity,
+      status: nextStatus,
+      updatedAt,
+    },
+  };
+}
+
+/**
+ * Domain-owned full-profile mutation boundary for the provisioning
+ * status transition. This is the single backstop for the
+ * `READY -> PENDING_LOGIN` recovery transition (Sprint 055).
+ *
+ * Invariants:
+ * - The existing `ALLOWED_PROFILE_STATUS_TRANSITIONS` state machine
+ *   still gates the raw status move.
+ * - For `READY -> PENDING_LOGIN`, the current `authenticationHealth`
+ *   MUST be `REAUTH_REQUIRED` or `CHECKPOINT_REVIEW_REQUIRED`. Any
+ *   other value (including `HEALTHY` and `NOT_PROVISIONED`) throws
+ *   `InvalidProvisioningRecoveryTransitionError`. This is the
+ *   domain-level guard that closes the bypass opportunity described
+ *   in the Sprint 055 review findings.
+ * - For `PENDING_CONFIG -> PENDING_LOGIN`, the existing required
+ *   configuration check is performed.
+ * - For `PENDING_LOGIN -> PENDING_LOGIN` (token restart), the status
+ *   is preserved and only `updatedAt` is refreshed.
+ * - `BUSY -> PENDING_LOGIN` is rejected by the state machine and
+ *   surfaces as `InvalidProfileStateTransitionError`.
+ *
+ * The function intentionally depends only on domain primitives and
+ * domain errors. It does not import or throw application errors so the
+ * invariant cannot be bypassed by a caller that skips the application
+ * precheck.
+ */
+export function transitionCollectorProfileStatusForProvisioning(
+  profile: CollectorProfile,
+  to: ProfileStatus,
+  updatedAt: IsoDateTime,
+): CollectorProfile {
+  if (profile.identity.status === "PENDING_CONFIG" && to === "PENDING_LOGIN") {
+    assertRequiredProfileConfiguration(profile);
+  }
+
+  if (
+    profile.identity.status === "READY" &&
+    to === "PENDING_LOGIN" &&
+    profile.authenticationHealth !== "REAUTH_REQUIRED" &&
+    profile.authenticationHealth !== "CHECKPOINT_REVIEW_REQUIRED"
+  ) {
+    throw new InvalidProvisioningRecoveryTransitionError(
+      profile.authenticationHealth,
+      profile.identity.id,
+    );
+  }
+
+  if (profile.identity.status === "PENDING_LOGIN" && to === "PENDING_LOGIN") {
+    return {
+      ...profile,
+      identity: {
+        ...profile.identity,
+        updatedAt,
+      },
+    };
   }
 
   const nextStatus = transitionProfileStatus(profile.identity.status, to);

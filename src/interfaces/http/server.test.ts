@@ -939,6 +939,137 @@ describe("HTTP server", () => {
     }
   });
 
+  it("starts recovery provisioning for READY + REAUTH_REQUIRED and returns the one-time token", async () => {
+    const { server, service } = createTestServer();
+
+    service.startProfileProvisioning.setOutput({
+      profile: createProfile({
+        status: "PENDING_LOGIN",
+        authenticationState: createAuthenticationState(),
+        authenticationHealth: "REAUTH_REQUIRED",
+        provisioningTokenStatus: "ISSUED",
+      }),
+      provisioningToken: "reauth-token-1",
+      expiresAt: "2026-01-05T18:15:00.000Z",
+    });
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/profile-1/provisioning/start",
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body).toMatchObject({
+        provisioningToken: "reauth-token-1",
+        expiresAt: "2026-01-05T18:15:00.000Z",
+        profile: {
+          id: "profile-1",
+          status: "PENDING_LOGIN",
+          provisioningTokenStatus: "ISSUED",
+          authenticationHealth: "REAUTH_REQUIRED",
+        },
+      });
+      expectProvisioningStartResponseIsSafe(body, "reauth-token-1");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("starts recovery provisioning for READY + CHECKPOINT_REVIEW_REQUIRED and returns the one-time token", async () => {
+    const { server, service } = createTestServer();
+
+    service.startProfileProvisioning.setOutput({
+      profile: createProfile({
+        status: "PENDING_LOGIN",
+        authenticationState: createAuthenticationState(),
+        authenticationHealth: "CHECKPOINT_REVIEW_REQUIRED",
+        provisioningTokenStatus: "ISSUED",
+      }),
+      provisioningToken: "checkpoint-recovery-token-1",
+      expiresAt: "2026-01-05T18:15:00.000Z",
+    });
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/profile-1/provisioning/start",
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body).toMatchObject({
+        provisioningToken: "checkpoint-recovery-token-1",
+        expiresAt: "2026-01-05T18:15:00.000Z",
+        profile: {
+          id: "profile-1",
+          status: "PENDING_LOGIN",
+          provisioningTokenStatus: "ISSUED",
+          authenticationHealth: "CHECKPOINT_REVIEW_REQUIRED",
+        },
+      });
+      expectProvisioningStartResponseIsSafe(
+        body,
+        "checkpoint-recovery-token-1",
+      );
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps READY + HEALTHY provisioning start to 409", async () => {
+    const { server, service } = createTestServer();
+
+    service.startProfileProvisioning.setError(
+      new InvalidApplicationOperationError(
+        "Profile recovery provisioning requires authenticationHealth REAUTH_REQUIRED or CHECKPOINT_REVIEW_REQUIRED, got HEALTHY.",
+      ),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/profile-1/provisioning/start",
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "INVALID_APPLICATION_OPERATION",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps BUSY provisioning start to 409", async () => {
+    const { server, service } = createTestServer();
+
+    service.startProfileProvisioning.setError(
+      new InvalidApplicationOperationError(
+        "Profile provisioning cannot start while the profile is BUSY. Release the active lease first.",
+      ),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/profile-1/provisioning/start",
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "INVALID_APPLICATION_OPERATION",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("returns provisioning configuration with runtime network context and without authentication state", async () => {
     const { server, service } = createTestServer();
 
@@ -1917,6 +2048,38 @@ function expectProfileSourceAccessPayloadIsSafe(bodyText: string): void {
   expect(bodyText).not.toContain("runtime");
   expect(bodyText).not.toContain("rawPayload");
   expect(bodyText).not.toContain("raw page HTML");
+}
+
+function expectProvisioningStartResponseIsSafe(
+  body: {
+    readonly profile?: Record<string, unknown> & {
+      readonly provisioningToken?: unknown;
+    };
+    readonly provisioningToken?: string;
+  },
+  provisioningToken: string,
+): void {
+  // The one-time provisioning token is only valid inside the immediate
+  // response; it must not be persisted in the safe profile DTO, must
+  // not contain token hashes, cookies, or local storage, and must not
+  // echo proxy credentials.
+  expect(body.provisioningToken).toBe(provisioningToken);
+  const profile = body.profile ?? {};
+  const profileText = JSON.stringify(profile);
+  expect(profileText).not.toContain(provisioningToken);
+  expect(profileText).not.toContain("tokenHash");
+  expect(profileText).not.toContain("hardwareFingerprint");
+  expect(profileText).not.toContain("authenticationState");
+  expect(profileText).not.toContain("cookies");
+  expect(profileText).not.toContain("localStorage");
+  expect(profileText).not.toContain("credentials");
+  expect(profileText).not.toContain("proxy-credentials-secret");
+  expect(profileText).not.toContain("password");
+  // The profile summary must not include the raw provisioningToken
+  // value itself. The `provisioningTokenStatus` indicator (NOT_ISSUED,
+  // ISSUED, CONSUMED, EXPIRED) is a safe DTO field and is allowed
+  // to be present.
+  expect(profile).not.toHaveProperty("provisioningToken");
 }
 
 interface CreateProfileOptions {

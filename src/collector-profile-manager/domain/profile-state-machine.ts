@@ -8,12 +8,14 @@ export const ALLOWED_PROFILE_STATUS_TRANSITIONS: Readonly<
   PENDING_LOGIN: ["READY"],
   // `READY` may transition to `PENDING_LOGIN` only as a guarded
   // reprovisioning recovery step driven by
-  // `StartProfileProvisioningUseCase` (Sprint 055). The use case
-  // additionally requires `authenticationHealth` to be
-  // `REAUTH_REQUIRED` or `CHECKPOINT_REVIEW_REQUIRED` before
-  // allowing this transition. The state machine permits the
-  // transition; the eligibility invariant lives in
-  // `canStartProvisioning`.
+  // `StartProfileProvisioningUseCase` (Sprint 055). The status
+  // machine permits the transition; the domain-level backstop
+  // `transitionCollectorProfileStatusForProvisioning` additionally
+  // requires `authenticationHealth` to be `REAUTH_REQUIRED` or
+  // `CHECKPOINT_REVIEW_REQUIRED` before allowing this transition.
+  // The companion eligibility helper `canStartProvisioning` is
+  // retained for application-friendly preflight checks and
+  // rejection-reason mapping.
   READY: ["BUSY", "PENDING_LOGIN"],
   BUSY: ["READY"],
 };

@@ -1,12 +1,15 @@
 import type { ProfileStatus } from "./profile-status";
 import type { ProfileAccountStage } from "./profile-account-stage";
+import type { ProfileAuthenticationHealth } from "./profile-authentication-health";
+import type { ProfileId } from "./profile-properties";
 
 export type CollectorProfileDomainErrorCode =
   | "INVALID_PROFILE_STATE_TRANSITION"
   | "INVALID_PROFILE_ACCOUNT_STAGE_TRANSITION"
   | "MISSING_REQUIRED_PROFILE_CONFIGURATION"
   | "INVALID_PROVISIONING_TOKEN_STATE"
-  | "IMMUTABLE_FINGERPRINT_VIOLATION";
+  | "IMMUTABLE_FINGERPRINT_VIOLATION"
+  | "INVALID_PROVISIONING_RECOVERY_TRANSITION";
 
 export abstract class CollectorProfileDomainError extends Error {
   public readonly code: CollectorProfileDomainErrorCode;
@@ -86,5 +89,32 @@ export class ImmutableFingerprintViolationError extends CollectorProfileDomainEr
       `Hardware fingerprint is immutable once assigned${suffix}.`,
     );
     this.profileId = profileId;
+  }
+}
+
+/**
+ * Domain-owned backstop for the `READY -> PENDING_LOGIN` recovery
+ * transition (Sprint 055). The full-profile mutation boundary
+ * `transitionCollectorProfileStatusForProvisioning` throws this error
+ * when the current `authenticationHealth` is not
+ * `REAUTH_REQUIRED` or `CHECKPOINT_REVIEW_REQUIRED`. The error lives
+ * in the domain layer and intentionally has no dependency on the
+ * application layer so the invariant cannot be bypassed by any caller.
+ */
+export class InvalidProvisioningRecoveryTransitionError extends CollectorProfileDomainError {
+  public readonly profileId: ProfileId | undefined;
+  public readonly currentHealth: ProfileAuthenticationHealth;
+
+  public constructor(
+    currentHealth: ProfileAuthenticationHealth,
+    profileId?: ProfileId,
+  ) {
+    const suffix = profileId ? ` for profile ${profileId}` : "";
+    super(
+      "INVALID_PROVISIONING_RECOVERY_TRANSITION",
+      `Profile recovery provisioning requires authenticationHealth REAUTH_REQUIRED or CHECKPOINT_REVIEW_REQUIRED, got ${currentHealth}${suffix}.`,
+    );
+    this.profileId = profileId;
+    this.currentHealth = currentHealth;
   }
 }
