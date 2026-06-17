@@ -7,8 +7,10 @@ import {
   ClaimNextCollectionRunUseCase,
   GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
+  GetCollectionScheduleUseCase,
   ListAccountExerciseRunsUseCase,
   ListCollectionRunsUseCase,
+  ListCollectionSchedulesUseCase,
   MarkAccountExerciseRunFailedUseCase,
   MarkAccountExerciseRunRunningUseCase,
   MarkAccountExerciseRunSucceededUseCase,
@@ -17,6 +19,7 @@ import {
   MarkCollectionRunSucceededUseCase,
   RequestAccountExerciseRunUseCase,
   RequestCollectionRunUseCase,
+  UpsertCollectionScheduleUseCase,
 } from "../../collector-runtime/application";
 import type {
   Clock,
@@ -28,6 +31,7 @@ import type {
 } from "../../collector-runtime/application";
 import { InMemoryCollectionRunRepository } from "../../collector-runtime/application/test-support/in-memory-collection-run-repository";
 import { InMemoryAccountExerciseRunRepository } from "../../collector-runtime/application/test-support/in-memory-account-exercise-run-repository";
+import { InMemoryCollectionScheduleRepository } from "../../collector-runtime/application/test-support/in-memory-collection-schedule-repository";
 import { InMemoryProfileSourceAccessCheckRunRepository } from "../../collector-runtime/application/test-support/in-memory-profile-source-access-check-run-repository";
 import { createCollectorRuntime } from "./collector-runtime.container";
 
@@ -37,6 +41,7 @@ describe("collector runtime composition container", () => {
     const services = createCollectorRuntime({
       accountExerciseRuns: new InMemoryAccountExerciseRunRepository(),
       collectionRuns: new InMemoryCollectionRunRepository(),
+      collectionSchedules: new InMemoryCollectionScheduleRepository(),
       checkRuns: new InMemoryProfileSourceAccessCheckRunRepository(),
       sourceGroups: new FakeSourceGroupLookupPort(),
       profiles: new FakeProfileReferencePort(),
@@ -95,6 +100,15 @@ describe("collector runtime composition container", () => {
     );
     expect(services.claimNextCollectionRun).toBeInstanceOf(
       ClaimNextCollectionRunUseCase,
+    );
+    expect(services.upsertCollectionSchedule).toBeInstanceOf(
+      UpsertCollectionScheduleUseCase,
+    );
+    expect(services.getCollectionSchedule).toBeInstanceOf(
+      GetCollectionScheduleUseCase,
+    );
+    expect(services.listCollectionSchedules).toBeInstanceOf(
+      ListCollectionSchedulesUseCase,
     );
 
     await services.close();

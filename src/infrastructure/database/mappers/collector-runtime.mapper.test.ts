@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  InvalidPersistedCollectionScheduleRecordError,
   toCollectionRunDomain,
   toCollectionRunRow,
+  toCollectionScheduleDomain,
+  toCollectionScheduleRow,
 } from "./collector-runtime.mapper";
-import type { CollectionRunRow } from "./collector-runtime.mapper";
-import type { CollectionRun } from "../../../collector-runtime/domain";
+import type {
+  CollectionRunRow,
+  CollectionScheduleRow,
+} from "./collector-runtime.mapper";
+import type {
+  CollectionRun,
+  CollectionSchedule,
+} from "../../../collector-runtime/domain";
 
 const now = "2026-04-01T10:00:00.000Z";
 
@@ -59,6 +68,79 @@ describe("collector runtime database mapper", () => {
     expect(toCollectionRunDomain(toSelectRow(row, createCollectionRun()))).toEqual(
       createCollectionRun(),
     );
+  });
+});
+
+describe("collector runtime database mapper: collection schedule", () => {
+  const sourceGroupId = "source-group-1";
+  const createdAt = "2026-06-17T10:00:00.000Z";
+  const updatedAt = "2026-06-17T11:00:00.000Z";
+
+  it("maps a valid schedule row to domain", () => {
+    const domain = toCollectionScheduleDomain({
+      sourceGroupId,
+      enabled: true,
+      intervalMinutes: 30,
+      nextRunAt: createdAt,
+      parameters: { maxScrolls: 5 },
+      createdAt,
+      updatedAt,
+    });
+
+    expect(domain).toEqual({
+      sourceGroupId,
+      enabled: true,
+      intervalMinutes: 30,
+      nextRunAt: createdAt,
+      parameters: { maxScrolls: 5 },
+      createdAt,
+      updatedAt,
+    });
+  });
+
+  it("throws InvalidPersistedCollectionScheduleRecordError on invalid persisted row", () => {
+    expect(() =>
+      toCollectionScheduleDomain({
+        sourceGroupId,
+        enabled: true,
+        intervalMinutes: 0,
+        nextRunAt: createdAt,
+        parameters: {},
+        createdAt,
+        updatedAt,
+      }),
+    ).toThrow(InvalidPersistedCollectionScheduleRecordError);
+  });
+
+  it("round-trips a valid schedule through toRow and back", () => {
+    const schedule: CollectionSchedule = {
+      sourceGroupId,
+      enabled: false,
+      intervalMinutes: 60,
+      nextRunAt: "2026-06-17T12:00:00.000Z",
+      parameters: { maxScrolls: 1, maxDurationMs: 1000 },
+      createdAt,
+      updatedAt,
+    };
+
+    const row = toCollectionScheduleRow(schedule);
+
+    expect(row).toEqual({
+      sourceGroupId,
+      enabled: false,
+      intervalMinutes: 60,
+      nextRunAt: "2026-06-17T12:00:00.000Z",
+      parameters: { maxScrolls: 1, maxDurationMs: 1000 },
+      createdAt,
+      updatedAt,
+    });
+
+    expect(
+      toCollectionScheduleDomain({
+        ...row,
+        sourceGroupId: row.sourceGroupId,
+      } as CollectionScheduleRow),
+    ).toEqual(schedule);
   });
 });
 

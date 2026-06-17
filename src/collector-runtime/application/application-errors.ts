@@ -30,7 +30,12 @@ export type CollectorRuntimeApplicationErrorCode =
   | "PROFILE_SOURCE_ACCESS_CHECK_RUN_CONFLICT"
   | "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_FOUND"
   | "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_ACTIVE"
-  | "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED";
+  | "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED"
+  | "COLLECTION_SCHEDULE_VALIDATION_ERROR"
+  | "COLLECTION_SCHEDULE_NOT_FOUND"
+  | "COLLECTION_SCHEDULE_SOURCE_GROUP_NOT_FOUND"
+  | "COLLECTION_SCHEDULE_SOURCE_GROUP_NOT_ACTIVE"
+  | "COLLECTION_SCHEDULE_SOURCE_GROUP_PLATFORM_UNSUPPORTED";
 
 export abstract class CollectorRuntimeApplicationError extends Error {
   public readonly code: CollectorRuntimeApplicationErrorCode;
@@ -387,5 +392,69 @@ export class ProfileSourceAccessCheckRunConflictError extends CollectorRuntimeAp
     );
     this.profileId = profileId;
     this.sourceGroupId = sourceGroupId;
+  }
+}
+
+export class CollectionScheduleValidationError extends CollectorRuntimeApplicationError {
+  public readonly issues: readonly ValidationIssue[];
+
+  public constructor(issues: readonly ValidationIssue[]) {
+    super(
+      "COLLECTION_SCHEDULE_VALIDATION_ERROR",
+      "Collection schedule input is invalid.",
+    );
+    this.issues = issues;
+  }
+}
+
+export class CollectionScheduleNotFoundError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+
+  public constructor(sourceGroupId: string) {
+    super(
+      "COLLECTION_SCHEDULE_NOT_FOUND",
+      `Collection schedule not found: ${sourceGroupId}.`,
+    );
+    this.sourceGroupId = sourceGroupId;
+  }
+}
+
+export class CollectionScheduleSourceGroupNotFoundError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+
+  public constructor(sourceGroupId: string) {
+    super(
+      "COLLECTION_SCHEDULE_SOURCE_GROUP_NOT_FOUND",
+      `Source group not found for collection schedule: ${sourceGroupId}.`,
+    );
+    this.sourceGroupId = sourceGroupId;
+  }
+}
+
+export class CollectionScheduleSourceGroupNotActiveError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+  public readonly status: string;
+
+  public constructor(sourceGroupId: string, status: string) {
+    super(
+      "COLLECTION_SCHEDULE_SOURCE_GROUP_NOT_ACTIVE",
+      `Source group ${sourceGroupId} must be ACTIVE to enable a collection schedule.`,
+    );
+    this.sourceGroupId = sourceGroupId;
+    this.status = status;
+  }
+}
+
+export class CollectionScheduleSourceGroupPlatformUnsupportedError extends CollectorRuntimeApplicationError {
+  public readonly sourceGroupId: string;
+  public readonly platform: string;
+
+  public constructor(sourceGroupId: string, platform: string) {
+    super(
+      "COLLECTION_SCHEDULE_SOURCE_GROUP_PLATFORM_UNSUPPORTED",
+      `Source group ${sourceGroupId} must use platform FACEBOOK for a collection schedule.`,
+    );
+    this.sourceGroupId = sourceGroupId;
+    this.platform = platform;
   }
 }

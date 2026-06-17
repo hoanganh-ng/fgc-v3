@@ -6,6 +6,9 @@ import type {
   CollectionRunSummary,
 } from "./collection-run";
 import type {
+  CollectionSchedule,
+} from "./collection-schedule";
+import type {
   AccountExerciseRun,
   AccountExerciseRunActionBudget,
   AccountExerciseRunFailureReason,
@@ -26,6 +29,7 @@ import {
   CollectionRunSchema,
   CollectionRunSummarySchema,
 } from "./collection-run.schemas";
+import { CollectionScheduleSchema } from "./collection-schedule.schemas";
 import { ProfileSourceAccessCheckRunSchema } from "./profile-source-access-check-run.schemas";
 
 export interface ValidationIssue {
@@ -207,6 +211,21 @@ export function validateProfileSourceAccessCheckRun(
   value: unknown,
 ): ValidationResult<ProfileSourceAccessCheckRun> {
   const result = ProfileSourceAccessCheckRunSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateCollectionSchedule(
+  value: unknown,
+): ValidationResult<CollectionSchedule> {
+  const result = CollectionScheduleSchema.safeParse(value);
 
   if (!result.success) {
     return invalid(formatZodIssues(result.error.issues));

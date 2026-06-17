@@ -1,8 +1,14 @@
 # Active Sprint
 
-Sprint 056 is active.
+Sprint 057 is active.
 
 Implementation authority:
+
+- [Sprint 057 - Collection Schedule Domain and Persistence Foundation](SPRINT-057-collection-schedule-domain-and-persistence-foundation.md)
+
+Sprint 056 is accepted and recorded as the operator authentication
+health filtering and profile inventory pagination foundation for
+Sprint 057:
 
 - [Sprint 056 - Operator Authentication Health Filtering and Profile Inventory Pagination](SPRINT-056-operator-authentication-health-filtering-and-profile-inventory-pagination.md)
 

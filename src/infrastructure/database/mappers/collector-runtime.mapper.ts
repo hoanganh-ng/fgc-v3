@@ -1,10 +1,18 @@
 import type {
   CollectionRun,
   CollectionRunIsoDateTime,
+  CollectionSchedule,
+  CollectionScheduleIsoDateTime,
   ValidationIssue,
 } from "../../../collector-runtime/domain";
-import { validateCollectionRun } from "../../../collector-runtime/domain";
-import { collectorCollectionRuns } from "../schema/collector-runtime.schema";
+import {
+  validateCollectionRun,
+  validateCollectionSchedule,
+} from "../../../collector-runtime/domain";
+import {
+  collectorCollectionRuns,
+  collectorCollectionSchedules,
+} from "../schema/collector-runtime.schema";
 
 export type CollectionRunRow = typeof collectorCollectionRuns.$inferSelect;
 export type CollectionRunInsert = typeof collectorCollectionRuns.$inferInsert;
@@ -128,4 +136,87 @@ function normalizeIsoDateTime(value: string | Date): CollectionRunIsoDateTime {
   }
 
   return new Date(parsed).toISOString();
+}
+
+export function normalizeCollectionScheduleIsoDateTime(
+  value: string | Date,
+): CollectionScheduleIsoDateTime {
+  return normalizeIsoDateTime(value);
+}
+
+export type CollectionScheduleRow =
+  typeof collectorCollectionSchedules.$inferSelect;
+export type CollectionScheduleInsert =
+  typeof collectorCollectionSchedules.$inferInsert;
+
+export class InvalidPersistedCollectionScheduleRecordError extends Error {
+  public readonly recordType: "collection schedule";
+  public readonly recordId: string;
+  public readonly issues: readonly ValidationIssue[];
+
+  public constructor(recordId: string, issues: readonly ValidationIssue[]) {
+    super(`Persisted collection schedule is invalid: ${recordId}.`);
+    this.name = "InvalidPersistedCollectionScheduleRecordError";
+    this.recordType = "collection schedule";
+    this.recordId = recordId;
+    this.issues = issues;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export function toCollectionScheduleRow(
+  collectionSchedule: CollectionSchedule,
+): CollectionScheduleInsert {
+  const validSchedule = parseCollectionScheduleForPersistence(
+    collectionSchedule,
+  );
+
+  return {
+    sourceGroupId: validSchedule.sourceGroupId,
+    enabled: validSchedule.enabled,
+    intervalMinutes: validSchedule.intervalMinutes,
+    nextRunAt: validSchedule.nextRunAt,
+    parameters: { ...validSchedule.parameters },
+    createdAt: validSchedule.createdAt,
+    updatedAt: validSchedule.updatedAt,
+  };
+}
+
+export function toCollectionScheduleDomain(
+  row: CollectionScheduleRow,
+): CollectionSchedule {
+  const candidate = {
+    sourceGroupId: row.sourceGroupId,
+    enabled: row.enabled,
+    intervalMinutes: row.intervalMinutes,
+    nextRunAt: normalizeCollectionScheduleIsoDateTime(row.nextRunAt),
+    parameters: row.parameters,
+    createdAt: normalizeCollectionScheduleIsoDateTime(row.createdAt),
+    updatedAt: normalizeCollectionScheduleIsoDateTime(row.updatedAt),
+  };
+  const result = validateCollectionSchedule(candidate);
+
+  if (!result.valid) {
+    throw new InvalidPersistedCollectionScheduleRecordError(
+      row.sourceGroupId,
+      result.issues,
+    );
+  }
+
+  return result.value;
+}
+
+function parseCollectionScheduleForPersistence(
+  collectionSchedule: CollectionSchedule,
+): CollectionSchedule {
+  const result = validateCollectionSchedule(collectionSchedule);
+
+  if (!result.valid) {
+    throw new InvalidPersistedCollectionScheduleRecordError(
+      collectionSchedule.sourceGroupId,
+      result.issues,
+    );
+  }
+
+  return result.value;
 }

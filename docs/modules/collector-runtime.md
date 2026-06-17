@@ -9,6 +9,7 @@
 - Submitting normalized collected content to Content Manager.
 - Processing lease-scoped runtime profile configuration.
 - Detecting authentication walls (login, checkpoints).
+- Owns the `CollectionSchedule` aggregate (one schedule per source group; persisted schedule, not yet driving dispatch).
 
 ## Does Not Own
 - Profile property invariants, session ingestion rules, or checkout eligibility.

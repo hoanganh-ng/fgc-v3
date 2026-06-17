@@ -7,8 +7,10 @@ import {
   ClaimNextProfileSourceAccessCheckRunUseCase,
   GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
+  GetCollectionScheduleUseCase,
   ListAccountExerciseRunsUseCase,
   ListCollectionRunsUseCase,
+  ListCollectionSchedulesUseCase,
   MarkAccountExerciseRunFailedUseCase,
   MarkAccountExerciseRunRunningUseCase,
   MarkAccountExerciseRunSucceededUseCase,
@@ -24,11 +26,13 @@ import {
   MarkProfileSourceAccessCheckRunRunningUseCase,
   MarkProfileSourceAccessCheckRunSucceededUseCase,
   CancelProfileSourceAccessCheckRunUseCase,
+  UpsertCollectionScheduleUseCase,
 } from "../../collector-runtime/application";
 import type {
   AccountExerciseRunRepository,
   Clock,
   CollectionRunRepository,
+  CollectionScheduleRepository,
   IdGenerator,
   SourceGroupLookupPort,
   ProfileSourceAccessCheckRunRepository,
@@ -38,6 +42,7 @@ import type {
 export interface CollectorRuntimeDependencies {
   readonly accountExerciseRuns: AccountExerciseRunRepository;
   readonly collectionRuns: CollectionRunRepository;
+  readonly collectionSchedules: CollectionScheduleRepository;
   readonly checkRuns: ProfileSourceAccessCheckRunRepository;
   readonly profiles: ProfileReferencePort;
   readonly sourceGroups: SourceGroupLookupPort;
@@ -62,6 +67,9 @@ export interface CollectorRuntimeContainer {
   readonly markCollectionRunSucceeded: MarkCollectionRunSucceededUseCase;
   readonly markCollectionRunFailed: MarkCollectionRunFailedUseCase;
   readonly cancelCollectionRun: CancelCollectionRunUseCase;
+  readonly upsertCollectionSchedule: UpsertCollectionScheduleUseCase;
+  readonly getCollectionSchedule: GetCollectionScheduleUseCase;
+  readonly listCollectionSchedules: ListCollectionSchedulesUseCase;
   readonly requestProfileSourceAccessCheckRun: RequestProfileSourceAccessCheckRunUseCase;
   readonly getProfileSourceAccessCheckRun: GetProfileSourceAccessCheckRunUseCase;
   readonly listProfileSourceAccessCheckRuns: ListProfileSourceAccessCheckRunsUseCase;
@@ -81,6 +89,7 @@ export function createCollectorRuntime(
   const {
     accountExerciseRuns,
     collectionRuns,
+    collectionSchedules,
     checkRuns,
     profiles,
     sourceGroups,
@@ -144,6 +153,17 @@ export function createCollectorRuntime(
     cancelCollectionRun: new CancelCollectionRunUseCase(
       collectionRuns,
       clock,
+    ),
+    upsertCollectionSchedule: new UpsertCollectionScheduleUseCase(
+      collectionSchedules,
+      sourceGroups,
+      clock,
+    ),
+    getCollectionSchedule: new GetCollectionScheduleUseCase(
+      collectionSchedules,
+    ),
+    listCollectionSchedules: new ListCollectionSchedulesUseCase(
+      collectionSchedules,
     ),
     requestProfileSourceAccessCheckRun: new RequestProfileSourceAccessCheckRunUseCase(
       checkRuns,

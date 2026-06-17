@@ -1,6 +1,9 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
+  check,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -155,5 +158,29 @@ export const collectorProfileSourceAccessCheckRuns = pgTable(
     uniqueIndex("collector_psa_check_runs_active_unique_idx")
       .on(table.profileId, table.sourceGroupId)
       .where(sql`status IN ('QUEUED', 'RUNNING')`),
+  ],
+);
+
+export const collectorCollectionSchedules = pgTable(
+  "collector_collection_schedules",
+  {
+    sourceGroupId: text("source_group_id").primaryKey(),
+    enabled: boolean("enabled").notNull(),
+    intervalMinutes: integer("interval_minutes").notNull(),
+    nextRunAt: timestampWithTimezone("next_run_at").notNull(),
+    parameters: jsonb("parameters").$type<CollectionRunParameters>().notNull(),
+    createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
+    updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "collector_collection_schedules_interval_minutes_check",
+      sql`${table.intervalMinutes} BETWEEN 1 AND 10080`,
+    ),
+    index("collector_collection_schedules_due_idx").on(
+      table.enabled,
+      table.nextRunAt,
+      table.sourceGroupId,
+    ),
   ],
 );
