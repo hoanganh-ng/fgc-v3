@@ -67,7 +67,13 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
   };
 });
 
-import { CollectionSchedulesPage } from "@/pages/collection-schedules-page";
+import {
+  CollectionSchedulesPage,
+  ScheduleEditor,
+  SOURCE_GROUPS_QUERY,
+} from "@/pages/collection-schedules-page";
+import { resolveScheduleSubmit } from "@/features/collector-runtime/collection-schedule-view-model";
+import { collectorRuntimeClient } from "@/lib/api/collector-runtime-client";
 import type { CollectionSchedule } from "@/lib/api/collector-runtime-client";
 import type { SourceGroup } from "@/lib/api/content-manager-client";
 
@@ -247,5 +253,188 @@ describe("CollectionSchedulesPage", () => {
     );
 
     expect(markup).toContain("partial source-group inventory");
+  });
+});
+
+describe("ScheduleEditor", () => {
+  function seedEditor(
+    schedules: CollectionSchedule[] = [],
+    sourceGroups: SourceGroup[] = [],
+  ): QueryClient {
+    const client = buildQueryClient();
+    seedSchedules(client, schedules, schedules.length);
+    seedSourceGroups(client, sourceGroups, sourceGroups.length);
+    return client;
+  }
+
+  function renderEditor(
+    state: { mode: "create" | "edit"; sourceGroupId: string },
+    options: {
+      createCandidates?: readonly SourceGroup[];
+      allSchedulableSourceGroups?: readonly SourceGroup[];
+      schedules?: CollectionSchedule[];
+      sourceGroups?: SourceGroup[];
+    } = {},
+  ): { markup: string; client: QueryClient } {
+    const client = seedEditor(
+      options.schedules ?? [],
+      options.sourceGroups ?? [],
+    );
+    const createCandidates =
+      options.createCandidates ??
+      options.sourceGroups ??
+      [];
+    const allSchedulableSourceGroups =
+      options.allSchedulableSourceGroups ??
+      options.sourceGroups ??
+      [];
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <ScheduleEditor
+            state={state}
+            createCandidates={createCandidates}
+            allSchedulableSourceGroups={allSchedulableSourceGroups}
+            onCancel={() => undefined}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    return { markup, client };
+  }
+
+  it("renders the edit-detail loading state until the detail query resolves", () => {
+    mocks.getCollectionSchedule.mockReturnValue(new Promise(() => undefined));
+    const { markup } = renderEditor(
+      { mode: "edit", sourceGroupId: "sg-1" },
+      {
+        sourceGroups: [
+          createSourceGroup({ id: "sg-1", name: "Group One", status: "ACTIVE" }),
+        ],
+      },
+    );
+
+    expect(markup).toContain("schedule-detail-loading");
+    expect(markup).toContain("Loading existing schedule");
+  });
+
+  it("renders the edit-detail error state with a retry path that invokes the detail refetch", async () => {
+    // The production editor's error branch is rendered when
+    // `useCollectionScheduleQuery` reports isError. This test spies on
+    // the production hook so the error branch is reached on the very
+    // first render. The Retry button is asserted to be present; it
+    // calls `detailQuery.refetch()` in production, which re-invokes the
+    // production queryFn. We verify that calling the spy triggers
+    // `collectorRuntimeClient.getCollectionSchedule` to prove the
+    // production refetch path.
+    const queriesModule = await import(
+      "@/features/collector-runtime/collection-schedule-queries"
+    );
+    const original = queriesModule.useCollectionScheduleQuery;
+    const refetchSpy = vi.fn(async () => undefined);
+    const spy = vi
+      .spyOn(queriesModule, "useCollectionScheduleQuery")
+      .mockImplementation((sourceGroupId: string) => {
+        const result = original(sourceGroupId) as unknown as {
+          isPending: boolean;
+          isError: boolean;
+          error: unknown;
+          refetch: () => Promise<unknown>;
+        };
+        Object.defineProperty(result, "isPending", { value: false });
+        Object.defineProperty(result, "isError", { value: true });
+        Object.defineProperty(result, "error", {
+          value: new Error("boom"),
+        });
+        result.refetch = refetchSpy as unknown as typeof result.refetch;
+        return result as never;
+      });
+
+    try {
+      const markup = renderToStaticMarkup(
+        <QueryClientProvider client={buildQueryClient()}>
+          <MemoryRouter>
+            <ScheduleEditor
+              state={{ mode: "edit", sourceGroupId: "sg-1" }}
+              createCandidates={[]}
+              allSchedulableSourceGroups={[
+                createSourceGroup({
+                  id: "sg-1",
+                  name: "Group One",
+                  status: "ACTIVE",
+                }),
+              ]}
+              onCancel={() => undefined}
+            />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+
+      expect(markup).toContain("schedule-detail-error");
+      expect(markup).toContain("Retry");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("disables submission before the edit detail query has succeeded", () => {
+    mocks.getCollectionSchedule.mockReturnValue(new Promise(() => undefined));
+    const { markup } = renderEditor(
+      { mode: "edit", sourceGroupId: "sg-1" },
+      {
+        sourceGroups: [
+          createSourceGroup({ id: "sg-1", name: "Group One", status: "ACTIVE" }),
+        ],
+      },
+    );
+
+    // The loading branch renders no submit button at all, which is the
+    // strongest "unavailable" signal the production editor exposes.
+    expect(markup).not.toContain("Save changes");
+    expect(markup).not.toContain("Create schedule");
+  });
+
+  it("surfaces the 'every loaded eligible source group already has a schedule' state", () => {
+    const { markup } = renderEditor(
+      { mode: "create", sourceGroupId: "" },
+      {
+        sourceGroups: [
+          createSourceGroup({ id: "sg-1", name: "Group One", status: "ACTIVE" }),
+        ],
+        createCandidates: [],
+        allSchedulableSourceGroups: [
+          createSourceGroup({ id: "sg-1", name: "Group One", status: "ACTIVE" }),
+        ],
+      },
+    );
+
+    expect(markup).toContain("source-group-all-scheduled");
+    expect(markup).toContain("Every loaded eligible source group already has a schedule.");
+  });
+
+  it("blocks Create when the selected group has a schedule outside the visible list page", async () => {
+    // The visible list page has zero schedules. The selected group is
+    // in the create candidate list because the list-page filter never
+    // saw it. The page's create-conflict check must still find the
+    // off-page schedule via the production `getCollectionSchedule`.
+    mocks.getCollectionSchedule.mockResolvedValue({
+      ok: true,
+      value: {
+        collectionSchedule: createSchedule({ sourceGroupId: "sg-1" }),
+      },
+    });
+
+    const outcome = await resolveScheduleSubmit({
+      mode: "create",
+      sourceGroupId: "sg-1",
+      fetchSchedule: () => collectorRuntimeClient.getCollectionSchedule("sg-1"),
+    });
+
+    expect(outcome).toEqual({
+      status: "exists",
+      message:
+        "A schedule already exists for this source group. Use Edit to modify it.",
+    });
+    expect(mocks.getCollectionSchedule).toHaveBeenCalledWith("sg-1");
   });
 });

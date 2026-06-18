@@ -21,6 +21,7 @@ import {
   formatLocalDateTimeSeconds,
   scheduleToFormValues,
   toUpsertCollectionScheduleRequest,
+  resolveScheduleSubmit,
   type ParsedUpsertCollectionScheduleFormValues,
   type UpsertCollectionScheduleFormValues,
 } from "@/features/collector-runtime/collection-schedule-view-model";
@@ -32,6 +33,7 @@ import {
   getErrorMessage,
 } from "@/features/profiles/profile-form-support";
 import { isApiResultError } from "@/lib/api/http-client";
+import { collectorRuntimeClient } from "@/lib/api/collector-runtime-client";
 import {
   type CollectionSchedule,
   DEFAULT_COLLECTION_SCHEDULE_LIST_LIMIT,
@@ -59,7 +61,7 @@ interface EditorState {
 
 const EMPTY_EDITOR: EditorState | null = null;
 
-const SOURCE_GROUPS_QUERY = {
+export const SOURCE_GROUPS_QUERY = {
   limit: 100,
   offset: 0,
 } as const;
@@ -404,7 +406,7 @@ interface ScheduleEditorProps {
   readonly onCancel: () => void;
 }
 
-function ScheduleEditor({
+export function ScheduleEditor({
   state,
   createCandidates,
   allSchedulableSourceGroups,
@@ -419,12 +421,17 @@ function ScheduleEditor({
   const [validationSummary, setValidationSummary] = useState<string | undefined>(
     undefined,
   );
+  const [conflictMessage, setConflictMessage] = useState<string | undefined>(
+    undefined,
+  );
+  const [isCheckingConflict, setIsCheckingConflict] = useState(false);
 
   const form = useForm<UpsertCollectionScheduleFormValues>({
     defaultValues: emptyScheduleFormValues(state.sourceGroupId),
   });
 
   useEffect(() => {
+    setConflictMessage(undefined);
     if (isEdit) {
       if (detailQuery.data) {
         form.reset(scheduleToFormValues(detailQuery.data.collectionSchedule));
@@ -488,8 +495,9 @@ function ScheduleEditor({
     );
   }
 
-  function submit(raw: UpsertCollectionScheduleFormValues): void {
+  async function submit(raw: UpsertCollectionScheduleFormValues): Promise<void> {
     setValidationSummary(undefined);
+    setConflictMessage(undefined);
     mutation.reset();
     const parsed = UpsertCollectionScheduleFormSchema.safeParse(raw);
 
@@ -512,6 +520,25 @@ function ScheduleEditor({
       return;
     }
 
+    if (!isEdit) {
+      setIsCheckingConflict(true);
+      const outcome = await resolveScheduleSubmit({
+        mode: "create",
+        sourceGroupId: targetSourceGroupId,
+        fetchSchedule: () =>
+          collectorRuntimeClient.getCollectionSchedule(targetSourceGroupId),
+      });
+      setIsCheckingConflict(false);
+      if (outcome.status === "exists") {
+        setConflictMessage(outcome.message);
+        return;
+      }
+      if (outcome.status === "error") {
+        setConflictMessage(outcome.message);
+        return;
+      }
+    }
+
     mutation.mutate(
       {
         sourceGroupId: targetSourceGroupId,
@@ -529,6 +556,8 @@ function ScheduleEditor({
     void form.handleSubmit(submit)(event);
   };
 
+  const isSubmitting = mutation.isPending || isCheckingConflict;
+
   const submitError = mutation.error;
   const sourceGroupsQueryUnavailable =
     sourceGroupsQuery.isError || sourceGroupsQuery.isPending;
@@ -545,6 +574,15 @@ function ScheduleEditor({
           className="rounded border border-[#e4a0a0] bg-[#fff5f5] px-3 py-2 text-xs text-[#7f1d1d]"
         >
           {validationSummary}
+        </p>
+      ) : null}
+      {conflictMessage !== undefined ? (
+        <p
+          role="alert"
+          data-testid="schedule-create-conflict"
+          className="rounded border border-[#dfc36e] bg-[#fff7dc] px-3 py-2 text-xs text-[#76591a]"
+        >
+          {conflictMessage}
         </p>
       ) : null}
       {isEdit ? (
@@ -747,7 +785,7 @@ function ScheduleEditor({
           type="button"
           variant="secondary"
           onClick={onCancel}
-          disabled={mutation.isPending}
+          disabled={isSubmitting}
         >
           <X aria-hidden="true" className="size-4" />
           <span>Cancel</span>
@@ -755,12 +793,12 @@ function ScheduleEditor({
         <Button
           type="submit"
           disabled={
-            mutation.isPending ||
+            isSubmitting ||
             (isEdit &&
               (detailQuery.isPending || detailQuery.isError))
           }
         >
-          {mutation.isPending ? (
+          {isSubmitting ? (
             <RefreshCw aria-hidden="true" className="size-4 animate-spin" />
           ) : (
             <Save aria-hidden="true" className="size-4" />

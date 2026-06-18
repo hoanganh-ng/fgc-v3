@@ -5,6 +5,7 @@ import type {
   UpsertCollectionScheduleRequest,
 } from "@/lib/api/collector-runtime-client";
 import type { SourceGroup } from "@/lib/api/content-manager-client";
+import { apiErrorToMessage, type ApiResult } from "@/lib/api/http-client";
 
 export const MIN_INTERVAL_MINUTES = 1;
 export const MAX_INTERVAL_MINUTES = 10080;
@@ -245,4 +246,84 @@ export function findSourceGroupById<
   sourceGroupId: string,
 ): TSourceGroup | undefined {
   return sourceGroups.find((group) => group.id === sourceGroupId);
+}
+
+export type CreateScheduleConflictCheckResult =
+  | { readonly status: "not_found" }
+  | { readonly status: "exists" }
+  | { readonly status: "error"; readonly message: string };
+
+/**
+ * Probe a source-group id against the existing schedule resource before
+ * permitting a Create submission. The check is independent of the current
+ * paginated list page so a schedule that lives on another page still
+ * blocks the create.
+ */
+export async function checkCreateScheduleConflict(
+  sourceGroupId: string,
+  fetchSchedule: () => Promise<ApiResult<unknown>>,
+): Promise<CreateScheduleConflictCheckResult> {
+  const result = await fetchSchedule();
+
+  if (result.ok) {
+    return { status: "exists" };
+  }
+
+  if (result.error.kind === "http" && result.error.status === 404) {
+    return { status: "not_found" };
+  }
+
+  return {
+    status: "error",
+    message: apiErrorToMessage(result.error),
+  };
+}
+
+export const CREATE_SCHEDULE_CONFLICT_EXISTS_MESSAGE =
+  "A schedule already exists for this source group. Use Edit to modify it.";
+
+export type ScheduleSubmitOutcome =
+  | { readonly status: "submit" }
+  | { readonly status: "exists"; readonly message: string }
+  | { readonly status: "error"; readonly message: string };
+
+/**
+ * Decide whether a Create or Edit submission may proceed. The Create
+ * branch performs an independent GET against the existing schedule
+ * resource so a schedule that lives outside the current paginated list
+ * page still blocks the create. Edit skips the conflict probe.
+ */
+export async function resolveScheduleSubmit({
+  mode,
+  sourceGroupId,
+  fetchSchedule,
+}: {
+  readonly mode: "create" | "edit";
+  readonly sourceGroupId: string;
+  readonly fetchSchedule: () => Promise<ApiResult<unknown>>;
+}): Promise<ScheduleSubmitOutcome> {
+  if (mode === "edit") {
+    return { status: "submit" };
+  }
+
+  const conflict = await checkCreateScheduleConflict(
+    sourceGroupId,
+    fetchSchedule,
+  );
+
+  if (conflict.status === "not_found") {
+    return { status: "submit" };
+  }
+
+  if (conflict.status === "exists") {
+    return {
+      status: "exists",
+      message: CREATE_SCHEDULE_CONFLICT_EXISTS_MESSAGE,
+    };
+  }
+
+  return {
+    status: "error",
+    message: `Could not verify that no schedule exists for this source group. ${conflict.message}`,
+  };
 }

@@ -11,6 +11,7 @@ import {
 import {
   MAX_INTERVAL_MINUTES,
   UpsertCollectionScheduleFormSchema,
+  checkCreateScheduleConflict,
   emptyScheduleFormValues,
   excludeScheduledSourceGroups,
   filterSchedulableSourceGroups,
@@ -25,6 +26,7 @@ import {
   type UpsertCollectionScheduleFormValues,
 } from "@/features/collector-runtime/collection-schedule-view-model";
 import type { SourceGroup } from "@/lib/api/content-manager-client";
+import type { ApiResult } from "@/lib/api/http-client";
 
 const timestamp = "2026-06-15T12:30:00.000Z";
 
@@ -451,5 +453,62 @@ describe("collection-schedule view-model", () => {
     };
     const parsed = CollectionScheduleListResponseSchema.safeParse(sample);
     expect(parsed.success).toBe(true);
+  });
+});
+
+describe("checkCreateScheduleConflict", () => {
+  function okResult(): ApiResult<unknown> {
+    return { ok: true, data: {} };
+  }
+
+  function httpError(status: number, message: string): ApiResult<unknown> {
+    return {
+      ok: false,
+      error: { kind: "http", status, code: "X", message },
+    };
+  }
+
+  function networkError(message: string): ApiResult<unknown> {
+    return { ok: false, error: { kind: "network", message } };
+  }
+
+  it("returns not_found when the GET yields 404 (creation may proceed)", async () => {
+    const fetchSchedule = async (): Promise<ApiResult<unknown>> =>
+      httpError(404, "Not found");
+    const result = await checkCreateScheduleConflict("sg-missing", fetchSchedule);
+    expect(result).toEqual({ status: "not_found" });
+  });
+
+  it("returns exists when the GET yields 200 (Create blocked)", async () => {
+    const fetchSchedule = async (): Promise<ApiResult<unknown>> => okResult();
+    const result = await checkCreateScheduleConflict("sg-existing", fetchSchedule);
+    expect(result).toEqual({ status: "exists" });
+  });
+
+  it("returns error when the GET yields 500 (unexpected failure surfaces)", async () => {
+    const fetchSchedule = async (): Promise<ApiResult<unknown>> =>
+      httpError(500, "boom");
+    const result = await checkCreateScheduleConflict("sg-boom", fetchSchedule);
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.message.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("returns error for non-404 http failures (blocks submission)", async () => {
+    const fetchSchedule = async (): Promise<ApiResult<unknown>> =>
+      httpError(400, "bad request");
+    const result = await checkCreateScheduleConflict("sg-bad", fetchSchedule);
+    expect(result.status).toBe("error");
+  });
+
+  it("returns error for network failures (blocks submission)", async () => {
+    const fetchSchedule = async (): Promise<ApiResult<unknown>> =>
+      networkError("offline");
+    const result = await checkCreateScheduleConflict("sg-offline", fetchSchedule);
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.message).toMatch(/offline/);
+    }
   });
 });

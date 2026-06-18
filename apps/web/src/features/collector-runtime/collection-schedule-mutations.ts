@@ -1,6 +1,7 @@
 import {
   useMutation,
   useQueryClient,
+  type QueryClient,
   type UseMutationResult,
 } from "@tanstack/react-query";
 import {
@@ -17,6 +18,28 @@ export interface UpsertCollectionScheduleVariables {
   readonly request: UpsertCollectionScheduleRequest;
 }
 
+export async function upsertCollectionSchedule(
+  variables: UpsertCollectionScheduleVariables,
+): Promise<CollectionScheduleResponse> {
+  return unwrapApiResult(
+    await collectorRuntimeClient.upsertCollectionSchedule(
+      variables.sourceGroupId,
+      variables.request,
+    ),
+  );
+}
+
+export async function invalidateCollectionScheduleQueries(
+  queryClient: Pick<QueryClient, "invalidateQueries">,
+): Promise<void> {
+  await queryClient.invalidateQueries({
+    queryKey: collectionScheduleQueryKeys.all,
+  });
+  await queryClient.invalidateQueries({
+    queryKey: collectionRunQueryKeys.all,
+  });
+}
+
 export function useUpsertCollectionScheduleMutation(): UseMutationResult<
   CollectionScheduleResponse,
   ApiResultError,
@@ -29,20 +52,9 @@ export function useUpsertCollectionScheduleMutation(): UseMutationResult<
     ApiResultError,
     UpsertCollectionScheduleVariables
   >({
-    mutationFn: async ({ sourceGroupId, request }) =>
-      unwrapApiResult(
-        await collectorRuntimeClient.upsertCollectionSchedule(
-          sourceGroupId,
-          request,
-        ),
-      ),
+    mutationFn: upsertCollectionSchedule,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: collectionScheduleQueryKeys.all,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: collectionRunQueryKeys.all,
-      });
+      await invalidateCollectionScheduleQueries(queryClient);
     },
   });
 }

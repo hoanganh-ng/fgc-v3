@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { MutationObserver, QueryClient } from "@tanstack/react-query";
 import {
-  collectionScheduleQueryKeys,
-} from "@/features/collector-runtime/collection-schedule-queries";
+  invalidateCollectionScheduleQueries,
+  upsertCollectionSchedule,
+} from "@/features/collector-runtime/collection-schedule-mutations";
 import { collectionRunQueryKeys } from "@/features/collector-runtime/collection-run-queries";
+import { collectionScheduleQueryKeys } from "@/features/collector-runtime/collection-schedule-queries";
 import type {
   CollectionScheduleResponse,
   UpsertCollectionScheduleRequest,
@@ -23,7 +24,7 @@ const mocks = vi.hoisted(() => ({
           updatedAt: "2026-06-15T12:30:00.000Z",
         },
       };
-      return { kind: "ok" as const, value: response };
+      return { ok: true as const, data: response };
     },
   ),
 }));
@@ -52,45 +53,9 @@ vi.mock("@/lib/api/collector-runtime-client", async (importOriginal) => {
   };
 });
 
-describe("collection-schedule mutation invalidation", () => {
-  it("invalidates collection-schedule and collection-run query keys on success", async () => {
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false, gcTime: 0 } },
-    });
-    const invalidateQueries = vi.fn(async (_filters?: unknown) => undefined);
-    vi.spyOn(client, "invalidateQueries").mockImplementation(
-      (() => invalidateQueries()) as never,
-    );
-
-    // Build the actual mutation through React Query's MutationObserver so
-    // we exercise the same onSuccess wiring the hook installs.
-    const observer = new MutationObserver<
-      CollectionScheduleResponse,
-      Error,
-      { sourceGroupId: string; request: UpsertCollectionScheduleRequest },
-      unknown
-    >(client, {
-      mutationFn: async ({ sourceGroupId, request }) => {
-        const result = await mocks.upsertCollectionSchedule(
-          sourceGroupId,
-          request,
-        );
-        if (result.kind !== "ok") {
-          throw new Error("expected ok result");
-        }
-        return result.value;
-      },
-      onSuccess: async () => {
-        await invalidateQueries({
-          queryKey: collectionScheduleQueryKeys.all,
-        });
-        await invalidateQueries({
-          queryKey: collectionRunQueryKeys.all,
-        });
-      },
-    });
-
-    observer.mutate({
+describe("collection-schedule mutation helpers", () => {
+  it("upsertCollectionSchedule calls the production client and returns the schedule", async () => {
+    const result = await upsertCollectionSchedule({
       sourceGroupId: "sg-1",
       request: {
         enabled: true,
@@ -100,27 +65,27 @@ describe("collection-schedule mutation invalidation", () => {
       },
     });
 
-    await new Promise((resolve) => {
-      const unsubscribe = observer.subscribe(() => {
-        if (observer.getCurrentResult().isSuccess) {
-          unsubscribe();
-          resolve(undefined);
-        }
-      });
+    expect(mocks.upsertCollectionSchedule).toHaveBeenCalledWith("sg-1", {
+      enabled: true,
+      intervalMinutes: 30,
+      nextRunAt: "2026-06-15T12:30:00.000Z",
+      parameters: {},
+    });
+    expect(result.collectionSchedule.sourceGroupId).toBe("sg-1");
+  });
+
+  it("invalidateCollectionScheduleQueries invalidates both schedule and run query keys", async () => {
+    const calls: unknown[] = [];
+
+    await invalidateCollectionScheduleQueries({
+      async invalidateQueries(filters) {
+        calls.push(filters);
+      },
     });
 
-    const calledKeys = invalidateQueries.mock.calls.map((call) => {
-      const filters = call[0] as { queryKey?: readonly unknown[] } | undefined;
-      return filters?.queryKey ?? [];
-    });
-    const scheduleInvalidated = calledKeys.some(
-      (key) => key[0] === collectionScheduleQueryKeys.all[0],
-    );
-    const runsInvalidated = calledKeys.some(
-      (key) => key[0] === collectionRunQueryKeys.all[0],
-    );
-
-    expect(scheduleInvalidated).toBe(true);
-    expect(runsInvalidated).toBe(true);
+    expect(calls).toEqual([
+      { queryKey: collectionScheduleQueryKeys.all },
+      { queryKey: collectionRunQueryKeys.all },
+    ]);
   });
 });

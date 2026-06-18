@@ -103,6 +103,9 @@ Web UI (apps/web/src/)
   features/collector-runtime/collection-schedule-mutations.ts
     useUpsertCollectionScheduleMutation (invalidates schedule keys
       and collection-run keys on success)
+    upsertCollectionSchedule (exported production mutation helper)
+    invalidateCollectionScheduleQueries (exported production post-success
+      invalidation helper; invalidates both schedule and run keys)
   features/collector-runtime/collection-schedule-view-model.ts
     toUpsertCollectionScheduleRequest (form -> API, requires parsed intervalMinutes)
     formatLocalDateTimeSeconds (renders local timezone for next-run/updated)
@@ -111,6 +114,11 @@ Web UI (apps/web/src/)
     filterSchedulableSourceGroups (FACEBOOK + ACTIVE/PAUSED/ARCHIVED)
     excludeScheduledSourceGroups (hides already-scheduled groups from the
       create selector)
+    checkCreateScheduleConflict (GET-based create guard, independent of
+      the current list page)
+    resolveScheduleSubmit (production submit-decision helper that calls
+      checkCreateScheduleConflict for create and short-circuits for edit)
+    CREATE_SCHEDULE_CONFLICT_EXISTS_MESSAGE
   pages/collection-schedules-page.tsx (new)
   app/router.tsx (adds the /collection-schedules route)
   app/navigation.ts (adds the "Schedules" entry)
@@ -181,6 +189,18 @@ container image are untouched.
 - **Invalidate relevant queries**: the mutation invalidates
   collection-schedule and collection-run query keys on success so
   the Collection Runs page refetches when a scheduled run changes.
+  The post-success invalidation logic is exported as
+  `invalidateCollectionScheduleQueries` and exercised by the
+  Sprint 061 mutation test.
+- **Independent create-conflict probe**: Create submissions are
+  guarded by `checkCreateScheduleConflict`, which performs a
+  single GET against the existing schedule resource independently
+  of the current paginated list page. A 200 response blocks
+  Create with `CREATE_SCHEDULE_CONFLICT_EXISTS_MESSAGE`; a 404
+  permits Create; any other GET failure blocks Create and surfaces
+  the underlying error. The combined submit-decision helper
+  `resolveScheduleSubmit` is the production seam and is covered by
+  the editor-state tests.
 
 ## File Manifest
 
@@ -242,10 +262,18 @@ container image are untouched.
 | Datetime conversion (local -> ISO with offset; ISO -> local input)          | `apps/web/src/features/collector-runtime/collection-schedule-view-model.test.ts`                 |
 | `toUpsertCollectionScheduleRequest` omits empty optionals                   | `apps/web/src/features/collector-runtime/collection-schedule-view-model.test.ts`                 |
 | `excludeScheduledSourceGroups` filters already-scheduled groups             | `apps/web/src/features/collector-runtime/collection-schedule-view-model.test.ts`                 |
+| `checkCreateScheduleConflict` returns `not_found` for 404, `exists` for 200, `error` otherwise (network, 5xx, non-404 http) | `apps/web/src/features/collector-runtime/collection-schedule-view-model.test.ts` |
+| `resolveScheduleSubmit` short-circuits on edit and gates create on the conflict probe | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx` (and the helper's view-model unit tests) |
 | Schedules page renders list with source-group metadata (smoke render)       | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
 | Schedules page does not issue an unsupported source-group `limit: 200`     | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
 | Schedules page renders a partial source-group inventory warning             | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
-| Collection-schedule mutation invalidates `collectionScheduleQueryKeys.all` and `collectionRunQueryKeys.all` | `apps/web/src/features/collector-runtime/collection-schedule-mutations.test.ts`     |
+| Edit detail renders a loading state until the detail query resolves         | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
+| Edit detail renders an error state with a retry path that calls the detail refetch | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                |
+| Edit submission is unavailable before the detail query succeeds             | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
+| Create surfaces the "every loaded eligible source group already has a schedule" state | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                |
+| Create is blocked when the selected group has a schedule outside the visible list page | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`            |
+| `upsertCollectionSchedule` (exported production mutation helper) calls the production client and returns the schedule | `apps/web/src/features/collector-runtime/collection-schedule-mutations.test.ts` |
+| `invalidateCollectionScheduleQueries` (exported production post-success helper) invalidates `collectionScheduleQueryKeys.all` and `collectionRunQueryKeys.all` | `apps/web/src/features/collector-runtime/collection-schedule-mutations.test.ts` |
 
 ## Out Of Scope
 
@@ -340,3 +368,35 @@ sprint scope. The corrections:
 - Correct the Sprint 061 Test Matrix to match the real coverage
   (and remove the nonexistent `formatScheduleForDisplay`
   reference).
+
+### Sprint 061 Corrections (continued)
+
+A second correction pass was applied to Sprint 061 without advancing
+the sprint scope. The corrections:
+
+- Make create-versus-edit protection independent of schedule
+  pagination. `resolveScheduleSubmit` performs a single GET against
+  the existing schedule resource before permitting a Create
+  submission. A 200 response blocks Create with
+  `CREATE_SCHEDULE_CONFLICT_EXISTS_MESSAGE`; a 404 permits Create;
+  unexpected GET failures block Create and surface the underlying
+  error. The check does not depend on the current list page, does
+  not introduce a create-only backend route, and does not load
+  every schedule page.
+- Factor the production mutation options into testable helpers
+  (`upsertCollectionSchedule` and
+  `invalidateCollectionScheduleQueries`). The
+  `useUpsertCollectionScheduleMutation` hook delegates to those
+  helpers, and the Sprint 061 mutation test exercises the helpers
+  directly so the test cannot pass if the production hook stops
+  invalidating `collectionScheduleQueryKeys.all` or
+  `collectionRunQueryKeys.all`.
+- Add focused coverage for implemented editor states: edit-detail
+  loading, edit-detail error with a retry path that calls the
+  detail refetch, submission unavailable before the detail query
+  succeeds, the "every loaded eligible source group already has a
+  schedule" state, and Create blocked when the selected group has
+  a schedule outside the visible list page.
+- Tighten the Sprint 060 wording to the precise scheduler-runtime
+  scope; remove the remaining broad "does not install Playwright …
+  or CloakBrowser" statements.
