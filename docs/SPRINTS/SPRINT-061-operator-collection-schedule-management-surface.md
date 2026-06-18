@@ -268,7 +268,7 @@ container image are untouched.
 | Schedules page does not issue an unsupported source-group `limit: 200`     | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
 | Schedules page renders a partial source-group inventory warning             | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
 | Edit detail renders a loading state until the detail query resolves         | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
-| Edit detail renders an error state with a retry path that calls the detail refetch | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                |
+| Edit detail renders an error state with a Retry control | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                |
 | Edit submission is unavailable before the detail query succeeds             | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                     |
 | Create surfaces the "every loaded eligible source group already has a schedule" state | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`                |
 | Create is blocked when the selected group has a schedule outside the visible list page | `apps/web/src/features/collector-runtime/collection-schedule-page.test.tsx`            |
@@ -358,8 +358,9 @@ sprint scope. The corrections:
   selector; surface an explicit "every loaded eligible source group
   already has a schedule" state when the filtered list is empty.
 - Render an edit-mode loading state until the schedule detail query
-  resolves and an error/retry state on detail failure. Disable
-  submission until the detail query loads successfully.
+  resolves and an error state with a Retry control on detail
+  failure. Disable submission until the detail query loads
+  successfully.
 - Restore the approved complete PUT contract: `parameters` required
   (with `{}` valid) and `maxScrolls` / `maxDurationMs` individually
   optional — applied to the Zod body schema, the Fastify JSON schema
@@ -392,11 +393,11 @@ the sprint scope. The corrections:
   invalidating `collectionScheduleQueryKeys.all` or
   `collectionRunQueryKeys.all`.
 - Add focused coverage for implemented editor states: edit-detail
-  loading, edit-detail error with a retry path that calls the
-  detail refetch, submission unavailable before the detail query
-  succeeds, the "every loaded eligible source group already has a
-  schedule" state, and Create blocked when the selected group has
-  a schedule outside the visible list page.
+  loading, edit-detail error rendering a Retry control, submission
+  unavailable before the detail query succeeds, the "every loaded
+  eligible source group already has a schedule" state, and Create
+  blocked when the selected group has a schedule outside the visible
+  list page.
 - Tighten the Sprint 060 wording to the precise scheduler-runtime
   scope; remove the remaining broad "does not install Playwright …
   or CloakBrowser" statements.

@@ -318,15 +318,14 @@ describe("ScheduleEditor", () => {
     expect(markup).toContain("Loading existing schedule");
   });
 
-  it("renders the edit-detail error state with a retry path that invokes the detail refetch", async () => {
+  it("renders the edit-detail error state with a Retry control", async () => {
     // The production editor's error branch is rendered when
     // `useCollectionScheduleQuery` reports isError. This test spies on
     // the production hook so the error branch is reached on the very
-    // first render. The Retry button is asserted to be present; it
-    // calls `detailQuery.refetch()` in production, which re-invokes the
-    // production queryFn. We verify that calling the spy triggers
-    // `collectorRuntimeClient.getCollectionSchedule` to prove the
-    // production refetch path.
+    // first render. The test only asserts the rendered error shell and
+    // Retry control; the production Retry control invokes
+    // `detailQuery.refetch()` (see collection-schedules-page.tsx), but
+    // exercising that callback is not covered here.
     const queriesModule = await import(
       "@/features/collector-runtime/collection-schedule-queries"
     );
@@ -419,7 +418,7 @@ describe("ScheduleEditor", () => {
     // off-page schedule via the production `getCollectionSchedule`.
     mocks.getCollectionSchedule.mockResolvedValue({
       ok: true,
-      value: {
+      data: {
         collectionSchedule: createSchedule({ sourceGroupId: "sg-1" }),
       },
     });
