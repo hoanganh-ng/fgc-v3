@@ -113,6 +113,45 @@ first:
 5. Manual live-Facebook validation fails → file a separate report; this
    is expected to surface drift that requires a follow-up sprint.
 
+## Acceptance Gates
+
+The change being made determines which layers must pass before the
+sprint can be marked complete. These gates are mandatory; skipping a
+layer is a sprint-scope violation.
+
+- **Domain or application changes** (new domain rules, application
+  use cases, value objects, ports, view-model helpers, schema
+  parsing): unit tests. A sprint that only touches these layers does
+  not need to extend the database, HTTP, Docker E2E, or manual
+  live-Facebook layers.
+- **Persistence, migration, or concurrency changes** (new Drizzle
+  schema, new migration, repository adapter, mapper, unique
+  constraint, atomic upsert, lease or run state transition): unit
+  tests plus Layer 2 (database integration). Concurrency changes
+  also require explicit contention coverage in the database
+  integration layer.
+- **HTTP contract changes** (new route, new DTO, request/response
+  schema change, error mapping change): unit tests, Layer 3 (HTTP
+  integration), and a focused Layer 4 (Docker E2E) spec that proves
+  the route through Nginx, the API, and the database.
+- **Web UI or top-level product flows** (new page, new form, new
+  navigation entry, new product flow that crosses Nginx → API →
+  database): Layer 4 (Docker E2E). The Web UI's accessible
+  selectors, not `data-testid`, are the source of the E2E
+  assertions.
+- **Real Facebook or browser-behavior changes** (new page-state
+  observer, new extraction rule that runs against captured
+  Facebook payloads, new browser-bound run lifecycle, new
+  sponsored-content or personal-profile exclusion, new
+  publisher-identity derivation): opt-in manual live-Facebook
+  validation only after Layers 1–4 are green. A sprint that changes
+  real Facebook or browser behavior does not claim success on
+  synthetic fixtures alone.
+
+A sprint that adds, removes, or renames a public API surface, a
+schema, a migration, or a top-level flow must update this document
+and the affected layers' specs in the same sprint.
+
 ## Non-Goals
 
 The strategy does not authorize:

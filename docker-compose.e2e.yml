@@ -24,8 +24,13 @@ services:
       DATABASE_URL: postgres://content_pipeline:content_pipeline@postgres:5432/content_pipeline
       HTTP_HOST: 0.0.0.0
       HTTP_PORT: 3000
+    # Readiness: exact HTTP 200 + {"status":"ok"} from GET /health. The route
+    # is the existing registerHealthRoutes response shape. The check refuses
+    # to accept any other status.
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then((r) => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))\""]
+      test:
+        - "CMD-SHELL"
+        - "node -e \"fetch('http://localhost:3000/health').then(async (r) => { if (r.status !== 200) { process.exit(1) } const body = await r.json().catch(() => ({})); process.exit(body && body.status === 'ok' ? 0 : 1) }).catch(() => process.exit(1))\""
       interval: 5s
       timeout: 5s
       retries: 20
@@ -38,11 +43,18 @@ services:
     build:
       context: .
       target: web-gateway
+    # Readiness: Nginx must serve the React app shell (exact 200 on /) and
+    # proxy a safe API read through to the API (exact 200 on
+    # /collector/content-categories returning {"items":[...]}). Both checks
+    # must pass.
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://localhost:80/ >/dev/null 2>&1 || exit 1"]
+      test:
+        - "CMD-SHELL"
+        - "wget -q -O- http://localhost:80/ | grep -q 'id=\"root\"' && wget -q -O- http://localhost:80/collector/content-categories | grep -q '\"items\"' || exit 1"
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 30
+      start_period: 5s
     depends_on:
       api:
         condition: service_healthy

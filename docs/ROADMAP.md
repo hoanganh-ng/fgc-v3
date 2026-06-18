@@ -79,46 +79,54 @@ Publish the feed discovery delivery plan, the cross-cutting testing strategy, th
 The cross-cutting testing strategy used by every sprint in the feed
 discovery sequence is documented in [`TESTING_STRATEGY.md`](TESTING_STRATEGY.md).
 
-## Sprint 063A: Publisher Domain And Application
+## Sprint 063A: Source Publisher Domain And Application
 
-Define the Publisher domain (publication candidates, drafts, review states, scheduled publication) and the application use cases for creating drafts from approved source groups. No persistence, no HTTP, no UI. Domain and application layers remain database-free.
+Define the Content Manager-owned `SourcePublisher` identity and observation behavior for Facebook groups and pages. Include statuses such as `discovered`, `approved`, `ignored`, and `blocked`. No persistence, no HTTP, no UI, no browser, no feed execution. `SourcePublisher` is a durable publishing-source identity, not the future Content Publisher pipeline module: it does not model drafts, publications, videos, publishing schedules, or published artifacts.
 
-## Sprint 063B: Publisher Persistence And Atomic Observation
+## Sprint 063B: Source Publisher Persistence And Atomic Observation
 
-Add Publisher PostgreSQL schema, Drizzle migrations, repository adapters, and atomic transitions between review states. Keep domain and application layers database-free.
+Add `SourcePublisher` PostgreSQL persistence, mapper, repository adapter, unique identity, and concurrency-safe observation / upsert behavior. Keep domain and application layers database-free.
 
-## Sprint 063C: Publisher HTTP Contract And E2E
+## Sprint 063C: Source Publisher HTTP Contract And E2E
 
-Add the Publisher HTTP routes, safe DTOs, and an E2E flow that proves the publisher surface works through Nginx, the API, migrations, and PostgreSQL using only synthetic fixtures.
+Add safe observation and required list / get HTTP contracts for `SourcePublisher`, composition wiring, and Docker E2E coverage. Do not add a review UI yet.
 
-## Sprint 064A: Content Provenance
+## Sprint 064A: Content Collection Provenance Model
 
-Define the content provenance model that records the originating content item, source group, captured payload hash, extraction rule version, and the publishing chain that produced a published artifact. Domain only; no persistence.
+Define the content collection provenance model that separates: the collection surface (such as a configured source group or a profile home feed); the publishing source, represented by an optional `SourcePublisher`; and the managed `SourceGroup` association. Do not model video publishing or published artifacts.
 
 ## Sprint 064B: Provenance Persistence And Compatibility
 
-Add provenance PostgreSQL schema, repository adapters, and the compatibility shim for legacy content items. Keep domain and application layers database-free.
+Persist collection provenance, migrate existing group-sourced content safely, and preserve current ingestion, deduplication, APIs, and source-group collection behavior. Keep domain and application layers database-free.
 
-## Sprint 065A: Home-Feed Extractor Fixtures
+## Sprint 065A: Facebook Home-Feed Extractor Fixtures
 
-Add deterministic home-feed extractor fixtures, parser tests, and the safe payload extractor contract that turns captured home-feed page-context and network-listener payloads into normalized home-feed candidates.
+Add sanitized, fixture-driven extraction for Facebook group posts, page posts, stable publisher identity, sponsored-content exclusion, personal-profile exclusion, and malformed payload handling. No browser execution.
 
-## Sprint 065B: Home-Feed Run Model
+## Sprint 065B: Profile-Bound Home-Feed Run Model
 
-Define the home-feed run domain (state machine, retry budget, dedupe key, source-group candidate set) and the application use cases that orchestrate runs and observations.
+Introduce a profile-bound home-feed collection target and run lifecycle. Do not overload `sourceGroupId` and do not create a fake "Home Feed" source group.
 
 ## Sprint 065C: Manual Home-Feed Execution
 
-Add a single manual home-feed operator command that exercises the run domain against synthetic fixtures, surfaces safe observations, and never launches a browser against Facebook.
+Implement actual bounded browser execution against the collector profile's Facebook home feed: profile checkout, feed navigation, max-scroll / max-duration / max-post bounds, payload capture, extraction, source-publisher observation, content submission, lease release, and sanitized summaries. Finish with opt-in manual live-Facebook validation. This sprint must not claim that it only runs synthetic fixtures.
 
-## Sprint 066: Publisher Review API And UI
+## Sprint 066: Source Publisher Discovery Review API And UI
 
-Expose the Publisher review surface (list, detail, approve, reject) through HTTP routes and a Web UI review page. Safe DTOs; minimal identifier exposure; null-vs-omission preserved.
+Add the discovered `SourcePublisher` review queue with approve, ignore, and block behavior, exposed through HTTP routes and a Web UI review page.
 
 ## Sprint 067: Approved Group Promotion
 
-Add the approved group promotion flow: a separate, auditable transition that promotes approved source groups into the Publisher production roster, scoped to operators with explicit recovery intent.
+Promote an approved discovered Facebook group into a paused managed `SourceGroup`. Require category selection and existing-source matching. Do not automatically join, activate, or schedule the promoted group.
 
-## Sprint 068: Feed Scheduling
+## Sprint 068: Home-Feed Scheduling
 
-Wire the Sprint 059 scheduled dispatch poller to feed discovery so a Publisher draft can be scheduled against an approved source group with bounded retries and a deterministic next-run timestamp.
+Generalize scheduling for profile-bound home-feed collection only after Sprint 065C's manual feed execution is validated. Wire the Sprint 059 scheduled dispatch poller to feed discovery so a home-feed run can be scheduled against a profile with bounded retries and a deterministic next-run timestamp.
+
+## Future: Content Builder
+
+Retain the long-term Content Builder pipeline stage. The Content Builder stage is not redefined or removed by the feed discovery sequence.
+
+## Future: Content Publisher
+
+Retain the long-term Content Publisher pipeline stage. The Content Publisher stage is the downstream video-publication pipeline and is not the `SourcePublisher` durable publishing-source identity introduced by Sprint 063A. The Content Publisher stage is not redefined or removed by the feed discovery sequence.

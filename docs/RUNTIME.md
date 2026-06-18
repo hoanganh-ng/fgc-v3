@@ -36,8 +36,8 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | `pnpm test` | Run default Vitest tests. |
 | `pnpm test:db` | Run opt-in database integration tests. |
 | `pnpm test:http:db` | Run opt-in DB-backed HTTP integration tests. |
-| `pnpm test:e2e:docker` | Run the isolated Docker E2E stack and Playwright runner. |
-| `pnpm test:e2e:container` | Run the in-container Playwright runner against an already-up stack. |
+| `pnpm test:e2e:docker` | Run the isolated Docker E2E stack and Playwright runner. The only operator-facing host command for the E2E harness. |
+| `pnpm test:e2e:container` | Internal: the in-container Playwright invocation the `e2e-runner` entrypoint calls. Not directly host-runnable; `http://web-gateway` is Docker-only and no host port is published. |
 
 ### Operator Tools
 
@@ -991,16 +991,20 @@ pnpm web:build
 
 Sprint 062 adds an isolated production-like Docker E2E harness. The
 harness is the only test layer that runs the full production surface
-(`web-gateway` → `api` → `postgres`) inside Docker. It runs only one
-command:
+(`web-gateway` → `api` → `postgres`) inside Docker. The only
+operator-facing host command is:
 
 ```bash
 pnpm test:e2e:docker
 ```
 
-`pnpm test:e2e:container` is the in-container Playwright invocation
-that the host driver calls. It is also exposed for manual invocations
-when the stack is already up.
+`pnpm test:e2e:container` is an internal command executed inside the
+`e2e-runtime` container. It is not directly usable from the host
+because `http://web-gateway` is Docker-only and no host port is
+published. The host driver invokes it inside the `e2e-runner`
+container; the script remains in `package.json` so the runner
+entrypoint can call it, but operators should run `pnpm test:e2e:docker`
+instead.
 
 ### What the harness does
 
@@ -1013,18 +1017,20 @@ Compose project (`fgc-v3-e2e`) and its own named volume
    --remove-orphans`.
 2. Build:
    `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml build`.
-3. Start (detached):
-   `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml up -d`.
-4. Wait on the E2E stack to report ready. The runner entrypoint polls
-   `http://web-gateway/` until it returns the React app HTML.
-5. Run Playwright inside the `e2e-runner` container against
-   `http://web-gateway` (Compose DNS).
-6. Capture the runner exit code.
-7. On non-zero exit, print sanitized
+3. Start `postgres`, `api`, and `web-gateway` in detached mode only:
+   `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml up -d
+   postgres api web-gateway`. The E2E runner is not started in this
+   step.
+4. Start the `e2e-runner` exactly once, in attached mode, with
+   `--abort-on-container-exit --exit-code-from e2e-runner`:
+   `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml up
+   --abort-on-container-exit --exit-code-from e2e-runner e2e-runner`.
+5. Capture the runner's exit code.
+6. On non-zero exit, print sanitized
    `docker compose logs --no-color` for `api`, `web-gateway`, and
    `e2e-runner`. The driver never prints `DATABASE_URL` or any
    environment value.
-8. Return the runner exit code as the host driver exit code.
+7. Return the runner's exit code as the host driver exit code.
 
 The driver installs a `trap` on `EXIT INT TERM` that always runs
 `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml down -v
@@ -1048,18 +1054,25 @@ The harness is intentionally small:
   localStorage, proxy credentials, session headers, or environment
   values from any container.
 - It does not use arbitrary sleeps as the readiness mechanism. The
-  only waits are `pg_isready`, the `api` `/health` healthcheck, and the
-  runner's HTTP poll against `http://web-gateway/`.
+  only waits are `pg_isready`, the `api` `/health` healthcheck (which
+  requires exact `200` with `{ "status": "ok" }`), and the runner's
+  HTTP poll against `http://web-gateway/` (which requires exact
+  `200` plus a stable React app-shell marker) followed by a safe API
+  read through Nginx (for example `GET /collector/content-categories`
+  returning exact `200`).
+- It does not start the E2E runner during the detached dependency
+  startup; the runner is started exactly once in attached mode.
 
 ### E2E stack
 
 ```
 postgres    postgres:16-alpine     no host port; isolated named volume
 api         api-runtime stage      pnpm db:migrate && pnpm start
-                                  healthcheck GET /health
+                                  healthcheck GET /health requires exact 200 + {"status":"ok"}
 web-gateway web-gateway stage      nginx:1.27-alpine; no host port
 e2e-runner  e2e-runtime stage      mcr.microsoft.com/playwright:v1.60.0-noble
                                   Playwright Chromium runner
+                                  started exactly once, in attached mode
 ```
 
 The `e2e-runtime` Dockerfile stage reuses the same Playwright base
@@ -1075,21 +1088,27 @@ pnpm test:e2e:docker   # repeat for determinism
 ```
 
 The second run uses the same isolated volume and starts from a fresh
-database because the host driver always runs `down -v` before the
-next `up -d`.
+database because the host driver always runs `down -v` before bringing
+up `postgres`, `api`, and `web-gateway` again.
 
 ### Troubleshooting
 
 - `no such service: web-gateway` — the host driver is being run from
   the wrong directory. `cd` to the repo root.
 - E2E stack starts but the runner reports `Could not reach
-  web-gateway` — the gateway container is unhealthy. Run
+  web-gateway` — the gateway container is not yet ready. Run
   `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml logs
   web-gateway` and check the Nginx config.
 - E2E stack starts but the runner reports API errors — the API
   container is unhealthy. Run
   `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml logs api`
   and check `pnpm db:migrate` output.
+- The E2E runner was started more than once — check
+  `docker ps -a --filter
+  "label=com.docker.compose.project=fgc-v3-e2e" --filter
+  "label=com.docker.compose.service=e2e-runner"`. There should be at
+  most one container per run; the host driver starts the runner
+  exactly once.
 - Leftover containers after a forced kill — the host driver `trap`
   ran `down -v`. Verify with
   `docker ps -a --filter "label=com.docker.compose.project=fgc-v3-e2e"`

@@ -29,7 +29,6 @@ Sprint 054A: Profile Authentication Health Foundation (Accepted).
 - **Content Manager**: Categories, source groups, normalized content, deduplication.
 - **Collector Runtime**: Collection orchestration, browser providers, extraction, submission, collection-schedule domain, atomic scheduled dispatch, scheduled dispatch poller.
 - **Web UI**: Operator presentation and safe API consumption.
-- **E2E Test Harness**: Isolated Docker stack and Playwright runner. Owned by Sprint 062.
 
 ## Important Architectural Invariants
 - Hexagonal architecture: Domain logic has zero dependencies on HTTP, databases, browsers, or queues.
@@ -63,5 +62,9 @@ fix. Sprint 062 publishes the feed discovery delivery plan, the
 cross-cutting testing strategy, the isolated Docker E2E harness, and the
 baseline E2E flow that proves the production-like stack works before
 feed discovery implementation begins. Future sprint work after Sprint
-062 will follow the new 063A–068 sequence documented in
-`docs/ROADMAP.md`.
+062 will follow the corrected 063A–068 sequence documented in
+`docs/ROADMAP.md`, in which `SourcePublisher` is the Content
+Manager-owned publishing-source identity (a group or a page observed
+while reading the feed) and is not the future Content Publisher
+pipeline stage. The long-term `Future: Content Builder` and
+`Future: Content Publisher` pipeline stages are retained.

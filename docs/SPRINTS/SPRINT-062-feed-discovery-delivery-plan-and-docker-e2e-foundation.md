@@ -28,12 +28,15 @@ discovery, publisher, or feed collection implementation.
     the testing strategy summary.
   - The roadmap (`docs/ROADMAP.md`) replaces the outdated
     "Future: Collector Runtime / Builder / Publisher" placeholders with
-    the Sprint 063A–068 sequence: publisher domain and application,
-    publisher persistence and atomic observation, publisher HTTP and E2E,
-    content provenance, provenance persistence and compatibility,
-    home-feed extractor fixtures, home-feed run model, manual home-feed
-    execution, publisher review API/UI, approved group promotion, and
-    feed scheduling.
+    the Sprint 063A–068 sequence: `SourcePublisher` domain and
+    application, `SourcePublisher` persistence and atomic observation,
+    `SourcePublisher` HTTP contract and E2E, content collection
+    provenance model, provenance persistence and compatibility,
+    Facebook home-feed extractor fixtures, profile-bound home-feed run
+    model, manual home-feed execution, `SourcePublisher` discovery
+    review API and UI, approved group promotion, and home-feed
+    scheduling. The long-term `Future: Content Builder` and
+    `Future: Content Publisher` pipeline stages are retained.
   - Runtime documentation (`docs/RUNTIME.md`) documents the Docker E2E
     stack, the `pnpm test:e2e:docker` and `pnpm test:e2e:container`
     commands, troubleshooting, and the rules the harness enforces (no
@@ -47,8 +50,7 @@ discovery, publisher, or feed collection implementation.
   - The `api` service runs `pnpm db:migrate && pnpm start` and exposes a
     Compose `healthcheck` that polls `http://localhost:3000/health`
     using the existing health route from `registerHealthRoutes`.
-  - The `web-gateway` service reuses the production
-    `mcr.microsoft.com/playwright` … no, the production `nginx:1.27-alpine`
+  - The `web-gateway` service reuses the production `nginx:1.27-alpine`
     image built from the existing `web-gateway` Dockerfile stage. The
     `e2e-runner` blocks on the gateway returning the React app HTML
     before running tests.
