@@ -1,5 +1,6 @@
 /**
- * Synthetic fixtures for the Sprint 062 baseline E2E flow.
+ * Synthetic fixtures for the Sprint 062 baseline E2E flow and the
+ * Sprint 063C Source Publisher HTTP E2E flow.
  *
  * These fixtures are deterministic, isolated to the E2E run, and never
  * reference real Facebook identifiers, sessions, cookies, localStorage,
@@ -23,6 +24,15 @@ export interface SyntheticSourceGroupFixture {
   readonly status: "ACTIVE";
   readonly collectionPriority: number;
   readonly notes: string;
+}
+
+export interface SyntheticSourcePublisherObservationFixture {
+  readonly platform: "FACEBOOK";
+  readonly kind: "GROUP" | "PAGE";
+  readonly externalPublisherId: string;
+  readonly observedAt: string;
+  readonly displayName: string;
+  readonly canonicalUrl: string;
 }
 
 export function buildCategoryFixture(
@@ -50,6 +60,35 @@ export function buildSourceGroupFixture(
     status: "ACTIVE",
     collectionPriority: 0,
     notes: "Synthetic Content Manager source group created by Sprint 062 E2E.",
+  };
+}
+
+export function buildSourcePublisherObservationFixture(
+  runStamp: string,
+  options: { readonly kind: "GROUP" | "PAGE"; readonly observedAt?: string },
+): SyntheticSourcePublisherObservationFixture {
+  return {
+    platform: "FACEBOOK",
+    kind: options.kind,
+    externalPublisherId: `sprint-063c-${options.kind.toLowerCase()}-${runStamp}`,
+    observedAt:
+      options.observedAt ?? "2026-06-18T12:00:00.000Z",
+    displayName: `Sprint 063C ${options.kind === "GROUP" ? "Group" : "Page"} ${runStamp}`,
+    canonicalUrl: `https://example.invalid/sprint-063c-${options.kind.toLowerCase()}-${runStamp}`,
+  };
+}
+
+export function buildSourcePublisherSecondObservationFixture(
+  base: SyntheticSourcePublisherObservationFixture,
+  options: { readonly observedAt: string },
+): SyntheticSourcePublisherObservationFixture {
+  return {
+    platform: base.platform,
+    kind: base.kind,
+    externalPublisherId: base.externalPublisherId,
+    observedAt: options.observedAt,
+    displayName: `${base.displayName} (Updated)`,
+    canonicalUrl: `${base.canonicalUrl}-v2`,
   };
 }
 

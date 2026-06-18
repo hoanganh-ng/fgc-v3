@@ -133,7 +133,15 @@ layer is a sprint-scope violation.
 - **HTTP contract changes** (new route, new DTO, request/response
   schema change, error mapping change): unit tests, Layer 3 (HTTP
   integration), and a focused Layer 4 (Docker E2E) spec that proves
-  the route through Nginx, the API, and the database.
+  the route through Nginx, the API, and the database. Sprint 063C
+  follows this gate for the `SourcePublisher` observation, list, and
+  get HTTP contracts; the Layer 4 spec is
+  `tests/e2e/source-publisher-http.spec.ts`, which exercises the
+  flow through `http://web-gateway` only, asserts that every
+  response is a safe allowlist (no raw payloads, sessions, tokens,
+  proxies, viewer IDs, account IDs, or diagnostic data), and
+  creates and owns its own synthetic fixtures independent from
+  `tests/e2e/stack-baseline.spec.ts`.
 - **Web UI or top-level product flows** (new page, new form, new
   navigation entry, new product flow that crosses Nginx → API →
   database): Layer 4 (Docker E2E). The Web UI's accessible

@@ -5,7 +5,9 @@ import {
   ContentItemNotFoundError,
   InvalidContentStatusTransitionError,
   SourceGroupNotFoundError,
+  SourcePublisherNotFoundError,
 } from "../../content-manager/application";
+import { toSourcePublisherDto } from "./routes/content-manager.routes";
 import { createHttpServer } from "./server";
 import {
   createUnusedCollectorProfileManagerHttpService,
@@ -19,6 +21,7 @@ import {
   createContentItem,
   createFakeContentManagerHttpService,
   createSourceGroup,
+  createSourcePublisher,
   createTopComment,
 } from "./test-support/content-manager-http-service";
 import { FakeSourceGroupReferencePort } from "./test-support/source-group-reference-port";
@@ -851,6 +854,463 @@ describe("Content Manager HTTP routes", () => {
       await server.close();
     }
   });
+
+  it("observes a source publisher and returns the safe DTO", async () => {
+    const { server, service } = createTestServer();
+
+    service.observeSourcePublisher.setOutput(
+      createSourcePublisher({
+        observationCount: 1,
+        externalPublisherId: "synthetic-group-123",
+        displayName: "Synthetic Knowledge Group",
+        canonicalUrl:
+          "https://example.invalid/groups/synthetic-group-123",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/observations",
+        payload: {
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "synthetic-group-123",
+          observedAt: "2026-06-18T12:00:00.000Z",
+          displayName: "Synthetic Knowledge Group",
+          canonicalUrl: "https://example.invalid/groups/synthetic-group-123",
+        },
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(service.observeSourcePublisher.calls).toEqual([
+        {
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "synthetic-group-123",
+          observedAt: "2026-06-18T12:00:00.000Z",
+          displayName: "Synthetic Knowledge Group",
+          canonicalUrl: "https://example.invalid/groups/synthetic-group-123",
+        },
+      ]);
+      expect(body).toMatchObject({
+        sourcePublisher: {
+          id: "source-publisher-1",
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "synthetic-group-123",
+          displayName: "Synthetic Knowledge Group",
+          canonicalUrl:
+            "https://example.invalid/groups/synthetic-group-123",
+          status: "DISCOVERED",
+          observationCount: 1,
+        },
+      });
+      expectSourcePublisherIsSafe(body);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("keeps omitted displayName and canonicalUrl omitted on observation", async () => {
+    const { server, service } = createTestServer();
+
+    service.observeSourcePublisher.setOutput(
+      createSourcePublisher({
+        externalPublisherId: "synthetic-page-456",
+        kind: "PAGE",
+        displayName: undefined,
+        canonicalUrl: undefined,
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/observations",
+        payload: {
+          platform: "FACEBOOK",
+          kind: "PAGE",
+          externalPublisherId: "synthetic-page-456",
+          observedAt: "2026-06-18T13:00:00.000Z",
+        },
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(service.observeSourcePublisher.calls).toEqual([
+        {
+          platform: "FACEBOOK",
+          kind: "PAGE",
+          externalPublisherId: "synthetic-page-456",
+          observedAt: "2026-06-18T13:00:00.000Z",
+        },
+      ]);
+      expect(body).toMatchObject({
+        sourcePublisher: {
+          platform: "FACEBOOK",
+          kind: "PAGE",
+          externalPublisherId: "synthetic-page-456",
+        },
+      });
+      expect(body.sourcePublisher).not.toHaveProperty("displayName");
+      expect(body.sourcePublisher).not.toHaveProperty("canonicalUrl");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects unknown fields on source publisher observation", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/observations",
+        payload: {
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "synthetic-group-123",
+          observedAt: "2026-06-18T12:00:00.000Z",
+          displayName: "Synthetic Knowledge Group",
+          status: "APPROVED",
+          observationCount: 99,
+          firstObservedAt: "2026-06-18T12:00:00.000Z",
+          lastObservedAt: "2026-06-18T12:00:00.000Z",
+          createdAt: "2026-06-18T12:00:01.000Z",
+          updatedAt: "2026-06-18T12:00:01.000Z",
+          id: "source-publisher-x",
+          rawPayload: { data: "raw" },
+          rawPayloadRef: "s3://content-payloads/x.json",
+          cookies: "session=abc",
+          localStorage: { key: "value" },
+          token: "secret",
+          authorization: "Bearer secret",
+          proxy: "http://proxy.invalid",
+          viewerId: "viewer-1",
+          accountId: "account-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(service.observeSourcePublisher.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects null optional fields on source publisher observation", async () => {
+    const { server, service } = createTestServer();
+
+    const payloads = [
+      {
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "synthetic-group-123",
+        observedAt: "2026-06-18T12:00:00.000Z",
+        displayName: null,
+      },
+      {
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "synthetic-group-123",
+        observedAt: "2026-06-18T12:00:00.000Z",
+        canonicalUrl: null,
+      },
+    ];
+
+    for (const payload of payloads) {
+      const local = createTestServer();
+      try {
+        const response = await local.server.inject({
+          method: "POST",
+          url: "/collector/source-publishers/observations",
+          payload,
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json()).toMatchObject({
+          error: { code: "VALIDATION_ERROR" },
+        });
+        expect(local.service.observeSourcePublisher.calls).toEqual([]);
+      } finally {
+        await local.server.close();
+      }
+    }
+
+    // ensure outer service untouched
+    expect(service.observeSourcePublisher.calls).toEqual([]);
+  });
+
+  it("rejects invalid observedAt, canonicalUrl, platform, and kind", async () => {
+    const { server, service } = createTestServer();
+
+    const invalidPayloads = [
+      {
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "synthetic-group-123",
+        observedAt: "not-a-datetime",
+      },
+      {
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "synthetic-group-123",
+        observedAt: "2026-06-18T12:00:00.000Z",
+        canonicalUrl: "not-a-url",
+      },
+      {
+        platform: "TWITTER",
+        kind: "GROUP",
+        externalPublisherId: "synthetic-group-123",
+        observedAt: "2026-06-18T12:00:00.000Z",
+      },
+      {
+        platform: "FACEBOOK",
+        kind: "CHANNEL",
+        externalPublisherId: "synthetic-group-123",
+        observedAt: "2026-06-18T12:00:00.000Z",
+      },
+      {
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "   ",
+        observedAt: "2026-06-18T12:00:00.000Z",
+      },
+      {
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "synthetic-group-123",
+        observedAt: "2026-06-18T12:00:00.000Z",
+        displayName: "",
+      },
+    ];
+
+    for (const payload of invalidPayloads) {
+      const local = createTestServer();
+      try {
+        const response = await local.server.inject({
+          method: "POST",
+          url: "/collector/source-publishers/observations",
+          payload,
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json()).toMatchObject({
+          error: { code: "VALIDATION_ERROR" },
+        });
+        expect(local.service.observeSourcePublisher.calls).toEqual([]);
+      } finally {
+        await local.server.close();
+      }
+    }
+
+    expect(service.observeSourcePublisher.calls).toEqual([]);
+  });
+
+  it("lists source publishers with filters and pagination", async () => {
+    const { server, service } = createTestServer();
+
+    service.listSourcePublishers.setOutput({
+      items: [createSourcePublisher()],
+      page: { limit: 25, offset: 5, total: 1 },
+    });
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/source-publishers?status=DISCOVERED&kind=GROUP&platform=FACEBOOK&limit=25&offset=5",
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(service.listSourcePublishers.calls).toEqual([
+        {
+          status: "DISCOVERED",
+          kind: "GROUP",
+          platform: "FACEBOOK",
+          limit: 25,
+          offset: 5,
+        },
+      ]);
+      expect(body).toMatchObject({
+        items: [
+          {
+            id: "source-publisher-1",
+            platform: "FACEBOOK",
+            kind: "GROUP",
+            status: "DISCOVERED",
+          },
+        ],
+        page: { limit: 25, offset: 5, total: 1 },
+      });
+      expectSourcePublisherIsSafe(body);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("applies default limit 50 and offset 0 to source publisher list", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/source-publishers",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(service.listSourcePublishers.calls).toEqual([
+        {
+          limit: 50,
+          offset: 0,
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects invalid source publisher list filters without invocation", async () => {
+    const { server, service } = createTestServer();
+
+    const invalidUrls = [
+      "/collector/source-publishers?status=REJECTED",
+      "/collector/source-publishers?kind=CHANNEL",
+      "/collector/source-publishers?platform=TWITTER",
+      "/collector/source-publishers?limit=0",
+      "/collector/source-publishers?limit=200",
+      "/collector/source-publishers?limit=-1",
+      "/collector/source-publishers?offset=-1",
+      "/collector/source-publishers?unexpected=1",
+    ];
+
+    for (const url of invalidUrls) {
+      const local = createTestServer();
+      try {
+        const response = await local.server.inject({
+          method: "GET",
+          url,
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json()).toMatchObject({
+          error: { code: "VALIDATION_ERROR" },
+        });
+        expect(local.service.listSourcePublishers.calls).toEqual([]);
+      } finally {
+        await local.server.close();
+      }
+    }
+
+    expect(service.listSourcePublishers.calls).toEqual([]);
+  });
+
+  it("keeps omitted metadata omitted on list response", async () => {
+    const { server, service } = createTestServer();
+
+    service.listSourcePublishers.setOutput({
+      items: [createSourcePublisher({
+        displayName: undefined,
+        canonicalUrl: undefined,
+      })],
+      page: { limit: 50, offset: 0, total: 1 },
+    });
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/source-publishers",
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body.items[0]).not.toHaveProperty("displayName");
+      expect(body.items[0]).not.toHaveProperty("canonicalUrl");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("gets one source publisher by id", async () => {
+    const { server, service } = createTestServer();
+
+    service.getSourcePublisher.setOutput(
+      createSourcePublisher({
+        displayName: "Synthetic Knowledge Group",
+        canonicalUrl:
+          "https://example.invalid/groups/synthetic-group-123",
+        observationCount: 2,
+        externalPublisherId: "synthetic-group-123",
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/source-publishers/source-publisher-1",
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(service.getSourcePublisher.calls).toEqual([
+        { sourcePublisherId: "source-publisher-1" },
+      ]);
+      expect(body).toMatchObject({
+        sourcePublisher: {
+          id: "source-publisher-1",
+          observationCount: 2,
+          displayName: "Synthetic Knowledge Group",
+          canonicalUrl:
+            "https://example.invalid/groups/synthetic-group-123",
+          externalPublisherId: "synthetic-group-123",
+        },
+      });
+      expectSourcePublisherIsSafe(body);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps missing source publishers to 404 SOURCE_PUBLISHER_NOT_FOUND", async () => {
+    const { server, service } = createTestServer();
+
+    service.getSourcePublisher.setError(
+      new SourcePublisherNotFoundError("source-publisher-missing"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "GET",
+        url: "/collector/source-publishers/source-publisher-missing",
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: { code: "SOURCE_PUBLISHER_NOT_FOUND" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("toSourcePublisherDto omits displayName and canonicalUrl when absent", async () => {
+    const dto = toSourcePublisherDto(
+      createSourcePublisher({
+        displayName: undefined,
+        canonicalUrl: undefined,
+      }),
+    );
+
+    expect(dto).not.toHaveProperty("displayName");
+    expect(dto).not.toHaveProperty("canonicalUrl");
+    expect(dto.id).toBe("source-publisher-1");
+    expect(dto.observationCount).toBe(1);
+  });
 });
 
 function createTestServer(): {
@@ -877,4 +1337,33 @@ function expectReadPayloadIsSafe(payload: unknown): void {
   expect(serialized).not.toContain("rawFacebookGraphqlPayload");
   expect(serialized).not.toContain("GraphQL");
   expect(serialized).not.toContain("s3://content-payloads");
+}
+
+const SENSITIVE_KEYS = [
+  "rawPayload",
+  "rawPayloadRef",
+  "cookies",
+  "localStorage",
+  "token",
+  "tokens",
+  "tokenHash",
+  "authorization",
+  "authorizationHeader",
+  "headers",
+  "viewerId",
+  "accountId",
+  "session",
+  "proxy",
+  "proxyCredentials",
+  "fingerprint",
+  "screenshot",
+  "diagnostics",
+] as const;
+
+function expectSourcePublisherIsSafe(payload: unknown): void {
+  const serialized = JSON.stringify(payload);
+
+  for (const key of SENSITIVE_KEYS) {
+    expect(serialized).not.toContain(`"${key}"`);
+  }
 }

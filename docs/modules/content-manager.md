@@ -22,14 +22,21 @@
   observation never changes review status.
 - Explicit, reversible `SourcePublisher` status updates (idempotent
   when reapplying the current status).
-- `SourcePublisher` application ports
-  (`observeAtomically`, `updateStatus`, `findById`,
-  `findByIdentity`, `list` with bounded `limit` and non-negative
-  `offset`, ordered `lastObservedAt` descending then `id` ascending).
-  Observation has a purpose-specific atomic operation, review
-  status has a purpose-specific partial status operation, and there
-  is no production full-row save path for `SourcePublisher`.
+- `SourcePublisher` application ports (`observeAtomically`,
+  `updateStatus`, `findById`, `findByIdentity`, `list` with bounded
+  `limit` and non-negative `offset`, ordered `lastObservedAt`
+  descending then `id` ascending). Observation has a
+  purpose-specific atomic operation, review status has a
+  purpose-specific partial status operation, and there is no
+  production full-row save path for `SourcePublisher`.
 - Safe read APIs for content and sources.
+- Safe `SourcePublisher` HTTP observation, list, and get contracts
+  served through Nginx → Fastify → Content Manager application →
+  PostgreSQL. The safe `SourcePublisherDto` allowlist explicitly
+  enumerates every response field; optional `displayName` and
+  `canonicalUrl` are omitted when absent and never serialized as
+  `null`. Status mutation (approve / ignore / block) is intentionally
+  deferred to Sprint 066.
 - Future handoff shape for Content Builder.
 
 ## Does Not Own
@@ -73,9 +80,33 @@
     `DrizzleSourcePublisherRepository`)
 - `src/content-manager/infrastructure/`
 - `src/content-manager/interface/`
+- `src/interfaces/http/`
+  - `routes/content-manager.routes.ts` (registers the
+    `SourcePublisher` observation, list, and get routes and exposes
+    the `toSourcePublisherDto` mapper)
+  - `schemas/content-manager.http-schemas.ts` (`ObserveSourcePublisherHttpBodySchema`,
+    `SourcePublisherIdHttpParamsSchema`,
+    `ListSourcePublishersHttpQuerySchema`, and the response JSON
+    schema)
+  - `content-manager.server.test.ts` (stub-backed HTTP coverage)
+  - `content-manager.server.database.integration.test.ts`
+    (opt-in PostgreSQL-backed HTTP coverage)
+  - `test-support/content-manager-http-service.ts`
+    (`FakeContentManagerHttpService` stubs and `createSourcePublisher`
+    fixture helper)
+- `tests/e2e/`
+  - `fixtures/synthetic-payloads.ts`
+    (`buildSourcePublisherObservationFixture` and
+    `buildSourcePublisherSecondObservationFixture` builders)
+  - `source-publisher-http.spec.ts` (Docker E2E flow through
+    `web-gateway`)
 
 ## Important Entrypoints
 - `Fastify API`: `src/content-manager/interface/http/` (e.g. `/content/items`, `/content/source-groups`)
+- `HTTP Adapter (SourcePublisher)`: `src/interfaces/http/routes/content-manager.routes.ts`
+  registers `POST /collector/source-publishers/observations`,
+  `GET /collector/source-publishers`, and
+  `GET /collector/source-publishers/:sourcePublisherId`.
 - `Composition Root`: `src/content-manager/composition/root.ts`
 
 ## Critical Invariants

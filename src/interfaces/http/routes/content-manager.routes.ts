@@ -5,10 +5,14 @@ import type {
   CreateSourceGroupInput,
   GetContentItemInput,
   GetSourceGroupInput,
+  GetSourcePublisherInput,
   ListContentItemsInput,
   ListContentItemsOutput,
   ListSourceGroupsInput,
   ListSourceGroupsOutput,
+  ListSourcePublishersInput,
+  ListSourcePublishersOutput,
+  ObserveSourcePublisherApplicationInput,
   RemoveSourceGroupEntryRouteInput,
   UpdateContentStatusInput,
   UpdateSourceGroupEntryRouteInput,
@@ -28,6 +32,8 @@ import type {
   SourceGroupEntryRouteType,
   SourceGroupId,
   SourceGroupStatus,
+  SourcePublisher,
+  SourcePublisherId,
   TopComment,
 } from "../../../content-manager/domain";
 import { resolveSourceGroupEntryRoutes } from "../../../content-manager/domain";
@@ -39,8 +45,11 @@ import {
   IngestCollectedContentHttpBodySchema,
   ListContentItemsHttpQuerySchema,
   ListSourceGroupsHttpQuerySchema,
+  ListSourcePublishersHttpQuerySchema,
+  ObserveSourcePublisherHttpBodySchema,
   SourceGroupEntryRouteIdHttpParamsSchema,
   SourceGroupIdHttpParamsSchema,
+  SourcePublisherIdHttpParamsSchema,
   UpdateContentStatusHttpBodySchema,
   UpdateSourceGroupEntryRouteHttpBodySchema,
   UpdateSourceGroupStatusHttpBodySchema,
@@ -49,10 +58,13 @@ import {
   createSourceGroupHttpRouteSchema,
   getContentItemHttpRouteSchema,
   getSourceGroupHttpRouteSchema,
+  getSourcePublisherHttpRouteSchema,
   ingestCollectedContentHttpRouteSchema,
   listContentCategoriesHttpRouteSchema,
   listContentItemsHttpRouteSchema,
   listSourceGroupsHttpRouteSchema,
+  listSourcePublishersHttpRouteSchema,
+  observeSourcePublisherHttpRouteSchema,
   parseHttpInput,
   removeSourceGroupEntryRouteHttpRouteSchema,
   updateContentStatusHttpRouteSchema,
@@ -113,6 +125,18 @@ export interface ContentManagerHttpService {
   readonly listContentItems: ExecutableUseCase<
     ListContentItemsInput,
     ListContentItemsOutput
+  >;
+  readonly observeSourcePublisher: ExecutableUseCase<
+    ObserveSourcePublisherApplicationInput,
+    SourcePublisher
+  >;
+  readonly getSourcePublisher: ExecutableUseCase<
+    GetSourcePublisherInput,
+    SourcePublisher
+  >;
+  readonly listSourcePublishers: ExecutableUseCase<
+    ListSourcePublishersInput,
+    ListSourcePublishersOutput
   >;
 }
 
@@ -185,6 +209,21 @@ export interface ContentItemDto {
   readonly shareCount?: number;
   readonly topComments: readonly TopCommentDto[];
   readonly status: ContentStatus;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+}
+
+export interface SourcePublisherDto {
+  readonly id: SourcePublisherId;
+  readonly platform: ContentPlatform;
+  readonly kind: SourcePublisher["kind"];
+  readonly externalPublisherId: string;
+  readonly displayName?: string;
+  readonly canonicalUrl?: string;
+  readonly status: SourcePublisher["status"];
+  readonly firstObservedAt: IsoDateTime;
+  readonly lastObservedAt: IsoDateTime;
+  readonly observationCount: number;
   readonly createdAt: IsoDateTime;
   readonly updatedAt: IsoDateTime;
 }
@@ -490,6 +529,79 @@ export function registerContentManagerRoutes(
       };
     },
   );
+
+  server.post(
+    "/collector/source-publishers/observations",
+    { schema: observeSourcePublisherHttpRouteSchema },
+    async (request) => {
+      const body = parseHttpInput(
+        ObserveSourcePublisherHttpBodySchema,
+        request.body,
+      );
+      const input = {
+        platform: body.platform,
+        kind: body.kind,
+        externalPublisherId: body.externalPublisherId,
+        observedAt: body.observedAt,
+        ...(body.displayName !== undefined
+          ? { displayName: body.displayName }
+          : {}),
+        ...(body.canonicalUrl !== undefined
+          ? { canonicalUrl: body.canonicalUrl }
+          : {}),
+      } satisfies ObserveSourcePublisherApplicationInput;
+      const sourcePublisher =
+        await contentManager.observeSourcePublisher.execute(input);
+
+      return {
+        sourcePublisher: toSourcePublisherDto(sourcePublisher),
+      };
+    },
+  );
+
+  server.get(
+    "/collector/source-publishers",
+    { schema: listSourcePublishersHttpRouteSchema },
+    async (request) => {
+      const query = parseHttpInput(
+        ListSourcePublishersHttpQuerySchema,
+        request.query,
+      );
+      const input = {
+        ...(query.status !== undefined ? { status: query.status } : {}),
+        ...(query.kind !== undefined ? { kind: query.kind } : {}),
+        ...(query.platform !== undefined ? { platform: query.platform } : {}),
+        limit: query.limit,
+        offset: query.offset,
+      } satisfies ListSourcePublishersInput;
+      const output =
+        await contentManager.listSourcePublishers.execute(input);
+
+      return {
+        items: output.items.map(toSourcePublisherDto),
+        page: output.page,
+      };
+    },
+  );
+
+  server.get(
+    "/collector/source-publishers/:sourcePublisherId",
+    { schema: getSourcePublisherHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        SourcePublisherIdHttpParamsSchema,
+        request.params,
+      );
+      const sourcePublisher =
+        await contentManager.getSourcePublisher.execute({
+          sourcePublisherId: params.sourcePublisherId,
+        } satisfies GetSourcePublisherInput);
+
+      return {
+        sourcePublisher: toSourcePublisherDto(sourcePublisher),
+      };
+    },
+  );
 }
 
 export function toContentCategoryDto(
@@ -588,5 +700,28 @@ function toTopCommentDto(comment: TopComment): TopCommentDto {
     ...(comment.replyCount !== undefined ? { replyCount: comment.replyCount } : {}),
     ...(comment.postedAt !== undefined ? { postedAt: comment.postedAt } : {}),
     collectedAt: comment.collectedAt,
+  };
+}
+
+export function toSourcePublisherDto(
+  sourcePublisher: SourcePublisher,
+): SourcePublisherDto {
+  return {
+    id: sourcePublisher.id,
+    platform: sourcePublisher.platform,
+    kind: sourcePublisher.kind,
+    externalPublisherId: sourcePublisher.externalPublisherId,
+    ...(sourcePublisher.displayName !== undefined
+      ? { displayName: sourcePublisher.displayName }
+      : {}),
+    ...(sourcePublisher.canonicalUrl !== undefined
+      ? { canonicalUrl: sourcePublisher.canonicalUrl }
+      : {}),
+    status: sourcePublisher.status,
+    firstObservedAt: sourcePublisher.firstObservedAt,
+    lastObservedAt: sourcePublisher.lastObservedAt,
+    observationCount: sourcePublisher.observationCount,
+    createdAt: sourcePublisher.createdAt,
+    updatedAt: sourcePublisher.updatedAt,
   };
 }

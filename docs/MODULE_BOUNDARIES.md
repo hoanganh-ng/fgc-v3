@@ -56,9 +56,10 @@ Owns:
   changes review status.
 - Explicit, reversible `SourcePublisher` status updates (idempotent
   when reapplying the current status).
-- `SourcePublisher` application ports (`save`, `findById`,
-  `findByIdentity`, `list` with bounded `limit` and non-negative
-  `offset`, ordered `lastObservedAt` descending then `id` ascending).
+- `SourcePublisher` application ports (`observeAtomically`,
+  `updateStatus`, `findById`, `findByIdentity`, `list` with bounded
+  `limit` and non-negative `offset`, ordered `lastObservedAt`
+  descending then `id` ascending).
 - Safe read APIs.
 - Future handoff shape for Content Builder.
 

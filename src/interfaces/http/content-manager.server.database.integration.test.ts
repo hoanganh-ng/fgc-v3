@@ -12,6 +12,7 @@ import {
   contentItems,
   createDatabaseClient,
   sourceGroups,
+  sourcePublishers,
 } from "../../infrastructure/database";
 import type { DatabaseClient } from "../../infrastructure/database";
 import { createHttpServer } from "./server";
@@ -47,6 +48,7 @@ if (!shouldRunHttpDbTests) {
     const createdCategoryIds = new Set<string>();
     const createdSourceGroupIds = new Set<string>();
     const createdContentItemIds = new Set<string>();
+    const createdSourcePublisherIds = new Set<string>();
 
     beforeAll(() => {
       const databaseClient = createDatabaseClient({
@@ -73,6 +75,7 @@ if (!shouldRunHttpDbTests) {
       const contentItemIds = [...createdContentItemIds];
       const sourceGroupIds = [...createdSourceGroupIds];
       const categoryIds = [...createdCategoryIds];
+      const sourcePublisherIds = [...createdSourcePublisherIds];
 
       if (contentItemIds.length > 0) {
         await client.db
@@ -92,9 +95,16 @@ if (!shouldRunHttpDbTests) {
           .where(inArray(contentCategories.id, categoryIds));
       }
 
+      if (sourcePublisherIds.length > 0) {
+        await client.db
+          .delete(sourcePublishers)
+          .where(inArray(sourcePublishers.id, sourcePublisherIds));
+      }
+
       createdContentItemIds.clear();
       createdSourceGroupIds.clear();
       createdCategoryIds.clear();
+      createdSourcePublisherIds.clear();
     });
 
     afterAll(async () => {
@@ -434,6 +444,12 @@ if (!shouldRunHttpDbTests) {
       return contentItemId;
     }
 
+    function trackSourcePublisherId(sourcePublisherId: string): string {
+      createdSourcePublisherIds.add(sourcePublisherId);
+
+      return sourcePublisherId;
+    }
+
     function getServer(): FastifyInstance {
       if (server === undefined) {
         throw new Error("HTTP server was not initialized.");
@@ -441,6 +457,151 @@ if (!shouldRunHttpDbTests) {
 
       return server;
     }
+
+    it("persists the Source Publisher HTTP flow through composition, repositories, and PostgreSQL", async () => {
+      const externalPublisherId = nextTestId("external-publisher");
+      const firstObservedAt = "2026-06-18T12:00:00.000Z";
+      const secondObservedAt = "2026-06-18T13:30:00.000Z";
+
+      const firstObserveResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/source-publishers/observations",
+        payload: {
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId,
+          observedAt: firstObservedAt,
+          displayName: "HTTP DB Knowledge Group",
+          canonicalUrl: `https://example.invalid/groups/${externalPublisherId}`,
+        },
+      });
+      const firstObserveBody = firstObserveResponse.json() as {
+        readonly sourcePublisher: {
+          readonly id: string;
+          readonly externalPublisherId: string;
+          readonly platform: string;
+          readonly kind: string;
+          readonly status: string;
+          readonly observationCount: number;
+          readonly firstObservedAt: string;
+          readonly lastObservedAt: string;
+          readonly createdAt: string;
+          readonly updatedAt: string;
+        };
+      };
+      const sourcePublisherId = trackSourcePublisherId(
+        firstObserveBody.sourcePublisher.id,
+      );
+
+      expect(firstObserveResponse.statusCode).toBe(200);
+      expect(firstObserveBody).toMatchObject({
+        sourcePublisher: {
+          id: sourcePublisherId,
+          externalPublisherId,
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          status: "DISCOVERED",
+          observationCount: 1,
+          firstObservedAt,
+          lastObservedAt: firstObservedAt,
+        },
+      });
+      expectSourcePublisherIsSafe(firstObserveBody);
+
+      const secondObserveResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/source-publishers/observations",
+        payload: {
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId,
+          observedAt: secondObservedAt,
+          displayName: "HTTP DB Knowledge Group (Updated)",
+          canonicalUrl: `https://example.invalid/groups/${externalPublisherId}/v2`,
+        },
+      });
+      const secondObserveBody = secondObserveResponse.json() as {
+        readonly sourcePublisher: {
+          readonly id: string;
+          readonly status: string;
+          readonly observationCount: number;
+          readonly displayName?: string;
+          readonly canonicalUrl?: string;
+          readonly firstObservedAt: string;
+          readonly lastObservedAt: string;
+          readonly updatedAt: string;
+        };
+      };
+
+      expect(secondObserveResponse.statusCode).toBe(200);
+      expect(secondObserveBody).toMatchObject({
+        sourcePublisher: {
+          id: sourcePublisherId,
+          status: "DISCOVERED",
+          observationCount: 2,
+          displayName: "HTTP DB Knowledge Group (Updated)",
+          canonicalUrl: `https://example.invalid/groups/${externalPublisherId}/v2`,
+          firstObservedAt,
+          lastObservedAt: secondObservedAt,
+        },
+      });
+      expectSourcePublisherIsSafe(secondObserveBody);
+
+      const getResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}`,
+      });
+      const getBody = getResponse.json() as {
+        readonly sourcePublisher: {
+          readonly id: string;
+          readonly externalPublisherId: string;
+          readonly observationCount: number;
+          readonly displayName?: string;
+        };
+      };
+
+      expect(getResponse.statusCode).toBe(200);
+      expect(getBody).toMatchObject({
+        sourcePublisher: {
+          id: sourcePublisherId,
+          externalPublisherId,
+          observationCount: 2,
+          displayName: "HTTP DB Knowledge Group (Updated)",
+        },
+      });
+      expectSourcePublisherIsSafe(getBody);
+
+      const listResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/source-publishers?status=DISCOVERED&kind=GROUP&platform=FACEBOOK&limit=100&offset=0`,
+      });
+      const listBody = listResponse.json() as {
+        readonly items: readonly {
+          readonly id: string;
+          readonly platform: string;
+          readonly kind: string;
+          readonly status: string;
+        }[];
+        readonly page: {
+          readonly limit: number;
+          readonly offset: number;
+          readonly total: number;
+        };
+      };
+
+      expect(listResponse.statusCode).toBe(200);
+      expect(listBody.page).toEqual({ limit: 100, offset: 0, total: expect.any(Number) });
+      expect(
+        listBody.items.some(
+          (item) =>
+            item.id === sourcePublisherId &&
+            item.platform === "FACEBOOK" &&
+            item.kind === "GROUP" &&
+            item.status === "DISCOVERED",
+        ),
+      ).toBe(true);
+      expectSourcePublisherIsSafe(listBody);
+    });
   });
 }
 
@@ -499,4 +660,33 @@ function expectReadPayloadIsSafe(payload: unknown): void {
   expect(serialized).not.toContain("rawPayloadRef");
   expect(serialized).not.toContain("s3://content-payloads");
   expect(serialized).not.toContain("rawFacebookGraphqlPayload");
+}
+
+const SENSITIVE_SOURCE_PUBLISHER_KEYS = [
+  "rawPayload",
+  "rawPayloadRef",
+  "cookies",
+  "localStorage",
+  "token",
+  "tokens",
+  "tokenHash",
+  "authorization",
+  "authorizationHeader",
+  "headers",
+  "viewerId",
+  "accountId",
+  "session",
+  "proxy",
+  "proxyCredentials",
+  "fingerprint",
+  "screenshot",
+  "diagnostics",
+] as const;
+
+function expectSourcePublisherIsSafe(payload: unknown): void {
+  const serialized = JSON.stringify(payload);
+
+  for (const key of SENSITIVE_SOURCE_PUBLISHER_KEYS) {
+    expect(serialized).not.toContain(`"${key}"`);
+  }
 }

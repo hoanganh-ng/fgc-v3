@@ -10,6 +10,7 @@ import {
   ContentStatusSchema,
   ExternalGroupIdSchema,
   ExternalPostIdSchema,
+  ExternalPublisherIdSchema,
   IsoDateTimeSchema,
   SourceGroupEntryRouteIdSchema,
   SourceGroupEntryRouteRiskLevelSchema,
@@ -19,13 +20,20 @@ import {
   SourceGroupIdSchema,
   SourceGroupStatusSchema,
   SOURCE_GROUP_STATUSES,
+  SourcePublisherIdSchema,
+  SourcePublisherKindSchema,
+  SourcePublisherStatusSchema,
+  SOURCE_PUBLISHER_KINDS,
+  SOURCE_PUBLISHER_STATUSES,
   TopCommentSchema,
 } from "../../../content-manager/domain";
 import {
   DEFAULT_CONTENT_ITEM_LIST_LIMIT,
   DEFAULT_SOURCE_GROUP_LIST_LIMIT,
+  DEFAULT_SOURCE_PUBLISHER_LIST_LIMIT,
   MAX_CONTENT_ITEM_LIST_LIMIT,
   MAX_SOURCE_GROUP_LIST_LIMIT,
+  MAX_SOURCE_PUBLISHER_LIST_LIMIT,
 } from "../../../content-manager/application";
 export { parseHttpInput } from "./http-validation";
 
@@ -138,6 +146,38 @@ export const UpdateContentStatusHttpBodySchema = z
   })
   .strict();
 
+export const ObserveSourcePublisherHttpBodySchema = z
+  .object({
+    platform: ContentPlatformSchema,
+    kind: SourcePublisherKindSchema,
+    externalPublisherId: ExternalPublisherIdSchema,
+    observedAt: IsoDateTimeSchema,
+    displayName: NonEmptyStringHttpSchema.optional(),
+    canonicalUrl: z.url().optional(),
+  })
+  .strict();
+
+export const SourcePublisherIdHttpParamsSchema = z
+  .object({
+    sourcePublisherId: SourcePublisherIdSchema,
+  })
+  .strict();
+
+export const ListSourcePublishersHttpQuerySchema = z
+  .object({
+    status: SourcePublisherStatusSchema.optional(),
+    kind: SourcePublisherKindSchema.optional(),
+    platform: ContentPlatformSchema.optional(),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_SOURCE_PUBLISHER_LIST_LIMIT)
+      .default(DEFAULT_SOURCE_PUBLISHER_LIST_LIMIT),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .strict();
+
 export type CreateContentCategoryHttpBody = z.infer<
   typeof CreateContentCategoryHttpBodySchema
 >;
@@ -173,6 +213,15 @@ export type ListContentItemsHttpQuery = z.infer<
 >;
 export type UpdateContentStatusHttpBody = z.infer<
   typeof UpdateContentStatusHttpBodySchema
+>;
+export type ObserveSourcePublisherHttpBody = z.infer<
+  typeof ObserveSourcePublisherHttpBodySchema
+>;
+export type SourcePublisherIdHttpParams = z.infer<
+  typeof SourcePublisherIdHttpParamsSchema
+>;
+export type ListSourcePublishersHttpQuery = z.infer<
+  typeof ListSourcePublishersHttpQuerySchema
 >;
 
 const nonEmptyStringJsonSchema = { type: "string", minLength: 1 } as const;
@@ -637,6 +686,129 @@ const contentStatusBodyJsonSchema = {
   },
 } as const;
 
+const sourcePublisherJsonSchema = {
+  type: "object",
+  required: [
+    "id",
+    "platform",
+    "kind",
+    "externalPublisherId",
+    "status",
+    "firstObservedAt",
+    "lastObservedAt",
+    "observationCount",
+    "createdAt",
+    "updatedAt",
+  ],
+  additionalProperties: false,
+  properties: {
+    id: nonEmptyStringJsonSchema,
+    platform: {
+      type: "string",
+      enum: CONTENT_PLATFORMS,
+    },
+    kind: {
+      type: "string",
+      enum: SOURCE_PUBLISHER_KINDS,
+    },
+    externalPublisherId: nonEmptyStringJsonSchema,
+    displayName: nonEmptyStringJsonSchema,
+    canonicalUrl: {
+      type: "string",
+      format: "uri",
+    },
+    status: {
+      type: "string",
+      enum: SOURCE_PUBLISHER_STATUSES,
+    },
+    firstObservedAt: {
+      type: "string",
+      format: "date-time",
+    },
+    lastObservedAt: {
+      type: "string",
+      format: "date-time",
+    },
+    observationCount: {
+      type: "integer",
+      minimum: 1,
+    },
+    createdAt: {
+      type: "string",
+      format: "date-time",
+    },
+    updatedAt: {
+      type: "string",
+      format: "date-time",
+    },
+  },
+} as const;
+
+const observeSourcePublisherBodyJsonSchema = {
+  type: "object",
+  required: ["platform", "kind", "externalPublisherId", "observedAt"],
+  additionalProperties: false,
+  properties: {
+    platform: {
+      type: "string",
+      enum: CONTENT_PLATFORMS,
+    },
+    kind: {
+      type: "string",
+      enum: SOURCE_PUBLISHER_KINDS,
+    },
+    externalPublisherId: nonEmptyStringJsonSchema,
+    observedAt: {
+      type: "string",
+      format: "date-time",
+    },
+    displayName: nonEmptyStringJsonSchema,
+    canonicalUrl: {
+      type: "string",
+      format: "uri",
+    },
+  },
+} as const;
+
+const sourcePublisherIdParamsJsonSchema = {
+  type: "object",
+  required: ["sourcePublisherId"],
+  additionalProperties: false,
+  properties: {
+    sourcePublisherId: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+const listSourcePublishersQueryJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    status: {
+      type: "string",
+      enum: SOURCE_PUBLISHER_STATUSES,
+    },
+    kind: {
+      type: "string",
+      enum: SOURCE_PUBLISHER_KINDS,
+    },
+    platform: {
+      type: "string",
+      enum: CONTENT_PLATFORMS,
+    },
+    limit: {
+      type: "integer",
+      minimum: 1,
+      maximum: MAX_SOURCE_PUBLISHER_LIST_LIMIT,
+      default: DEFAULT_SOURCE_PUBLISHER_LIST_LIMIT,
+    },
+    offset: {
+      type: "integer",
+      minimum: 0,
+      default: 0,
+    },
+  },
+} as const;
+
 export const createContentCategoryHttpRouteSchema = {
   body: contentCategoryBodyJsonSchema,
   response: {
@@ -852,6 +1024,58 @@ export const updateContentStatusHttpRouteSchema = {
       additionalProperties: false,
       properties: {
         contentItem: contentItemJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const observeSourcePublisherHttpRouteSchema = {
+  body: observeSourcePublisherBodyJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["sourcePublisher"],
+      additionalProperties: false,
+      properties: {
+        sourcePublisher: sourcePublisherJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const listSourcePublishersHttpRouteSchema = {
+  querystring: listSourcePublishersQueryJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["items", "page"],
+      additionalProperties: false,
+      properties: {
+        items: {
+          type: "array",
+          items: sourcePublisherJsonSchema,
+        },
+        page: pageJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const getSourcePublisherHttpRouteSchema = {
+  params: sourcePublisherIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["sourcePublisher"],
+      additionalProperties: false,
+      properties: {
+        sourcePublisher: sourcePublisherJsonSchema,
       },
     },
     "4xx": errorResponseJsonSchema,

@@ -4,10 +4,14 @@ import type {
   CreateSourceGroupInput,
   GetContentItemInput,
   GetSourceGroupInput,
+  GetSourcePublisherInput,
   ListContentItemsInput,
   ListContentItemsOutput,
   ListSourceGroupsInput,
   ListSourceGroupsOutput,
+  ListSourcePublishersInput,
+  ListSourcePublishersOutput,
+  ObserveSourcePublisherApplicationInput,
   RemoveSourceGroupEntryRouteInput,
   UpdateContentStatusInput,
   UpdateSourceGroupEntryRouteInput,
@@ -20,6 +24,7 @@ import type {
   ContentStatus,
   SourceGroup,
   SourceGroupStatus,
+  SourcePublisher,
   TopComment,
 } from "../../../content-manager/domain";
 import { createDefaultSourceGroupEntryRoute } from "../../../content-manager/domain";
@@ -124,12 +129,25 @@ export interface FakeContentManagerHttpService
     ListContentItemsInput,
     ListContentItemsOutput
   >;
+  readonly observeSourcePublisher: StubUseCase<
+    ObserveSourcePublisherApplicationInput,
+    SourcePublisher
+  >;
+  readonly getSourcePublisher: StubUseCase<
+    GetSourcePublisherInput,
+    SourcePublisher
+  >;
+  readonly listSourcePublishers: StubUseCase<
+    ListSourcePublishersInput,
+    ListSourcePublishersOutput
+  >;
 }
 
 export function createFakeContentManagerHttpService(): FakeContentManagerHttpService {
   const category = createContentCategory();
   const sourceGroup = createSourceGroup();
   const contentItem = createContentItem();
+  const sourcePublisher = createSourcePublisher();
 
   return {
     createContentCategory: new StubUseCase(category),
@@ -173,6 +191,16 @@ export function createFakeContentManagerHttpService(): FakeContentManagerHttpSer
     getContentItem: new StubUseCase(contentItem),
     listContentItems: new StubUseCase({
       items: [contentItem],
+      page: {
+        limit: 50,
+        offset: 0,
+        total: 1,
+      },
+    }),
+    observeSourcePublisher: new StubUseCase(sourcePublisher),
+    getSourcePublisher: new StubUseCase(sourcePublisher),
+    listSourcePublishers: new StubUseCase({
+      items: [sourcePublisher],
       page: {
         limit: 50,
         offset: 0,
@@ -316,4 +344,30 @@ export function createSourceGroupWithStatus(
   status: SourceGroupStatus,
 ): SourceGroup {
   return createSourceGroup({ status });
+}
+
+export function createSourcePublisher(
+  options: Partial<SourcePublisher> = {},
+): SourcePublisher {
+  return {
+    id: options.id ?? "source-publisher-1",
+    platform: options.platform ?? "FACEBOOK",
+    kind: options.kind ?? "GROUP",
+    externalPublisherId:
+      options.externalPublisherId ?? "synthetic-group-123",
+    ...(options.displayName !== undefined
+      ? { displayName: options.displayName }
+      : {}),
+    ...(options.canonicalUrl !== undefined
+      ? { canonicalUrl: options.canonicalUrl }
+      : {}),
+    status: options.status ?? "DISCOVERED",
+    firstObservedAt:
+      options.firstObservedAt ?? "2026-06-18T12:00:00.000Z",
+    lastObservedAt:
+      options.lastObservedAt ?? "2026-06-18T12:00:00.000Z",
+    observationCount: options.observationCount ?? 1,
+    createdAt: options.createdAt ?? "2026-06-18T12:00:01.000Z",
+    updatedAt: options.updatedAt ?? "2026-06-18T12:00:01.000Z",
+  };
 }
