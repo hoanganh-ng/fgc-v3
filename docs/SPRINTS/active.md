@@ -1,28 +1,39 @@
 # Active Sprint
 
-Sprint 063A — Source Publisher Domain and Application is the active
-sprint. It defines the Content Manager-owned `SourcePublisher`
-identity and pure observation behavior and the Content Manager
-application layer (ports, use cases, typed application error, and
-in-memory repository). No persistence, HTTP, UI, browser, or feed
-execution.
+Sprint 063A — Source Publisher Domain and Application is **accepted**.
+It defined the Content Manager-owned `SourcePublisher` identity and
+pure observation behavior and the Content Manager application layer
+(ports, use cases, typed application error, and in-memory
+repository). No persistence, HTTP, UI, browser, or feed execution.
 
 - [Sprint 063A - Source Publisher Domain and Application](SPRINT-063A-source-publisher-domain-and-application.md)
+
+Sprint 063B — Source Publisher Persistence and Atomic Observation is
+**awaiting definition**. It is not active and is not authorized for
+implementation. When defined, it will cover PostgreSQL persistence,
+the Drizzle schema and migration, the durable repository
+implementation, the atomic upsert and concurrency guarantees for
+re-observation, and composition wiring for `SourcePublisher`. HTTP
+routes, DTOs, Docker E2E coverage, the Web UI review surface,
+`SourceGroup` promotion, the extractor and browser behavior, and
+the future Content Builder / Content Publisher pipeline stages
+remain out of scope and are not part of Sprint 063B.
+`SourcePublisher` is the Content Manager-owned publishing-source
+identity (a Facebook group or page observed while reading the feed)
+and is not the future Content Publisher pipeline stage; it does not
+model drafts, publications, videos, publishing schedules, or
+published artifacts.
+
+The roadmap in `docs/ROADMAP.md` records the remaining feed discovery
+sequence (Sprint 063B–068) as documentation placeholders. The
+long-term `Future: Content Builder` and `Future: Content Publisher`
+pipeline stages are retained and are not removed or redefined by the
+feed discovery sequence.
 
 Sprint 062 is accepted and recorded as the feed discovery delivery plan
 and Docker E2E foundation:
 
 - [Sprint 062 - Feed Discovery Delivery Plan And Docker E2E Foundation](SPRINT-062-feed-discovery-delivery-plan-and-docker-e2e-foundation.md)
-
-The roadmap in `docs/ROADMAP.md` records the remaining feed discovery
-sequence (Sprint 063B–068) as documentation placeholders. The long-term
-`Future: Content Builder` and `Future: Content Publisher` pipeline
-stages are retained and are not removed or redefined by the feed
-discovery sequence. `SourcePublisher` is the Content Manager-owned
-publishing-source identity (a Facebook group or page observed while
-reading the feed) and is not the future Content Publisher pipeline
-stage; it does not model drafts, publications, videos, publishing
-schedules, or published artifacts.
 
 Sprint 061 is accepted and recorded as the operator collection schedule
 management surface foundation for Sprint 062:

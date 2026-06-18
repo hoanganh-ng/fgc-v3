@@ -221,8 +221,8 @@ Content Manager (application)
   — add `InMemorySourcePublisherRepository`.
 - `src/content-manager/domain/content-domain.test.ts` — extend with
   SourcePublisher validation, observation, status update, identity
-  comparison, identity-mismatch non-mutation, equal-timestamp
-  metadata behavior, and `findByIdentity` malformed-output tests.
+  comparison, identity-mismatch non-mutation, and equal-timestamp
+  metadata behavior tests.
 - `src/content-manager/application/source-publisher-application.test.ts`
   — extend with strict observation-input validation tests (invalid
   `observedAt`, blank `displayName`, invalid `canonicalUrl`, unknown
@@ -335,6 +335,20 @@ failing. Database integration and HTTP integration suites are opt-in
 and may legitimately be skipped by the default `pnpm test` invocation;
 this is expected and does not indicate a defect in Sprint 063A.
 
+## Verification Results
+
+Recorded at Sprint 063A acceptance:
+
+- `pnpm typecheck` exited 0.
+- `pnpm test` exited 0. The Content Manager source-publisher test
+  suite (`src/content-manager/application/source-publisher-application.test.ts`)
+  and the Content Manager domain test suite
+  (`src/content-manager/domain/content-domain.test.ts`) both passed.
+  No Source Publisher test was failing and no other Content Manager
+  test regressed. Database integration and HTTP integration suites
+  were skipped, as expected by the default `pnpm test` invocation;
+  this is not a defect in Sprint 063A.
+
 ## Sprint Status
 
 Sprint 063A is implemented in this branch as the Content Manager
@@ -345,4 +359,22 @@ repository, and ships the domain and application unit tests. It does
 not add persistence, HTTP, UI, browser execution, or feed execution,
 and it does not promote, configure, schedule, or join anything.
 
-Sprint 063A is active and is not yet accepted.
+Sprint 063A is **accepted**. The final correction added strict
+runtime validation for the observation application input and
+expanded regression coverage proving that invalid input is rejected
+before any use-case side effect and before `findByIdentity`, and
+that invalid metadata on an older observation is rejected rather
+than silently ignored.
+
+Sprint 063B — Source Publisher Persistence and Atomic Observation
+remains **awaiting definition**. It is not active and is not
+authorized for implementation. Its scope, when defined, will cover
+PostgreSQL persistence, the Drizzle schema and migration, the
+durable repository implementation, the atomic upsert and
+concurrency guarantees for re-observation, and composition wiring
+for `SourcePublisher`. HTTP routes, DTOs, Docker E2E coverage, the
+Web UI review surface, `SourceGroup` promotion, the extractor and
+browser behavior, and the future Content Builder / Content
+Publisher pipeline stages remain out of scope and are not part of
+Sprint 063B. `SourcePublisher` continues to be distinct from the
+future Content Publisher pipeline stage.
