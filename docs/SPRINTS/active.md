@@ -9,23 +9,34 @@ repository). No persistence, HTTP, UI, browser, or feed execution.
 - [Sprint 063A - Source Publisher Domain and Application](SPRINT-063A-source-publisher-domain-and-application.md)
 
 Sprint 063B — Source Publisher Persistence and Atomic Observation is
-**implemented and awaiting review**. It is not yet accepted. It adds
-PostgreSQL persistence for the Content Manager-owned
-`SourcePublisher` aggregate, the Drizzle schema and migration, the
-durable repository implementation, the atomic observation algorithm,
-the durable status update, the durable read operations, and the
-Content Manager composition wiring. HTTP routes, DTOs, Docker E2E
-coverage, the Web UI review surface, `SourceGroup` promotion, the
-extractor and browser behavior, and the future Content Builder /
-Content Publisher pipeline stages remain out of scope and are not
-part of Sprint 063B.
-`SourcePublisher` is the Content Manager-owned publishing-source
-identity (a Facebook group or page observed while reading the feed)
-and is not the future Content Publisher pipeline stage; it does not
-model drafts, publications, videos, publishing schedules, or
-published artifacts.
+**accepted**. It added PostgreSQL persistence for the Content
+Manager-owned `SourcePublisher` aggregate, the Drizzle schema and
+migration, the durable repository implementation, the atomic
+observation algorithm, the durable status update, the durable read
+operations, and the Content Manager composition wiring. The
+durable outcome: `SourcePublisher` persistence is
+PostgreSQL-backed; observation is atomic and concurrency-safe;
+observation and status writes own separate fields; domain rules
+remain the source of truth. HTTP routes, DTOs, Docker E2E coverage,
+the Web UI review surface, `SourceGroup` promotion, the extractor
+and browser behavior, and the future Content Builder / Content
+Publisher pipeline stages remain out of scope and were not part of
+Sprint 063B.
 
 - [Sprint 063B - Source Publisher Persistence and Atomic Observation](SPRINT-063B-source-publisher-persistence-and-atomic-observation.md)
+
+Sprint 063C — Source Publisher HTTP Contract and E2E is
+**awaiting definition**. It is not active and has not been
+authorized for implementation. Sprint 063B is closed and Sprint
+063C will be defined in a future sprint-shaping pass; no code,
+migration, HTTP, Docker E2E, or Web UI work for Sprint 063C has
+been started.
+
+`SourcePublisher` is the Content Manager-owned publishing-source
+identity (a Facebook group or page observed while reading the feed)
+and is not the future Content Publisher pipeline stage; it does
+not model drafts, publications, videos, publishing schedules, or
+published artifacts.
 
 The roadmap in `docs/ROADMAP.md` records the remaining feed discovery
 sequence (Sprint 063C–068) as documentation placeholders. The

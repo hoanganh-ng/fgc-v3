@@ -5,16 +5,15 @@ The product is currently in the **Content Collector** stage (Stage 1 of 3, prece
 
 ## Current Active Sprint
 Sprint 063B — Source Publisher Persistence and Atomic Observation
-(Implemented; awaiting review). Sprint 063B adds PostgreSQL
-persistence for the Content Manager-owned `SourcePublisher`
-aggregate, the Drizzle schema and migration, the durable repository
-implementation, the atomic observation algorithm, the durable status
-update, the durable read operations, and the Content Manager
-composition wiring. HTTP routes, DTOs, Docker E2E coverage, the
-Web UI review surface, `SourceGroup` promotion, the extractor and
-browser behavior, and the future Content Builder / Content
-Publisher pipeline stages remain out of scope and are not part of
-Sprint 063B.
+(Accepted). Sprint 063B durably delivered PostgreSQL persistence
+for the Content Manager-owned `SourcePublisher` aggregate, the
+Drizzle schema and migration, the durable repository implementation,
+the atomic observation algorithm, the durable status update, the
+durable read operations, and the Content Manager composition wiring.
+HTTP routes, DTOs, Docker E2E coverage, the Web UI review surface,
+`SourceGroup` promotion, the extractor and browser behavior, and the
+future Content Builder / Content Publisher pipeline stages remain
+out of scope and were not part of Sprint 063B.
 Sprint 063A — Source Publisher Domain and Application (Accepted).
 Sprint 062: Feed Discovery Delivery Plan And Docker E2E Foundation (Accepted).
 Sprint 061: Operator Collection Schedule Management Surface (Accepted).
@@ -81,16 +80,19 @@ observation behavior (no persistence, no HTTP, no UI, no browser, no
 feed execution) plus strict runtime validation for the observation
 application input and the regression coverage that proves invalid
 input is rejected before any use-case side effect. Sprint 063B —
-Source Publisher Persistence and Atomic Observation is implemented
-and awaiting review: it shipped the `source_publishers` Drizzle
-schema and migration, the `DrizzleSourcePublisherRepository`
-adapter with the atomic observation algorithm, the durable status
-update, the durable read operations, the Content Manager
-composition wiring, the unit and mapper tests, the opt-in database
-integration tests, and the real PostgreSQL concurrency tests.
-Future sprint work after Sprint 063B follows the 063C–068 sequence
-documented in `docs/ROADMAP.md`, in which `SourcePublisher` is the
-Content Manager-owned publishing-source identity (a group or a page
-observed while reading the feed) and is not the future Content
-Publisher pipeline stage. The long-term `Future: Content Builder`
-and `Future: Content Publisher` pipeline stages are retained.
+Source Publisher Persistence and Atomic Observation is accepted: it
+shipped the `source_publishers` Drizzle schema and migration, the
+`DrizzleSourcePublisherRepository` adapter with the atomic observation
+algorithm, the durable status update, the durable read operations,
+the Content Manager composition wiring, the unit and mapper tests,
+the opt-in database integration tests, and the real PostgreSQL
+concurrency tests. The next expected work is shaping Sprint 063C
+(Source Publisher HTTP Contract and E2E). Sprint 063C is not yet
+active and has not been authorized for implementation; it will be
+defined in a future sprint-shaping pass. Future sprint work after
+Sprint 063C follows the 063D–068 sequence documented in
+`docs/ROADMAP.md`, in which `SourcePublisher` is the Content
+Manager-owned publishing-source identity (a group or a page observed
+while reading the feed) and is not the future Content Publisher
+pipeline stage. The long-term `Future: Content Builder` and
+`Future: Content Publisher` pipeline stages are retained.
