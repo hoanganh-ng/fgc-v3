@@ -16,8 +16,11 @@ discovery, publisher, or feed collection implementation.
 ## Capability Summary
 
 - Documentation:
-  - Sprint 062 is recorded as the active sprint; Sprint 061 is recorded
-    as accepted.
+  - Sprint 062 is recorded as accepted; Sprint 061 was already
+    recorded as accepted. The acceptance pass records the corrected
+    `SourcePublisher` terminology and retains the long-term
+    `Future: Content Builder` and `Future: Content Publisher`
+    pipeline stages in `docs/ROADMAP.md`.
   - A new authoritative testing strategy (`docs/TESTING_STRATEGY.md`)
     describes the five layers: unit, database integration, HTTP
     integration, Docker E2E, and manual live-Facebook validation. The
@@ -89,13 +92,18 @@ discovery, publisher, or feed collection implementation.
   All API calls use `http://web-gateway` as the base URL; the spec never
   calls the API service directly.
 - Commands:
-  - `pnpm test:e2e:docker` — the host driver. Cleans any prior E2E
-    resources, builds the stack, runs the suite, returns the runner exit
-    code, prints sanitized logs on failure, cleans up on success, failure,
-    and interruption.
-  - `pnpm test:e2e:container` — the in-container command, used by the
-    host driver and available for direct invocation when the stack is
-    already up. It runs `playwright test --config=tests/e2e/playwright.config.ts`.
+  - `pnpm test:e2e:docker` — the only operator-facing host command for
+    the E2E harness. Cleans any prior E2E resources, builds the stack,
+    brings up `postgres`, `api`, and `web-gateway` in detached mode,
+    runs the `e2e-runner` exactly once in attached mode, returns the
+    runner exit code, prints sanitized logs on failure, and cleans up
+    on success, failure, and interruption.
+  - `pnpm test:e2e:container` — the in-container command, Docker-internal.
+    It is not directly host-runnable: `http://web-gateway` is Docker-only
+    and no host port is published. The host driver invokes it inside the
+    `e2e-runner` container; operators should run `pnpm test:e2e:docker`
+    instead. It runs
+    `playwright test --config=tests/e2e/playwright.config.ts`.
 
 ## Architecture
 
@@ -104,29 +112,45 @@ Host command: pnpm test:e2e:docker
   └─ scripts/test-e2e-docker.sh
         ├─ cleanup (down -v --remove-orphans, project fgc-v3-e2e)
         ├─ docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml build
-        ├─ docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml up -d
+        ├─ docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml up -d postgres api web-gateway
         │     ├─ postgres           isolated volume fgc_e2e_postgres_data
         │     │                     healthcheck pg_isready
         │     ├─ api                pnpm db:migrate && pnpm start
-        │     │                     healthcheck node fetch /health
-        │     ├─ web-gateway        production nginx image
-        │     │                     no host port; depends_on api
+        │     │                     healthcheck GET /health (exact 200 + {"status":"ok"})
+        │     └─ web-gateway        production nginx image
+        │                           no host port; depends_on api (service_healthy)
+        │                           healthcheck: exact 200 on / with id="root"
+        │                                       + exact 200 on /collector/content-categories
+        ├─ docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml up \
+        │     --abort-on-container-exit --exit-code-from e2e-runner e2e-runner
         │     └─ e2e-runner         mcr.microsoft.com/playwright:v1.60.0-noble
-        │                           waits gateway ready; exec playwright test
-        ├─ wait_for_stack_ready (deterministic; no sleeps as readiness)
+        │                           waits gateway ready (exact 200 + safe API read)
+        │                           exec playwright test
         ├─ capture runner exit code
         ├─ on non-zero: print sanitized logs for api / web-gateway / e2e-runner
         └─ trap EXIT INT TERM ⇒ docker compose ... down -v --remove-orphans
 ```
 
-Readiness is deterministic:
+The detached `up -d` step starts exactly three services
+(`postgres`, `api`, `web-gateway`); the `e2e-runner` is not started in
+that step. The runner is started exactly once in attached mode via
+`up --abort-on-container-exit --exit-code-from e2e-runner e2e-runner`
+so Compose returns the runner's exit code as its own.
+
+Readiness is deterministic and uses exact status codes:
 
 - `postgres` is gated by `pg_isready` (mirrors dev and preview).
 - `api` is gated by a Compose healthcheck that polls
-  `http://localhost:3000/health`; the runner does not poll the API.
-- `web-gateway` is gated by the runner polling
-  `http://web-gateway/` until it returns the React app HTML. The runner
-  uses `expect.poll` and never `waitForTimeout` for navigation correctness.
+  `http://localhost:3000/health` and requires exact HTTP `200` with a
+  body of `{"status":"ok"}`. The runner does not poll the API.
+- `web-gateway` is gated by a Compose healthcheck that requires exact
+  HTTP `200` on `/` containing the stable `id="root"` React app-shell
+  marker AND exact HTTP `200` on the safe API read
+  `GET /collector/content-categories` (whose body contains `"items"`).
+  The runner entrypoint re-proves the same two checks before Playwright
+  starts, polling with a bounded interval and a 60s deadline; it never
+  uses `waitForTimeout` for navigation correctness — the spec itself
+  uses `expect.poll`.
 
 ## Invariants
 
@@ -191,18 +215,23 @@ Readiness is deterministic:
 - `docs/PROJECT_SNAPSHOT.md` — update current sprint, immediate next
   work, currently available capabilities, and verification commands.
 - `docs/ROADMAP.md` — replace the "Future: Collector Runtime / Builder /
-  Publisher" placeholders with the Sprint 063A–068 sequence and add a
-  note pointing to `docs/TESTING_STRATEGY.md`.
+  Publisher" placeholders with the Sprint 063A–068 sequence while
+  retaining the long-term `Future: Content Builder` and
+  `Future: Content Publisher` pipeline stages. Add a note pointing to
+  `docs/TESTING_STRATEGY.md`.
 - `docs/RUNTIME.md` — add a `## Docker End-to-End Testing` section with
   the commands, the architecture summary, the readiness contract, the
   cleanup contract, and troubleshooting.
 - `Dockerfile` — add the `e2e-runtime` stage and a comment that locks the
   Playwright base image to the existing `v1.60.0-noble` tag.
 - `package.json` — add `test:e2e:docker` and `test:e2e:container`
-  scripts and add `@playwright/test@1.60.0` (exact pin) to
-  `devDependencies` so the test runner matches the existing
-  `playwright@^1.60.0` runtime and the Playwright base image tag in the
-  `e2e-runtime` Dockerfile stage.
+  scripts and add `@playwright/test@1.60.0` (exact pin) and
+  `@types/node@^20.11.0` to `devDependencies`. `@playwright/test` is
+  the E2E test runner (pinned to match the `playwright@^1.60.0` runtime
+  and the Playwright base image tag in the `e2e-runtime` Dockerfile
+  stage). `@types/node` is required so
+  `pnpm exec tsc -p tests/tsconfig.json` can resolve the
+  `types: ["node"]` field for the isolated E2E typecheck config.
 
 ### Do not touch
 
@@ -241,9 +270,15 @@ Readiness is deterministic:
 - Running the E2E harness against an existing dev or preview database.
 - Real Facebook connection, sessions, cookies, localStorage, tokens,
   proxies, account IDs, or payloads.
-- Adding new dependencies beyond `@playwright/test` (the existing
+- Adding new dependencies beyond `@playwright/test` and `@types/node`.
+  `@playwright/test` is the E2E test runner (pinned to match the
+  `playwright@^1.60.0` runtime and the Playwright base image tag in
+  the `e2e-runtime` Dockerfile stage). `@types/node` is required so
+  `pnpm exec tsc -p tests/tsconfig.json` can resolve the
+  `types: ["node"]` field for the isolated E2E typecheck config; it
+  is a type-only dependency and adds no runtime code. The existing
   `playwright@^1.60.0` package and base image already supply the
-  Chromium runtime).
+  Chromium runtime.
 - Commits, pushes, marking the sprint complete, or moving to the next
   sprint.
 
@@ -277,11 +312,32 @@ docker ps -a                   # no leftover fgc-v3-e2e containers after the run
 
 ## Sprint Status
 
-Sprint 061 is accepted and recorded as the operator collection schedule
-management surface foundation for Sprint 062. Sprint 062 is implemented
-as the feed discovery delivery plan, the cross-cutting testing strategy,
-the isolated Docker E2E harness, and a deterministic baseline E2E flow
-that proves the production-like stack works through Nginx → API →
-migrations → PostgreSQL using only synthetic fixtures. It does not
-begin feed discovery implementation and does not advance beyond its
-declared scope.
+Sprint 062 is accepted. It ships the feed discovery delivery plan, the
+cross-cutting testing strategy, the isolated Docker E2E harness, and a
+deterministic baseline E2E flow that proves the production-like stack
+works through Nginx → API → migrations → PostgreSQL using only
+synthetic fixtures. It does not begin feed discovery implementation and
+does not advance beyond its declared scope.
+
+The follow-up acceptance corrections recorded in this document:
+
+- State that `pnpm test:e2e:container` is Docker-internal and not
+  directly host-runnable; `pnpm test:e2e:docker` is the only
+  operator-facing host command.
+- Correct the architecture diagram: detached startup of `postgres`,
+  `api`, and `web-gateway` only, then one attached `e2e-runner`
+  execution with `--abort-on-container-exit --exit-code-from
+  e2e-runner`.
+- Tighten readiness: API exact `200` with `{"status":"ok"}`, gateway
+  exact `200` with the React `id="root"` marker, exact `200` on a
+  safe `/collector/content-categories` read through Nginx.
+- Correct the roadmap manifest wording: the Sprint 063A–068 sequence
+  was added while the long-term `Future: Content Builder` and
+  `Future: Content Publisher` pipeline stages were retained.
+- Correct the dependency statement: `@types/node` was also added
+  alongside `@playwright/test` for the isolated E2E typecheck
+  (`tests/tsconfig.json`).
+
+Sprint 063A — Source Publisher Domain and Application is recorded in
+`docs/SPRINTS/active.md` as awaiting definition; it is not yet
+authorized for implementation.

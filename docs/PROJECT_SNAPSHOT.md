@@ -4,7 +4,8 @@
 The product is currently in the **Content Collector** stage (Stage 1 of 3, preceding Builder and Publisher). The core focus is collecting normalized content from configured Facebook sources while maintaining strict isolation between profile management, collection orchestration, and content storage.
 
 ## Current Active Sprint
-Sprint 062: Feed Discovery Delivery Plan And Docker E2E Foundation (Active).
+Sprint 063A — Source Publisher Domain and Application: awaiting definition (not active; not authorized for implementation).
+Sprint 062: Feed Discovery Delivery Plan And Docker E2E Foundation (Accepted).
 Sprint 061: Operator Collection Schedule Management Surface (Accepted).
 Sprint 060: Collection Scheduler Containerization and Stack Integration (Accepted).
 Sprint 059: Scheduled Collection Dispatch Poller (Accepted).
@@ -58,13 +59,16 @@ pnpm test:e2e:docker
 ## Immediate Next Expected Work
 Sprint 061 closed the operator feedback loop for collection schedules
 by adding HTTP routes, a Web UI page, and the small SCHEDULED regression
-fix. Sprint 062 publishes the feed discovery delivery plan, the
-cross-cutting testing strategy, the isolated Docker E2E harness, and the
-baseline E2E flow that proves the production-like stack works before
-feed discovery implementation begins. Future sprint work after Sprint
-062 will follow the corrected 063A–068 sequence documented in
-`docs/ROADMAP.md`, in which `SourcePublisher` is the Content
-Manager-owned publishing-source identity (a group or a page observed
-while reading the feed) and is not the future Content Publisher
-pipeline stage. The long-term `Future: Content Builder` and
-`Future: Content Publisher` pipeline stages are retained.
+fix. Sprint 062 is accepted: it published the feed discovery delivery
+plan, the cross-cutting testing strategy, the isolated Docker E2E
+harness, and the baseline E2E flow that proves the production-like
+stack works through Nginx → API → migrations → PostgreSQL using only
+synthetic fixtures. Future sprint work after Sprint 062 will follow
+the corrected 063A–068 sequence documented in `docs/ROADMAP.md`, in
+which `SourcePublisher` is the Content Manager-owned publishing-source
+identity (a group or a page observed while reading the feed) and is
+not the future Content Publisher pipeline stage. The long-term
+`Future: Content Builder` and `Future: Content Publisher` pipeline
+stages are retained. Sprint 063A — Source Publisher Domain and
+Application is awaiting definition; it is not yet active and is not
+authorized for implementation.
