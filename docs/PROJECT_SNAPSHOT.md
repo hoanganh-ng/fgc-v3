@@ -4,7 +4,8 @@
 The product is currently in the **Content Collector** stage (Stage 1 of 3, preceding Builder and Publisher). The core focus is collecting normalized content from configured Facebook sources while maintaining strict isolation between profile management, collection orchestration, and content storage.
 
 ## Current Active Sprint
-Sprint 061: Operator Collection Schedule Management Surface (Active).
+Sprint 062: Feed Discovery Delivery Plan And Docker E2E Foundation (Active).
+Sprint 061: Operator Collection Schedule Management Surface (Accepted).
 Sprint 060: Collection Scheduler Containerization and Stack Integration (Accepted).
 Sprint 059: Scheduled Collection Dispatch Poller (Accepted).
 Sprint 058: Atomic Scheduled Collection Dispatch (Accepted).
@@ -21,22 +22,28 @@ Sprint 054A: Profile Authentication Health Foundation (Accepted).
 - **Collection Scheduling**: One persisted `CollectionSchedule` per source group (interval, next run, parameters). A containerized `collection-scheduler` Compose service drains due schedules into queued `SCHEDULED` collection runs on an interval; the scheduler-runtime image does not provision browser executables, Playwright browser downloads, Xvfb, browser-specific system packages, or a runnable CloakBrowser browser/system runtime, and does not launch a browser.
 - **Operator Tools**: CLI tools for profile provisioning, manual collection, worker execution, browser probing, the same provisioning CLI used for first-time and recovery login, and the containerized collection scheduler.
 - **Web UI**: Dashboard for managing profiles, source groups, categories, content items, and reviewing run status. The profile detail page now displays `authenticationHealth` and a generalized provisioning card for `Start Provisioning`, `Issue New Provisioning Token`, `Start Reauthentication`, and `Start Manual Checkpoint Recovery`. The profile inventory page now supports URL-backed Status and Authentication Health filters, a `Health Updated` column, and 25-item pagination with Previous / Next navigation.
+- **Docker E2E**: An isolated production-like Docker E2E harness (`docker-compose.e2e.yml`) that runs the production Nginx gateway, the API after migrations, an isolated PostgreSQL instance, and a Playwright Chromium runner. The harness proves the current stack works end-to-end using only synthetic fixtures. It never touches dev or preview volumes and never publishes a host port.
 
 ## Current Modules
 - **Collector Profile Manager**: Identity, sessions, provisioning, readiness, leases.
 - **Content Manager**: Categories, source groups, normalized content, deduplication.
 - **Collector Runtime**: Collection orchestration, browser providers, extraction, submission, collection-schedule domain, atomic scheduled dispatch, scheduled dispatch poller.
 - **Web UI**: Operator presentation and safe API consumption.
+- **E2E Test Harness**: Isolated Docker stack and Playwright runner. Owned by Sprint 062.
 
 ## Important Architectural Invariants
 - Hexagonal architecture: Domain logic has zero dependencies on HTTP, databases, browsers, or queues.
 - Security: Raw session data (cookies, tokens, proxy credentials) and raw Facebook private payloads are never exposed to the UI, logs, or persistent records.
 - Separation of Concerns: Profile readiness/leasing is owned entirely by Profile Manager. Browsers consume leases but do not determine profile eligibility.
+- Test isolation: The E2E harness uses its own Compose project (`fgc-v3-e2e`), its own named volume (`fgc_e2e_postgres_data`), and its own network. It cannot read or modify dev or preview resources.
 
 ## Important Unresolved Risks
 - Scale of active profile checkout frequency vs PostgreSQL concurrency.
 - Long-term viability of browser provider evasion capabilities (e.g. Playwright vs CloakBrowser) against Facebook fingerprinting.
 - Future Content Builder handoff payload structure.
+
+## Testing Strategy
+The cross-cutting testing strategy is documented in [`docs/TESTING_STRATEGY.md`](TESTING_STRATEGY.md). It defines five layers: unit tests (Vitest), database integration tests (opt-in Vitest with PostgreSQL), HTTP integration tests (opt-in Vitest with PostgreSQL), Docker E2E (Sprint 062 Playwright in production-like Compose), and manual live-Facebook validation (opt-in operator-driven probes).
 
 ## Verification Commands
 ```bash
@@ -46,14 +53,15 @@ pnpm test:db
 pnpm test:http:db
 pnpm web:typecheck
 pnpm web:build
+pnpm test:e2e:docker
 ```
 
 ## Immediate Next Expected Work
-Sprint 060 made the Sprint 059 scheduled dispatch poller deployable in
-the dev and preview stacks as a lightweight `collection-scheduler`
-Compose service. Sprint 061 closes the operator feedback loop by adding
-HTTP routes for listing, getting, and upserting `CollectionSchedule`
-records, a Web UI schedules page, and the operator-visible surface for
-inspecting and editing the schedules that the scheduler will dispatch.
-Future sprint work after Sprint 061 will build on the schedule
-management surface.
+Sprint 061 closed the operator feedback loop for collection schedules
+by adding HTTP routes, a Web UI page, and the small SCHEDULED regression
+fix. Sprint 062 publishes the feed discovery delivery plan, the
+cross-cutting testing strategy, the isolated Docker E2E harness, and the
+baseline E2E flow that proves the production-like stack works before
+feed discovery implementation begins. Future sprint work after Sprint
+062 will follow the new 063A–068 sequence documented in
+`docs/ROADMAP.md`.

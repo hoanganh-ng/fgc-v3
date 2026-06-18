@@ -41,6 +41,8 @@
     "test:db": "RUN_DB_TESTS=true vitest run src/infrastructure",
     "test:db:dispatch:isolated": "RUN_DB_TESTS=true SPRINT_058_DATABASE_URL=${SPRINT_058_DATABASE_URL:?SPRINT_058_DATABASE_URL must be set to a sprint_058_isolated database} vitest run src/infrastructure/database/repositories/drizzle-dispatch-next-due-collection-schedule.repository.integration.test.ts",
     "test:http:db": "RUN_HTTP_DB_TESTS=true vitest run src/interfaces/http",
+    "test:e2e:container": "playwright test --config=tests/e2e/playwright.config.ts",
+    "test:e2e:docker": "bash scripts/test-e2e-docker.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "stack:dev:start": "docker compose -f docker-compose.dev.yml up --build -d",
@@ -73,6 +75,7 @@
     "stack:preview:reset": "docker compose -f docker-compose.preview.yml --profile worker down --volumes --remove-orphans"
   },
   "devDependencies": {
+    "@playwright/test": "1.60.0",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.22.4",

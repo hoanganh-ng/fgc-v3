@@ -64,14 +64,61 @@ Start the Web UI foundation for profile and content management, consuming applic
 
 Add the first real Facebook browser payload capture adapter for Collector Runtime, behind the Sprint 022 capture port.
 
-## Future: Collector Runtime
+## Sprint 060: Collection Scheduler Containerization
 
-Define and implement additional runtime behavior that checks out eligible profiles, visits Facebook groups and posts, captures platform artifacts, invokes Platform Extractors, submits normalized content to Content Manager, and releases profile leases through explicit application contracts.
+Add the containerized collection scheduler service that drives the scheduled dispatch poller in the dev and preview stacks. The scheduler-runtime image is lightweight and does not install a browser.
 
-## Future: Content Builder
+## Sprint 061: Operator Collection Schedule Management Surface
 
-Define and implement the pipeline stage that converts collected material into video outputs.
+Expose the existing `CollectionSchedule` aggregate to operators through HTTP routes and a Web UI management page. Closes the operator feedback loop for collection schedules.
 
-## Future: Content Publisher
+## Sprint 062: Feed Discovery Delivery Plan And Docker E2E Foundation
 
-Define and implement the pipeline stage that publishes completed videos to target destinations.
+Publish the feed discovery delivery plan, the cross-cutting testing strategy, the isolated Docker E2E harness, and a deterministic baseline E2E flow that proves the production-like stack works through Nginx, the API, migrations, and PostgreSQL using only synthetic fixtures.
+
+The cross-cutting testing strategy used by every sprint in the feed
+discovery sequence is documented in [`TESTING_STRATEGY.md`](TESTING_STRATEGY.md).
+
+## Sprint 063A: Publisher Domain And Application
+
+Define the Publisher domain (publication candidates, drafts, review states, scheduled publication) and the application use cases for creating drafts from approved source groups. No persistence, no HTTP, no UI. Domain and application layers remain database-free.
+
+## Sprint 063B: Publisher Persistence And Atomic Observation
+
+Add Publisher PostgreSQL schema, Drizzle migrations, repository adapters, and atomic transitions between review states. Keep domain and application layers database-free.
+
+## Sprint 063C: Publisher HTTP Contract And E2E
+
+Add the Publisher HTTP routes, safe DTOs, and an E2E flow that proves the publisher surface works through Nginx, the API, migrations, and PostgreSQL using only synthetic fixtures.
+
+## Sprint 064A: Content Provenance
+
+Define the content provenance model that records the originating content item, source group, captured payload hash, extraction rule version, and the publishing chain that produced a published artifact. Domain only; no persistence.
+
+## Sprint 064B: Provenance Persistence And Compatibility
+
+Add provenance PostgreSQL schema, repository adapters, and the compatibility shim for legacy content items. Keep domain and application layers database-free.
+
+## Sprint 065A: Home-Feed Extractor Fixtures
+
+Add deterministic home-feed extractor fixtures, parser tests, and the safe payload extractor contract that turns captured home-feed page-context and network-listener payloads into normalized home-feed candidates.
+
+## Sprint 065B: Home-Feed Run Model
+
+Define the home-feed run domain (state machine, retry budget, dedupe key, source-group candidate set) and the application use cases that orchestrate runs and observations.
+
+## Sprint 065C: Manual Home-Feed Execution
+
+Add a single manual home-feed operator command that exercises the run domain against synthetic fixtures, surfaces safe observations, and never launches a browser against Facebook.
+
+## Sprint 066: Publisher Review API And UI
+
+Expose the Publisher review surface (list, detail, approve, reject) through HTTP routes and a Web UI review page. Safe DTOs; minimal identifier exposure; null-vs-omission preserved.
+
+## Sprint 067: Approved Group Promotion
+
+Add the approved group promotion flow: a separate, auditable transition that promotes approved source groups into the Publisher production roster, scoped to operators with explicit recovery intent.
+
+## Sprint 068: Feed Scheduling
+
+Wire the Sprint 059 scheduled dispatch poller to feed discovery so a Publisher draft can be scheduled against an approved source group with bounded retries and a deterministic next-run timestamp.

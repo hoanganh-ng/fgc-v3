@@ -36,6 +36,8 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | `pnpm test` | Run default Vitest tests. |
 | `pnpm test:db` | Run opt-in database integration tests. |
 | `pnpm test:http:db` | Run opt-in DB-backed HTTP integration tests. |
+| `pnpm test:e2e:docker` | Run the isolated Docker E2E stack and Playwright runner. |
+| `pnpm test:e2e:container` | Run the in-container Playwright runner against an already-up stack. |
 
 ### Operator Tools
 
@@ -983,4 +985,125 @@ Run repository checks:
 pnpm run typecheck
 pnpm test
 pnpm web:build
+```
+
+## Docker End-to-End Testing
+
+Sprint 062 adds an isolated production-like Docker E2E harness. The
+harness is the only test layer that runs the full production surface
+(`web-gateway` → `api` → `postgres`) inside Docker. It runs only one
+command:
+
+```bash
+pnpm test:e2e:docker
+```
+
+`pnpm test:e2e:container` is the in-container Playwright invocation
+that the host driver calls. It is also exposed for manual invocations
+when the stack is already up.
+
+### What the harness does
+
+The host driver (`scripts/test-e2e-docker.sh`) runs inside its own
+Compose project (`fgc-v3-e2e`) and its own named volume
+(`fgc_e2e_postgres_data`). It performs, in order:
+
+1. Cleanup of any prior E2E resources:
+   `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml down -v
+   --remove-orphans`.
+2. Build:
+   `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml build`.
+3. Start (detached):
+   `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml up -d`.
+4. Wait on the E2E stack to report ready. The runner entrypoint polls
+   `http://web-gateway/` until it returns the React app HTML.
+5. Run Playwright inside the `e2e-runner` container against
+   `http://web-gateway` (Compose DNS).
+6. Capture the runner exit code.
+7. On non-zero exit, print sanitized
+   `docker compose logs --no-color` for `api`, `web-gateway`, and
+   `e2e-runner`. The driver never prints `DATABASE_URL` or any
+   environment value.
+8. Return the runner exit code as the host driver exit code.
+
+The driver installs a `trap` on `EXIT INT TERM` that always runs
+`docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml down -v
+--remove-orphans`. Cleanup runs on success, failure, and interruption
+(including `Ctrl+C`).
+
+### What the harness does not do
+
+The harness is intentionally small:
+
+- It does not publish a host port. `web-gateway` and `e2e-runner`
+  reach services through Compose service DNS only.
+- It does not reuse `fgc_dev_postgres_data` or
+  `fgc_preview_postgres_data`. The E2E volume is `fgc_e2e_postgres_data`
+  under the E2E project.
+- It does not start the collection worker, the account exercise worker,
+  or the collection scheduler.
+- It does not connect to Facebook. The Playwright spec uses only
+  synthetic fixtures and never touches the platform.
+- It does not log `DATABASE_URL`, base URLs, raw payloads, cookies,
+  localStorage, proxy credentials, session headers, or environment
+  values from any container.
+- It does not use arbitrary sleeps as the readiness mechanism. The
+  only waits are `pg_isready`, the `api` `/health` healthcheck, and the
+  runner's HTTP poll against `http://web-gateway/`.
+
+### E2E stack
+
+```
+postgres    postgres:16-alpine     no host port; isolated named volume
+api         api-runtime stage      pnpm db:migrate && pnpm start
+                                  healthcheck GET /health
+web-gateway web-gateway stage      nginx:1.27-alpine; no host port
+e2e-runner  e2e-runtime stage      mcr.microsoft.com/playwright:v1.60.0-noble
+                                  Playwright Chromium runner
+```
+
+The `e2e-runtime` Dockerfile stage reuses the same Playwright base
+image tag as the existing `worker-runtime` stage so browser binaries
+are already installed. The workspace is installed with
+`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`; the base image supplies Chromium.
+
+### Running
+
+```bash
+pnpm test:e2e:docker
+pnpm test:e2e:docker   # repeat for determinism
+```
+
+The second run uses the same isolated volume and starts from a fresh
+database because the host driver always runs `down -v` before the
+next `up -d`.
+
+### Troubleshooting
+
+- `no such service: web-gateway` — the host driver is being run from
+  the wrong directory. `cd` to the repo root.
+- E2E stack starts but the runner reports `Could not reach
+  web-gateway` — the gateway container is unhealthy. Run
+  `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml logs
+  web-gateway` and check the Nginx config.
+- E2E stack starts but the runner reports API errors — the API
+  container is unhealthy. Run
+  `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml logs api`
+  and check `pnpm db:migrate` output.
+- Leftover containers after a forced kill — the host driver `trap`
+  ran `down -v`. Verify with
+  `docker ps -a --filter "label=com.docker.compose.project=fgc-v3-e2e"`
+  (should be empty) and `docker volume ls` (should not list
+  `fgc-v3-e2e_fgc_e2e_postgres_data`).
+- The driver prints `Cleanup failed: …` — the underlying `docker
+  compose down -v` failed. Run it manually:
+  `docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml down -v
+  --remove-orphans`.
+
+### Verifying isolation
+
+```bash
+docker volume ls               # fgc_dev_postgres_data, fgc_preview_postgres_data unchanged
+docker ps -a                   # no leftover fgc-v3-e2e containers
+docker network ls              # no leftover fgc-v3-e2e_default network
 ```

@@ -1,8 +1,13 @@
 # Active Sprint
 
-Sprint 061 is active.
+Sprint 062 is active.
 
 Implementation authority:
+
+- [Sprint 062 - Feed Discovery Delivery Plan And Docker E2E Foundation](SPRINT-062-feed-discovery-delivery-plan-and-docker-e2e-foundation.md)
+
+Sprint 061 is accepted and recorded as the operator collection schedule
+management surface foundation for Sprint 062:
 
 - [Sprint 061 - Operator Collection Schedule Management Surface](SPRINT-061-operator-collection-schedule-management-surface.md)
 
