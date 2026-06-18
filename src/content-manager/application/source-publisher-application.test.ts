@@ -162,11 +162,26 @@ describe("source publisher application use cases", () => {
   });
 
   it("rejects observation input that violates the runtime schema", async () => {
+    const savingRepository = new CountingSourcePublisherRepository();
     const context = createTestContext(["publisher-1"]);
+
+    await new ObserveSourcePublisherUseCase(
+      savingRepository,
+      context.ids,
+      context.clock,
+    ).execute({
+      platform: "FACEBOOK",
+      kind: "GROUP",
+      externalPublisherId: "facebook-group-1",
+      observedAt: baseObservedAt,
+    });
+
+    const saveCountAfterSeed = savingRepository.saveCallCount;
+    const seeded = (await savingRepository.findById("publisher-1"))!;
 
     await expect(
       new ObserveSourcePublisherUseCase(
-        context.sourcePublishers,
+        savingRepository,
         context.ids,
         context.clock,
       ).execute({
@@ -175,7 +190,12 @@ describe("source publisher application use cases", () => {
         externalPublisherId: "facebook-group-1",
         observedAt: "not-a-timestamp",
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ContentValidationError);
+
+    const after = (await savingRepository.findById("publisher-1"))!;
+    expect(after.observationCount).toBe(seeded.observationCount);
+    expect(after.observationCount).toBe(1);
+    expect(savingRepository.saveCallCount).toBe(saveCountAfterSeed);
   });
 
   it("rejects unknown kind on observation", async () => {
@@ -509,6 +529,268 @@ describe("source publisher application use cases", () => {
       }),
     ).rejects.toThrow(ContentValidationError);
   });
+
+  describe("observation input validation", () => {
+    it("rejects invalid observation input before findByIdentity is called", async () => {
+      const stub = new CountingIdentitySourcePublisherRepository();
+      const context = createTestContext();
+
+      await expect(
+        new ObserveSourcePublisherUseCase(
+          stub,
+          context.ids,
+          context.clock,
+        ).execute({
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "facebook-group-1",
+          observedAt: "not-a-timestamp",
+        }),
+      ).rejects.toThrow(ContentValidationError);
+
+      expect(stub.findByIdentityCallCount).toBe(0);
+      expect(stub.saveCallCount).toBe(0);
+    });
+
+    it("rejects a blank displayName before findByIdentity is called", async () => {
+      const stub = new CountingIdentitySourcePublisherRepository();
+      const context = createTestContext();
+
+      await expect(
+        new ObserveSourcePublisherUseCase(
+          stub,
+          context.ids,
+          context.clock,
+        ).execute({
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "facebook-group-1",
+          observedAt: baseObservedAt,
+          displayName: "   ",
+        }),
+      ).rejects.toThrow(ContentValidationError);
+
+      expect(stub.findByIdentityCallCount).toBe(0);
+    });
+
+    it("rejects an invalid canonicalUrl before findByIdentity is called", async () => {
+      const stub = new CountingIdentitySourcePublisherRepository();
+      const context = createTestContext();
+
+      await expect(
+        new ObserveSourcePublisherUseCase(
+          stub,
+          context.ids,
+          context.clock,
+        ).execute({
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "facebook-group-1",
+          observedAt: baseObservedAt,
+          canonicalUrl: "not-a-url",
+        }),
+      ).rejects.toThrow(ContentValidationError);
+
+      expect(stub.findByIdentityCallCount).toBe(0);
+    });
+
+    it("rejects unknown observation input fields at runtime", async () => {
+      const stub = new CountingIdentitySourcePublisherRepository();
+      const context = createTestContext();
+
+      await expect(
+        new ObserveSourcePublisherUseCase(
+          stub,
+          context.ids,
+          context.clock,
+        ).execute({
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "facebook-group-1",
+          observedAt: baseObservedAt,
+          leakedField: "nope",
+        } as unknown as Parameters<
+          ObserveSourcePublisherUseCase["execute"]
+        >[0]),
+      ).rejects.toThrow(ContentValidationError);
+
+      expect(stub.findByIdentityCallCount).toBe(0);
+    });
+
+    it("rejects null optional observation metadata (omission only)", async () => {
+      const stub = new CountingIdentitySourcePublisherRepository();
+      const context = createTestContext();
+
+      await expect(
+        new ObserveSourcePublisherUseCase(
+          stub,
+          context.ids,
+          context.clock,
+        ).execute({
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "facebook-group-1",
+          observedAt: baseObservedAt,
+          displayName: null,
+        } as unknown as Parameters<
+          ObserveSourcePublisherUseCase["execute"]
+        >[0]),
+      ).rejects.toThrow(ContentValidationError);
+
+      expect(stub.findByIdentityCallCount).toBe(0);
+    });
+
+    it("rejects invalid observedAt for an existing publisher without bumping count or saving", async () => {
+      const savingRepository = new CountingSourcePublisherRepository();
+      const context = createTestContext(["publisher-1"]);
+
+      await new ObserveSourcePublisherUseCase(
+        savingRepository,
+        context.ids,
+        context.clock,
+      ).execute({
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "facebook-group-1",
+        observedAt: baseObservedAt,
+      });
+
+      const saveCountAfterSeed = savingRepository.saveCallCount;
+      const seeded =
+        (await savingRepository.findById("publisher-1"))!;
+
+      await expect(
+        new ObserveSourcePublisherUseCase(
+          savingRepository,
+          context.ids,
+          context.clock,
+        ).execute({
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "facebook-group-1",
+          observedAt: "not-a-timestamp",
+        }),
+      ).rejects.toThrow(ContentValidationError);
+
+      const after = (await savingRepository.findById("publisher-1"))!;
+      expect(after.observationCount).toBe(seeded.observationCount);
+      expect(after.observationCount).toBe(1);
+      expect(after.lastObservedAt).toBe(seeded.lastObservedAt);
+      expect(savingRepository.saveCallCount).toBe(saveCountAfterSeed);
+    });
+
+    it("rejects an older observation with an invalid canonicalUrl", async () => {
+      const context = createTestContext(["publisher-1"]);
+
+      await new ObserveSourcePublisherUseCase(
+        context.sourcePublishers,
+        context.ids,
+        context.clock,
+      ).execute({
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "facebook-group-1",
+        observedAt: laterObservedAt,
+        displayName: "Latest Display Name",
+        canonicalUrl: "https://www.facebook.com/groups/latest",
+      });
+
+      await expect(
+        new ObserveSourcePublisherUseCase(
+          context.sourcePublishers,
+          context.ids,
+          context.clock,
+        ).execute({
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "facebook-group-1",
+          observedAt: olderObservedAt,
+          canonicalUrl: "not-a-url",
+        }),
+      ).rejects.toThrow(ContentValidationError);
+
+      const after = (await context.sourcePublishers.findById("publisher-1"))!;
+      expect(after.canonicalUrl).toBe(
+        "https://www.facebook.com/groups/latest",
+      );
+      expect(after.lastObservedAt).toBe(laterObservedAt);
+      expect(after.observationCount).toBe(1);
+    });
+
+    it("rejects an older observation with a blank displayName", async () => {
+      const context = createTestContext(["publisher-1"]);
+
+      await new ObserveSourcePublisherUseCase(
+        context.sourcePublishers,
+        context.ids,
+        context.clock,
+      ).execute({
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "facebook-group-1",
+        observedAt: laterObservedAt,
+        displayName: "Latest Display Name",
+      });
+
+      await expect(
+        new ObserveSourcePublisherUseCase(
+          context.sourcePublishers,
+          context.ids,
+          context.clock,
+        ).execute({
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "facebook-group-1",
+          observedAt: olderObservedAt,
+          displayName: "   ",
+        }),
+      ).rejects.toThrow(ContentValidationError);
+
+      const after = (await context.sourcePublishers.findById("publisher-1"))!;
+      expect(after.displayName).toBe("Latest Display Name");
+      expect(after.lastObservedAt).toBe(laterObservedAt);
+      expect(after.observationCount).toBe(1);
+    });
+
+    it("replaces metadata and increments count when observedAt equals lastObservedAt", async () => {
+      const context = createTestContext(["publisher-1"]);
+
+      await new ObserveSourcePublisherUseCase(
+        context.sourcePublishers,
+        context.ids,
+        context.clock,
+      ).execute({
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "facebook-group-1",
+        observedAt: baseObservedAt,
+        displayName: "Original Display Name",
+        canonicalUrl: "https://www.facebook.com/groups/original",
+      });
+      context.clock.setNow(laterUpdatedAt);
+
+      const merged = await new ObserveSourcePublisherUseCase(
+        context.sourcePublishers,
+        context.ids,
+        context.clock,
+      ).execute({
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "facebook-group-1",
+        observedAt: baseObservedAt,
+        displayName: "Equal-Timestamp Display Name",
+        canonicalUrl: "https://www.facebook.com/groups/equal",
+      });
+
+      expect(merged.displayName).toBe("Equal-Timestamp Display Name");
+      expect(merged.canonicalUrl).toBe(
+        "https://www.facebook.com/groups/equal",
+      );
+      expect(merged.lastObservedAt).toBe(baseObservedAt);
+      expect(merged.observationCount).toBe(2);
+      expect(merged.updatedAt).toBe(laterUpdatedAt);
+    });
+  });
 });
 
 interface TestContext {
@@ -625,5 +907,30 @@ class FixedClock implements Clock {
 
   public setNow(isoDateTime: string): void {
     this.current = new Date(isoDateTime);
+  }
+}
+
+class CountingIdentitySourcePublisherRepository {
+  public findByIdentityCallCount = 0;
+  public saveCallCount = 0;
+
+  public async save(): Promise<void> {
+    this.saveCallCount += 1;
+  }
+
+  public async findById(): Promise<SourcePublisher | null> {
+    return null;
+  }
+
+  public async findByIdentity(): Promise<SourcePublisher | null> {
+    this.findByIdentityCallCount += 1;
+    return null;
+  }
+
+  public async list(): Promise<{
+    items: readonly SourcePublisher[];
+    total: number;
+  }> {
+    return { items: [], total: 0 };
   }
 }

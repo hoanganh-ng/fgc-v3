@@ -186,26 +186,55 @@ Content Manager (application)
 
 ### Modify
 
+- `src/content-manager/domain/content-errors.ts` — add
+  `SourcePublisherIdentityMismatchError` (the source of the new
+  409 mapping in the generic HTTP error mapper).
 - `src/content-manager/domain/index.ts` — re-export the new domain
   modules.
 - `src/content-manager/domain/validation.ts` — add
-  `validateSourcePublisher` and `parseSourcePublisher` validators.
+  `validateSourcePublisher`, `parseSourcePublisher`,
+  `validateObserveSourcePublisherInput`, and
+  `parseObserveSourcePublisherInput` validators.
+- `src/content-manager/domain/source-publisher.schemas.ts` — add
+  `ObserveSourcePublisherInputSchema` (strict Zod) and the inferred
+  `ObserveSourcePublisherApplicationInput` TypeScript type.
 - `src/content-manager/application/index.ts` — re-export the new
   application modules.
 - `src/content-manager/application/application-errors.ts` — add the
   `SOURCE_PUBLISHER_NOT_FOUND` error code and
   `SourcePublisherNotFoundError`.
 - `src/content-manager/application/content-validation.ts` — add
-  `loadValidatedSourcePublisherById` and
-  `validateSourcePublisherForApplication`.
+  `loadValidatedSourcePublisherById`,
+  `loadValidatedSourcePublisherByIdentity`,
+  `validateSourcePublisherForApplication`, and
+  `validateObserveSourcePublisherInputForApplication`. The identity
+  lookup revalidates the non-null `findByIdentity` output before
+  returning it to the use case.
+- `src/content-manager/application/use-cases/observe-source-publisher.use-case.ts`
+  — call `validateObserveSourcePublisherInputForApplication` as the
+  first statement of `execute()`, before `clock.now()`,
+  `findByIdentity`, `generateId`, the domain observation, or
+  `save`. The validated value is used for all subsequent work. The
+  use case input type is the inferred
+  `ObserveSourcePublisherApplicationInput`.
 - `src/content-manager/application/test-support/in-memory-repositories.ts`
   — add `InMemorySourcePublisherRepository`.
 - `src/content-manager/domain/content-domain.test.ts` — extend with
-  SourcePublisher validation, observation, status update, and
-  identity comparison tests.
+  SourcePublisher validation, observation, status update, identity
+  comparison, identity-mismatch non-mutation, equal-timestamp
+  metadata behavior, and `findByIdentity` malformed-output tests.
+- `src/content-manager/application/source-publisher-application.test.ts`
+  — extend with strict observation-input validation tests (invalid
+  `observedAt`, blank `displayName`, invalid `canonicalUrl`, unknown
+  fields, null optional metadata) and regression coverage proving
+  that, when an existing publisher is present, invalid input does
+  not increment `observationCount`, does not call `save`, and is
+  rejected before `findByIdentity`. Also exercises the idempotent
+  status-update skipping `save` path through a counting repository.
 - `src/interfaces/http/errors/http-error-mapper.ts` — map
-  `SOURCE_PUBLISHER_NOT_FOUND` to HTTP 404 so the future HTTP layer
-  has a typed status for the new error code.
+  `SOURCE_PUBLISHER_NOT_FOUND` to HTTP 404 and
+  `SOURCE_PUBLISHER_IDENTITY_MISMATCH` to HTTP 409 so the future
+  HTTP layer has typed statuses for the new error codes.
 - `docs/SPRINTS/active.md` — record Sprint 063A as active and update
   the awaiting-definition note.
 - `docs/PROJECT_SNAPSHOT.md` — record the new `SourcePublisher`
@@ -250,17 +279,29 @@ Content Manager (application)
 | Subsequent observations preserve id, identity, `createdAt`, `firstObservedAt`, status | `src/content-manager/domain/content-domain.test.ts`                       |
 | `lastObservedAt` never moves backward                                | `src/content-manager/domain/content-domain.test.ts`                                    |
 | Older observations do not overwrite metadata                         | `src/content-manager/domain/content-domain.test.ts`                                    |
+| Equal-timestamp observation replaces metadata and increments count   | `src/content-manager/domain/content-domain.test.ts`                                    |
 | Omitted metadata does not clear existing metadata                    | `src/content-manager/domain/content-domain.test.ts`                                    |
 | Observation never changes review status                              | `src/content-manager/domain/content-domain.test.ts`                                    |
 | Status update applies new status and bumps `updatedAt`               | `src/content-manager/domain/content-domain.test.ts`                                    |
 | Reapplying current status is idempotent                              | `src/content-manager/domain/content-domain.test.ts`                                    |
 | Identity comparison matches on `platform + kind + externalPublisherId` | `src/content-manager/domain/content-domain.test.ts`                                    |
+| Identity mismatch is rejected and the existing aggregate is not mutated | `src/content-manager/domain/content-domain.test.ts`                                  |
 | `ObserveSourcePublisherUseCase` creates and merges correctly          | `src/content-manager/application/source-publisher-application.test.ts`                 |
+| `ObserveSourcePublisherUseCase` validates input strictly before any side effect | `src/content-manager/application/source-publisher-application.test.ts`        |
+| Invalid observation `observedAt` rejects without `save` or count bump | `src/content-manager/application/source-publisher-application.test.ts`                |
+| Older observation with invalid `canonicalUrl` is rejected            | `src/content-manager/application/source-publisher-application.test.ts`                 |
+| Older observation with blank `displayName` is rejected               | `src/content-manager/application/source-publisher-application.test.ts`                 |
+| Unknown observation-input field is rejected (strict schema)          | `src/content-manager/application/source-publisher-application.test.ts`                 |
+| Null optional observation metadata is rejected (omission only)       | `src/content-manager/application/source-publisher-application.test.ts`                 |
+| Equal-timestamp observation replaces metadata and increments count (application) | `src/content-manager/application/source-publisher-application.test.ts`        |
 | `GetSourcePublisherUseCase` raises `SourcePublisherNotFoundError`    | `src/content-manager/application/source-publisher-application.test.ts`                 |
 | `ListSourcePublishersUseCase` applies filters and pagination         | `src/content-manager/application/source-publisher-application.test.ts`                 |
 | `ListSourcePublishersUseCase` orders by `lastObservedAt` desc, `id` asc | `src/content-manager/application/source-publisher-application.test.ts`              |
+| Invalid list-filter (status/kind/platform) is rejected               | `src/content-manager/application/source-publisher-application.test.ts`                 |
 | `UpdateSourcePublisherStatusUseCase` is idempotent on same status    | `src/content-manager/application/source-publisher-application.test.ts`                 |
+| Idempotent status update skips `save`                                | `src/content-manager/application/source-publisher-application.test.ts`                 |
 | Repository outputs are validated through the runtime schema          | `src/content-manager/application/source-publisher-application.test.ts`                 |
+| Malformed `findByIdentity` output is rejected before save            | `src/content-manager/application/source-publisher-application.test.ts`                 |
 | In-memory repository supports `findByIdentity` and list ordering     | `src/content-manager/application/source-publisher-application.test.ts`                 |
 
 ## Out Of Scope

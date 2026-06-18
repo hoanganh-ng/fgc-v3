@@ -13,6 +13,7 @@ import {
   validateCollectedContentInput,
   validateContentCategory,
   validateContentItem,
+  validateObserveSourcePublisherInput,
   validateSourceGroup,
   validateSourcePublisher,
 } from "../domain";
@@ -25,6 +26,7 @@ import type {
   ContentPlatform,
   ExternalPublisherId,
   IsoDateTime,
+  ObserveSourcePublisherApplicationInput,
   SourceGroup,
   SourceGroupId,
   SourcePublisher,
@@ -159,6 +161,18 @@ export function validateSourcePublisherForApplication(
   sourcePublisher: SourcePublisher,
 ): SourcePublisher {
   const result = validateSourcePublisher(sourcePublisher);
+
+  if (!result.valid) {
+    throw new ContentValidationError(result.issues);
+  }
+
+  return result.value;
+}
+
+export function validateObserveSourcePublisherInputForApplication(
+  input: ObserveSourcePublisherApplicationInput,
+): ObserveSourcePublisherApplicationInput {
+  const result = validateObserveSourcePublisherInput(input);
 
   if (!result.valid) {
     throw new ContentValidationError(result.issues);

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { infer as zInfer } from "zod";
 import { ContentPlatformSchema, IsoDateTimeSchema } from "./content.schemas";
 import { SOURCE_PUBLISHER_KINDS } from "./source-publisher-kind";
 import { SOURCE_PUBLISHER_STATUSES } from "./source-publisher-status";
@@ -45,3 +46,18 @@ export const SourcePublisherSchema = z
       });
     }
   });
+
+export const ObserveSourcePublisherInputSchema = z
+  .object({
+    platform: ContentPlatformSchema,
+    kind: SourcePublisherKindSchema,
+    externalPublisherId: ExternalPublisherIdSchema,
+    observedAt: IsoDateTimeSchema,
+    displayName: NonEmptyStringSchema.optional(),
+    canonicalUrl: z.url().optional(),
+  })
+  .strict();
+
+export type ObserveSourcePublisherApplicationInput = zInfer<
+  typeof ObserveSourcePublisherInputSchema
+>;

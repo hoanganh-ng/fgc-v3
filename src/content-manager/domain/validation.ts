@@ -14,7 +14,11 @@ import {
   TopCommentSchema,
 } from "./content.schemas";
 import type { SourcePublisher } from "./source-publisher";
-import { SourcePublisherSchema } from "./source-publisher.schemas";
+import {
+  ObserveSourcePublisherInputSchema,
+  type ObserveSourcePublisherApplicationInput,
+  SourcePublisherSchema,
+} from "./source-publisher.schemas";
 
 export interface ValidationIssue {
   readonly path: string;
@@ -138,6 +142,27 @@ export function parseSourcePublisher(
   value: unknown,
 ): ValidationResult<SourcePublisher> {
   const result = SourcePublisherSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateObserveSourcePublisherInput(
+  value: unknown,
+): ValidationResult<ObserveSourcePublisherApplicationInput> {
+  return parseObserveSourcePublisherInput(value);
+}
+
+export function parseObserveSourcePublisherInput(
+  value: unknown,
+): ValidationResult<ObserveSourcePublisherApplicationInput> {
+  const result = ObserveSourcePublisherInputSchema.safeParse(value);
 
   if (!result.success) {
     return invalid(formatZodIssues(result.error.issues));

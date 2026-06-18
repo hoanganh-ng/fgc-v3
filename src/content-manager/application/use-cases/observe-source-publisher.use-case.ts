@@ -1,6 +1,7 @@
 import {
   loadValidatedSourcePublisherByIdentity,
   toIsoDateTime,
+  validateObserveSourcePublisherInputForApplication,
   validateSourcePublisherForApplication,
 } from "../content-validation";
 import type { Clock } from "../ports/clock.port";
@@ -8,20 +9,11 @@ import type { IdGenerator } from "../ports/id-generator.port";
 import type { SourcePublisherRepository } from "../ports/source-publisher-repository.port";
 import { observeSourcePublisher } from "../../domain";
 import type {
-  ContentPlatform,
-  ExternalPublisherId,
+  ObserveSourcePublisherApplicationInput,
   SourcePublisher,
-  SourcePublisherKind,
 } from "../../domain";
 
-export interface ObserveSourcePublisherInput {
-  readonly platform: ContentPlatform;
-  readonly kind: SourcePublisherKind;
-  readonly externalPublisherId: ExternalPublisherId;
-  readonly observedAt: SourcePublisher["lastObservedAt"];
-  readonly displayName?: string;
-  readonly canonicalUrl?: string;
-}
+export type { ObserveSourcePublisherApplicationInput };
 
 export class ObserveSourcePublisherUseCase {
   public constructor(
@@ -31,14 +23,15 @@ export class ObserveSourcePublisherUseCase {
   ) {}
 
   public async execute(
-    input: ObserveSourcePublisherInput,
+    input: ObserveSourcePublisherApplicationInput,
   ): Promise<SourcePublisher> {
+    const validated = validateObserveSourcePublisherInputForApplication(input);
     const updatedAt = toIsoDateTime(this.clock.now());
     const existing = await loadValidatedSourcePublisherByIdentity(
       this.sourcePublishers,
-      input.platform,
-      input.kind,
-      input.externalPublisherId,
+      validated.platform,
+      validated.kind,
+      validated.externalPublisherId,
     );
 
     const id = existing?.id ?? (await this.ids.generateId());
@@ -49,16 +42,16 @@ export class ObserveSourcePublisherUseCase {
         {
           id,
           identity: {
-            platform: input.platform,
-            kind: input.kind,
-            externalPublisherId: input.externalPublisherId,
+            platform: validated.platform,
+            kind: validated.kind,
+            externalPublisherId: validated.externalPublisherId,
           },
-          observedAt: input.observedAt,
-          ...(input.displayName !== undefined
-            ? { displayName: input.displayName }
+          observedAt: validated.observedAt,
+          ...(validated.displayName !== undefined
+            ? { displayName: validated.displayName }
             : {}),
-          ...(input.canonicalUrl !== undefined
-            ? { canonicalUrl: input.canonicalUrl }
+          ...(validated.canonicalUrl !== undefined
+            ? { canonicalUrl: validated.canonicalUrl }
             : {}),
         },
         { updatedAt },
