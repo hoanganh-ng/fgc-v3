@@ -4,7 +4,7 @@
 The product is currently in the **Content Collector** stage (Stage 1 of 3, preceding Builder and Publisher). The core focus is collecting normalized content from configured Facebook sources while maintaining strict isolation between profile management, collection orchestration, and content storage.
 
 ## Current Active Sprint
-Sprint 063A — Source Publisher Domain and Application: awaiting definition (not active; not authorized for implementation).
+Sprint 063A — Source Publisher Domain and Application (Active; not yet accepted; not committed; not pushed).
 Sprint 062: Feed Discovery Delivery Plan And Docker E2E Foundation (Accepted).
 Sprint 061: Operator Collection Schedule Management Surface (Accepted).
 Sprint 060: Collection Scheduler Containerization and Stack Integration (Accepted).
@@ -18,7 +18,7 @@ Sprint 054A: Profile Authentication Health Foundation (Accepted).
 
 ## Currently Available Capabilities
 - **Profile Management**: Creation, lifecycle, session ingestion, checkout leasing, and operator-driven recovery reprovisioning for `REAUTH_REQUIRED` and `CHECKPOINT_REVIEW_REQUIRED` profiles.
-- **Content Management**: Storage of normalized Facebook knowledge group text posts and top comments.
+- **Content Management**: Storage of normalized Facebook knowledge group text posts and top comments, and the Content Manager-owned `SourcePublisher` identity and observation behavior (durable publishing-source identity for a Facebook group or page observed while reading a feed, with `DISCOVERED | APPROVED | IGNORED | BLOCKED` review status). `SourcePublisher` is distinct from managed `SourceGroup` and is not the future Content Publisher pipeline stage; Sprint 063A ships domain and application foundation only (no persistence, no HTTP, no UI, no browser, no feed execution).
 - **Collection Execution**: Headless browser extraction using Playwright (or experimental CloakBrowser). Worker processes automatically consume queued collection runs, ambient exercise runs, and access-check runs.
 - **Collection Scheduling**: One persisted `CollectionSchedule` per source group (interval, next run, parameters). A containerized `collection-scheduler` Compose service drains due schedules into queued `SCHEDULED` collection runs on an interval; the scheduler-runtime image does not provision browser executables, Playwright browser downloads, Xvfb, browser-specific system packages, or a runnable CloakBrowser browser/system runtime, and does not launch a browser.
 - **Operator Tools**: CLI tools for profile provisioning, manual collection, worker execution, browser probing, the same provisioning CLI used for first-time and recovery login, and the containerized collection scheduler.
@@ -63,12 +63,14 @@ fix. Sprint 062 is accepted: it published the feed discovery delivery
 plan, the cross-cutting testing strategy, the isolated Docker E2E
 harness, and the baseline E2E flow that proves the production-like
 stack works through Nginx → API → migrations → PostgreSQL using only
-synthetic fixtures. Future sprint work after Sprint 062 will follow
-the corrected 063A–068 sequence documented in `docs/ROADMAP.md`, in
-which `SourcePublisher` is the Content Manager-owned publishing-source
+synthetic fixtures. Sprint 063A — Source Publisher Domain and
+Application is the active sprint: it ships the Content Manager domain
+and application foundation for the `SourcePublisher` identity and
+observation behavior (no persistence, no HTTP, no UI, no browser, no
+feed execution). Future sprint work after Sprint 063A follows the
+063A–068 sequence documented in `docs/ROADMAP.md`, in which
+`SourcePublisher` is the Content Manager-owned publishing-source
 identity (a group or a page observed while reading the feed) and is
 not the future Content Publisher pipeline stage. The long-term
 `Future: Content Builder` and `Future: Content Publisher` pipeline
-stages are retained. Sprint 063A — Source Publisher Domain and
-Application is awaiting definition; it is not yet active and is not
-authorized for implementation.
+stages are retained.

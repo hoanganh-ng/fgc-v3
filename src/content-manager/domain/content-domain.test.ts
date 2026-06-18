@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
   InvalidContentStatusTransitionError,
+  applySourcePublisherObservation,
+  applySourcePublisherStatusUpdate,
   createDefaultSourceGroupEntryRoute,
+  createInitialSourcePublisher,
   mergeCollectedContent,
   normalizeTopComments,
+  observeSourcePublisher,
+  sourcePublishersShareIdentity,
   transitionContentStatus,
   validateCollectedContentInput,
   validateContentCategory,
   validateContentItem,
   validateSourceGroup,
+  validateSourcePublisher,
 } from "./index";
 import type {
   CollectedContentInput,
@@ -17,6 +23,7 @@ import type {
   ContentStatus,
   SourceGroup,
   SourceGroupEntryRoute,
+  SourcePublisher,
   TopComment,
   ValidationResult,
 } from "./index";
@@ -446,4 +453,333 @@ function expectValidationIssue<T>(
       expect.arrayContaining([expect.objectContaining({ path })]),
     );
   }
+}
+
+const publisherFirstObservedAt = "2026-03-01T08:00:00.000Z";
+const publisherUpdatedAt = "2026-03-01T08:05:00.000Z";
+const publisherLaterObservedAt = "2026-03-01T09:00:00.000Z";
+const publisherNewerUpdatedAt = "2026-03-01T09:05:00.000Z";
+const publisherOlderObservedAt = "2026-03-01T07:30:00.000Z";
+
+describe("source publisher validation", () => {
+  it("passes a valid source publisher", () => {
+    const result = validateSourcePublisher(createSourcePublisher());
+
+    expect(result.valid).toBe(true);
+  });
+
+  it("passes when displayName and canonicalUrl are omitted", () => {
+    const result = validateSourcePublisher(
+      createSourcePublisher({ displayName: undefined, canonicalUrl: undefined }),
+    );
+
+    expect(result.valid).toBe(true);
+  });
+
+  it("fails when an unknown field is provided", () => {
+    const result = validateSourcePublisher({
+      ...createSourcePublisher(),
+      leakedField: "nope",
+    });
+
+    expect(result.valid).toBe(false);
+
+    if (!result.valid) {
+      expect(result.issues.length).toBeGreaterThan(0);
+      expect(result.issues[0]?.message).toMatch(/leakedField/);
+    }
+  });
+
+  it("fails when kind is unknown", () => {
+    const result = validateSourcePublisher({
+      ...createSourcePublisher(),
+      kind: "UNKNOWN" as SourcePublisher["kind"],
+    });
+
+    expectValidationIssue(result, "kind");
+  });
+
+  it("fails when status is unknown", () => {
+    const result = validateSourcePublisher({
+      ...createSourcePublisher(),
+      status: "UNKNOWN" as SourcePublisher["status"],
+    });
+
+    expectValidationIssue(result, "status");
+  });
+
+  it("fails when observationCount is zero", () => {
+    const result = validateSourcePublisher({
+      ...createSourcePublisher(),
+      observationCount: 0,
+    });
+
+    expectValidationIssue(result, "observationCount");
+  });
+
+  it("fails when firstObservedAt is after lastObservedAt", () => {
+    const result = validateSourcePublisher({
+      ...createSourcePublisher({
+        firstObservedAt: publisherLaterObservedAt,
+        lastObservedAt: publisherFirstObservedAt,
+      }),
+    });
+
+    expectValidationIssue(result, "lastObservedAt");
+  });
+
+  it("rejects null optional metadata", () => {
+    const result = validateSourcePublisher({
+      ...createSourcePublisher(),
+      displayName: null,
+    });
+
+    expect(result.valid).toBe(false);
+  });
+});
+
+describe("source publisher observation", () => {
+  it("creates a DISCOVERED source publisher with observationCount 1 on first observation", () => {
+    const sourcePublisher = createInitialSourcePublisher(
+      {
+        id: "publisher-1",
+        identity: {
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId: "facebook-group-1",
+        },
+        observedAt: publisherFirstObservedAt,
+        displayName: "Knowledge Group 1",
+        canonicalUrl: "https://www.facebook.com/groups/knowledge-1",
+      },
+      { updatedAt: publisherUpdatedAt },
+    );
+
+    expect(sourcePublisher.status).toBe("DISCOVERED");
+    expect(sourcePublisher.observationCount).toBe(1);
+    expect(sourcePublisher.firstObservedAt).toBe(publisherFirstObservedAt);
+    expect(sourcePublisher.lastObservedAt).toBe(publisherFirstObservedAt);
+    expect(sourcePublisher.displayName).toBe("Knowledge Group 1");
+    expect(sourcePublisher.canonicalUrl).toBe(
+      "https://www.facebook.com/groups/knowledge-1",
+    );
+  });
+
+  it("preserves id, identity, createdAt, firstObservedAt, and status on subsequent observations", () => {
+    const existing = createSourcePublisher({
+      id: "publisher-1",
+      createdAt: "2026-02-01T00:00:00.000Z",
+      firstObservedAt: "2026-02-01T00:00:00.000Z",
+      status: "IGNORED",
+      observationCount: 3,
+      lastObservedAt: "2026-02-15T00:00:00.000Z",
+    });
+
+    const merged = observeSourcePublisher(
+      existing,
+      {
+        id: existing.id,
+        identity: {
+          platform: existing.platform,
+          kind: existing.kind,
+          externalPublisherId: existing.externalPublisherId,
+        },
+        observedAt: publisherLaterObservedAt,
+      },
+      { updatedAt: publisherNewerUpdatedAt },
+    );
+
+    expect(merged.id).toBe(existing.id);
+    expect(merged.platform).toBe(existing.platform);
+    expect(merged.kind).toBe(existing.kind);
+    expect(merged.externalPublisherId).toBe(existing.externalPublisherId);
+    expect(merged.createdAt).toBe(existing.createdAt);
+    expect(merged.firstObservedAt).toBe(existing.firstObservedAt);
+    expect(merged.status).toBe(existing.status);
+    expect(merged.observationCount).toBe(existing.observationCount + 1);
+  });
+
+  it("moves lastObservedAt forward when the incoming observation is newer", () => {
+    const existing = createSourcePublisher({
+      lastObservedAt: publisherFirstObservedAt,
+    });
+
+    const merged = applySourcePublisherObservation(
+      existing,
+      {
+        identity: {
+          platform: existing.platform,
+          kind: existing.kind,
+          externalPublisherId: existing.externalPublisherId,
+        },
+        observedAt: publisherLaterObservedAt,
+      },
+      { updatedAt: publisherNewerUpdatedAt },
+    );
+
+    expect(merged.lastObservedAt).toBe(publisherLaterObservedAt);
+  });
+
+  it("keeps lastObservedAt when the incoming observation is older", () => {
+    const existing = createSourcePublisher({
+      lastObservedAt: publisherLaterObservedAt,
+    });
+
+    const merged = applySourcePublisherObservation(
+      existing,
+      {
+        identity: {
+          platform: existing.platform,
+          kind: existing.kind,
+          externalPublisherId: existing.externalPublisherId,
+        },
+        observedAt: publisherOlderObservedAt,
+      },
+      { updatedAt: publisherNewerUpdatedAt },
+    );
+
+    expect(merged.lastObservedAt).toBe(publisherLaterObservedAt);
+  });
+
+  it("does not overwrite newer metadata with an older observation", () => {
+    const existing = createSourcePublisher({
+      displayName: "Latest Display Name",
+      canonicalUrl: "https://www.facebook.com/groups/latest",
+      firstObservedAt: publisherFirstObservedAt,
+      lastObservedAt: publisherLaterObservedAt,
+    });
+
+    const merged = applySourcePublisherObservation(
+      existing,
+      {
+        identity: {
+          platform: existing.platform,
+          kind: existing.kind,
+          externalPublisherId: existing.externalPublisherId,
+        },
+        observedAt: publisherOlderObservedAt,
+        displayName: "Stale Display Name",
+        canonicalUrl: "https://www.facebook.com/groups/stale",
+      },
+      { updatedAt: publisherNewerUpdatedAt },
+    );
+
+    expect(merged.displayName).toBe("Latest Display Name");
+    expect(merged.canonicalUrl).toBe("https://www.facebook.com/groups/latest");
+  });
+
+  it("does not clear existing metadata when the incoming observation omits it", () => {
+    const existing = createSourcePublisher({
+      displayName: "Stable Display Name",
+      canonicalUrl: "https://www.facebook.com/groups/stable",
+    });
+
+    const merged = applySourcePublisherObservation(
+      existing,
+      {
+        identity: {
+          platform: existing.platform,
+          kind: existing.kind,
+          externalPublisherId: existing.externalPublisherId,
+        },
+        observedAt: publisherLaterObservedAt,
+      },
+      { updatedAt: publisherNewerUpdatedAt },
+    );
+
+    expect(merged.displayName).toBe("Stable Display Name");
+    expect(merged.canonicalUrl).toBe("https://www.facebook.com/groups/stable");
+  });
+
+  it("never changes the review status from an observation", () => {
+    const existing = createSourcePublisher({ status: "BLOCKED" });
+
+    const merged = observeSourcePublisher(
+      existing,
+      {
+        id: existing.id,
+        identity: {
+          platform: existing.platform,
+          kind: existing.kind,
+          externalPublisherId: existing.externalPublisherId,
+        },
+        observedAt: publisherLaterObservedAt,
+      },
+      { updatedAt: publisherNewerUpdatedAt },
+    );
+
+    expect(merged.status).toBe("BLOCKED");
+  });
+});
+
+describe("source publisher status update", () => {
+  it("applies a new status and updates updatedAt", () => {
+    const existing = createSourcePublisher({ status: "DISCOVERED" });
+
+    const updated = applySourcePublisherStatusUpdate(existing, "APPROVED", {
+      updatedAt: publisherNewerUpdatedAt,
+    });
+
+    expect(updated.status).toBe("APPROVED");
+    expect(updated.updatedAt).toBe(publisherNewerUpdatedAt);
+  });
+
+  it("is idempotent when reapplying the current status", () => {
+    const existing = createSourcePublisher({
+      status: "APPROVED",
+      updatedAt: publisherUpdatedAt,
+    });
+
+    const updated = applySourcePublisherStatusUpdate(existing, "APPROVED", {
+      updatedAt: publisherNewerUpdatedAt,
+    });
+
+    expect(updated).toBe(existing);
+  });
+});
+
+describe("source publisher identity comparison", () => {
+  it("matches on platform + kind + externalPublisherId", () => {
+    const sourcePublisher = createSourcePublisher({
+      platform: "FACEBOOK",
+      kind: "PAGE",
+      externalPublisherId: "facebook-page-1",
+    });
+
+    expect(
+      sourcePublishersShareIdentity(sourcePublisher, {
+        platform: "FACEBOOK",
+        kind: "PAGE",
+        externalPublisherId: "facebook-page-1",
+      }),
+    ).toBe(true);
+
+    expect(
+      sourcePublishersShareIdentity(sourcePublisher, {
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "facebook-page-1",
+      }),
+    ).toBe(false);
+  });
+});
+
+function createSourcePublisher(
+  overrides: Partial<SourcePublisher> = {},
+): SourcePublisher {
+  return {
+    id: "publisher-1",
+    platform: "FACEBOOK",
+    kind: "GROUP",
+    externalPublisherId: "facebook-group-1",
+    displayName: "Knowledge Group 1",
+    canonicalUrl: "https://www.facebook.com/groups/knowledge-1",
+    status: "DISCOVERED",
+    firstObservedAt: publisherFirstObservedAt,
+    lastObservedAt: publisherFirstObservedAt,
+    observationCount: 1,
+    createdAt: publisherUpdatedAt,
+    updatedAt: publisherUpdatedAt,
+    ...overrides,
+  };
 }

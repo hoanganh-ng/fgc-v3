@@ -1,17 +1,20 @@
 import {
   ContentValidationError,
   SourceGroupNotFoundError,
+  SourcePublisherNotFoundError,
   ContentCategoryNotFoundError,
   ContentItemNotFoundError,
 } from "./application-errors";
 import type { ContentCategoryRepository } from "./ports/content-category-repository.port";
 import type { ContentItemRepository } from "./ports/content-item-repository.port";
 import type { SourceGroupRepository } from "./ports/source-group-repository.port";
+import type { SourcePublisherRepository } from "./ports/source-publisher-repository.port";
 import {
   validateCollectedContentInput,
   validateContentCategory,
   validateContentItem,
   validateSourceGroup,
+  validateSourcePublisher,
 } from "../domain";
 import type {
   CollectedContentInput,
@@ -22,6 +25,8 @@ import type {
   IsoDateTime,
   SourceGroup,
   SourceGroupId,
+  SourcePublisher,
+  SourcePublisherId,
 } from "../domain";
 
 export function toIsoDateTime(date: Date): IsoDateTime {
@@ -67,6 +72,19 @@ export async function loadValidatedContentItemById(
   return validateContentItemForApplication(contentItem);
 }
 
+export async function loadValidatedSourcePublisherById(
+  repository: SourcePublisherRepository,
+  sourcePublisherId: SourcePublisherId,
+): Promise<SourcePublisher> {
+  const sourcePublisher = await repository.findById(sourcePublisherId);
+
+  if (sourcePublisher === null) {
+    throw new SourcePublisherNotFoundError(sourcePublisherId);
+  }
+
+  return validateSourcePublisherForApplication(sourcePublisher);
+}
+
 export function validateContentCategoryForApplication(
   category: ContentCategory,
 ): ContentCategory {
@@ -107,6 +125,18 @@ export function validateCollectedContentInputForApplication(
   input: CollectedContentInput,
 ): CollectedContentInput {
   const result = validateCollectedContentInput(input);
+
+  if (!result.valid) {
+    throw new ContentValidationError(result.issues);
+  }
+
+  return result.value;
+}
+
+export function validateSourcePublisherForApplication(
+  sourcePublisher: SourcePublisher,
+): SourcePublisher {
+  const result = validateSourcePublisher(sourcePublisher);
 
   if (!result.valid) {
     throw new ContentValidationError(result.issues);

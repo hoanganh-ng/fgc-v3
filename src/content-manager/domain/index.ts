@@ -6,4 +6,8 @@ export * from "./content-status";
 export * from "./content.schemas";
 export * from "./source-group-entry-route";
 export * from "./source-group-status";
+export * from "./source-publisher";
+export * from "./source-publisher-kind";
+export * from "./source-publisher-status";
+export * from "./source-publisher.schemas";
 export * from "./validation";

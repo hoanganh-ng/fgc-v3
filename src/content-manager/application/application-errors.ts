@@ -12,7 +12,8 @@ export type ContentManagerApplicationErrorCode =
   | "SOURCE_GROUP_ENTRY_ROUTE_NOT_FOUND"
   | "CONTENT_ITEM_NOT_FOUND"
   | "INVALID_CONTENT_STATUS_TRANSITION"
-  | "CONTENT_VALIDATION_ERROR";
+  | "CONTENT_VALIDATION_ERROR"
+  | "SOURCE_PUBLISHER_NOT_FOUND";
 
 export abstract class ContentManagerApplicationError extends Error {
   public readonly code: ContentManagerApplicationErrorCode;
@@ -120,5 +121,17 @@ export class ContentValidationError extends ContentManagerApplicationError {
   public constructor(issues: readonly ValidationIssue[]) {
     super("CONTENT_VALIDATION_ERROR", "Content Manager input is invalid.");
     this.issues = issues;
+  }
+}
+
+export class SourcePublisherNotFoundError extends ContentManagerApplicationError {
+  public readonly sourcePublisherId: string;
+
+  public constructor(sourcePublisherId: string) {
+    super(
+      "SOURCE_PUBLISHER_NOT_FOUND",
+      `Source publisher not found: ${sourcePublisherId}.`,
+    );
+    this.sourcePublisherId = sourcePublisherId;
   }
 }

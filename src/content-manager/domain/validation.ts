@@ -13,6 +13,8 @@ import {
   SourceGroupSchema,
   TopCommentSchema,
 } from "./content.schemas";
+import type { SourcePublisher } from "./source-publisher";
+import { SourcePublisherSchema } from "./source-publisher.schemas";
 
 export interface ValidationIssue {
   readonly path: string;
@@ -115,6 +117,27 @@ export function parseCollectedContentInput(
   value: unknown,
 ): ValidationResult<CollectedContentInput> {
   const result = CollectedContentInputSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateSourcePublisher(
+  value: unknown,
+): ValidationResult<SourcePublisher> {
+  return parseSourcePublisher(value);
+}
+
+export function parseSourcePublisher(
+  value: unknown,
+): ValidationResult<SourcePublisher> {
+  const result = SourcePublisherSchema.safeParse(value);
 
   if (!result.success) {
     return invalid(formatZodIssues(result.error.issues));

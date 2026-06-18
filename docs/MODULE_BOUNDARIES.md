@@ -43,6 +43,22 @@ Owns:
 - Group categories as managed entities.
 - Engagement counts.
 - Top comments as normalized metadata for each content item.
+- `SourcePublisher` identity (`platform + kind + externalPublisherId`)
+  as the durable publishing-source identity for a Facebook group or
+  page observed while reading a feed.
+- `SourcePublisher` pure observation behavior: first observation
+  creates `status = DISCOVERED` with `observationCount = 1`; subsequent
+  observations preserve `id`, identity, `createdAt`, `firstObservedAt`,
+  and current review `status`; `observationCount` increments by
+  exactly 1; `lastObservedAt` never moves backward; older observations
+  do not overwrite metadata from newer observations; omitted
+  metadata does not clear existing metadata; observation never
+  changes review status.
+- Explicit, reversible `SourcePublisher` status updates (idempotent
+  when reapplying the current status).
+- `SourcePublisher` application ports (`save`, `findById`,
+  `findByIdentity`, `list` with bounded `limit` and non-negative
+  `offset`, ordered `lastObservedAt` descending then `id` ascending).
 - Safe read APIs.
 - Future handoff shape for Content Builder.
 
@@ -58,8 +74,21 @@ Does not own:
 - Comment crawling strategy.
 - Video generation.
 - Publishing workflows.
+- Promotion of a `SourcePublisher` into a managed `SourceGroup`,
+  `SourceGroup` configuration, scheduling, or any social action.
+- `Content Publisher` pipeline behavior. `SourcePublisher` is the
+  Content Manager-owned durable publishing-source identity, not the
+  future Content Publisher pipeline module, and it does not model
+  drafts, publications, videos, publishing schedules, or published
+  artifacts.
 
 Content Manager should not accept raw Facebook GraphQL payloads as its primary ingestion contract. Its canonical write contract is normalized Content Manager ingestion input. A future implementation may optionally store sanitized raw payload data or a raw payload reference for trusted diagnostics or reprocessing, but that storage is not the canonical content model.
+
+`SourcePublisher` is the Content Manager-owned publishing-source
+identity and is distinct from `SourceGroup`. A `SourcePublisher` is
+not a managed `SourceGroup`, is not the future Content Publisher
+pipeline stage, and Sprint 063A does not promote, configure,
+schedule, or join anything.
 
 ## Collector Runtime
 

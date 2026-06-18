@@ -333,6 +333,7 @@ const contentApplicationErrorStatus: Record<
   CONTENT_ITEM_NOT_FOUND: 404,
   INVALID_CONTENT_STATUS_TRANSITION: 409,
   CONTENT_VALIDATION_ERROR: 400,
+  SOURCE_PUBLISHER_NOT_FOUND: 404,
 };
 
 const collectorRuntimeApplicationErrorStatus: Record<

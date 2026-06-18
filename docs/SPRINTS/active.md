@@ -1,15 +1,18 @@
 # Active Sprint
 
+Sprint 063A — Source Publisher Domain and Application is the active
+sprint. It defines the Content Manager-owned `SourcePublisher`
+identity and pure observation behavior and the Content Manager
+application layer (ports, use cases, typed application error, and
+in-memory repository). No persistence, HTTP, UI, browser, or feed
+execution.
+
+- [Sprint 063A - Source Publisher Domain and Application](SPRINT-063A-source-publisher-domain-and-application.md)
+
 Sprint 062 is accepted and recorded as the feed discovery delivery plan
 and Docker E2E foundation:
 
 - [Sprint 062 - Feed Discovery Delivery Plan And Docker E2E Foundation](SPRINT-062-feed-discovery-delivery-plan-and-docker-e2e-foundation.md)
-
-Sprint 063A — Source Publisher Domain and Application is awaiting
-definition. It is not active and is not authorized for implementation:
-
-- [Sprint 063A - Source Publisher Domain and Application](SPRINT-063A-source-publisher-domain-and-application.md)
-  (awaiting definition; not active; not authorized for implementation)
 
 The roadmap in `docs/ROADMAP.md` records the remaining feed discovery
 sequence (Sprint 063B–068) as documentation placeholders. The long-term

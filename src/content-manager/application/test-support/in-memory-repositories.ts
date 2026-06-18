@@ -5,9 +5,13 @@ import type {
   ContentItem,
   ContentPlatform,
   ExternalGroupId,
+  ExternalPublisherId,
   ExternalPostId,
   SourceGroup,
   SourceGroupId,
+  SourcePublisher,
+  SourcePublisherId,
+  SourcePublisherKind,
 } from "../../domain";
 import type { ContentCategoryRepository } from "../ports/content-category-repository.port";
 import type {
@@ -20,6 +24,11 @@ import type {
   SourceGroupListResult,
   SourceGroupRepository,
 } from "../ports/source-group-repository.port";
+import type {
+  SourcePublisherListQuery,
+  SourcePublisherListResult,
+  SourcePublisherRepository,
+} from "../ports/source-publisher-repository.port";
 
 export class InMemoryContentCategoryRepository
   implements ContentCategoryRepository
@@ -148,6 +157,71 @@ export class InMemoryContentItemRepository implements ContentItemRepository {
   }
 }
 
+export class InMemorySourcePublisherRepository
+  implements SourcePublisherRepository
+{
+  private readonly sourcePublishers = new Map<
+    SourcePublisherId,
+    SourcePublisher
+  >();
+
+  public async save(sourcePublisher: SourcePublisher): Promise<void> {
+    this.sourcePublishers.set(sourcePublisher.id, sourcePublisher);
+  }
+
+  public async findById(
+    id: SourcePublisherId,
+  ): Promise<SourcePublisher | null> {
+    return this.sourcePublishers.get(id) ?? null;
+  }
+
+  public async findByIdentity(
+    platform: ContentPlatform,
+    kind: SourcePublisherKind,
+    externalPublisherId: ExternalPublisherId,
+  ): Promise<SourcePublisher | null> {
+    for (const sourcePublisher of this.sourcePublishers.values()) {
+      if (
+        sourcePublisher.platform === platform &&
+        sourcePublisher.kind === kind &&
+        sourcePublisher.externalPublisherId === externalPublisherId
+      ) {
+        return sourcePublisher;
+      }
+    }
+
+    return null;
+  }
+
+  public async list(
+    query: SourcePublisherListQuery,
+  ): Promise<SourcePublisherListResult> {
+    const matchingSourcePublishers = [...this.sourcePublishers.values()]
+      .filter(
+        (sourcePublisher) =>
+          query.status === undefined || sourcePublisher.status === query.status,
+      )
+      .filter(
+        (sourcePublisher) =>
+          query.kind === undefined || sourcePublisher.kind === query.kind,
+      )
+      .filter(
+        (sourcePublisher) =>
+          query.platform === undefined ||
+          sourcePublisher.platform === query.platform,
+      )
+      .sort(compareSourcePublishersByLastObservedAt);
+
+    return {
+      items: matchingSourcePublishers.slice(
+        query.offset,
+        query.offset + query.limit,
+      ),
+      total: matchingSourcePublishers.length,
+    };
+  }
+}
+
 function compareCategoriesByCreatedAt(
   left: ContentCategory,
   right: ContentCategory,
@@ -182,6 +256,22 @@ function compareContentItemsByCreatedAt(
 
   if (createdAtComparison !== 0) {
     return createdAtComparison;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+function compareSourcePublishersByLastObservedAt(
+  left: SourcePublisher,
+  right: SourcePublisher,
+): number {
+  const lastObservedComparison = compareIsoDates(
+    left.lastObservedAt,
+    right.lastObservedAt,
+  );
+
+  if (lastObservedComparison !== 0) {
+    return -lastObservedComparison;
   }
 
   return left.id.localeCompare(right.id);
