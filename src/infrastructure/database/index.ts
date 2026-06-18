@@ -10,6 +10,7 @@ export * from "./repositories/drizzle-profile.repository";
 export * from "./repositories/drizzle-profile-source-access.repository";
 export * from "./repositories/drizzle-profile-source-access-check-run.repository";
 export * from "./repositories/drizzle-source-group.repository";
+export * from "./repositories/drizzle-source-publisher.repository";
 export * from "./schema/collector-profile-manager.schema";
 export * from "./schema/collector-runtime.schema";
 export * from "./schema/content-manager.schema";

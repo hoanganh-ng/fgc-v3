@@ -8,7 +8,15 @@ import {
   SourcePublisherNotFoundError,
   UpdateSourcePublisherStatusUseCase,
 } from "./index";
-import type { Clock, IdGenerator } from "./index";
+import type {
+  AtomicSourcePublisherObservationInput,
+  Clock,
+  IdGenerator,
+  SourcePublisherListQuery,
+  SourcePublisherListResult,
+  SourcePublisherRepository,
+  SourcePublisherStatusPersistenceInput,
+} from "./index";
 import { InMemorySourcePublisherRepository } from "./test-support/in-memory-repositories";
 import type { SourcePublisher } from "../domain";
 
@@ -162,11 +170,11 @@ describe("source publisher application use cases", () => {
   });
 
   it("rejects observation input that violates the runtime schema", async () => {
-    const savingRepository = new CountingSourcePublisherRepository();
+    const observationRepository = new CountingSourcePublisherRepository();
     const context = createTestContext(["publisher-1"]);
 
     await new ObserveSourcePublisherUseCase(
-      savingRepository,
+      observationRepository,
       context.ids,
       context.clock,
     ).execute({
@@ -176,12 +184,12 @@ describe("source publisher application use cases", () => {
       observedAt: baseObservedAt,
     });
 
-    const saveCountAfterSeed = savingRepository.saveCallCount;
-    const seeded = (await savingRepository.findById("publisher-1"))!;
+    const observeCountAfterSeed = observationRepository.observeCount;
+    const seeded = (await observationRepository.findById("publisher-1"))!;
 
     await expect(
       new ObserveSourcePublisherUseCase(
-        savingRepository,
+        observationRepository,
         context.ids,
         context.clock,
       ).execute({
@@ -192,10 +200,10 @@ describe("source publisher application use cases", () => {
       }),
     ).rejects.toThrow(ContentValidationError);
 
-    const after = (await savingRepository.findById("publisher-1"))!;
+    const after = (await observationRepository.findById("publisher-1"))!;
     expect(after.observationCount).toBe(seeded.observationCount);
     expect(after.observationCount).toBe(1);
-    expect(savingRepository.saveCallCount).toBe(saveCountAfterSeed);
+    expect(observationRepository.observeCount).toBe(observeCountAfterSeed);
   });
 
   it("rejects unknown kind on observation", async () => {
@@ -275,10 +283,10 @@ describe("source publisher application use cases", () => {
 
   it("is idempotent when reapplying the current status", async () => {
     const context = createTestContext(["publisher-1"]);
-    const savingRepository = new CountingSourcePublisherRepository();
+    const statusRepository = new CountingSourcePublisherRepository();
 
     await new ObserveSourcePublisherUseCase(
-      savingRepository,
+      statusRepository,
       context.ids,
       context.clock,
     ).execute({
@@ -289,20 +297,20 @@ describe("source publisher application use cases", () => {
     });
 
     await new UpdateSourcePublisherStatusUseCase(
-      savingRepository,
+      statusRepository,
       context.clock,
     ).execute({
       sourcePublisherId: "publisher-1",
       status: "APPROVED",
     });
 
-    const updatedAtBefore = (await savingRepository.findById("publisher-1"))!
+    const updatedAtBefore = (await statusRepository.findById("publisher-1"))!
       .updatedAt;
-    const saveCountBefore = savingRepository.saveCallCount;
+    const updateStatusCountBefore = statusRepository.updateStatusCount;
     context.clock.setNow(laterUpdatedAt);
 
     const updated = await new UpdateSourcePublisherStatusUseCase(
-      savingRepository,
+      statusRepository,
       context.clock,
     ).execute({
       sourcePublisherId: "publisher-1",
@@ -311,17 +319,17 @@ describe("source publisher application use cases", () => {
 
     expect(updated.updatedAt).toBe(updatedAtBefore);
     expect(updated).toEqual(
-      await savingRepository.findById("publisher-1"),
+      await statusRepository.findById("publisher-1"),
     );
-    expect(savingRepository.saveCallCount).toBe(saveCountBefore);
+    expect(statusRepository.updateStatusCount).toBe(updateStatusCountBefore);
   });
 
-  it("saves exactly once on a real status change", async () => {
+  it("calls updateStatus exactly once on a real status change", async () => {
     const context = createTestContext(["publisher-1"]);
-    const savingRepository = new CountingSourcePublisherRepository();
+    const statusRepository = new CountingSourcePublisherRepository();
 
     await new ObserveSourcePublisherUseCase(
-      savingRepository,
+      statusRepository,
       context.ids,
       context.clock,
     ).execute({
@@ -331,18 +339,20 @@ describe("source publisher application use cases", () => {
       observedAt: baseObservedAt,
     });
 
-    const saveCountAfterObserve = savingRepository.saveCallCount;
+    const updateStatusCountAfterObserve = statusRepository.updateStatusCount;
     context.clock.setNow(laterUpdatedAt);
 
     await new UpdateSourcePublisherStatusUseCase(
-      savingRepository,
+      statusRepository,
       context.clock,
     ).execute({
       sourcePublisherId: "publisher-1",
       status: "APPROVED",
     });
 
-    expect(savingRepository.saveCallCount).toBe(saveCountAfterObserve + 1);
+    expect(statusRepository.updateStatusCount).toBe(
+      updateStatusCountAfterObserve + 1,
+    );
   });
 
   it("throws SourcePublisherNotFoundError when updating a missing publisher", async () => {
@@ -364,7 +374,7 @@ describe("source publisher application use cases", () => {
       "publisher-d",
     ]);
 
-    await context.sourcePublishers.save({
+    context.sourcePublishers.seedForTest({
       id: "publisher-a",
       platform: "FACEBOOK",
       kind: "GROUP",
@@ -376,7 +386,7 @@ describe("source publisher application use cases", () => {
       createdAt: "2026-03-01T08:00:00.000Z",
       updatedAt: "2026-03-01T08:00:00.000Z",
     });
-    await context.sourcePublishers.save({
+    context.sourcePublishers.seedForTest({
       id: "publisher-b",
       platform: "FACEBOOK",
       kind: "PAGE",
@@ -388,7 +398,7 @@ describe("source publisher application use cases", () => {
       createdAt: "2026-03-02T08:00:00.000Z",
       updatedAt: "2026-03-02T09:00:00.000Z",
     });
-    await context.sourcePublishers.save({
+    context.sourcePublishers.seedForTest({
       id: "publisher-c",
       platform: "FACEBOOK",
       kind: "GROUP",
@@ -400,7 +410,7 @@ describe("source publisher application use cases", () => {
       createdAt: "2026-03-03T08:00:00.000Z",
       updatedAt: "2026-03-03T09:00:00.000Z",
     });
-    await context.sourcePublishers.save({
+    context.sourcePublishers.seedForTest({
       id: "publisher-d",
       platform: "FACEBOOK",
       kind: "GROUP",
@@ -483,30 +493,9 @@ describe("source publisher application use cases", () => {
     ).rejects.toThrow(ContentValidationError);
   });
 
-  it("does not touch the repository when findByIdentity returns malformed data", async () => {
-    const stubRepository = new MalformedIdentitySourcePublisherRepository();
-    const context = createTestContext();
-
-    await expect(
-      new ObserveSourcePublisherUseCase(
-        stubRepository,
-        context.ids,
-        context.clock,
-      ).execute({
-        platform: "FACEBOOK",
-        kind: "GROUP",
-        externalPublisherId: "facebook-group-1",
-        observedAt: baseObservedAt,
-      }),
-    ).rejects.toThrow(ContentValidationError);
-
-    expect(stubRepository.saveCallCount).toBe(0);
-  });
-
   it("validates repository outputs through the runtime schema", async () => {
     const context = createTestContext();
-
-    await context.sourcePublishers.save({
+    context.sourcePublishers.seedForTest({
       id: "publisher-invalid",
       platform: "FACEBOOK",
       kind: "GROUP",
@@ -531,8 +520,8 @@ describe("source publisher application use cases", () => {
   });
 
   describe("observation input validation", () => {
-    it("rejects invalid observation input before findByIdentity is called", async () => {
-      const stub = new CountingIdentitySourcePublisherRepository();
+    it("rejects invalid observation input before observeAtomically is called", async () => {
+      const stub = new CountingObservationSourcePublisherRepository();
       const context = createTestContext();
 
       await expect(
@@ -548,12 +537,11 @@ describe("source publisher application use cases", () => {
         }),
       ).rejects.toThrow(ContentValidationError);
 
-      expect(stub.findByIdentityCallCount).toBe(0);
-      expect(stub.saveCallCount).toBe(0);
+      expect(stub.observeCount).toBe(0);
     });
 
-    it("rejects a blank displayName before findByIdentity is called", async () => {
-      const stub = new CountingIdentitySourcePublisherRepository();
+    it("rejects a blank displayName before observeAtomically is called", async () => {
+      const stub = new CountingObservationSourcePublisherRepository();
       const context = createTestContext();
 
       await expect(
@@ -570,11 +558,11 @@ describe("source publisher application use cases", () => {
         }),
       ).rejects.toThrow(ContentValidationError);
 
-      expect(stub.findByIdentityCallCount).toBe(0);
+      expect(stub.observeCount).toBe(0);
     });
 
-    it("rejects an invalid canonicalUrl before findByIdentity is called", async () => {
-      const stub = new CountingIdentitySourcePublisherRepository();
+    it("rejects an invalid canonicalUrl before observeAtomically is called", async () => {
+      const stub = new CountingObservationSourcePublisherRepository();
       const context = createTestContext();
 
       await expect(
@@ -591,11 +579,11 @@ describe("source publisher application use cases", () => {
         }),
       ).rejects.toThrow(ContentValidationError);
 
-      expect(stub.findByIdentityCallCount).toBe(0);
+      expect(stub.observeCount).toBe(0);
     });
 
     it("rejects unknown observation input fields at runtime", async () => {
-      const stub = new CountingIdentitySourcePublisherRepository();
+      const stub = new CountingObservationSourcePublisherRepository();
       const context = createTestContext();
 
       await expect(
@@ -614,11 +602,11 @@ describe("source publisher application use cases", () => {
         >[0]),
       ).rejects.toThrow(ContentValidationError);
 
-      expect(stub.findByIdentityCallCount).toBe(0);
+      expect(stub.observeCount).toBe(0);
     });
 
     it("rejects null optional observation metadata (omission only)", async () => {
-      const stub = new CountingIdentitySourcePublisherRepository();
+      const stub = new CountingObservationSourcePublisherRepository();
       const context = createTestContext();
 
       await expect(
@@ -637,15 +625,15 @@ describe("source publisher application use cases", () => {
         >[0]),
       ).rejects.toThrow(ContentValidationError);
 
-      expect(stub.findByIdentityCallCount).toBe(0);
+      expect(stub.observeCount).toBe(0);
     });
 
-    it("rejects invalid observedAt for an existing publisher without bumping count or saving", async () => {
-      const savingRepository = new CountingSourcePublisherRepository();
+    it("rejects invalid observedAt for an existing publisher without bumping count", async () => {
+      const observationRepository = new CountingSourcePublisherRepository();
       const context = createTestContext(["publisher-1"]);
 
       await new ObserveSourcePublisherUseCase(
-        savingRepository,
+        observationRepository,
         context.ids,
         context.clock,
       ).execute({
@@ -655,13 +643,12 @@ describe("source publisher application use cases", () => {
         observedAt: baseObservedAt,
       });
 
-      const saveCountAfterSeed = savingRepository.saveCallCount;
-      const seeded =
-        (await savingRepository.findById("publisher-1"))!;
+      const observeCountAfterSeed = observationRepository.observeCount;
+      const seeded = (await observationRepository.findById("publisher-1"))!;
 
       await expect(
         new ObserveSourcePublisherUseCase(
-          savingRepository,
+          observationRepository,
           context.ids,
           context.clock,
         ).execute({
@@ -672,11 +659,11 @@ describe("source publisher application use cases", () => {
         }),
       ).rejects.toThrow(ContentValidationError);
 
-      const after = (await savingRepository.findById("publisher-1"))!;
+      const after = (await observationRepository.findById("publisher-1"))!;
       expect(after.observationCount).toBe(seeded.observationCount);
       expect(after.observationCount).toBe(1);
       expect(after.lastObservedAt).toBe(seeded.lastObservedAt);
-      expect(savingRepository.saveCallCount).toBe(saveCountAfterSeed);
+      expect(observationRepository.observeCount).toBe(observeCountAfterSeed);
     });
 
     it("rejects an older observation with an invalid canonicalUrl", async () => {
@@ -820,16 +807,74 @@ class FakeIdGenerator implements IdGenerator {
   }
 }
 
-class CountingSourcePublisherRepository {
-  private readonly store = new Map<
-    string,
-    SourcePublisher
-  >();
-  public saveCallCount = 0;
+class CountingSourcePublisherRepository implements SourcePublisherRepository {
+  private readonly store = new Map<string, SourcePublisher>();
+  public observeCount = 0;
+  public updateStatusCount = 0;
 
-  public async save(sourcePublisher: SourcePublisher): Promise<void> {
-    this.saveCallCount += 1;
-    this.store.set(sourcePublisher.id, sourcePublisher);
+  public async observeAtomically(
+    input: AtomicSourcePublisherObservationInput,
+  ): Promise<SourcePublisher> {
+    this.observeCount += 1;
+    const id = this.resolveExistingId(input);
+    const existing = id === null ? null : (this.store.get(id) ?? null);
+    const next: SourcePublisher = existing
+      ? {
+          ...existing,
+          ...(input.displayName !== undefined && input.observedAt >= existing.lastObservedAt
+            ? { displayName: input.displayName }
+            : {}),
+          ...(input.canonicalUrl !== undefined && input.observedAt >= existing.lastObservedAt
+            ? { canonicalUrl: input.canonicalUrl }
+            : {}),
+          observationCount: existing.observationCount + 1,
+          lastObservedAt:
+            input.observedAt >= existing.lastObservedAt
+              ? input.observedAt
+              : existing.lastObservedAt,
+          updatedAt: input.updatedAt,
+        }
+      : {
+          id: input.candidateId,
+          platform: input.platform,
+          kind: input.kind,
+          externalPublisherId: input.externalPublisherId,
+          ...(input.displayName !== undefined
+            ? { displayName: input.displayName }
+            : {}),
+          ...(input.canonicalUrl !== undefined
+            ? { canonicalUrl: input.canonicalUrl }
+            : {}),
+          status: "DISCOVERED",
+          firstObservedAt: input.observedAt,
+          lastObservedAt: input.observedAt,
+          observationCount: 1,
+          createdAt: input.updatedAt,
+          updatedAt: input.updatedAt,
+        };
+    this.store.set(next.id, next);
+
+    return next;
+  }
+
+  public async updateStatus(
+    input: SourcePublisherStatusPersistenceInput,
+  ): Promise<SourcePublisher | null> {
+    this.updateStatusCount += 1;
+    const existing = this.store.get(input.sourcePublisherId);
+
+    if (existing === undefined) {
+      return null;
+    }
+
+    const next: SourcePublisher = {
+      ...existing,
+      status: input.status,
+      updatedAt: input.updatedAt,
+    };
+    this.store.set(next.id, next);
+
+    return next;
   }
 
   public async findById(id: string): Promise<SourcePublisher | null> {
@@ -853,19 +898,56 @@ class CountingSourcePublisherRepository {
     return null;
   }
 
-  public async list(): Promise<{
-    items: readonly SourcePublisher[];
-    total: number;
-  }> {
-    return { items: [...this.store.values()], total: this.store.size };
+  public async list(
+    query: SourcePublisherListQuery,
+  ): Promise<SourcePublisherListResult> {
+    const items = [...this.store.values()].filter(
+      (sourcePublisher) =>
+        (query.status === undefined || sourcePublisher.status === query.status) &&
+        (query.kind === undefined || sourcePublisher.kind === query.kind) &&
+        (query.platform === undefined || sourcePublisher.platform === query.platform),
+    );
+
+    return {
+      items: items.slice(query.offset, query.offset + query.limit),
+      total: items.length,
+    };
+  }
+
+  private resolveExistingId(
+    input: AtomicSourcePublisherObservationInput,
+  ): string | null {
+    for (const sourcePublisher of this.store.values()) {
+      if (
+        sourcePublisher.platform === input.platform &&
+        sourcePublisher.kind === input.kind &&
+        sourcePublisher.externalPublisherId === input.externalPublisherId
+      ) {
+        return sourcePublisher.id;
+      }
+    }
+    return null;
   }
 }
 
-class MalformedIdentitySourcePublisherRepository {
-  public saveCallCount = 0;
+class CountingObservationSourcePublisherRepository
+  implements SourcePublisherRepository
+{
+  public observeCount = 0;
+  public updateStatusCount = 0;
 
-  public async save(): Promise<void> {
-    this.saveCallCount += 1;
+  public async observeAtomically(
+    _input: AtomicSourcePublisherObservationInput,
+  ): Promise<SourcePublisher> {
+    this.observeCount += 1;
+    throw new Error("observeAtomically should not be called for invalid input");
+  }
+
+  public async updateStatus(
+    _input: SourcePublisherStatusPersistenceInput,
+  ): Promise<SourcePublisher | null> {
+    this.updateStatusCount += 1;
+    throw new Error("updateStatus should not be called for invalid input");
   }
 
   public async findById(): Promise<SourcePublisher | null> {
@@ -873,24 +955,11 @@ class MalformedIdentitySourcePublisherRepository {
   }
 
   public async findByIdentity(): Promise<SourcePublisher | null> {
-    return {
-      id: "publisher-malformed",
-      platform: "FACEBOOK",
-      kind: "GROUP",
-      externalPublisherId: "facebook-group-1",
-      status: "DISCOVERED",
-      firstObservedAt: baseObservedAt,
-      lastObservedAt: olderObservedAt,
-      observationCount: 1,
-      createdAt: baseUpdatedAt,
-      updatedAt: baseUpdatedAt,
-    } as unknown as SourcePublisher;
+    return null;
   }
 
-  public async list(): Promise<{
-    items: readonly SourcePublisher[];
-  }> {
-    return { items: [] };
+  public async list(): Promise<SourcePublisherListResult> {
+    return { items: [], total: 0 };
   }
 }
 
@@ -907,30 +976,5 @@ class FixedClock implements Clock {
 
   public setNow(isoDateTime: string): void {
     this.current = new Date(isoDateTime);
-  }
-}
-
-class CountingIdentitySourcePublisherRepository {
-  public findByIdentityCallCount = 0;
-  public saveCallCount = 0;
-
-  public async save(): Promise<void> {
-    this.saveCallCount += 1;
-  }
-
-  public async findById(): Promise<SourcePublisher | null> {
-    return null;
-  }
-
-  public async findByIdentity(): Promise<SourcePublisher | null> {
-    this.findByIdentityCallCount += 1;
-    return null;
-  }
-
-  public async list(): Promise<{
-    items: readonly SourcePublisher[];
-    total: number;
-  }> {
-    return { items: [], total: 0 };
   }
 }

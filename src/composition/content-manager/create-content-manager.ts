@@ -4,6 +4,7 @@ import {
   DrizzleContentCategoryRepository,
   DrizzleContentItemRepository,
   DrizzleSourceGroupRepository,
+  DrizzleSourcePublisherRepository,
 } from "../../infrastructure/database";
 import type {
   CreateDatabaseClientOptions,
@@ -73,11 +74,15 @@ export function createContentManagerFromDatabaseClient(
   const categories = new DrizzleContentCategoryRepository(databaseClient.db);
   const sourceGroups = new DrizzleSourceGroupRepository(databaseClient.db);
   const contentItems = new DrizzleContentItemRepository(databaseClient.db);
+  const sourcePublishers = new DrizzleSourcePublisherRepository(
+    databaseClient.db,
+  );
 
   return createContentManager({
     categories,
     sourceGroups,
     contentItems,
+    sourcePublishers,
     clock: overrides.clock ?? new SystemClock(),
     idGenerator: overrides.idGenerator ?? new CryptoIdGenerator(),
     close: () => databaseClient.close(),

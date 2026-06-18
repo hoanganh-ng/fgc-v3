@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -27,6 +28,18 @@ export const contentStatusEnum = pgEnum("content_status", [
   "SELECTED",
   "REJECTED",
   "USED",
+]);
+
+export const sourcePublisherKindEnum = pgEnum("source_publisher_kind", [
+  "GROUP",
+  "PAGE",
+]);
+
+export const sourcePublisherStatusEnum = pgEnum("source_publisher_status", [
+  "DISCOVERED",
+  "APPROVED",
+  "IGNORED",
+  "BLOCKED",
 ]);
 
 const timestampWithTimezone = (name: string) =>
@@ -116,5 +129,45 @@ export const contentItems = pgTable(
     index("content_items_last_collected_at_idx").on(table.lastCollectedAt),
     index("content_items_reaction_count_idx").on(table.reactionCount),
     index("content_items_comment_count_idx").on(table.commentCount),
+  ],
+);
+
+export const sourcePublishers = pgTable(
+  "source_publishers",
+  {
+    id: text("id").primaryKey(),
+    platform: contentPlatformEnum("platform").notNull(),
+    kind: sourcePublisherKindEnum("kind").notNull(),
+    externalPublisherId: text("external_publisher_id").notNull(),
+    displayName: text("display_name"),
+    canonicalUrl: text("canonical_url"),
+    status: sourcePublisherStatusEnum("status").notNull(),
+    firstObservedAt: timestampWithTimezone("first_observed_at").notNull(),
+    lastObservedAt: timestampWithTimezone("last_observed_at").notNull(),
+    observationCount: integer("observation_count").notNull(),
+    createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
+    updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("source_publishers_identity_uidx").on(
+      table.platform,
+      table.kind,
+      table.externalPublisherId,
+    ),
+    index("source_publishers_status_idx").on(table.status),
+    index("source_publishers_kind_idx").on(table.kind),
+    index("source_publishers_platform_idx").on(table.platform),
+    index("source_publishers_last_observed_at_id_idx").on(
+      table.lastObservedAt,
+      table.id,
+    ),
+    check(
+      "source_publishers_observation_count_check",
+      sql`${table.observationCount} >= 1`,
+    ),
+    check(
+      "source_publishers_first_le_last_observed_at_check",
+      sql`${table.firstObservedAt} <= ${table.lastObservedAt}`,
+    ),
   ],
 );

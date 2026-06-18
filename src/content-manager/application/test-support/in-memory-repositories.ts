@@ -13,6 +13,7 @@ import type {
   SourcePublisherId,
   SourcePublisherKind,
 } from "../../domain";
+import { observeSourcePublisher } from "../../domain";
 import type { ContentCategoryRepository } from "../ports/content-category-repository.port";
 import type {
   ContentItemListQuery,
@@ -25,9 +26,11 @@ import type {
   SourceGroupRepository,
 } from "../ports/source-group-repository.port";
 import type {
+  AtomicSourcePublisherObservationInput,
   SourcePublisherListQuery,
   SourcePublisherListResult,
   SourcePublisherRepository,
+  SourcePublisherStatusPersistenceInput,
 } from "../ports/source-publisher-repository.port";
 
 export class InMemoryContentCategoryRepository
@@ -165,8 +168,55 @@ export class InMemorySourcePublisherRepository
     SourcePublisher
   >();
 
-  public async save(sourcePublisher: SourcePublisher): Promise<void> {
-    this.sourcePublishers.set(sourcePublisher.id, sourcePublisher);
+  public async observeAtomically(
+    input: AtomicSourcePublisherObservationInput,
+  ): Promise<SourcePublisher> {
+    const existing = await this.findByIdentity(
+      input.platform,
+      input.kind,
+      input.externalPublisherId,
+    );
+    const next = observeSourcePublisher(
+      existing,
+      {
+        id: input.candidateId,
+        identity: {
+          platform: input.platform,
+          kind: input.kind,
+          externalPublisherId: input.externalPublisherId,
+        },
+        observedAt: input.observedAt,
+        ...(input.displayName !== undefined
+          ? { displayName: input.displayName }
+          : {}),
+        ...(input.canonicalUrl !== undefined
+          ? { canonicalUrl: input.canonicalUrl }
+          : {}),
+      },
+      { updatedAt: input.updatedAt },
+    );
+    this.sourcePublishers.set(next.id, next);
+
+    return next;
+  }
+
+  public async updateStatus(
+    input: SourcePublisherStatusPersistenceInput,
+  ): Promise<SourcePublisher | null> {
+    const existing = this.sourcePublishers.get(input.sourcePublisherId);
+
+    if (existing === undefined) {
+      return null;
+    }
+
+    const next: SourcePublisher = {
+      ...existing,
+      status: input.status,
+      updatedAt: input.updatedAt,
+    };
+    this.sourcePublishers.set(next.id, next);
+
+    return next;
   }
 
   public async findById(
@@ -219,6 +269,15 @@ export class InMemorySourcePublisherRepository
       ),
       total: matchingSourcePublishers.length,
     };
+  }
+
+  /**
+   * Test-only seeding mechanism. Lets a test fixture pre-populate the in-memory
+   * store with a fully-formed aggregate before exercising the use cases. This
+   * is not part of the production SourcePublisherRepository port.
+   */
+  public seedForTest(sourcePublisher: SourcePublisher): void {
+    this.sourcePublishers.set(sourcePublisher.id, sourcePublisher);
   }
 }
 

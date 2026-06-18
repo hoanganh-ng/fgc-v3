@@ -4,18 +4,18 @@
 The product is currently in the **Content Collector** stage (Stage 1 of 3, preceding Builder and Publisher). The core focus is collecting normalized content from configured Facebook sources while maintaining strict isolation between profile management, collection orchestration, and content storage.
 
 ## Current Active Sprint
-Sprint 063A — Source Publisher Domain and Application (Accepted).
 Sprint 063B — Source Publisher Persistence and Atomic Observation
-(Awaiting definition; not active and not authorized for
-implementation). When defined, it will cover PostgreSQL
-persistence, the Drizzle schema and migration, the durable
-repository implementation, the atomic upsert and concurrency
-guarantees for re-observation, and composition wiring for
-`SourcePublisher`. HTTP routes, DTOs, Docker E2E coverage, the
+(Implemented; awaiting review). Sprint 063B adds PostgreSQL
+persistence for the Content Manager-owned `SourcePublisher`
+aggregate, the Drizzle schema and migration, the durable repository
+implementation, the atomic observation algorithm, the durable status
+update, the durable read operations, and the Content Manager
+composition wiring. HTTP routes, DTOs, Docker E2E coverage, the
 Web UI review surface, `SourceGroup` promotion, the extractor and
 browser behavior, and the future Content Builder / Content
 Publisher pipeline stages remain out of scope and are not part of
 Sprint 063B.
+Sprint 063A — Source Publisher Domain and Application (Accepted).
 Sprint 062: Feed Discovery Delivery Plan And Docker E2E Foundation (Accepted).
 Sprint 061: Operator Collection Schedule Management Surface (Accepted).
 Sprint 060: Collection Scheduler Containerization and Stack Integration (Accepted).
@@ -29,7 +29,7 @@ Sprint 054A: Profile Authentication Health Foundation (Accepted).
 
 ## Currently Available Capabilities
 - **Profile Management**: Creation, lifecycle, session ingestion, checkout leasing, and operator-driven recovery reprovisioning for `REAUTH_REQUIRED` and `CHECKPOINT_REVIEW_REQUIRED` profiles.
-- **Content Management**: Storage of normalized Facebook knowledge group text posts and top comments, and the Content Manager-owned `SourcePublisher` identity and observation behavior (durable publishing-source identity for a Facebook group or page observed while reading a feed, with `DISCOVERED | APPROVED | IGNORED | BLOCKED` review status). `SourcePublisher` is distinct from managed `SourceGroup` and is not the future Content Publisher pipeline stage; Sprint 063A (accepted) ships domain and application foundation only (no persistence, no HTTP, no UI, no browser, no feed execution). Sprint 063B — Source Publisher Persistence and Atomic Observation is awaiting definition and is not active.
+- **Content Management**: Storage of normalized Facebook knowledge group text posts and top comments, and the Content Manager-owned `SourcePublisher` identity and observation behavior (durable publishing-source identity for a Facebook group or page observed while reading a feed, with `DISCOVERED | APPROVED | IGNORED | BLOCKED` review status). `SourcePublisher` is distinct from managed `SourceGroup` and is not the future Content Publisher pipeline stage. Sprint 063A (accepted) shipped the domain and application foundation; Sprint 063B (implemented, awaiting review) shipped the durable persistence, the atomic observation algorithm, the durable status update, the durable read operations, and the Content Manager composition wiring. No HTTP, no UI, no browser, no feed execution.
 - **Collection Execution**: Headless browser extraction using Playwright (or experimental CloakBrowser). Worker processes automatically consume queued collection runs, ambient exercise runs, and access-check runs.
 - **Collection Scheduling**: One persisted `CollectionSchedule` per source group (interval, next run, parameters). A containerized `collection-scheduler` Compose service drains due schedules into queued `SCHEDULED` collection runs on an interval; the scheduler-runtime image does not provision browser executables, Playwright browser downloads, Xvfb, browser-specific system packages, or a runnable CloakBrowser browser/system runtime, and does not launch a browser.
 - **Operator Tools**: CLI tools for profile provisioning, manual collection, worker execution, browser probing, the same provisioning CLI used for first-time and recovery login, and the containerized collection scheduler.
@@ -81,11 +81,16 @@ observation behavior (no persistence, no HTTP, no UI, no browser, no
 feed execution) plus strict runtime validation for the observation
 application input and the regression coverage that proves invalid
 input is rejected before any use-case side effect. Sprint 063B —
-Source Publisher Persistence and Atomic Observation is awaiting
-definition and is not active; future sprint work after Sprint 063A
-follows the 063A–068 sequence documented in `docs/ROADMAP.md`, in
-which `SourcePublisher` is the Content Manager-owned publishing-source
-identity (a group or a page observed while reading the feed) and is
-not the future Content Publisher pipeline stage. The long-term
-`Future: Content Builder` and `Future: Content Publisher` pipeline
-stages are retained.
+Source Publisher Persistence and Atomic Observation is implemented
+and awaiting review: it shipped the `source_publishers` Drizzle
+schema and migration, the `DrizzleSourcePublisherRepository`
+adapter with the atomic observation algorithm, the durable status
+update, the durable read operations, the Content Manager
+composition wiring, the unit and mapper tests, the opt-in database
+integration tests, and the real PostgreSQL concurrency tests.
+Future sprint work after Sprint 063B follows the 063C–068 sequence
+documented in `docs/ROADMAP.md`, in which `SourcePublisher` is the
+Content Manager-owned publishing-source identity (a group or a page
+observed while reading the feed) and is not the future Content
+Publisher pipeline stage. The long-term `Future: Content Builder`
+and `Future: Content Publisher` pipeline stages are retained.

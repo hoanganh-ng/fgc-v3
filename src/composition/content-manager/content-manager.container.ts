@@ -4,14 +4,18 @@ import {
   CreateSourceGroupUseCase,
   GetContentItemUseCase,
   GetSourceGroupUseCase,
+  GetSourcePublisherUseCase,
   IngestCollectedContentUseCase,
   ListContentCategoriesUseCase,
   ListContentItemsUseCase,
   ListSourceGroupsUseCase,
+  ListSourcePublishersUseCase,
+  ObserveSourcePublisherUseCase,
   RemoveSourceGroupEntryRouteUseCase,
   UpdateContentStatusUseCase,
   UpdateSourceGroupEntryRouteUseCase,
   UpdateSourceGroupStatusUseCase,
+  UpdateSourcePublisherStatusUseCase,
 } from "../../content-manager/application";
 import type {
   Clock,
@@ -19,12 +23,14 @@ import type {
   ContentItemRepository,
   IdGenerator,
   SourceGroupRepository,
+  SourcePublisherRepository,
 } from "../../content-manager/application";
 
 export interface ContentManagerDependencies {
   readonly categories: ContentCategoryRepository;
   readonly sourceGroups: SourceGroupRepository;
   readonly contentItems: ContentItemRepository;
+  readonly sourcePublishers: SourcePublisherRepository;
   readonly clock: Clock;
   readonly idGenerator: IdGenerator;
   readonly close?: () => Promise<void>;
@@ -44,6 +50,10 @@ export interface ContentManagerContainer {
   readonly updateContentStatus: UpdateContentStatusUseCase;
   readonly getContentItem: GetContentItemUseCase;
   readonly listContentItems: ListContentItemsUseCase;
+  readonly observeSourcePublisher: ObserveSourcePublisherUseCase;
+  readonly getSourcePublisher: GetSourcePublisherUseCase;
+  readonly listSourcePublishers: ListSourcePublishersUseCase;
+  readonly updateSourcePublisherStatus: UpdateSourcePublisherStatusUseCase;
   close(): Promise<void>;
 }
 
@@ -54,6 +64,7 @@ export function createContentManager(
     categories,
     sourceGroups,
     contentItems,
+    sourcePublishers,
     clock,
     idGenerator,
   } = dependencies;
@@ -99,6 +110,17 @@ export function createContentManager(
     updateContentStatus: new UpdateContentStatusUseCase(contentItems, clock),
     getContentItem: new GetContentItemUseCase(contentItems),
     listContentItems: new ListContentItemsUseCase(contentItems),
+    observeSourcePublisher: new ObserveSourcePublisherUseCase(
+      sourcePublishers,
+      idGenerator,
+      clock,
+    ),
+    getSourcePublisher: new GetSourcePublisherUseCase(sourcePublishers),
+    listSourcePublishers: new ListSourcePublishersUseCase(sourcePublishers),
+    updateSourcePublisherStatus: new UpdateSourcePublisherStatusUseCase(
+      sourcePublishers,
+      clock,
+    ),
     close: dependencies.close ?? noopClose,
   };
 }

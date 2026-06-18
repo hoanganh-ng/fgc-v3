@@ -22,9 +22,13 @@
   observation never changes review status.
 - Explicit, reversible `SourcePublisher` status updates (idempotent
   when reapplying the current status).
-- `SourcePublisher` application ports (`save`, `findById`,
+- `SourcePublisher` application ports
+  (`observeAtomically`, `updateStatus`, `findById`,
   `findByIdentity`, `list` with bounded `limit` and non-negative
   `offset`, ordered `lastObservedAt` descending then `id` ascending).
+  Observation has a purpose-specific atomic operation, review
+  status has a purpose-specific partial status operation, and there
+  is no production full-row save path for `SourcePublisher`.
 - Safe read APIs for content and sources.
 - Future handoff shape for Content Builder.
 
@@ -54,9 +58,21 @@
   - `use-cases/update-source-publisher-status.use-case.ts`
   - `test-support/in-memory-repositories.ts`
     (`InMemorySourcePublisherRepository`)
+- `src/infrastructure/database/`
+  - `schema/content-manager.schema.ts` (`source_publishers` table,
+    `source_publisher_kind` enum, `source_publisher_status` enum)
+  - `mappers/content-manager.mapper.ts` (`SourcePublisherRow`,
+    `SourcePublisherInsert`, `toSourcePublisherRow`,
+    `toSourcePublisherDomain`)
+  - `repositories/drizzle-source-publisher.repository.ts`
+- `src/composition/content-manager/`
+  - `content-manager.container.ts` (exposes
+    `observeSourcePublisher`, `getSourcePublisher`,
+    `listSourcePublishers`, `updateSourcePublisherStatus`)
+  - `create-content-manager.ts` (instantiates
+    `DrizzleSourcePublisherRepository`)
 - `src/content-manager/infrastructure/`
 - `src/content-manager/interface/`
-- `src/content-manager/composition/`
 
 ## Important Entrypoints
 - `Fastify API`: `src/content-manager/interface/http/` (e.g. `/content/items`, `/content/source-groups`)

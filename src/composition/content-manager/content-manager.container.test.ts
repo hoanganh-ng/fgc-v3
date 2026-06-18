@@ -5,20 +5,25 @@ import {
   CreateSourceGroupUseCase,
   GetContentItemUseCase,
   GetSourceGroupUseCase,
+  GetSourcePublisherUseCase,
   IngestCollectedContentUseCase,
   ListContentCategoriesUseCase,
   ListContentItemsUseCase,
   ListSourceGroupsUseCase,
+  ListSourcePublishersUseCase,
+  ObserveSourcePublisherUseCase,
   RemoveSourceGroupEntryRouteUseCase,
   UpdateContentStatusUseCase,
   UpdateSourceGroupEntryRouteUseCase,
   UpdateSourceGroupStatusUseCase,
+  UpdateSourcePublisherStatusUseCase,
 } from "../../content-manager/application";
 import type { Clock, IdGenerator } from "../../content-manager/application";
 import {
   InMemoryContentCategoryRepository,
   InMemoryContentItemRepository,
   InMemorySourceGroupRepository,
+  InMemorySourcePublisherRepository,
 } from "../../content-manager/application/test-support/in-memory-repositories";
 import type { DatabaseClient } from "../../infrastructure/database";
 import { createContentManager } from "./content-manager.container";
@@ -31,6 +36,7 @@ describe("content manager composition container", () => {
       categories: new InMemoryContentCategoryRepository(),
       sourceGroups: new InMemorySourceGroupRepository(),
       contentItems: new InMemoryContentItemRepository(),
+      sourcePublishers: new InMemorySourcePublisherRepository(),
       clock: new FixedClock(),
       idGenerator: new FakeIdGenerator(),
       close: async () => {
@@ -81,6 +87,10 @@ function expectContentManagerServices(services: {
   readonly updateContentStatus: unknown;
   readonly getContentItem: unknown;
   readonly listContentItems: unknown;
+  readonly observeSourcePublisher: unknown;
+  readonly getSourcePublisher: unknown;
+  readonly listSourcePublishers: unknown;
+  readonly updateSourcePublisherStatus: unknown;
 }): void {
   expect(services.createContentCategory).toBeInstanceOf(
     CreateContentCategoryUseCase,
@@ -111,6 +121,18 @@ function expectContentManagerServices(services: {
   );
   expect(services.getContentItem).toBeInstanceOf(GetContentItemUseCase);
   expect(services.listContentItems).toBeInstanceOf(ListContentItemsUseCase);
+  expect(services.observeSourcePublisher).toBeInstanceOf(
+    ObserveSourcePublisherUseCase,
+  );
+  expect(services.getSourcePublisher).toBeInstanceOf(
+    GetSourcePublisherUseCase,
+  );
+  expect(services.listSourcePublishers).toBeInstanceOf(
+    ListSourcePublishersUseCase,
+  );
+  expect(services.updateSourcePublisherStatus).toBeInstanceOf(
+    UpdateSourcePublisherStatusUseCase,
+  );
 }
 
 class FixedClock implements Clock {

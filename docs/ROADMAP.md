@@ -85,11 +85,19 @@ Define the Content Manager-owned `SourcePublisher` identity and observation beha
 
 ## Sprint 063B: Source Publisher Persistence And Atomic Observation
 
-Add `SourcePublisher` PostgreSQL persistence, mapper, repository adapter, unique identity, and concurrency-safe observation / upsert behavior. Keep domain and application layers database-free.
+Add `SourcePublisher` PostgreSQL persistence, mapper, repository
+adapter, unique identity, and concurrency-safe observation / upsert
+behavior. Keep domain and application layers database-free. Wire
+the four `SourcePublisher` use cases through the Content Manager
+composition root. No HTTP routes, no Docker E2E, no Web UI review
+surface.
 
 ## Sprint 063C: Source Publisher HTTP Contract And E2E
 
-Add safe observation and required list / get HTTP contracts for `SourcePublisher`, composition wiring, and Docker E2E coverage. Do not add a review UI yet.
+Add safe observation and required list / get HTTP contracts for
+`SourcePublisher` and Docker E2E coverage. Composition wiring for
+`SourcePublisher` is already implemented in Sprint 063B and is not
+in scope for Sprint 063C. Do not add a review UI yet.
 
 ## Sprint 064A: Content Collection Provenance Model
 

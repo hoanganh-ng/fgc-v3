@@ -1,8 +1,8 @@
 import {
   loadValidatedSourcePublisherById,
   toIsoDateTime,
-  validateSourcePublisherForApplication,
 } from "../content-validation";
+import { SourcePublisherNotFoundError } from "../application-errors";
 import type { Clock } from "../ports/clock.port";
 import type { SourcePublisherRepository } from "../ports/source-publisher-repository.port";
 import { applySourcePublisherStatusUpdate } from "../../domain";
@@ -26,26 +26,32 @@ export class UpdateSourcePublisherStatusUseCase {
   public async execute(
     input: UpdateSourcePublisherStatusInput,
   ): Promise<SourcePublisher> {
+    const updatedAt = toIsoDateTime(this.clock.now());
     const existing = await loadValidatedSourcePublisherById(
       this.sourcePublishers,
       input.sourcePublisherId,
     );
 
-    const updatedSourcePublisher = applySourcePublisherStatusUpdate(
+    const candidate = applySourcePublisherStatusUpdate(
       existing,
       input.status,
-      { updatedAt: toIsoDateTime(this.clock.now()) },
+      { updatedAt },
     );
 
-    if (updatedSourcePublisher === existing) {
+    if (candidate === existing) {
       return existing;
     }
 
-    const validatedSourcePublisher =
-      validateSourcePublisherForApplication(updatedSourcePublisher);
+    const updated = await this.sourcePublishers.updateStatus({
+      sourcePublisherId: existing.id,
+      status: input.status,
+      updatedAt,
+    });
 
-    await this.sourcePublishers.save(validatedSourcePublisher);
+    if (updated === null) {
+      throw new SourcePublisherNotFoundError(existing.id);
+    }
 
-    return validatedSourcePublisher;
+    return updated;
   }
 }

@@ -3,17 +3,20 @@ import type {
   ContentItem,
   IsoDateTime,
   SourceGroup,
+  SourcePublisher,
   ValidationIssue,
 } from "../../../content-manager/domain";
 import {
   validateContentCategory,
   validateContentItem,
   validateSourceGroup,
+  validateSourcePublisher,
 } from "../../../content-manager/domain";
 import {
   contentCategories,
   contentItems,
   sourceGroups,
+  sourcePublishers,
 } from "../schema/content-manager.schema";
 
 export type ContentCategoryRow = typeof contentCategories.$inferSelect;
@@ -22,11 +25,14 @@ export type SourceGroupRow = typeof sourceGroups.$inferSelect;
 export type SourceGroupInsert = typeof sourceGroups.$inferInsert;
 export type ContentItemRow = typeof contentItems.$inferSelect;
 export type ContentItemInsert = typeof contentItems.$inferInsert;
+export type SourcePublisherRow = typeof sourcePublishers.$inferSelect;
+export type SourcePublisherInsert = typeof sourcePublishers.$inferInsert;
 
 type ContentManagerRecordType =
   | "content category"
   | "source group"
-  | "content item";
+  | "content item"
+  | "source publisher";
 
 export class InvalidPersistedContentManagerRecordError extends Error {
   public readonly recordType: ContentManagerRecordType;
@@ -181,6 +187,71 @@ export function toContentItemDomain(row: ContentItemRow): ContentItem {
 
   if (!result.valid) {
     throw invalidPersisted("content item", row.id, result.issues);
+  }
+
+  return result.value;
+}
+
+export function toSourcePublisherRow(
+  sourcePublisher: SourcePublisher,
+): SourcePublisherInsert {
+  const validSourcePublisher = parseSourcePublisherForPersistence(
+    sourcePublisher,
+  );
+
+  return {
+    id: validSourcePublisher.id,
+    platform: validSourcePublisher.platform,
+    kind: validSourcePublisher.kind,
+    externalPublisherId: validSourcePublisher.externalPublisherId,
+    displayName: validSourcePublisher.displayName ?? null,
+    canonicalUrl: validSourcePublisher.canonicalUrl ?? null,
+    status: validSourcePublisher.status,
+    firstObservedAt: validSourcePublisher.firstObservedAt,
+    lastObservedAt: validSourcePublisher.lastObservedAt,
+    observationCount: validSourcePublisher.observationCount,
+    createdAt: validSourcePublisher.createdAt,
+    updatedAt: validSourcePublisher.updatedAt,
+  };
+}
+
+export function toSourcePublisherDomain(
+  row: SourcePublisherRow,
+): SourcePublisher {
+  const candidate = {
+    id: row.id,
+    platform: row.platform,
+    kind: row.kind,
+    externalPublisherId: row.externalPublisherId,
+    ...optional("displayName", row.displayName),
+    ...optional("canonicalUrl", row.canonicalUrl),
+    status: row.status,
+    firstObservedAt: normalizeIsoDateTime(row.firstObservedAt),
+    lastObservedAt: normalizeIsoDateTime(row.lastObservedAt),
+    observationCount: row.observationCount,
+    createdAt: normalizeIsoDateTime(row.createdAt),
+    updatedAt: normalizeIsoDateTime(row.updatedAt),
+  };
+  const result = validateSourcePublisher(candidate);
+
+  if (!result.valid) {
+    throw invalidPersisted("source publisher", row.id, result.issues);
+  }
+
+  return result.value;
+}
+
+function parseSourcePublisherForPersistence(
+  sourcePublisher: SourcePublisher,
+): SourcePublisher {
+  const result = validateSourcePublisher(sourcePublisher);
+
+  if (!result.valid) {
+    throw invalidPersisted(
+      "source publisher",
+      sourcePublisher.id,
+      result.issues,
+    );
   }
 
   return result.value;
