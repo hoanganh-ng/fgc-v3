@@ -91,10 +91,22 @@ if (!shouldRunDbTests) {
         expect(allRows[0]?.id).toBe(durableId);
         expect(allRows[0]?.observationCount).toBe(participantCount);
 
+        const winnerIndex = observations.findIndex(
+          (observation) => observation.candidateId === durableId,
+        );
+        expect(winnerIndex).toBeGreaterThanOrEqual(0);
+        const winner = observations[winnerIndex]!;
+
         const firstObservedAt = allRows[0]?.firstObservedAt;
         const createdAt = allRows[0]?.createdAt;
         expect(typeof firstObservedAt).toBe("string");
         expect(typeof createdAt).toBe("string");
+        expect(new Date(firstObservedAt!).toISOString()).toBe(
+          new Date(winner.observedAt).toISOString(),
+        );
+        expect(new Date(createdAt!).toISOString()).toBe(
+          new Date(winner.updatedAt).toISOString(),
+        );
       });
 
       it("concurrent re-observations against an existing identity never lose a count", async () => {
@@ -304,17 +316,40 @@ if (!shouldRunDbTests) {
         });
         trackedIds.add(seeded.id);
 
-        const observations = Array.from({ length: 4 }, (_, index) => ({
+        const observations = [
+          {
+            observedAt: "2026-03-01T09:00:00.000Z",
+            updatedAt: "2026-03-01T09:00:05.000Z",
+            displayName: "Observed 0",
+          },
+          {
+            observedAt: "2026-03-01T09:01:00.000Z",
+            updatedAt: "2026-03-01T09:01:05.000Z",
+            displayName: "Observed 1",
+          },
+          {
+            observedAt: "2026-03-01T09:02:00.000Z",
+            updatedAt: "2026-03-01T09:02:05.000Z",
+            displayName: "Observed 2",
+          },
+          {
+            observedAt: "2026-03-01T09:03:00.000Z",
+            updatedAt: "2026-03-01T09:03:05.000Z",
+            displayName: "Observed 3",
+          },
+        ];
+
+        const inputs = observations.map((observation, index) => ({
           candidateId: nextId(`concurrent-status-vs-obs-cand-${index}`),
           platform: seeded.platform,
           kind: seeded.kind,
           externalPublisherId: external,
-          observedAt: `2026-03-01T09:0${index}:00.000Z`,
-          updatedAt: `2026-03-01T09:0${index}:05.000Z`,
-          displayName: `Observed ${index}`,
+          observedAt: observation.observedAt,
+          updatedAt: observation.updatedAt,
+          displayName: observation.displayName,
         }));
 
-        const observationRepositories = observations.map(
+        const observationRepositories = inputs.map(
           () => new DrizzleSourcePublisherRepository(client!.db),
         );
         const statusRepository = new DrizzleSourcePublisherRepository(
@@ -322,7 +357,7 @@ if (!shouldRunDbTests) {
         );
 
         await Promise.all([
-          ...observations.map((input, index) =>
+          ...inputs.map((input, index) =>
             observationRepositories[index]!.observeAtomically(input),
           ),
           statusRepository.updateStatus({
@@ -334,8 +369,8 @@ if (!shouldRunDbTests) {
 
         const stored = await statusRepository.findById(seeded.id);
         expect(stored?.status).toBe("BLOCKED");
-        expect(stored?.observationCount).toBe(1 + observations.length);
-        expect(stored?.displayName).toBe("Initial");
+        expect(stored?.observationCount).toBe(1 + inputs.length);
+        expect(stored?.displayName).toBe("Observed 3");
         expect(new Date(stored!.lastObservedAt).toISOString()).toBe(
           new Date("2026-03-01T09:03:00.000Z").toISOString(),
         );

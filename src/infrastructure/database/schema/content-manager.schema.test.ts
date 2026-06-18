@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   contentCategories,
@@ -6,6 +8,9 @@ import {
   contentStatusEnum,
   sourceGroups,
   sourceGroupStatusEnum,
+  sourcePublisherKindEnum,
+  sourcePublisherStatusEnum,
+  sourcePublishers,
 } from "./content-manager.schema";
 
 describe("content manager database schema", () => {
@@ -32,6 +37,19 @@ describe("content manager database schema", () => {
     expect(contentItems.rawPayloadRef.name).toBe("raw_payload_ref");
   });
 
+  it("exports source publisher table metadata for migration generation", () => {
+    expect(sourcePublishers.id.name).toBe("id");
+    expect(sourcePublishers.kind.name).toBe("kind");
+    expect(sourcePublishers.externalPublisherId.name).toBe(
+      "external_publisher_id",
+    );
+    expect(sourcePublishers.displayName.name).toBe("display_name");
+    expect(sourcePublishers.canonicalUrl.name).toBe("canonical_url");
+    expect(sourcePublishers.firstObservedAt.name).toBe("first_observed_at");
+    expect(sourcePublishers.lastObservedAt.name).toBe("last_observed_at");
+    expect(sourcePublishers.observationCount.name).toBe("observation_count");
+  });
+
   it("keeps database enum values aligned with the Content Manager model", () => {
     expect(contentPlatformEnum.enumValues).toEqual(["FACEBOOK"]);
     expect(sourceGroupStatusEnum.enumValues).toEqual([
@@ -45,5 +63,26 @@ describe("content manager database schema", () => {
       "REJECTED",
       "USED",
     ]);
+    expect(sourcePublisherKindEnum.enumValues).toEqual(["GROUP", "PAGE"]);
+    expect(sourcePublisherStatusEnum.enumValues).toEqual([
+      "DISCOVERED",
+      "APPROVED",
+      "IGNORED",
+      "BLOCKED",
+    ]);
+  });
+
+  it("creates the source publisher lastObservedAt-id index as DESC, ASC", () => {
+    const migrationPath = resolve(
+      process.cwd(),
+      "drizzle/0017_curious_dust.sql",
+    );
+    const sql = readFileSync(migrationPath, "utf8");
+    const match = sql.match(
+      /CREATE INDEX "source_publishers_last_observed_at_id_idx"[^;]+;/i,
+    );
+    expect(match).not.toBeNull();
+    expect(match![0]).toMatch(/"last_observed_at"\s+DESC/i);
+    expect(match![0]).toMatch(/"id"\s+ASC/i);
   });
 });

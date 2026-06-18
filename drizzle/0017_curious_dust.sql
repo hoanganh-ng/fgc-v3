@@ -21,4 +21,4 @@ CREATE UNIQUE INDEX "source_publishers_identity_uidx" ON "source_publishers" USI
 CREATE INDEX "source_publishers_status_idx" ON "source_publishers" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "source_publishers_kind_idx" ON "source_publishers" USING btree ("kind");--> statement-breakpoint
 CREATE INDEX "source_publishers_platform_idx" ON "source_publishers" USING btree ("platform");--> statement-breakpoint
-CREATE INDEX "source_publishers_last_observed_at_id_idx" ON "source_publishers" USING btree ("last_observed_at","id");
+CREATE INDEX "source_publishers_last_observed_at_id_idx" ON "source_publishers" USING btree ("last_observed_at" DESC,"id" ASC);

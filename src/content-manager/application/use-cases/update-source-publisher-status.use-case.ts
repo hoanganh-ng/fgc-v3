@@ -1,6 +1,7 @@
 import {
   loadValidatedSourcePublisherById,
   toIsoDateTime,
+  validateSourcePublisherForApplication,
 } from "../content-validation";
 import { SourcePublisherNotFoundError } from "../application-errors";
 import type { Clock } from "../ports/clock.port";
@@ -38,7 +39,9 @@ export class UpdateSourcePublisherStatusUseCase {
       { updatedAt },
     );
 
-    if (candidate === existing) {
+    const validatedCandidate = validateSourcePublisherForApplication(candidate);
+
+    if (validatedCandidate.status === existing.status) {
       return existing;
     }
 
@@ -52,6 +55,6 @@ export class UpdateSourcePublisherStatusUseCase {
       throw new SourcePublisherNotFoundError(existing.id);
     }
 
-    return updated;
+    return validateSourcePublisherForApplication(updated);
   }
 }

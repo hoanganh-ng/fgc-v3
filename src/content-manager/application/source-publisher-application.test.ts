@@ -366,6 +366,62 @@ describe("source publisher application use cases", () => {
     ).rejects.toThrow(SourcePublisherNotFoundError);
   });
 
+  it("rejects an invalid runtime status before updateStatus is called", async () => {
+    const statusRepository = new CountingSourcePublisherRepository();
+    const context = createTestContext(["publisher-1"]);
+
+    await new ObserveSourcePublisherUseCase(
+      statusRepository,
+      context.ids,
+      context.clock,
+    ).execute({
+      platform: "FACEBOOK",
+      kind: "GROUP",
+      externalPublisherId: "facebook-group-1",
+      observedAt: baseObservedAt,
+    });
+
+    const updateStatusCountBefore = statusRepository.updateStatusCount;
+
+    await expect(
+      new UpdateSourcePublisherStatusUseCase(
+        statusRepository,
+        context.clock,
+      ).execute({
+        sourcePublisherId: "publisher-1",
+        status: "UNKNOWN" as SourcePublisher["status"],
+      }),
+    ).rejects.toThrow(ContentValidationError);
+
+    expect(statusRepository.updateStatusCount).toBe(updateStatusCountBefore);
+  });
+
+  it("rejects a malformed aggregate returned by updateStatus", async () => {
+    const malformedRepository = new MalformedUpdateStatusSourcePublisherRepository();
+    const context = createTestContext(["publisher-1"]);
+
+    await new ObserveSourcePublisherUseCase(
+      malformedRepository,
+      context.ids,
+      context.clock,
+    ).execute({
+      platform: "FACEBOOK",
+      kind: "GROUP",
+      externalPublisherId: "facebook-group-1",
+      observedAt: baseObservedAt,
+    });
+
+    await expect(
+      new UpdateSourcePublisherStatusUseCase(
+        malformedRepository,
+        context.clock,
+      ).execute({
+        sourcePublisherId: "publisher-1",
+        status: "APPROVED",
+      }),
+    ).rejects.toThrow(ContentValidationError);
+  });
+
   it("lists with status, kind, and platform filters plus pagination ordered by lastObservedAt desc, id asc", async () => {
     const context = createTestContext([
       "publisher-a",
@@ -952,6 +1008,65 @@ class CountingObservationSourcePublisherRepository
 
   public async findById(): Promise<SourcePublisher | null> {
     return null;
+  }
+
+  public async findByIdentity(): Promise<SourcePublisher | null> {
+    return null;
+  }
+
+  public async list(): Promise<SourcePublisherListResult> {
+    return { items: [], total: 0 };
+  }
+}
+
+class MalformedUpdateStatusSourcePublisherRepository
+  implements SourcePublisherRepository
+{
+  private readonly store = new Map<string, SourcePublisher>();
+
+  public async observeAtomically(
+    input: AtomicSourcePublisherObservationInput,
+  ): Promise<SourcePublisher> {
+    const seeded: SourcePublisher = {
+      id: input.candidateId,
+      platform: input.platform,
+      kind: input.kind,
+      externalPublisherId: input.externalPublisherId,
+      ...(input.displayName !== undefined
+        ? { displayName: input.displayName }
+        : {}),
+      ...(input.canonicalUrl !== undefined
+        ? { canonicalUrl: input.canonicalUrl }
+        : {}),
+      status: "DISCOVERED",
+      firstObservedAt: input.observedAt,
+      lastObservedAt: input.observedAt,
+      observationCount: 1,
+      createdAt: input.updatedAt,
+      updatedAt: input.updatedAt,
+    };
+    this.store.set(seeded.id, seeded);
+    return seeded;
+  }
+
+  public async updateStatus(
+    input: SourcePublisherStatusPersistenceInput,
+  ): Promise<SourcePublisher | null> {
+    const existing = this.store.get(input.sourcePublisherId);
+    if (existing === undefined) {
+      return null;
+    }
+    return {
+      ...existing,
+      status: input.status,
+      updatedAt: input.updatedAt,
+      firstObservedAt: "2026-03-02T08:00:00.000Z",
+      lastObservedAt: "2026-03-01T08:00:00.000Z",
+    } as SourcePublisher;
+  }
+
+  public async findById(id: string): Promise<SourcePublisher | null> {
+    return this.store.get(id) ?? null;
   }
 
   public async findByIdentity(): Promise<SourcePublisher | null> {

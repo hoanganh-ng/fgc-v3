@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { asc, desc, sql } from "drizzle-orm";
 import {
   check,
   index,
@@ -158,8 +158,8 @@ export const sourcePublishers = pgTable(
     index("source_publishers_kind_idx").on(table.kind),
     index("source_publishers_platform_idx").on(table.platform),
     index("source_publishers_last_observed_at_id_idx").on(
-      table.lastObservedAt,
-      table.id,
+      desc(table.lastObservedAt),
+      asc(table.id),
     ),
     check(
       "source_publishers_observation_count_check",

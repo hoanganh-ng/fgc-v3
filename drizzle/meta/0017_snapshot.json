@@ -1916,7 +1916,7 @@
             {
               "expression": "last_observed_at",
               "isExpression": false,
-              "asc": true,
+              "asc": false,
               "nulls": "last"
             },
             {
