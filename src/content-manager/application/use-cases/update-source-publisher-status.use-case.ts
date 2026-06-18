@@ -31,14 +31,21 @@ export class UpdateSourcePublisherStatusUseCase {
       input.sourcePublisherId,
     );
 
-    const updatedSourcePublisher = validateSourcePublisherForApplication(
-      applySourcePublisherStatusUpdate(existing, input.status, {
-        updatedAt: toIsoDateTime(this.clock.now()),
-      }),
+    const updatedSourcePublisher = applySourcePublisherStatusUpdate(
+      existing,
+      input.status,
+      { updatedAt: toIsoDateTime(this.clock.now()) },
     );
 
-    await this.sourcePublishers.save(updatedSourcePublisher);
+    if (updatedSourcePublisher === existing) {
+      return existing;
+    }
 
-    return updatedSourcePublisher;
+    const validatedSourcePublisher =
+      validateSourcePublisherForApplication(updatedSourcePublisher);
+
+    await this.sourcePublishers.save(validatedSourcePublisher);
+
+    return validatedSourcePublisher;
   }
 }

@@ -22,11 +22,14 @@ import type {
   ContentCategoryId,
   ContentId,
   ContentItem,
+  ContentPlatform,
+  ExternalPublisherId,
   IsoDateTime,
   SourceGroup,
   SourceGroupId,
   SourcePublisher,
   SourcePublisherId,
+  SourcePublisherKind,
 } from "../domain";
 
 export function toIsoDateTime(date: Date): IsoDateTime {
@@ -80,6 +83,25 @@ export async function loadValidatedSourcePublisherById(
 
   if (sourcePublisher === null) {
     throw new SourcePublisherNotFoundError(sourcePublisherId);
+  }
+
+  return validateSourcePublisherForApplication(sourcePublisher);
+}
+
+export async function loadValidatedSourcePublisherByIdentity(
+  repository: SourcePublisherRepository,
+  platform: ContentPlatform,
+  kind: SourcePublisherKind,
+  externalPublisherId: ExternalPublisherId,
+): Promise<SourcePublisher | null> {
+  const sourcePublisher = await repository.findByIdentity(
+    platform,
+    kind,
+    externalPublisherId,
+  );
+
+  if (sourcePublisher === null) {
+    return null;
   }
 
   return validateSourcePublisherForApplication(sourcePublisher);

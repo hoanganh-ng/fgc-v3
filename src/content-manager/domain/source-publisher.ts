@@ -1,4 +1,5 @@
 import type { infer as zInfer } from "zod";
+import { SourcePublisherIdentityMismatchError } from "./content-errors";
 import type { SourcePublisherKind } from "./source-publisher-kind";
 import type { SourcePublisherStatus } from "./source-publisher-status";
 import type {
@@ -58,19 +59,21 @@ export function applySourcePublisherObservation(
   input: Omit<ObserveSourcePublisherInput, "id">,
   options: ObserveSourcePublisherOptions,
 ): SourcePublisher {
+  assertSourcePublisherIdentityMatches(existing, input.identity);
+
   const observedAt = input.observedAt;
-  const observedAtIsNewer =
-    Date.parse(observedAt) > Date.parse(existing.lastObservedAt);
-  const monotonicLastObservedAt = observedAtIsNewer
+  const observedAtIsCurrentOrNewer =
+    Date.parse(observedAt) >= Date.parse(existing.lastObservedAt);
+  const monotonicLastObservedAt = observedAtIsCurrentOrNewer
     ? observedAt
     : existing.lastObservedAt;
 
   const incomingDisplayName =
-    input.displayName !== undefined && observedAtIsNewer
+    input.displayName !== undefined && observedAtIsCurrentOrNewer
       ? input.displayName
       : undefined;
   const incomingCanonicalUrl =
-    input.canonicalUrl !== undefined && observedAtIsNewer
+    input.canonicalUrl !== undefined && observedAtIsCurrentOrNewer
       ? input.canonicalUrl
       : undefined;
 
@@ -138,4 +141,26 @@ export function sourcePublishersShareIdentity(
     left.kind === right.kind &&
     left.externalPublisherId === right.externalPublisherId
   );
+}
+
+export function sourcePublisherIdentityOf(
+  sourcePublisher: SourcePublisher,
+): SourcePublisherIdentity {
+  return {
+    platform: sourcePublisher.platform,
+    kind: sourcePublisher.kind,
+    externalPublisherId: sourcePublisher.externalPublisherId,
+  };
+}
+
+export function assertSourcePublisherIdentityMatches(
+  existing: SourcePublisher,
+  incoming: SourcePublisherIdentity,
+): void {
+  if (!sourcePublishersShareIdentity(existing, incoming)) {
+    throw new SourcePublisherIdentityMismatchError(
+      sourcePublisherIdentityOf(existing),
+      incoming,
+    );
+  }
 }

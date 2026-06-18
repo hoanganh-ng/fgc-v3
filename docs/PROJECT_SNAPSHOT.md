@@ -4,7 +4,7 @@
 The product is currently in the **Content Collector** stage (Stage 1 of 3, preceding Builder and Publisher). The core focus is collecting normalized content from configured Facebook sources while maintaining strict isolation between profile management, collection orchestration, and content storage.
 
 ## Current Active Sprint
-Sprint 063A — Source Publisher Domain and Application (Active; not yet accepted; not committed; not pushed).
+Sprint 063A — Source Publisher Domain and Application (Active; not yet accepted).
 Sprint 062: Feed Discovery Delivery Plan And Docker E2E Foundation (Accepted).
 Sprint 061: Operator Collection Schedule Management Surface (Accepted).
 Sprint 060: Collection Scheduler Containerization and Stack Integration (Accepted).

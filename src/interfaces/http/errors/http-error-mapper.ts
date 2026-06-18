@@ -378,6 +378,7 @@ const collectorRuntimeApplicationErrorStatus: Record<
 
 const contentDomainErrorStatus: Record<ContentManagerDomainErrorCode, number> = {
   INVALID_CONTENT_STATUS_TRANSITION: 409,
+  SOURCE_PUBLISHER_IDENTITY_MISMATCH: 409,
 };
 
 const collectorRuntimeDomainErrorStatus: Record<

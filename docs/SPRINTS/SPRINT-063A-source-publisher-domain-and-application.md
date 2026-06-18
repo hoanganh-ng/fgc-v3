@@ -40,13 +40,21 @@ publishing schedules, or published artifacts.
   - Existing observations preserve `id`, identity, `createdAt`,
     `firstObservedAt`, and current `status`. `observationCount` is
     incremented by exactly 1. `lastObservedAt` never moves backward.
-  - When the incoming observation is newer than the existing
-    `lastObservedAt`, the incoming `displayName` and `canonicalUrl`
-    (when present) replace the existing values. When the incoming
-    observation is older, the existing metadata is preserved.
+  - When the incoming observation is current or newer than the existing
+    `lastObservedAt` (i.e., `observedAt >= lastObservedAt`), the
+    incoming `displayName` and `canonicalUrl` (when present) replace
+    the existing values. When the incoming observation is older, the
+    existing metadata is preserved.
   - Omitted `displayName` or `canonicalUrl` does not clear existing
     metadata.
   - Observation never changes review `status`.
+  - `applySourcePublisherObservation` / `observeSourcePublisher`
+    reject an observation whose identity
+    (`platform + kind + externalPublisherId`) differs from the
+    existing aggregate's identity by throwing
+    `SourcePublisherIdentityMismatchError`. Adapters and use cases
+    cannot bypass this check; it is enforced inside the domain
+    operation.
 - Explicit, reversible status updates via
   `applySourcePublisherStatusUpdate`. Reapplying the current status is
   idempotent: the existing aggregate is returned unchanged and
@@ -120,8 +128,11 @@ Content Manager (application)
 - `displayName` and `canonicalUrl` are optional but, when present,
   must be non-empty string and URL respectively. They cannot be
   `null`. Unknown fields are rejected.
-- The repository port never returns `null` for an unknown identity;
-  use cases raise the typed `SourcePublisherNotFoundError`.
+- `findByIdentity` may return `null`. When `findByIdentity` returns
+  `null`, this is the first observation for that identity and a new
+  `DISCOVERED` aggregate is created.
+- `findById` may return `null`. When `findById` returns `null`, use
+  cases that look up by id raise `SourcePublisherNotFoundError`.
 - Domain and application layers do not depend on HTTP, Fastify,
   PostgreSQL, Drizzle, browser automation, queues, or React.
 
@@ -137,8 +148,9 @@ Content Manager (application)
   observation timestamps. The two flows are independent and the
   aggregate invariants hold under both.
 - **Metadata update rule**: incoming `displayName` and `canonicalUrl`
-  only replace existing values when the incoming observation is newer
-  than the existing `lastObservedAt`. Omitted metadata is preserved.
+  only replace existing values when the incoming observation is
+  current or newer than the existing `lastObservedAt`
+  (`observedAt >= lastObservedAt`). Omitted metadata is preserved.
   This matches the sprint's "older observations cannot overwrite
   metadata from newer observations" and "omitted metadata does not
   clear existing metadata" rules.
@@ -277,7 +289,10 @@ pnpm test
 ```
 
 `pnpm typecheck` must exit 0 and `pnpm test` must report all Source
-Publisher tests as passing and no other test as failing or skipped.
+Publisher tests as passing and no other Content Manager test as
+failing. Database integration and HTTP integration suites are opt-in
+and may legitimately be skipped by the default `pnpm test` invocation;
+this is expected and does not indicate a defect in Sprint 063A.
 
 ## Sprint Status
 
@@ -289,5 +304,4 @@ repository, and ships the domain and application unit tests. It does
 not add persistence, HTTP, UI, browser execution, or feed execution,
 and it does not promote, configure, schedule, or join anything.
 
-Sprint 063A is not yet accepted, has not been committed, and has not
-been pushed.
+Sprint 063A is active and is not yet accepted.

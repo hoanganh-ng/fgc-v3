@@ -1,4 +1,5 @@
 import {
+  loadValidatedSourcePublisherByIdentity,
   toIsoDateTime,
   validateSourcePublisherForApplication,
 } from "../content-validation";
@@ -33,7 +34,8 @@ export class ObserveSourcePublisherUseCase {
     input: ObserveSourcePublisherInput,
   ): Promise<SourcePublisher> {
     const updatedAt = toIsoDateTime(this.clock.now());
-    const existing = await this.sourcePublishers.findByIdentity(
+    const existing = await loadValidatedSourcePublisherByIdentity(
+      this.sourcePublishers,
       input.platform,
       input.kind,
       input.externalPublisherId,

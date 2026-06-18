@@ -1,12 +1,15 @@
 import { ContentValidationError } from "../application-errors";
 import { validateSourcePublisherForApplication } from "../content-validation";
 import type { SourcePublisherRepository } from "../ports/source-publisher-repository.port";
-import type {
-  ContentPlatform,
-  SourcePublisher,
-  SourcePublisherKind,
-  SourcePublisherStatus,
-  ValidationIssue,
+import {
+  isContentPlatform,
+  isSourcePublisherKind,
+  isSourcePublisherStatus,
+  type ContentPlatform,
+  type SourcePublisher,
+  type SourcePublisherKind,
+  type SourcePublisherStatus,
+  type ValidationIssue,
 } from "../../domain";
 
 export const DEFAULT_SOURCE_PUBLISHER_LIST_LIMIT = 50;
@@ -81,6 +84,27 @@ function normalizeListSourcePublishersInput(input: ListSourcePublishersInput): {
     issues.push({
       path: "offset",
       message: "offset must be a non-negative integer.",
+    });
+  }
+
+  if (input.status !== undefined && !isSourcePublisherStatus(input.status)) {
+    issues.push({
+      path: "status",
+      message: `status must be one of: DISCOVERED, APPROVED, IGNORED, BLOCKED.`,
+    });
+  }
+
+  if (input.kind !== undefined && !isSourcePublisherKind(input.kind)) {
+    issues.push({
+      path: "kind",
+      message: `kind must be one of: GROUP, PAGE.`,
+    });
+  }
+
+  if (input.platform !== undefined && !isContentPlatform(input.platform)) {
+    issues.push({
+      path: "platform",
+      message: `platform must be one of: FACEBOOK.`,
     });
   }
 

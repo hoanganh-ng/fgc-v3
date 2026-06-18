@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   InvalidContentStatusTransitionError,
+  SourcePublisherIdentityMismatchError,
   applySourcePublisherObservation,
   applySourcePublisherStatusUpdate,
   createDefaultSourceGroupEntryRoute,
@@ -709,6 +710,156 @@ describe("source publisher observation", () => {
     );
 
     expect(merged.status).toBe("BLOCKED");
+  });
+
+  it("replaces provided metadata when observedAt equals lastObservedAt", () => {
+    const existing = createSourcePublisher({
+      displayName: "Old Display Name",
+      canonicalUrl: "https://www.facebook.com/groups/old",
+      lastObservedAt: publisherFirstObservedAt,
+    });
+
+    const merged = applySourcePublisherObservation(
+      existing,
+      {
+        identity: {
+          platform: existing.platform,
+          kind: existing.kind,
+          externalPublisherId: existing.externalPublisherId,
+        },
+        observedAt: publisherFirstObservedAt,
+        displayName: "Updated Display Name",
+        canonicalUrl: "https://www.facebook.com/groups/updated",
+      },
+      { updatedAt: publisherNewerUpdatedAt },
+    );
+
+    expect(merged.displayName).toBe("Updated Display Name");
+    expect(merged.canonicalUrl).toBe(
+      "https://www.facebook.com/groups/updated",
+    );
+    expect(merged.lastObservedAt).toBe(publisherFirstObservedAt);
+    expect(merged.observationCount).toBe(existing.observationCount + 1);
+  });
+
+  it("fills previously omitted metadata on equal-timestamp observation", () => {
+    const existing = createSourcePublisher({
+      displayName: undefined,
+      canonicalUrl: undefined,
+      lastObservedAt: publisherFirstObservedAt,
+    });
+
+    const merged = applySourcePublisherObservation(
+      existing,
+      {
+        identity: {
+          platform: existing.platform,
+          kind: existing.kind,
+          externalPublisherId: existing.externalPublisherId,
+        },
+        observedAt: publisherFirstObservedAt,
+        displayName: "Newly Provided Display Name",
+        canonicalUrl: "https://www.facebook.com/groups/new",
+      },
+      { updatedAt: publisherNewerUpdatedAt },
+    );
+
+    expect(merged.displayName).toBe("Newly Provided Display Name");
+    expect(merged.canonicalUrl).toBe(
+      "https://www.facebook.com/groups/new",
+    );
+    expect(merged.lastObservedAt).toBe(publisherFirstObservedAt);
+    expect(merged.observationCount).toBe(existing.observationCount + 1);
+  });
+
+  it("rejects observation whose platform differs from the existing aggregate", () => {
+    const existing = createSourcePublisher({ platform: "FACEBOOK" });
+
+    expect(() =>
+      applySourcePublisherObservation(
+        existing,
+        {
+          identity: {
+            platform: "TWITTER" as SourcePublisher["platform"],
+            kind: existing.kind,
+            externalPublisherId: existing.externalPublisherId,
+          },
+          observedAt: publisherLaterObservedAt,
+        },
+        { updatedAt: publisherNewerUpdatedAt },
+      ),
+    ).toThrow(SourcePublisherIdentityMismatchError);
+  });
+
+  it("rejects observation whose kind differs from the existing aggregate", () => {
+    const existing = createSourcePublisher({ kind: "GROUP" });
+
+    expect(() =>
+      applySourcePublisherObservation(
+        existing,
+        {
+          identity: {
+            platform: existing.platform,
+            kind: "PAGE" as SourcePublisher["kind"],
+            externalPublisherId: existing.externalPublisherId,
+          },
+          observedAt: publisherLaterObservedAt,
+        },
+        { updatedAt: publisherNewerUpdatedAt },
+      ),
+    ).toThrow(SourcePublisherIdentityMismatchError);
+  });
+
+  it("rejects observation whose externalPublisherId differs from the existing aggregate", () => {
+    const existing = createSourcePublisher({
+      externalPublisherId: "facebook-group-1",
+    });
+
+    expect(() =>
+      applySourcePublisherObservation(
+        existing,
+        {
+          identity: {
+            platform: existing.platform,
+            kind: existing.kind,
+            externalPublisherId: "facebook-group-2",
+          },
+          observedAt: publisherLaterObservedAt,
+        },
+        { updatedAt: publisherNewerUpdatedAt },
+      ),
+    ).toThrow(SourcePublisherIdentityMismatchError);
+  });
+
+  it("does not mutate the existing aggregate when identity mismatches", () => {
+    const existing = createSourcePublisher({
+      id: "publisher-1",
+      externalPublisherId: "facebook-group-1",
+      observationCount: 4,
+      lastObservedAt: publisherFirstObservedAt,
+      displayName: "Stable Display Name",
+      canonicalUrl: "https://www.facebook.com/groups/stable",
+    });
+    const snapshot = JSON.parse(JSON.stringify(existing));
+
+    expect(() =>
+      applySourcePublisherObservation(
+        existing,
+        {
+          identity: {
+            platform: existing.platform,
+            kind: existing.kind,
+            externalPublisherId: "facebook-group-2",
+          },
+          observedAt: publisherLaterObservedAt,
+          displayName: "Mutated Display Name",
+          canonicalUrl: "https://www.facebook.com/groups/mutated",
+        },
+        { updatedAt: publisherNewerUpdatedAt },
+      ),
+    ).toThrow(SourcePublisherIdentityMismatchError);
+
+    expect(existing).toEqual(snapshot);
   });
 });
 

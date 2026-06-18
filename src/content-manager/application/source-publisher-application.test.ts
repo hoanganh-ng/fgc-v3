@@ -255,9 +255,10 @@ describe("source publisher application use cases", () => {
 
   it("is idempotent when reapplying the current status", async () => {
     const context = createTestContext(["publisher-1"]);
+    const savingRepository = new CountingSourcePublisherRepository();
 
     await new ObserveSourcePublisherUseCase(
-      context.sourcePublishers,
+      savingRepository,
       context.ids,
       context.clock,
     ).execute({
@@ -268,19 +269,20 @@ describe("source publisher application use cases", () => {
     });
 
     await new UpdateSourcePublisherStatusUseCase(
-      context.sourcePublishers,
+      savingRepository,
       context.clock,
     ).execute({
       sourcePublisherId: "publisher-1",
       status: "APPROVED",
     });
 
-    const updatedAtBefore = (await context.sourcePublishers.findById("publisher-1"))!
+    const updatedAtBefore = (await savingRepository.findById("publisher-1"))!
       .updatedAt;
+    const saveCountBefore = savingRepository.saveCallCount;
     context.clock.setNow(laterUpdatedAt);
 
     const updated = await new UpdateSourcePublisherStatusUseCase(
-      context.sourcePublishers,
+      savingRepository,
       context.clock,
     ).execute({
       sourcePublisherId: "publisher-1",
@@ -288,6 +290,39 @@ describe("source publisher application use cases", () => {
     });
 
     expect(updated.updatedAt).toBe(updatedAtBefore);
+    expect(updated).toEqual(
+      await savingRepository.findById("publisher-1"),
+    );
+    expect(savingRepository.saveCallCount).toBe(saveCountBefore);
+  });
+
+  it("saves exactly once on a real status change", async () => {
+    const context = createTestContext(["publisher-1"]);
+    const savingRepository = new CountingSourcePublisherRepository();
+
+    await new ObserveSourcePublisherUseCase(
+      savingRepository,
+      context.ids,
+      context.clock,
+    ).execute({
+      platform: "FACEBOOK",
+      kind: "GROUP",
+      externalPublisherId: "facebook-group-1",
+      observedAt: baseObservedAt,
+    });
+
+    const saveCountAfterObserve = savingRepository.saveCallCount;
+    context.clock.setNow(laterUpdatedAt);
+
+    await new UpdateSourcePublisherStatusUseCase(
+      savingRepository,
+      context.clock,
+    ).execute({
+      sourcePublisherId: "publisher-1",
+      status: "APPROVED",
+    });
+
+    expect(savingRepository.saveCallCount).toBe(saveCountAfterObserve + 1);
   });
 
   it("throws SourcePublisherNotFoundError when updating a missing publisher", async () => {
@@ -406,6 +441,48 @@ describe("source publisher application use cases", () => {
     ).rejects.toThrow(ContentValidationError);
   });
 
+  it("rejects invalid status, kind, and platform filters at runtime", async () => {
+    const context = createTestContext();
+
+    await expect(
+      new ListSourcePublishersUseCase(context.sourcePublishers).execute({
+        status: "UNKNOWN" as SourcePublisher["status"],
+      }),
+    ).rejects.toThrow(ContentValidationError);
+
+    await expect(
+      new ListSourcePublishersUseCase(context.sourcePublishers).execute({
+        kind: "UNKNOWN" as SourcePublisher["kind"],
+      }),
+    ).rejects.toThrow(ContentValidationError);
+
+    await expect(
+      new ListSourcePublishersUseCase(context.sourcePublishers).execute({
+        platform: "TWITTER" as SourcePublisher["platform"],
+      }),
+    ).rejects.toThrow(ContentValidationError);
+  });
+
+  it("does not touch the repository when findByIdentity returns malformed data", async () => {
+    const stubRepository = new MalformedIdentitySourcePublisherRepository();
+    const context = createTestContext();
+
+    await expect(
+      new ObserveSourcePublisherUseCase(
+        stubRepository,
+        context.ids,
+        context.clock,
+      ).execute({
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "facebook-group-1",
+        observedAt: baseObservedAt,
+      }),
+    ).rejects.toThrow(ContentValidationError);
+
+    expect(stubRepository.saveCallCount).toBe(0);
+  });
+
   it("validates repository outputs through the runtime schema", async () => {
     const context = createTestContext();
 
@@ -458,6 +535,80 @@ class FakeIdGenerator implements IdGenerator {
     this.nextIdIndex += 1;
 
     return id ?? `generated-id-${this.nextIdIndex}`;
+  }
+}
+
+class CountingSourcePublisherRepository {
+  private readonly store = new Map<
+    string,
+    SourcePublisher
+  >();
+  public saveCallCount = 0;
+
+  public async save(sourcePublisher: SourcePublisher): Promise<void> {
+    this.saveCallCount += 1;
+    this.store.set(sourcePublisher.id, sourcePublisher);
+  }
+
+  public async findById(id: string): Promise<SourcePublisher | null> {
+    return this.store.get(id) ?? null;
+  }
+
+  public async findByIdentity(
+    platform: SourcePublisher["platform"],
+    kind: SourcePublisher["kind"],
+    externalPublisherId: string,
+  ): Promise<SourcePublisher | null> {
+    for (const sourcePublisher of this.store.values()) {
+      if (
+        sourcePublisher.platform === platform &&
+        sourcePublisher.kind === kind &&
+        sourcePublisher.externalPublisherId === externalPublisherId
+      ) {
+        return sourcePublisher;
+      }
+    }
+    return null;
+  }
+
+  public async list(): Promise<{
+    items: readonly SourcePublisher[];
+    total: number;
+  }> {
+    return { items: [...this.store.values()], total: this.store.size };
+  }
+}
+
+class MalformedIdentitySourcePublisherRepository {
+  public saveCallCount = 0;
+
+  public async save(): Promise<void> {
+    this.saveCallCount += 1;
+  }
+
+  public async findById(): Promise<SourcePublisher | null> {
+    return null;
+  }
+
+  public async findByIdentity(): Promise<SourcePublisher | null> {
+    return {
+      id: "publisher-malformed",
+      platform: "FACEBOOK",
+      kind: "GROUP",
+      externalPublisherId: "facebook-group-1",
+      status: "DISCOVERED",
+      firstObservedAt: baseObservedAt,
+      lastObservedAt: olderObservedAt,
+      observationCount: 1,
+      createdAt: baseUpdatedAt,
+      updatedAt: baseUpdatedAt,
+    } as unknown as SourcePublisher;
+  }
+
+  public async list(): Promise<{
+    items: readonly SourcePublisher[];
+  }> {
+    return { items: [] };
   }
 }
 
