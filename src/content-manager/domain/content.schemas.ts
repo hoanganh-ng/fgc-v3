@@ -154,22 +154,14 @@ export const ContentItemSchema = z
     const provenance = item.collectionProvenance;
     const surface = provenance.firstCollectionSurface;
 
+    // SOURCE_GROUP: cross-field compatibility only.
+    // `ContentCollectionProvenanceSchema` already enforces that a
+    // SOURCE_GROUP provenance carries `managedSourceGroupId` and that
+    // `managedSourceGroupId` equals `firstCollectionSurface.sourceGroupId`.
+    // The cross-field invariant for SOURCE_GROUP is that the
+    // legacy `sourceGroupId` matches the surface `sourceGroupId`.
     if (surface.kind === "SOURCE_GROUP") {
-      const surfaceSourceGroupId = surface.sourceGroupId;
-
-      if (
-        provenance.managedSourceGroupId !== undefined &&
-        provenance.managedSourceGroupId !== surfaceSourceGroupId
-      ) {
-        context.addIssue({
-          code: "custom",
-          path: ["collectionProvenance", "managedSourceGroupId"],
-          message:
-            "managedSourceGroupId must equal firstCollectionSurface.sourceGroupId when firstCollectionSurface.kind is SOURCE_GROUP.",
-        });
-      }
-
-      if (item.sourceGroupId !== surfaceSourceGroupId) {
+      if (item.sourceGroupId !== surface.sourceGroupId) {
         context.addIssue({
           code: "custom",
           path: ["collectionProvenance", "firstCollectionSurface"],

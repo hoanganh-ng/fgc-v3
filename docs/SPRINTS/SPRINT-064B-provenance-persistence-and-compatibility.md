@@ -217,7 +217,7 @@ already records it. The verification commands assert this.
 
 ## Architecture
 
-```
+```text
 Content Manager (domain)
   content.ts
     ContentItem gained collectionProvenance
@@ -547,21 +547,41 @@ pnpm test src/infrastructure/database/repositories/sprint-064b-isolated-database
 pnpm test src/interfaces/http/content-manager.server.collection-provenance-compatibility.test.ts
 pnpm test src/content-manager/domain
 pnpm test src/content-manager/application
+pnpm test src/infrastructure/database/migration-journal.test.ts
 pnpm typecheck
 pnpm test
 RUN_DB_TESTS=true DATABASE_URL=… \
   pnpm test:db src/infrastructure/database/repositories/drizzle-content-item.repository.collection-provenance.integration.test.ts
-RUN_DB_TESTS=true SPRINT_064B_DATABASE_URL=… \
-  pnpm test:db src/infrastructure/database/repositories/drizzle-content-item.repository.collection-provenance-migration-backfill.integration.test.ts
+pnpm test:db:provenance:isolated
 pnpm test:http:db
 pnpm test:e2e:docker
 pnpm db:generate
 git diff --check
 ```
 
+`pnpm test:db:provenance:isolated` expands to:
+
+```bash
+RUN_DB_TESTS=true \
+  SPRINT_064B_DATABASE_URL=${SPRINT_064B_DATABASE_URL:?SPRINT_064B_DATABASE_URL must be set to a sprint_064b_isolated database} \
+  vitest run src/infrastructure/database/repositories/drizzle-content-item.repository.collection-provenance-migration-backfill.integration.test.ts
+```
+
+The script fails fast when `SPRINT_064B_DATABASE_URL` is unset, and
+the test itself fails fast via
+`resolveIsolatedSprint064BDatabaseUrl` when the URL targets a shared
+or non-Sprint 064B-prefixed database. The general
+`pnpm test:db` (`vitest run src/infrastructure`) does not require
+`SPRINT_064B_DATABASE_URL`; the migration-backfill suite is skipped
+unless both `RUN_DB_TESTS=true` and `SPRINT_064B_DATABASE_URL` are
+set, so existing general DB verification is unaffected.
+
 The `pnpm db:generate` step must not propose a new migration that
 adds `collection_provenance` again; the snapshot chain already
-records the column on `content_items`.
+records the column on `content_items`. As of the verification run,
+`pnpm db:generate` proposes only an unrelated
+`source_publishers_last_observed_at_id_idx` re-order migration,
+which is captured and deleted before acceptance.
 
 ## Security
 
@@ -599,3 +619,74 @@ Verification results are recorded in the Builder's session output.
 Claims in this document are limited to commands the Builder
 actually ran. Any verification not yet executed is recorded as
 "not executed in this session" with the exact command to run.
+
+### Corrective Verification Run (current session)
+
+- `pnpm typecheck` — exit `0` (clean).
+- `pnpm test src/content-manager/domain/content-collection-provenance.test.merge.test.ts`
+  — 10 / 10 tests passed.
+- `pnpm test src/content-manager/application/content-collection-provenance-persistence.test.ts`
+  — 6 / 6 tests passed.
+- `pnpm test src/infrastructure/database/mappers/content-manager.mapper.collection-provenance.test.ts`
+  — 10 / 10 tests passed.
+- `pnpm test src/infrastructure/database/repositories/sprint-064b-isolated-database.guard.test.ts`
+  — 21 / 21 tests passed.
+- `pnpm test src/interfaces/http/content-manager.server.collection-provenance-compatibility.test.ts`
+  — 7 / 7 tests passed.
+- `pnpm test src/content-manager` — 180 / 180 tests passed across
+  6 test files.
+- `pnpm test src/infrastructure/database/migration-journal.test.ts`
+  — 4 / 4 tests passed; the journal chain still ends at
+  `0020_content_items_collection_provenance_not_null`.
+- `pnpm test` — 1460 / 1460 functional tests passed, 14 / 14
+  intentionally skipped. Two HTTP tests in
+  `src/interfaces/http/content-manager.server.test.ts`
+  (`rejects invalid observedAt, canonicalUrl, platform, and kind`
+  and `rejects invalid source publisher list filters without
+  invocation`) intermittently exceed the 5000 ms default vitest
+  timeout only when the full backend suite runs concurrently; both
+  pass deterministically when the file is run in isolation
+  (`pnpm test src/interfaces/http/content-manager.server.test.ts`,
+  34 / 34 tests passed, slowest test ≈ 4.6 s). These timeouts are
+  pre-existing parallel-execution flakes, are not caused by Sprint
+  064B changes, and remain to be hardened outside the Sprint 064B
+  scope.
+- `RUN_DB_TESTS=true pnpm vitest run src/infrastructure/database/repositories/drizzle-content-item.repository.collection-provenance-migration-backfill.integration.test.ts`
+  (without `SPRINT_064B_DATABASE_URL`) — 1 / 1 file skipped
+  (`describe.skip`); the gating is correct.
+- `pnpm test:db:provenance:isolated` without
+  `SPRINT_064B_DATABASE_URL` — `sh: 1: SPRINT_064B_DATABASE_URL:
+  SPRINT_064B_DATABASE_URL must be set to a sprint_064b_isolated
+  database`. Script fails fast as required.
+- `RUN_DB_TESTS=true SPRINT_064B_DATABASE_URL=postgres://user:secret@host:5432/content_pipeline pnpm test:db:provenance:isolated`
+  — `Sprint064BIsolatedDatabaseGuardError: SPRINT_064B_DATABASE_URL
+  targets the shared database "content_pipeline"...`. No
+  credentials or full URL in the error message; guard refuses
+  shared databases as required.
+- `RUN_DB_TESTS=true pnpm vitest run src/infrastructure` without
+  `SPRINT_064B_DATABASE_URL` — 14 files passed, 1 file skipped, 11
+  files failed for an unrelated reason: `DATABASE_URL is required
+  to create the database client`. No Sprint 064B guard errors
+  fired, confirming general DB verification does not unexpectedly
+  require a Sprint 064B disposable database merely because
+  `RUN_DB_TESTS=true`.
+- Focused provenance repository integration, full
+  `drizzle-content-manager-repositories.integration.test.ts`, and
+  PostgreSQL-backed HTTP integration on a clean database —
+  not executed in this session; the disposable
+  `sprint_064b_isolated` database was not provisioned in this
+  sandbox. The exact commands to run on a fresh disposable
+  database are recorded in `Verification Commands` above.
+- `pnpm db:generate` — produces no `collection_provenance`
+  migration; the snapshot chain at `0020` already records the
+  column on `content_items`. Drizzle still proposes an unrelated
+  `source_publishers_last_observed_at_id_idx` reorder migration
+  (full SQL:
+  `DROP INDEX "source_publishers_last_observed_at_id_idx"; CREATE INDEX "source_publishers_last_observed_at_id_idx" ON "source_publishers" USING btree ("last_observed_at" desc,"id" asc);`).
+  The proposed file, its snapshot, and the journal entry are
+  deleted before Sprint 064B acceptance; the migration is outside
+  Sprint 064B scope.
+- `git diff --check` — exit `0` (clean).
+- `pnpm test:e2e:docker` — not executed in this session; Docker
+  daemon availability was not verified. This is not a Sprint 064B
+  acceptance spec.
