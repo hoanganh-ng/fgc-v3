@@ -70,10 +70,24 @@ not introduce home-feed ingestion or execution, does not make
 observation or resolution, does not add a new HTTP DTO field,
 does not add a provenance filter or index, and does not change the
 Collector Runtime, extractor, browser, workers, scheduler, Docker,
-or Web UI. Sprint 065A, Sprint 065B, and Sprint 065C remain future
-work and are not activated by this acceptance.
+or Web UI. Sprint 065B and Sprint 065C remain future work and are
+not activated by this acceptance.
 
 - [Sprint 064B - Provenance Persistence And Compatibility](SPRINT-064B-provenance-persistence-and-compatibility.md)
+
+Sprint 065A — Facebook Home-Feed Extractor Fixtures is **active and
+authorized**. It adds a separate, pure, fixture-driven Facebook
+home-feed GraphQL extractor for group and page posts. The extractor
+produces normalized content candidates without `sourceGroupId`,
+derives a safe `publisherObservation` for explicit GROUP/PAGE
+publishers with stable external publisher ids, excludes explicit
+sponsored and personal-profile posts with typed warnings, handles
+malformed payloads safely, and keeps the existing source-group
+extractor contract unchanged. Sprint 065A does not add browser,
+persistence, HTTP, worker, scheduler, Docker, Web UI, or live-Facebook
+behavior. Sprint 065B and Sprint 065C remain future work.
+
+- [Sprint 065A - Facebook Home-Feed Extractor Fixtures](SPRINT-065A-facebook-home-feed-extractor-fixtures.md)
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

@@ -184,6 +184,24 @@ describe("FacebookGraphQLPayloadExtractor", () => {
     );
   });
 
+  it("keeps sourceGroupId required for source-group extraction", () => {
+    const result = new FacebookGraphQLPayloadExtractor().extract({
+      sourceGroupId: " ",
+      capturedAt,
+      payload: syntheticValidGroupPostPayload,
+    });
+
+    expect(result).toEqual({
+      valid: false,
+      issues: [
+        expect.objectContaining({
+          code: "INVALID_SOURCE_GROUP_ID",
+          path: "sourceGroupId",
+        }),
+      ],
+    });
+  });
+
   it("requires body text before producing a candidate", () => {
     const result = requireValid(
       new FacebookGraphQLPayloadExtractor().extract({

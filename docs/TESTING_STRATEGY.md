@@ -20,6 +20,9 @@ higher layer can attribute the failure correctly.
 - Speed budget: full suite under a few minutes on a developer machine.
 - Owner: every sprint that touches a domain, application, route
   handler, view model, or React component.
+- Sprint 065A is fixture/unit verified only: its home-feed extractor
+  uses sanitized synthetic payloads, makes no live-Facebook validation
+  claim, and leaves mandatory live home-feed validation to Sprint 065C.
 
 ## Layer 2 — Database Integration Tests
 
@@ -154,7 +157,10 @@ layer is a sprint-scope violation.
   publisher-identity derivation): opt-in manual live-Facebook
   validation only after Layers 1–4 are green. A sprint that changes
   real Facebook or browser behavior does not claim success on
-  synthetic fixtures alone.
+  synthetic fixtures alone. Sprint 065A is intentionally limited to
+  fixture/unit extraction and makes no live-Facebook claim; Sprint
+  065C remains the mandatory live-validation sprint for home-feed
+  execution.
 
 A sprint that adds, removes, or renames a public API surface, a
 schema, a migration, or a top-level flow must update this document
