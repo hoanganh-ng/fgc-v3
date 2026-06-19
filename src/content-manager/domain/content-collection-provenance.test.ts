@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import {
   CollectedContentProvenanceInputSchema,
   CollectionSurfaceSchema,
@@ -18,6 +19,7 @@ import type {
   CollectedContentProvenanceInput,
   CollectionSurface,
   ContentCollectionProvenance,
+  ProfileHomeFeedCollectionSurface,
   SourceGroupCollectionSurface,
 } from "./index";
 
@@ -26,7 +28,12 @@ const SOURCE_GROUP_SURFACE: SourceGroupCollectionSurface = {
   sourceGroupId: "source-group-1",
 };
 
-const PROFILE_HOME_FEED_SURFACE: CollectionSurface = {
+const OTHER_SOURCE_GROUP_SURFACE: SourceGroupCollectionSurface = {
+  kind: "SOURCE_GROUP",
+  sourceGroupId: "source-group-2",
+};
+
+const PROFILE_HOME_FEED_SURFACE: ProfileHomeFeedCollectionSurface = {
   kind: "PROFILE_HOME_FEED",
 };
 
@@ -147,7 +154,7 @@ describe("content collection provenance schemas", () => {
     expect(result.success).toBe(false);
   });
 
-  it("requires managedSourceGroupId to match the surface sourceGroupId", () => {
+  it("requires managedSourceGroupId to equal the surface sourceGroupId", () => {
     const result = CollectedContentProvenanceInputSchema.safeParse({
       collectionSurface: SOURCE_GROUP_SURFACE,
       managedSourceGroupId: "source-group-2",
@@ -156,13 +163,21 @@ describe("content collection provenance schemas", () => {
     expect(result.success).toBe(false);
   });
 
-  it("forbids managedSourceGroupId when the surface is PROFILE_HOME_FEED", () => {
+  it("accepts managedSourceGroupId when the surface is PROFILE_HOME_FEED", () => {
     const result = CollectedContentProvenanceInputSchema.safeParse({
       collectionSurface: PROFILE_HOME_FEED_SURFACE,
       managedSourceGroupId: "source-group-1",
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts an absent managedSourceGroupId when the surface is PROFILE_HOME_FEED", () => {
+    const result = CollectedContentProvenanceInputSchema.safeParse({
+      collectionSurface: PROFILE_HOME_FEED_SURFACE,
+    });
+
+    expect(result.success).toBe(true);
   });
 
   it("requires managedSourceGroupId on durable SOURCE_GROUP provenance", () => {
@@ -173,13 +188,39 @@ describe("content collection provenance schemas", () => {
     expect(result.success).toBe(false);
   });
 
-  it("forbids managedSourceGroupId on durable PROFILE_HOME_FEED provenance", () => {
+  it("rejects mismatching managedSourceGroupId on durable SOURCE_GROUP provenance", () => {
+    const result = ContentCollectionProvenanceSchema.safeParse({
+      firstCollectionSurface: SOURCE_GROUP_SURFACE,
+      managedSourceGroupId: "source-group-2",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a matching managedSourceGroupId on durable SOURCE_GROUP provenance", () => {
+    const result = ContentCollectionProvenanceSchema.safeParse({
+      firstCollectionSurface: SOURCE_GROUP_SURFACE,
+      managedSourceGroupId: "source-group-1",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts an absent managedSourceGroupId on durable PROFILE_HOME_FEED provenance", () => {
+    const result = ContentCollectionProvenanceSchema.safeParse({
+      firstCollectionSurface: PROFILE_HOME_FEED_SURFACE,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a present managedSourceGroupId on durable PROFILE_HOME_FEED provenance", () => {
     const result = ContentCollectionProvenanceSchema.safeParse({
       firstCollectionSurface: PROFILE_HOME_FEED_SURFACE,
       managedSourceGroupId: "source-group-1",
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it("rejects unknown fields on the durable provenance schema", () => {
@@ -192,7 +233,7 @@ describe("content collection provenance schemas", () => {
   });
 });
 
-describe("content collection provenance validation", () => {
+describe("content collection provenance validation helpers", () => {
   it("returns a valid result for a SOURCE_GROUP input", () => {
     const result = validateCollectedContentProvenanceInput(
       createSourceGroupInput(),
@@ -217,6 +258,15 @@ describe("content collection provenance validation", () => {
     }
   });
 
+  it("returns a valid result for a PROFILE_HOME_FEED input with managedSourceGroupId", () => {
+    const result = validateCollectedContentProvenanceInput({
+      collectionSurface: PROFILE_HOME_FEED_SURFACE,
+      managedSourceGroupId: "source-group-1",
+    });
+
+    expect(result.valid).toBe(true);
+  });
+
   it("parses a durable provenance through parseContentCollectionProvenance", () => {
     const provenance: ContentCollectionProvenance = {
       firstCollectionSurface: PROFILE_HOME_FEED_SURFACE,
@@ -234,6 +284,15 @@ describe("content collection provenance validation", () => {
   it("rejects an unknown surface kind from parseCollectedContentProvenanceInput", () => {
     const result = parseCollectedContentProvenanceInput({
       collectionSurface: { kind: "UNKNOWN" },
+    });
+
+    expect(result.valid).toBe(false);
+  });
+
+  it("rejects a mismatching durable SOURCE_GROUP provenance", () => {
+    const result = validateContentCollectionProvenance({
+      firstCollectionSurface: SOURCE_GROUP_SURFACE,
+      managedSourceGroupId: "source-group-2",
     });
 
     expect(result.valid).toBe(false);
@@ -262,14 +321,25 @@ describe("content collection provenance creation", () => {
     expect(provenance.managedSourceGroupId).toBeUndefined();
   });
 
+  it("creates PROFILE_HOME_FEED provenance with a managedSourceGroupId", () => {
+    const provenance = createInitialContentCollectionProvenance(
+      createProfileHomeFeedInput({ managedSourceGroupId: "source-group-1" }),
+    );
+
+    expect(provenance.firstCollectionSurface).toEqual(
+      PROFILE_HOME_FEED_SURFACE,
+    );
+    expect(provenance.managedSourceGroupId).toBe("source-group-1");
+  });
+
   it("omits an absent sourcePublisherId rather than serializing null", () => {
     const provenance = createInitialContentCollectionProvenance(
       createProfileHomeFeedInput(),
     );
 
-    expect(Object.prototype.hasOwnProperty.call(provenance, "sourcePublisherId")).toBe(
-      false,
-    );
+    expect(
+      Object.prototype.hasOwnProperty.call(provenance, "sourcePublisherId"),
+    ).toBe(false);
   });
 
   it("omits an absent managedSourceGroupId rather than serializing null", () => {
@@ -280,6 +350,29 @@ describe("content collection provenance creation", () => {
     expect(
       Object.prototype.hasOwnProperty.call(provenance, "managedSourceGroupId"),
     ).toBe(false);
+  });
+
+  it("rejects runtime-invalid input forced through TypeScript casts", () => {
+    // Bypass the static type to confirm runtime validation rejects bad input.
+    const invalid = {
+      collectionSurface: SOURCE_GROUP_SURFACE,
+      // managedSourceGroupId is missing — required for SOURCE_GROUP.
+    } as unknown as CollectedContentProvenanceInput;
+
+    expect(() => createInitialContentCollectionProvenance(invalid)).toThrow(
+      ZodError,
+    );
+  });
+
+  it("rejects runtime-invalid input with mismatching managedSourceGroupId", () => {
+    const invalid = {
+      collectionSurface: SOURCE_GROUP_SURFACE,
+      managedSourceGroupId: "source-group-2",
+    } as unknown as CollectedContentProvenanceInput;
+
+    expect(() => createInitialContentCollectionProvenance(invalid)).toThrow(
+      ZodError,
+    );
   });
 });
 
@@ -299,21 +392,21 @@ describe("content collection provenance enrichment", () => {
     expect(merged.managedSourceGroupId).toBe("source-group-1");
   });
 
-  it("fills an absent managedSourceGroupId on a later observation when allowed by the input schema", () => {
-    // First observed as PROFILE_HOME_FEED with no sourcePublisherId.
+  it("fills an absent managedSourceGroupId on a later SOURCE_GROUP observation", () => {
+    // First observed as PROFILE_HOME_FEED with no associations.
     const existing = createInitialContentCollectionProvenance(
       createProfileHomeFeedInput(),
     );
 
-    // A later SOURCE_GROUP observation carries a managedSourceGroupId.
+    // A later SOURCE_GROUP observation carries the managedSourceGroupId.
     const merged = mergeContentCollectionProvenance(existing, {
       collectionSurface: SOURCE_GROUP_SURFACE,
-      managedSourceGroupId: "source-group-2",
+      managedSourceGroupId: SOURCE_GROUP_SURFACE.sourceGroupId,
       sourcePublisherId: "publisher-1",
     });
 
     expect(merged.firstCollectionSurface).toEqual(PROFILE_HOME_FEED_SURFACE);
-    expect(merged.managedSourceGroupId).toBe("source-group-2");
+    expect(merged.managedSourceGroupId).toBe("source-group-1");
     expect(merged.sourcePublisherId).toBe("publisher-1");
   });
 
@@ -389,22 +482,21 @@ describe("content collection provenance different-surface recollection", () => {
     expect(merged.sourcePublisherId).toBe("publisher-1");
   });
 
-  it("throws a typed conflict when a later SOURCE_GROUP observation targets a different source group", () => {
-    const existing = createInitialContentCollectionProvenance(
-      createSourceGroupInput(),
-    );
+  it("home-feed-first then source-group observation produces a durable schema-valid result", () => {
+    const existing = createInitialContentCollectionProvenance({
+      collectionSurface: PROFILE_HOME_FEED_SURFACE,
+    });
 
-    const laterSurface: SourceGroupCollectionSurface = {
-      kind: "SOURCE_GROUP",
-      sourceGroupId: "source-group-2",
-    };
+    const merged = mergeContentCollectionProvenance(existing, {
+      collectionSurface: SOURCE_GROUP_SURFACE,
+      managedSourceGroupId: "source-group-1",
+    });
 
-    expect(() =>
-      mergeContentCollectionProvenance(existing, {
-        collectionSurface: laterSurface,
-        managedSourceGroupId: laterSurface.sourceGroupId,
-      }),
-    ).toThrow(ContentCollectionProvenanceConflictError);
+    const result = ContentCollectionProvenanceSchema.safeParse(merged);
+
+    expect(result.success).toBe(true);
+    expect(merged.firstCollectionSurface).toEqual(PROFILE_HOME_FEED_SURFACE);
+    expect(merged.managedSourceGroupId).toBe("source-group-1");
   });
 });
 
@@ -441,22 +533,17 @@ describe("content collection provenance conflicts", () => {
       createSourceGroupInput(),
     );
 
-    const laterSurface: SourceGroupCollectionSurface = {
-      kind: "SOURCE_GROUP",
-      sourceGroupId: "source-group-2",
-    };
-
     expect(() =>
       mergeContentCollectionProvenance(existing, {
-        collectionSurface: laterSurface,
-        managedSourceGroupId: laterSurface.sourceGroupId,
+        collectionSurface: OTHER_SOURCE_GROUP_SURFACE,
+        managedSourceGroupId: OTHER_SOURCE_GROUP_SURFACE.sourceGroupId,
       }),
     ).toThrow(ContentCollectionProvenanceConflictError);
 
     try {
       mergeContentCollectionProvenance(existing, {
-        collectionSurface: laterSurface,
-        managedSourceGroupId: laterSurface.sourceGroupId,
+        collectionSurface: OTHER_SOURCE_GROUP_SURFACE,
+        managedSourceGroupId: OTHER_SOURCE_GROUP_SURFACE.sourceGroupId,
       });
     } catch (error) {
       const conflict = error as ContentCollectionProvenanceConflictError;
@@ -497,6 +584,106 @@ describe("content collection provenance conflicts", () => {
     ).toThrow(ContentCollectionProvenanceConflictError);
 
     expect(incoming).toEqual(snapshot);
+  });
+});
+
+describe("content collection provenance runtime validation", () => {
+  it("createInitialContentCollectionProvenance rejects runtime-invalid input", () => {
+    const invalid = {
+      collectionSurface: SOURCE_GROUP_SURFACE,
+    } as unknown as CollectedContentProvenanceInput;
+
+    expect(() => createInitialContentCollectionProvenance(invalid)).toThrow(
+      ZodError,
+    );
+  });
+
+  it("mergeContentCollectionProvenance rejects runtime-invalid existing provenance", () => {
+    const valid = createInitialContentCollectionProvenance(
+      createSourceGroupInput(),
+    );
+
+    // Bypass the static type to force a mismatching SOURCE_GROUP durable value.
+    const invalidExisting = {
+      firstCollectionSurface: SOURCE_GROUP_SURFACE,
+      managedSourceGroupId: "source-group-2",
+    } as unknown as ContentCollectionProvenance;
+
+    expect(() =>
+      mergeContentCollectionProvenance(invalidExisting, {
+        ...createSourceGroupInput(),
+      }),
+    ).toThrow(ZodError);
+
+    // Confirm the valid value is untouched and would still merge successfully.
+    const merged = mergeContentCollectionProvenance(valid, {
+      ...createSourceGroupInput(),
+    });
+
+    expect(merged.firstCollectionSurface).toEqual(SOURCE_GROUP_SURFACE);
+  });
+
+  it("mergeContentCollectionProvenance rejects runtime-invalid incoming input", () => {
+    const valid = createInitialContentCollectionProvenance(
+      createSourceGroupInput(),
+    );
+
+    // Bypass the static type to drop the required managedSourceGroupId.
+    const invalidIncoming = {
+      collectionSurface: SOURCE_GROUP_SURFACE,
+    } as unknown as CollectedContentProvenanceInput;
+
+    expect(() =>
+      mergeContentCollectionProvenance(valid, invalidIncoming),
+    ).toThrow(ZodError);
+  });
+
+  it("createInitialContentCollectionProvenance result always passes the durable schema", () => {
+    const inputs: CollectedContentProvenanceInput[] = [
+      createSourceGroupInput(),
+      createSourceGroupInput({ sourcePublisherId: "publisher-1" }),
+      createProfileHomeFeedInput(),
+      createProfileHomeFeedInput({ managedSourceGroupId: "source-group-1" }),
+      createProfileHomeFeedInput({
+        managedSourceGroupId: "source-group-1",
+        sourcePublisherId: "publisher-1",
+      }),
+    ];
+
+    for (const input of inputs) {
+      const provenance = createInitialContentCollectionProvenance(input);
+      const result = ContentCollectionProvenanceSchema.safeParse(provenance);
+
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("mergeContentCollectionProvenance result always passes the durable schema", () => {
+    const initial = createInitialContentCollectionProvenance(
+      createProfileHomeFeedInput(),
+    );
+
+    const cases: CollectedContentProvenanceInput[] = [
+      {
+        collectionSurface: SOURCE_GROUP_SURFACE,
+        managedSourceGroupId: SOURCE_GROUP_SURFACE.sourceGroupId,
+      },
+      {
+        collectionSurface: SOURCE_GROUP_SURFACE,
+        managedSourceGroupId: SOURCE_GROUP_SURFACE.sourceGroupId,
+        sourcePublisherId: "publisher-1",
+      },
+      createProfileHomeFeedInput(),
+      createProfileHomeFeedInput({ managedSourceGroupId: "source-group-1" }),
+      createProfileHomeFeedInput({ sourcePublisherId: "publisher-1" }),
+    ];
+
+    for (const incoming of cases) {
+      const merged = mergeContentCollectionProvenance(initial, incoming);
+      const result = ContentCollectionProvenanceSchema.safeParse(merged);
+
+      expect(result.success).toBe(true);
+    }
   });
 });
 
@@ -544,17 +731,14 @@ describe("content collection provenance surface helpers", () => {
 
   it("compares surfaces by kind and sourceGroupId", () => {
     expect(
-      collectionSurfaceEquals(
-        SOURCE_GROUP_SURFACE,
-        SOURCE_GROUP_SURFACE,
-      ),
+      collectionSurfaceEquals(SOURCE_GROUP_SURFACE, SOURCE_GROUP_SURFACE),
     ).toBe(true);
 
     expect(
-      collectionSurfaceEquals(SOURCE_GROUP_SURFACE, {
-        kind: "SOURCE_GROUP",
-        sourceGroupId: "source-group-2",
-      }),
+      collectionSurfaceEquals(
+        SOURCE_GROUP_SURFACE,
+        OTHER_SOURCE_GROUP_SURFACE,
+      ),
     ).toBe(false);
 
     expect(

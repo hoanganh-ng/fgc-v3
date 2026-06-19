@@ -2,12 +2,6 @@ import { z } from "zod";
 import { SourceGroupIdSchema } from "./content.schemas";
 import { SourcePublisherIdSchema } from "./source-publisher.schemas";
 
-const NonEmptyStringSchema = z
-  .string()
-  .refine((value) => value.trim().length > 0, {
-    message: "Expected non-empty string.",
-  });
-
 export const CollectionSurfaceKindSchema = z.enum([
   "SOURCE_GROUP",
   "PROFILE_HOME_FEED",
@@ -62,13 +56,6 @@ export const CollectedContentProvenanceInputSchema = z
             "managedSourceGroupId must equal collectionSurface.sourceGroupId when collectionSurface.kind is SOURCE_GROUP.",
         });
       }
-    } else if (value.managedSourceGroupId !== undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["managedSourceGroupId"],
-        message:
-          "managedSourceGroupId must be omitted when collectionSurface.kind is PROFILE_HOME_FEED.",
-      });
     }
   });
 
@@ -80,26 +67,27 @@ export const ContentCollectionProvenanceSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (
-      value.firstCollectionSurface.kind === "SOURCE_GROUP" &&
-      value.managedSourceGroupId === undefined
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["managedSourceGroupId"],
-        message:
-          "managedSourceGroupId is required when firstCollectionSurface.kind is SOURCE_GROUP.",
-      });
-    } else if (
-      value.firstCollectionSurface.kind === "PROFILE_HOME_FEED" &&
-      value.managedSourceGroupId !== undefined
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["managedSourceGroupId"],
-        message:
-          "managedSourceGroupId must be omitted when firstCollectionSurface.kind is PROFILE_HOME_FEED.",
-      });
+    if (value.firstCollectionSurface.kind === "SOURCE_GROUP") {
+      const surfaceSourceGroupId = value.firstCollectionSurface.sourceGroupId;
+
+      if (value.managedSourceGroupId === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["managedSourceGroupId"],
+          message:
+            "managedSourceGroupId is required when firstCollectionSurface.kind is SOURCE_GROUP.",
+        });
+        return;
+      }
+
+      if (value.managedSourceGroupId !== surfaceSourceGroupId) {
+        context.addIssue({
+          code: "custom",
+          path: ["managedSourceGroupId"],
+          message:
+            "managedSourceGroupId must equal firstCollectionSurface.sourceGroupId when firstCollectionSurface.kind is SOURCE_GROUP.",
+        });
+      }
     }
   });
 
@@ -107,6 +95,3 @@ export const ProvenanceConflictFieldSchema = z.enum([
   "sourcePublisherId",
   "managedSourceGroupId",
 ]);
-
-// Re-export the non-empty string schema for downstream typing convenience.
-export { NonEmptyStringSchema };

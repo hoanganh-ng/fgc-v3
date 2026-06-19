@@ -34,14 +34,30 @@ export type ProvenanceConflictField = zInfer<
 export function createInitialContentCollectionProvenance(
   input: CollectedContentProvenanceInput,
 ): ContentCollectionProvenance {
-  return buildProvenance(input, input.collectionSurface);
+  const parsedInput = CollectedContentProvenanceInputSchema.parse(input);
+
+  const provenance = buildProvenance(
+    parsedInput,
+    parsedInput.collectionSurface,
+  );
+
+  return ContentCollectionProvenanceSchema.parse(provenance);
 }
 
 export function mergeContentCollectionProvenance(
   existing: ContentCollectionProvenance,
   incoming: CollectedContentProvenanceInput,
 ): ContentCollectionProvenance {
-  return buildProvenance(incoming, existing.firstCollectionSurface, existing);
+  const parsedExisting = ContentCollectionProvenanceSchema.parse(existing);
+  const parsedIncoming = CollectedContentProvenanceInputSchema.parse(incoming);
+
+  const provenance = buildProvenance(
+    parsedIncoming,
+    parsedExisting.firstCollectionSurface,
+    parsedExisting,
+  );
+
+  return ContentCollectionProvenanceSchema.parse(provenance);
 }
 
 function buildProvenance(

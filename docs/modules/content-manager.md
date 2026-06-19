@@ -36,21 +36,29 @@
   `CollectedContentProvenanceInput` with the collection surface,
   an optional `sourcePublisherId`, and an optional
   `managedSourceGroupId` (required and equal to the surface
-  `sourceGroupId` when the surface is `SOURCE_GROUP`); a durable
+  `sourceGroupId` when the surface is `SOURCE_GROUP`; absent or
+  present when the surface is `PROFILE_HOME_FEED`); a durable
   `ContentCollectionProvenance` with the immutable
-  `firstCollectionSurface` plus the optional associations; pure
+  `firstCollectionSurface` plus the optional associations (the
+  same cross-field rule applies: required and equal when the
+  first surface is `SOURCE_GROUP`, absent or present when the
+  first surface is `PROFILE_HOME_FEED`); pure
   `createInitialContentCollectionProvenance` and
-  `mergeContentCollectionProvenance` that preserve the first
-  surface, fill absent associations later, are idempotent on
-  identical observations, do not mutate inputs, and throw a typed
-  `ContentCollectionProvenanceConflictError` (code
-  `CONTENT_COLLECTION_PROVENANCE_CONFLICT`) on conflicting
-  `sourcePublisherId` or `managedSourceGroupId`. Provenance is a
-  domain value object; it has no profile id, collection run id,
-  URL, entry route, raw publisher identity, raw payload,
-  observation array, or event history, and Sprint 064A adds no
-  persistence, HTTP, application, composition, runtime, extractor,
-  browser, scheduler, Docker, or Web UI behavior.
+  `mergeContentCollectionProvenance` that runtime-validate their
+  inputs and outputs against the existing Zod domain schemas,
+  preserve the first surface, fill absent associations later,
+  are idempotent on identical observations, do not mutate inputs,
+  and throw a typed `ContentCollectionProvenanceConflictError`
+  (code `CONTENT_COLLECTION_PROVENANCE_CONFLICT`) on conflicting
+  `sourcePublisherId` or `managedSourceGroupId`. The
+  `PROFILE_HOME_FEED` surface contains no source-group
+  identifier; the optional `managedSourceGroupId` association is
+  a separate top-level field. Provenance is a domain value
+  object; it has no profile id, collection run id, URL, entry
+  route, raw publisher identity, raw payload, observation array,
+  or event history, and Sprint 064A adds no persistence, HTTP,
+  application, composition, runtime, extractor, browser,
+  scheduler, Docker, or Web UI behavior.
 - Safe read APIs for content and sources.
 - Safe `SourcePublisher` HTTP observation, list, and get contracts
   served through Nginx → Fastify → Content Manager application →

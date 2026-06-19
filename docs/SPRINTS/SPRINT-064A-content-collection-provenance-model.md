@@ -33,7 +33,9 @@ arrays, or event history.
 - A `CollectionSurface` discriminated union with two branches:
   - `SOURCE_GROUP` carrying a single `sourceGroupId`.
   - `PROFILE_HOME_FEED` carrying no profile id, no source group id,
-    and no other identifying information.
+    and no other identifying information. The home-feed surface is a
+    bare marker; the optional `managedSourceGroupId` association is a
+    separate top-level field and is not part of the surface itself.
 - A `CollectedContentProvenanceInput` value object composed of the
   collection surface, an optional `sourcePublisherId`, and an
   optional `managedSourceGroupId`. The input is strict, rejects
@@ -41,18 +43,21 @@ arrays, or event history.
   enforces the cross-field rule that for a `SOURCE_GROUP` input the
   `managedSourceGroupId` is required and must equal
   `collectionSurface.sourceGroupId`. A `PROFILE_HOME_FEED` input
-  forbids a `managedSourceGroupId`.
+  permits an absent or present `managedSourceGroupId`.
 - A `ContentCollectionProvenance` durable value object composed of
   the immutable `firstCollectionSurface`, an optional
   `sourcePublisherId`, and an optional `managedSourceGroupId`. The
   durable object is strict, rejects unknown fields, rejects `null`
   for any optional field, and mirrors the same cross-field rule
-  between the first surface and `managedSourceGroupId`.
+  between the first surface and `managedSourceGroupId` (required
+  and equal when the first surface is `SOURCE_GROUP`; absent or
+  present when the first surface is `PROFILE_HOME_FEED`).
 - Pure `createInitialContentCollectionProvenance` and
   `mergeContentCollectionProvenance` functions. Both are pure, do
   not mutate inputs, omit absent optional fields rather than
-  serializing `null`, and produce a new durable value object on
-  every call.
+  serializing `null`, runtime-validate their inputs and outputs
+  against the existing Zod domain schemas, and produce a new
+  durable value object on every call.
 - A new typed Content Manager domain error
   `ContentCollectionProvenanceConflictError` with code
   `CONTENT_COLLECTION_PROVENANCE_CONFLICT`. The error carries the
@@ -88,6 +93,23 @@ arrays, or event history.
   `CONTENT_COLLECTION_PROVENANCE_CONFLICT`.
 - Neither the existing provenance nor the incoming input is
   mutated.
+- Inputs and the resulting durable value are runtime-validated
+  against the existing Zod domain schemas before return.
+
+## Runtime Validation
+
+`createInitialContentCollectionProvenance` runtime-validates its
+input with `CollectedContentProvenanceInputSchema` and
+runtime-validates its output with `ContentCollectionProvenanceSchema`
+before returning it. `mergeContentCollectionProvenance`
+runtime-validates the existing durable provenance with
+`ContentCollectionProvenanceSchema`, runtime-validates the incoming
+input with `CollectedContentProvenanceInputSchema`, applies the
+merge and conflict rules, and runtime-validates the resulting
+durable value with `ContentCollectionProvenanceSchema` before
+returning it. Invalid input or result surfaces a Zod error; the
+domain does not introduce an application, HTTP, or persistence
+error type for validation.
 
 ## Architecture
 
@@ -201,19 +223,26 @@ covers:
   `sourcePublisherId` on the input schema.
 - The cross-field rule that `managedSourceGroupId` is required and
   must equal `collectionSurface.sourceGroupId` for `SOURCE_GROUP`
-  inputs and is forbidden for `PROFILE_HOME_FEED` inputs.
-- The same cross-field rule on the durable provenance schema.
+  inputs, and is permitted (absent or present) for `PROFILE_HOME_FEED`
+  inputs.
+- The same cross-field rule on the durable provenance schema,
+  including equality between `firstCollectionSurface.sourceGroupId`
+  and `managedSourceGroupId` when the first surface is
+  `SOURCE_GROUP`.
 - Validation result helpers return issues on the
   `managedSourceGroupId` path.
-- Initial creation omits absent `sourcePublisherId` and
-  `managedSourceGroupId` (no `null`).
+- Initial creation accepts a `PROFILE_HOME_FEED` input with a
+  `managedSourceGroupId` and omits absent optional fields (no
+  `null`).
 - Enrichment fills an absent `sourcePublisherId` or
   `managedSourceGroupId` on a later observation and keeps existing
   values when later observations omit them.
 - Idempotency for identical SOURCE_GROUP and PROFILE_HOME_FEED
   observations.
 - Preservation of `firstCollectionSurface` when a later observation
-  uses a different surface.
+  uses a different surface, including the home-feed-first then
+  source-group case, which must produce a durable schema-valid
+  result.
 - Typed `ContentCollectionProvenanceConflictError` with code
   `CONTENT_COLLECTION_PROVENANCE_CONFLICT` on conflicting
   `sourcePublisherId` and on conflicting `managedSourceGroupId`,
@@ -224,6 +253,12 @@ covers:
   when merge throws.
 - No mutation of the existing provenance or the incoming input on
   successful merge.
+- Runtime validation: `createInitialContentCollectionProvenance`
+  rejects invalid input (including values forced through TypeScript
+  casts); `mergeContentCollectionProvenance` rejects invalid
+  existing provenance and invalid incoming input. Every
+  representative creation and merge result passes
+  `ContentCollectionProvenanceSchema`.
 - Surface helpers classify and compare surfaces correctly.
 
 The full Content Manager domain suite is exercised by
@@ -235,6 +270,7 @@ The full Content Manager domain suite is exercised by
 pnpm test src/content-manager/domain/content-collection-provenance.test.ts
 pnpm test src/content-manager/domain
 pnpm typecheck
+pnpm test
 git diff --check
 ```
 
@@ -243,10 +279,11 @@ git diff --check
 Recorded at Sprint 064A implementation:
 
 - `pnpm test src/content-manager/domain/content-collection-provenance.test.ts`
-  exited 0; 42 tests passed, 0 failed.
-- `pnpm test src/content-manager/domain` exited 0; 94 tests passed,
-  0 failed.
+  exited 0; all focused provenance tests passed, 0 failed.
+- `pnpm test src/content-manager/domain` exited 0; all domain
+  tests passed, 0 failed.
 - `pnpm typecheck` exited 0.
+- `pnpm test` (full suite) exited 0; no regression.
 - `git diff --check` exited 0.
 
 No persistence, HTTP, runtime, extractor, browser, UI, scheduler,
