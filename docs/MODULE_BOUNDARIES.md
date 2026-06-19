@@ -60,6 +60,28 @@ Owns:
   `updateStatus`, `findById`, `findByIdentity`, `list` with bounded
   `limit` and non-negative `offset`, ordered `lastObservedAt`
   descending then `id` ascending).
+- `ContentCollectionProvenance` domain value object: a strict,
+  Zod-validated `CollectionSurface` discriminated union with
+  `SOURCE_GROUP` (with `sourceGroupId`) and `PROFILE_HOME_FEED`
+  (no profile id, no source group id) branches; a
+  `CollectedContentProvenanceInput` with the collection surface,
+  an optional `sourcePublisherId`, and an optional
+  `managedSourceGroupId` (required and equal to the surface
+  `sourceGroupId` when the surface is `SOURCE_GROUP`); a durable
+  `ContentCollectionProvenance` with the immutable
+  `firstCollectionSurface` plus the optional associations; pure
+  `createInitialContentCollectionProvenance` and
+  `mergeContentCollectionProvenance` that preserve the first
+  surface, fill absent associations later, are idempotent on
+  identical observations, do not mutate inputs, and throw a typed
+  `ContentCollectionProvenanceConflictError` (code
+  `CONTENT_COLLECTION_PROVENANCE_CONFLICT`) on conflicting
+  `sourcePublisherId` or `managedSourceGroupId`. Provenance is a
+  domain value object; it does not own profile ids, collection
+  run ids, URLs, entry routes, raw publisher identities, raw
+  payloads, observation arrays, or event history. Sprint 064A
+  adds no persistence, HTTP, application, composition, runtime,
+  extractor, browser, scheduler, Docker, or Web UI behavior.
 - Safe read APIs.
 - Future handoff shape for Content Builder.
 
@@ -82,6 +104,12 @@ Does not own:
   future Content Publisher pipeline module, and it does not model
   drafts, publications, videos, publishing schedules, or published
   artifacts.
+- Profile ids, collection run ids, URLs, entry routes, raw
+  publisher identities, raw payloads, observation arrays, or
+  event history for `ContentCollectionProvenance`. The provenance
+  value object records the first collection surface and the
+  optional `SourcePublisher` and managed `SourceGroup`
+  associations only.
 
 Content Manager should not accept raw Facebook GraphQL payloads as its primary ingestion contract. Its canonical write contract is normalized Content Manager ingestion input. A future implementation may optionally store sanitized raw payload data or a raw payload reference for trusted diagnostics or reprocessing, but that storage is not the canonical content model.
 

@@ -3,7 +3,8 @@ import type { SourcePublisherIdentity } from "./source-publisher";
 
 export type ContentManagerDomainErrorCode =
   | "INVALID_CONTENT_STATUS_TRANSITION"
-  | "SOURCE_PUBLISHER_IDENTITY_MISMATCH";
+  | "SOURCE_PUBLISHER_IDENTITY_MISMATCH"
+  | "CONTENT_COLLECTION_PROVENANCE_CONFLICT";
 
 export abstract class ContentManagerDomainError extends Error {
   public readonly code: ContentManagerDomainErrorCode;
@@ -42,6 +43,30 @@ export class SourcePublisherIdentityMismatchError extends ContentManagerDomainEr
       "SOURCE_PUBLISHER_IDENTITY_MISMATCH",
       `Source publisher identity mismatch: existing=${existing.platform}/${existing.kind}/${existing.externalPublisherId} incoming=${incoming.platform}/${incoming.kind}/${incoming.externalPublisherId}.`,
     );
+    this.existing = existing;
+    this.incoming = incoming;
+  }
+}
+
+export type ContentCollectionProvenanceConflictField =
+  | "sourcePublisherId"
+  | "managedSourceGroupId";
+
+export class ContentCollectionProvenanceConflictError extends ContentManagerDomainError {
+  public readonly field: ContentCollectionProvenanceConflictField;
+  public readonly existing: string;
+  public readonly incoming: string;
+
+  public constructor(
+    field: ContentCollectionProvenanceConflictField,
+    existing: string,
+    incoming: string,
+  ) {
+    super(
+      "CONTENT_COLLECTION_PROVENANCE_CONFLICT",
+      `Content collection provenance conflict on ${field}: existing=${existing} incoming=${incoming}.`,
+    );
+    this.field = field;
     this.existing = existing;
     this.incoming = incoming;
   }

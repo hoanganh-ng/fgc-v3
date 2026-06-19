@@ -19,6 +19,14 @@ import {
   type ObserveSourcePublisherApplicationInput,
   SourcePublisherSchema,
 } from "./source-publisher.schemas";
+import type {
+  CollectedContentProvenanceInput,
+  ContentCollectionProvenance,
+} from "./content-collection-provenance";
+import {
+  CollectedContentProvenanceInputSchema,
+  ContentCollectionProvenanceSchema,
+} from "./content-collection-provenance.schemas";
 
 export interface ValidationIssue {
   readonly path: string;
@@ -163,6 +171,48 @@ export function parseObserveSourcePublisherInput(
   value: unknown,
 ): ValidationResult<ObserveSourcePublisherApplicationInput> {
   const result = ObserveSourcePublisherInputSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateCollectedContentProvenanceInput(
+  value: unknown,
+): ValidationResult<CollectedContentProvenanceInput> {
+  return parseCollectedContentProvenanceInput(value);
+}
+
+export function parseCollectedContentProvenanceInput(
+  value: unknown,
+): ValidationResult<CollectedContentProvenanceInput> {
+  const result = CollectedContentProvenanceInputSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateContentCollectionProvenance(
+  value: unknown,
+): ValidationResult<ContentCollectionProvenance> {
+  return parseContentCollectionProvenance(value);
+}
+
+export function parseContentCollectionProvenance(
+  value: unknown,
+): ValidationResult<ContentCollectionProvenance> {
+  const result = ContentCollectionProvenanceSchema.safeParse(value);
 
   if (!result.success) {
     return invalid(formatZodIssues(result.error.issues));

@@ -4,14 +4,26 @@
 The product is currently in the **Content Collector** stage (Stage 1 of 3, preceding Builder and Publisher). The core focus is collecting normalized content from configured Facebook sources while maintaining strict isolation between profile management, collection orchestration, and content storage.
 
 ## Current Active Sprint
-Sprint 063C — Source Publisher HTTP Contract and E2E is
-**accepted**. It exposes safe HTTP contracts for observing,
-listing, and reading Content Manager-owned `SourcePublisher`
-aggregates through Nginx web-gateway → Fastify HTTP adapter →
-Content Manager application → PostgreSQL using only synthetic
-fixtures. Status mutation (approve / ignore / block) remains
-deferred to Sprint 066.
+Sprint 064A — Content Collection Provenance Model is **active and
+authorized**. It adds a pure Content Manager domain model that
+records, for a collected content item, the immutable first
+collection surface and the optional `SourcePublisher` and managed
+`SourceGroup` associations. The model is strict, Zod-validated,
+rejects unknown fields and `null` optional fields, enforces that
+for a `SOURCE_GROUP` input the `managedSourceGroupId` is required
+and must equal `collectionSurface.sourceGroupId`, never mutates
+inputs, and throws a typed
+`ContentCollectionProvenanceConflictError` (code
+`CONTENT_COLLECTION_PROVENANCE_CONFLICT`) on conflicting
+`sourcePublisherId` or `managedSourceGroupId`. It does not add
+persistence, HTTP, application, composition, runtime, extractor,
+browser, scheduler, Docker, or Web UI behavior, and it does not
+modify existing ingestion, persistence, HTTP, Collector Runtime,
+extractor, browser, Web UI, scheduler, or Docker behavior.
+Sprint 064A is not accepted and is not complete.
 Sprint 063C — Source Publisher HTTP Contract and E2E (Accepted).
+Sprint 064A — Content Collection Provenance Model (Active and
+authorized; not accepted and not complete).
 Sprint 063B — Source Publisher Persistence and Atomic Observation (Accepted).
 Sprint 063A — Source Publisher Domain and Application (Accepted).
 Sprint 062: Feed Discovery Delivery Plan And Docker E2E Foundation (Accepted).
@@ -27,7 +39,7 @@ Sprint 054A: Profile Authentication Health Foundation (Accepted).
 
 ## Currently Available Capabilities
 - **Profile Management**: Creation, lifecycle, session ingestion, checkout leasing, and operator-driven recovery reprovisioning for `REAUTH_REQUIRED` and `CHECKPOINT_REVIEW_REQUIRED` profiles.
-- **Content Management**: Storage of normalized Facebook knowledge group text posts and top comments, and the Content Manager-owned `SourcePublisher` identity and observation behavior (durable publishing-source identity for a Facebook group or page observed while reading a feed, with `DISCOVERED | APPROVED | IGNORED | BLOCKED` review status). `SourcePublisher` is distinct from managed `SourceGroup` and is not the future Content Publisher pipeline stage. Sprint 063A (accepted) shipped the domain and application foundation; Sprint 063B (accepted) shipped the durable persistence, the atomic observation algorithm, the durable status update, the durable read operations, and the Content Manager composition wiring; Sprint 063C (accepted) ships the safe observation, list, and get HTTP contracts, the safe `SourcePublisherDto` allowlist, the stub-backed HTTP unit tests, the opt-in PostgreSQL-backed HTTP integration test, the Docker E2E spec through web-gateway, and the corresponding documentation. `SourcePublisher` status mutation (approve / ignore / block) remains deferred to Sprint 066; no review UI, no Web UI changes, no Collector Runtime consumption, no browser execution, and no feed execution are part of Sprint 063C.
+- **Content Management**: Storage of normalized Facebook knowledge group text posts and top comments, and the Content Manager-owned `SourcePublisher` identity and observation behavior (durable publishing-source identity for a Facebook group or page observed while reading a feed, with `DISCOVERED | APPROVED | IGNORED | BLOCKED` review status). `SourcePublisher` is distinct from managed `SourceGroup` and is not the future Content Publisher pipeline stage. Sprint 063A (accepted) shipped the domain and application foundation; Sprint 063B (accepted) shipped the durable persistence, the atomic observation algorithm, the durable status update, the durable read operations, and the Content Manager composition wiring; Sprint 063C (accepted) ships the safe observation, list, and get HTTP contracts, the safe `SourcePublisherDto` allowlist, the stub-backed HTTP unit tests, the opt-in PostgreSQL-backed HTTP integration test, the Docker E2E spec through web-gateway, and the corresponding documentation. `SourcePublisher` status mutation (approve / ignore / block) remains deferred to Sprint 066; no review UI, no Web UI changes, no Collector Runtime consumption, no browser execution, and no feed execution are part of Sprint 063C. Sprint 064A (active and authorized) adds the pure Content Manager `ContentCollectionProvenance` domain model: a strict, Zod-validated `CollectionSurface` discriminated union with `SOURCE_GROUP` (with `sourceGroupId`) and `PROFILE_HOME_FEED` (no profile id, no source group id) branches; a `CollectedContentProvenanceInput` with the collection surface, an optional `sourcePublisherId`, and an optional `managedSourceGroupId` (required and equal to the surface `sourceGroupId` when the surface is `SOURCE_GROUP`); a durable `ContentCollectionProvenance` with the immutable `firstCollectionSurface` plus the optional associations; pure `createInitialContentCollectionProvenance` and `mergeContentCollectionProvenance` that preserve the first surface, fill absent associations later, are idempotent on identical observations, do not mutate inputs, and throw a typed `ContentCollectionProvenanceConflictError` (code `CONTENT_COLLECTION_PROVENANCE_CONFLICT`) on conflicting `sourcePublisherId` or `managedSourceGroupId`. Sprint 064A adds no persistence, HTTP, application, composition, runtime, extractor, browser, scheduler, Docker, or Web UI behavior.
 - **Collection Execution**: Headless browser extraction using Playwright (or experimental CloakBrowser). Worker processes automatically consume queued collection runs, ambient exercise runs, and access-check runs.
 - **Collection Scheduling**: One persisted `CollectionSchedule` per source group (interval, next run, parameters). A containerized `collection-scheduler` Compose service drains due schedules into queued `SCHEDULED` collection runs on an interval; the scheduler-runtime image does not provision browser executables, Playwright browser downloads, Xvfb, browser-specific system packages, or a runnable CloakBrowser browser/system runtime, and does not launch a browser.
 - **Operator Tools**: CLI tools for profile provisioning, manual collection, worker execution, browser probing, the same provisioning CLI used for first-time and recovery login, and the containerized collection scheduler.
@@ -91,12 +103,19 @@ HTTP contracts, the safe `SourcePublisherDto` allowlist, the
 stub-backed HTTP unit tests, the opt-in PostgreSQL-backed HTTP
 integration test, the Docker E2E spec through web-gateway, and
 the corresponding documentation. Status mutation (approve / ignore /
-block) is intentionally deferred to Sprint 066. The immediate next
-expected work is shaping Sprint 064A — Content Collection Provenance
-Model, which is not yet active or authorized. Future sprint work
-after Sprint 064A follows the 064A–068 sequence documented in
-`docs/ROADMAP.md`, in which `SourcePublisher` is the Content
-Manager-owned publishing-source identity (a group or a page
-observed while reading the feed) and is not the future Content
-Publisher pipeline stage. The long-term `Future: Content Builder`
-and `Future: Content Publisher` pipeline stages are retained.
+block) is intentionally deferred to Sprint 066. Sprint 064A —
+Content Collection Provenance Model is active and authorized: it
+adds the pure Content Manager `ContentCollectionProvenance`
+domain model (the `CollectionSurface` discriminated union, the
+strict input and durable schemas, the typed
+`ContentCollectionProvenanceConflictError`, and the pure create /
+merge behavior) plus the focused unit test coverage. Sprint 064A
+adds no persistence, HTTP, application, composition, runtime,
+extractor, browser, scheduler, Docker, or Web UI behavior. Future
+sprint work after Sprint 064A follows the 064A–068 sequence
+documented in `docs/ROADMAP.md`, in which `SourcePublisher` is
+the Content Manager-owned publishing-source identity (a group or
+a page observed while reading the feed) and is not the future
+Content Publisher pipeline stage. The long-term `Future: Content
+Builder` and `Future: Content Publisher` pipeline stages are
+retained.

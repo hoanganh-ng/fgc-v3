@@ -1,4 +1,6 @@
 export * from "./content";
+export * from "./content-collection-provenance";
+export * from "./content-collection-provenance.schemas";
 export * from "./content-errors";
 export * from "./content-platform";
 export * from "./content-state-machine";

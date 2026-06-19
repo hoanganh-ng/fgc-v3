@@ -36,7 +36,16 @@ block) remains deferred to Sprint 066.
 - [Sprint 063C - Source Publisher HTTP Contract and E2E](SPRINT-063C-source-publisher-http-contract-and-e2e.md)
 
 Sprint 064A — Content Collection Provenance Model is
-**awaiting definition**. It is not active and is not authorized.
+**active and authorized**. It adds a pure Content Manager domain
+model that records the first collection surface and the optional
+`SourcePublisher` and managed `SourceGroup` associations for a
+collected content item. It does not add persistence, HTTP, runtime,
+extractor, browser, UI, scheduler, or Docker behavior, and it does
+not modify existing ingestion, persistence, HTTP, Collector Runtime,
+extractor, browser, Web UI, scheduler, or Docker behavior. Sprint
+064A is not accepted and is not complete.
+
+- [Sprint 064A - Content Collection Provenance Model](SPRINT-064A-content-collection-provenance-model.md)
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

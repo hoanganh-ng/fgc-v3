@@ -29,6 +29,28 @@
   purpose-specific atomic operation, review status has a
   purpose-specific partial status operation, and there is no
   production full-row save path for `SourcePublisher`.
+- `ContentCollectionProvenance` domain value object: a strict,
+  Zod-validated `CollectionSurface` discriminated union with
+  `SOURCE_GROUP` (with `sourceGroupId`) and `PROFILE_HOME_FEED`
+  (no profile id, no source group id) branches; a
+  `CollectedContentProvenanceInput` with the collection surface,
+  an optional `sourcePublisherId`, and an optional
+  `managedSourceGroupId` (required and equal to the surface
+  `sourceGroupId` when the surface is `SOURCE_GROUP`); a durable
+  `ContentCollectionProvenance` with the immutable
+  `firstCollectionSurface` plus the optional associations; pure
+  `createInitialContentCollectionProvenance` and
+  `mergeContentCollectionProvenance` that preserve the first
+  surface, fill absent associations later, are idempotent on
+  identical observations, do not mutate inputs, and throw a typed
+  `ContentCollectionProvenanceConflictError` (code
+  `CONTENT_COLLECTION_PROVENANCE_CONFLICT`) on conflicting
+  `sourcePublisherId` or `managedSourceGroupId`. Provenance is a
+  domain value object; it has no profile id, collection run id,
+  URL, entry route, raw publisher identity, raw payload,
+  observation array, or event history, and Sprint 064A adds no
+  persistence, HTTP, application, composition, runtime, extractor,
+  browser, scheduler, Docker, or Web UI behavior.
 - Safe read APIs for content and sources.
 - Safe `SourcePublisher` HTTP observation, list, and get contracts
   served through Nginx → Fastify → Content Manager application →
@@ -57,6 +79,8 @@
 - `src/content-manager/domain/`
   - `source-publisher.ts`, `source-publisher-kind.ts`,
     `source-publisher-status.ts`, `source-publisher.schemas.ts`
+  - `content-collection-provenance.ts`,
+    `content-collection-provenance.schemas.ts` (Sprint 064A)
 - `src/content-manager/application/`
   - `ports/source-publisher-repository.port.ts`
   - `use-cases/observe-source-publisher.use-case.ts`
