@@ -609,9 +609,9 @@ the existing HTTP integration coverage to remain green. No Layer 4
 
 ## Status
 
-Sprint 064B is **active and authorized**. Sprint 064A is accepted.
-Sprint 064B is not accepted and is not complete. Sprint 065A,
-Sprint 065B, and Sprint 065C remain future work.
+Sprint 064B is **accepted**. Sprint 064A is accepted. Sprint 065A,
+Sprint 065B, and Sprint 065C remain future work and are not
+activated by this acceptance.
 
 ## Verification Results
 
@@ -690,3 +690,134 @@ actually ran. Any verification not yet executed is recorded as
 - `pnpm test:e2e:docker` — not executed in this session; Docker
   daemon availability was not verified. This is not a Sprint 064B
   acceptance spec.
+
+### Final Acceptance Verification (clean disposable databases)
+
+Disposable PostgreSQL databases were provisioned in a
+`postgres:16-alpine` container published on host port `5434`. Two
+clean databases were created: `sprint_064b_isolated` and
+`sprint_064b_clean`. Credentials redacted.
+
+```bash
+SPRINT_064B_DATABASE_URL=postgres://fgc_test:****@127.0.0.1:5434/sprint_064b_isolated \
+  pnpm test:db:provenance:isolated
+```
+
+Result: **10 / 10 tests passed (exit 0)**. Confirmed: full
+0000–0017 chain replayed; the seeded legacy content row existed
+pre-0018; `collection_provenance` was `NULL` after 0018; 0019
+backfilled `SOURCE_GROUP` provenance derived from `source_group_id`;
+0020 enforced `NOT NULL`; every original field on the legacy row
+(`platform`, `source_group_id`, `external_post_id`, `source_url`,
+`title`, `body_text`, `author_display_name`, `author_external_id`,
+`posted_at`, `first_collected_at`, `last_collected_at`,
+`reaction_count`, `comment_count`, `share_count`, non-empty
+`top_comments`, `status`, `raw_payload_ref`, `created_at`,
+`updated_at`) was preserved unchanged; `data_type=jsonb`,
+`is_nullable=NO`, `column_default=NULL`, no index on
+`collection_provenance`, no `sourcePublisherId` invented; `afterAll`
+reset the public schema so the next run starts blank.
+
+```bash
+DATABASE_URL=postgres://fgc_test:****@127.0.0.1:5434/sprint_064b_clean \
+  pnpm db:migrate
+```
+
+Result: **migrations applied successfully (exit 0)**; final schema
+verified via `psql \d "content_items"` to show
+`collection_provenance | jsonb | not null |` with no default and
+no index.
+
+```bash
+RUN_DB_TESTS=true DATABASE_URL=postgres://fgc_test:****@127.0.0.1:5434/sprint_064b_clean \
+  pnpm exec vitest run \
+  src/infrastructure/database/repositories/drizzle-content-item.repository.collection-provenance.integration.test.ts
+```
+
+Result: **5 / 5 tests passed (exit 0)**.
+
+```bash
+RUN_DB_TESTS=true DATABASE_URL=postgres://fgc_test:****@127.0.0.1:5434/sprint_064b_clean \
+  pnpm exec vitest run \
+  src/infrastructure/database/repositories/drizzle-content-manager-repositories.integration.test.ts
+```
+
+Result: **5 / 5 tests passed (exit 0)**.
+
+```bash
+RUN_HTTP_DB_TESTS=true DATABASE_URL=postgres://fgc_test:****@127.0.0.1:5434/sprint_064b_clean \
+  pnpm exec vitest run \
+  src/interfaces/http/content-manager.server.database.integration.test.ts
+```
+
+Result: **2 / 2 tests passed (exit 0)**.
+
+```bash
+pnpm typecheck
+pnpm test src/infrastructure/database/migration-journal.test.ts
+git diff --check
+```
+
+Result: `pnpm typecheck` exit `0`; migration-journal test **4 / 4
+passed (exit 0)** with the chain ending at
+`0020_content_items_collection_provenance_not_null`; `git diff
+--check` exit `0`.
+
+```bash
+pnpm test
+```
+
+Result: **exit 1** in the full-suite run; **104 test files
+passed, 13 skipped, 1 failed (1460 passed, 14 skipped, 1 failed)**.
+The single failure is
+`src/interfaces/http/content-manager.server.test.ts > Content
+Manager HTTP routes > rejects invalid observedAt, canonicalUrl,
+platform, and kind`, which exceeded the 5000 ms default vitest
+timeout at 5416 ms / 5677 ms across two runs of the full suite.
+The same file passes deterministically when run in isolation
+(`pnpm test src/interfaces/http/content-manager.server.test.ts`:
+**34 / 34 tests passed**, slowest test 672 ms). This is a
+**pre-existing parallel-execution flake**, not caused by Sprint
+064B, and is recorded as a known verification limitation. It did
+not block Sprint 064B acceptance; the unrelated test was not
+modified.
+
+```bash
+pnpm db:generate
+```
+
+Result: exit `0`. Drizzle did not propose a `collection_provenance`
+migration. The only generated migration was an unrelated
+`source_publishers_last_observed_at_id_idx` reorder. The generated
+file, its snapshot, and the journal entry were deleted after
+capturing the SQL. The drift is recorded as **deferred follow-up
+work** (see below) and is outside Sprint 064B scope.
+
+```bash
+git diff --check
+```
+
+Result: exit `0` (clean).
+
+## Deferred Follow-Up Work (not part of Sprint 064B)
+
+The following items surfaced during Sprint 064B verification and
+are intentionally out of scope:
+
+- **Pre-existing parallel-suite timeout flake** in
+  `src/interfaces/http/content-manager.server.test.ts`. The two
+  slow cases
+  (`rejects invalid observedAt, canonicalUrl, platform, and kind`
+  and `rejects invalid source publisher list filters without
+  invocation`) intermittently exceed the 5000 ms default vitest
+  timeout only when the full backend suite runs concurrently; both
+  pass deterministically when that file is run in isolation.
+  Hardening the slow paths or raising the per-test timeout is a
+  narrow follow-up that does not belong to Sprint 064B.
+- **Unrelated `source_publishers_last_observed_at_id_idx` Drizzle
+  generation drift**. `pnpm db:generate` continues to propose a
+  reorder of the existing `source_publishers_last_observed_at_id_idx`
+  index (`DROP INDEX …; CREATE INDEX … USING btree ("last_observed_at" desc, "id" asc);`).
+  The drift is independent of Sprint 064B content and is captured
+  here as deferred follow-up so the snapshot chain remains the
+  authoritative destination for Sprint 064B.

@@ -77,7 +77,7 @@
   `collectionProvenance.firstCollectionSurface.kind === 'SOURCE_GROUP'`
   and that
   `collectionProvenance.firstCollectionSurface.sourceGroupId === sourceGroupId`
-  on every persisted content item. Sprint 064B does not introduce
+  on every persisted content item. Sprint 064B is accepted and does not introduce
   home-feed ingestion or execution, does not make `sourceGroupId`
   nullable, does not add `SourcePublisher` observation or
   resolution, does not add a new HTTP DTO field, does not add a

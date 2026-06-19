@@ -113,7 +113,7 @@ Owns:
   `collectionProvenance.firstCollectionSurface.sourceGroupId === sourceGroupId`
   on every persisted content item. The HTTP DTOs and JSON schemas
   are unchanged; `collectionProvenance` is internal-only and is
-  not exposed through HTTP. Sprint 064B does not introduce
+  not exposed through HTTP. Sprint 064B is accepted and does not introduce
   home-feed ingestion or execution, does not make `sourceGroupId`
   nullable, does not add `SourcePublisher` observation or
   resolution, does not add a new HTTP DTO field, does not add a

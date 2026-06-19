@@ -47,21 +47,31 @@ extractor, browser, Web UI, scheduler, or Docker behavior.
 - [Sprint 064A - Content Collection Provenance Model](SPRINT-064A-content-collection-provenance-model.md)
 
 Sprint 064B — Provenance Persistence And Compatibility is
-**active and authorized**. It persists the Sprint 064A
-`ContentCollectionProvenance` value object as part of every
-`ContentItem`, safely backfills every existing source-group content
-row from its `source_group_id`, and integrates provenance creation
-and merge into the current source-group ingestion flow without
-changing the existing `CollectedContentInput`, HTTP request, HTTP
-response, route, DTO, or JSON schema. The existing
-`sourceGroupId` field and the PostgreSQL `source_group_id` column
-remain required and unchanged for backward compatibility. Sprint
-064B does not make `sourceGroupId` nullable, does not introduce
-home-feed ingestion or execution, does not add `SourcePublisher`
-observation or resolution, does not add a new HTTP DTO field, does
-not add a provenance filter or index, and does not change the
+**accepted**. It persists the Sprint 064A
+`ContentCollectionProvenance` value object as a required
+`collectionProvenance` field on every durable `ContentItem`, adds
+a final `NOT NULL content_items.collection_provenance JSONB`
+column, safely backfills every existing source-group content row
+from its `source_group_id` through a split add-column → backfill →
+set-NOT-NULL migration sequence mirroring the existing
+`0011`/`0012`/`0013` split, and integrates provenance creation
+(`createInitialContentCollectionProvenance`) and merge
+(`mergeContentCollectionProvenance`) into the current source-group
+ingestion flow. Provenance is derived from the required
+`sourceGroupId` internally through a `SOURCE_GROUP` collection
+surface; conflicting merges propagate a typed
+`ContentCollectionProvenanceConflictError` and never persist. The
+existing `sourceGroupId` field and the PostgreSQL
+`source_group_id` column remain required and unchanged for
+backward compatibility; `collectionProvenance` is internal-only and
+is not exposed through HTTP DTOs or JSON schemas. Sprint 064B does
+not introduce home-feed ingestion or execution, does not make
+`sourceGroupId` nullable, does not add `SourcePublisher`
+observation or resolution, does not add a new HTTP DTO field,
+does not add a provenance filter or index, and does not change the
 Collector Runtime, extractor, browser, workers, scheduler, Docker,
-or Web UI. Sprint 064B is not accepted and is not complete.
+or Web UI. Sprint 065A, Sprint 065B, and Sprint 065C remain future
+work and are not activated by this acceptance.
 
 - [Sprint 064B - Provenance Persistence And Compatibility](SPRINT-064B-provenance-persistence-and-compatibility.md)
 
