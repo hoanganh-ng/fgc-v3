@@ -962,11 +962,19 @@ function createSourceGroupEntryRoute(
 
 function createContentItem(overrides: Partial<ContentItem> = {}): ContentItem {
   const status: ContentStatus = overrides.status ?? "COLLECTED";
+  const sourceGroupId = overrides.sourceGroupId ?? "source-group-1";
+  const provenance = {
+    firstCollectionSurface: {
+      kind: "SOURCE_GROUP" as const,
+      sourceGroupId,
+    },
+    managedSourceGroupId: sourceGroupId,
+  };
 
   return {
     id: "content-1",
     platform: "FACEBOOK",
-    sourceGroupId: "source-group-1",
+    sourceGroupId,
     externalPostId: "post-1",
     sourceUrl: "https://www.facebook.com/groups/group-1/posts/post-1",
     title: "Useful post",
@@ -982,6 +990,7 @@ function createContentItem(overrides: Partial<ContentItem> = {}): ContentItem {
     topComments: [createTopComment()],
     status,
     rawPayloadRef: "payload-ref-1",
+    collectionProvenance: provenance,
     createdAt,
     updatedAt: createdAt,
     ...overrides,

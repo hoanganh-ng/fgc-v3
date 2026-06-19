@@ -47,6 +47,7 @@ export class DrizzleContentItemRepository implements ContentItemRepository {
           topComments: row.topComments,
           status: row.status,
           rawPayloadRef: row.rawPayloadRef,
+          collectionProvenance: row.collectionProvenance,
           updatedAt: row.updatedAt,
         },
       });

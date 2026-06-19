@@ -127,6 +127,27 @@
       "when": 1781798276871,
       "tag": "0017_curious_dust",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1781798276872,
+      "tag": "0018_add_content_items_collection_provenance",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1781798276873,
+      "tag": "0019_backfill_content_items_collection_provenance",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1781798276874,
+      "tag": "0020_content_items_collection_provenance_not_null",
+      "breakpoints": true
     }
   ]
 }

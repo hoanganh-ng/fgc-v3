@@ -487,6 +487,14 @@ function createContentItem(
   sourceGroupId: string,
   options: ContentItemOptions = {},
 ): ContentItem {
+  const provenance = {
+    firstCollectionSurface: {
+      kind: "SOURCE_GROUP" as const,
+      sourceGroupId,
+    },
+    managedSourceGroupId: sourceGroupId,
+  };
+
   return {
     id,
     platform: "FACEBOOK",
@@ -514,6 +522,7 @@ function createContentItem(
     ...(options.rawPayloadRef === undefined
       ? {}
       : { rawPayloadRef: options.rawPayloadRef }),
+    collectionProvenance: provenance,
     createdAt: options.createdAt ?? defaultCreatedAt,
     updatedAt: options.updatedAt ?? options.createdAt ?? defaultCreatedAt,
   };

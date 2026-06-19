@@ -59,6 +59,31 @@
   or event history, and Sprint 064A adds no persistence, HTTP,
   application, composition, runtime, extractor, browser,
   scheduler, Docker, or Web UI behavior.
+- Durable `ContentItem.collectionProvenance`: the Sprint 064A
+  `ContentCollectionProvenance` value object is required on every
+  durable content item and is persisted through a final
+  `NOT NULL content_items.collection_provenance JSONB` column.
+  Provenance is derived from the required `sourceGroupId`
+  internally through a `SOURCE_GROUP` collection surface and is
+  not exposed through HTTP. New content items use
+  `createInitialContentCollectionProvenance`; duplicate content
+  items (matched by `platform + externalPostId`) use
+  `mergeContentCollectionProvenance`. A merge that throws
+  `ContentCollectionProvenanceConflictError` propagates the typed
+  domain error and never persists. The legacy `sourceGroupId`
+  field and the PostgreSQL `source_group_id` column remain
+  required and unchanged for backward compatibility. A source-group
+  consistency invariant guarantees that
+  `collectionProvenance.firstCollectionSurface.kind === 'SOURCE_GROUP'`
+  and that
+  `collectionProvenance.firstCollectionSurface.sourceGroupId === sourceGroupId`
+  on every persisted content item. Sprint 064B does not introduce
+  home-feed ingestion or execution, does not make `sourceGroupId`
+  nullable, does not add `SourcePublisher` observation or
+  resolution, does not add a new HTTP DTO field, does not add a
+  provenance filter or index, and does not change the Collector
+  Runtime, extractor, browser, workers, scheduler, Docker, or
+  Web UI.
 - Safe read APIs for content and sources.
 - Safe `SourcePublisher` HTTP observation, list, and get contracts
   served through Nginx → Fastify → Content Manager application →
@@ -95,14 +120,20 @@
   - `use-cases/get-source-publisher.use-case.ts`
   - `use-cases/list-source-publishers.use-case.ts`
   - `use-cases/update-source-publisher-status.use-case.ts`
+  - `use-cases/ingest-collected-content.use-case.ts` (Sprint 064B
+    integrates provenance creation and merge)
   - `test-support/in-memory-repositories.ts`
     (`InMemorySourcePublisherRepository`)
 - `src/infrastructure/database/`
   - `schema/content-manager.schema.ts` (`source_publishers` table,
-    `source_publisher_kind` enum, `source_publisher_status` enum)
+    `source_publisher_kind` enum, `source_publisher_status` enum;
+    `content_items` gains `collection_provenance` JSONB in
+    Sprint 064B)
   - `mappers/content-manager.mapper.ts` (`SourcePublisherRow`,
     `SourcePublisherInsert`, `toSourcePublisherRow`,
-    `toSourcePublisherDomain`)
+    `toSourcePublisherDomain`, and the Sprint 064B
+    `collection_provenance` round-trip on
+    `toContentItemRow`/`toContentItemDomain`)
   - `repositories/drizzle-source-publisher.repository.ts`
 - `src/composition/content-manager/`
   - `content-manager.container.ts` (exposes

@@ -90,6 +90,36 @@ Owns:
   observation arrays, or event history. Sprint 064A adds no
   persistence, HTTP, application, composition, runtime,
   extractor, browser, scheduler, Docker, or Web UI behavior.
+- Durable `ContentItem.collectionProvenance` persistence and
+  ingestion integration: the Sprint 064A
+  `ContentCollectionProvenance` value object is required on every
+  durable content item and is persisted through a final
+  `NOT NULL content_items.collection_provenance JSONB` column.
+  The Content Manager owns the safe split add-column → backfill →
+  set-NOT-NULL migration sequence that mirrors the existing
+  `0011`/`0012`/`0013` split. Provenance is derived from the
+  required `sourceGroupId` internally through a `SOURCE_GROUP`
+  collection surface; new content items use
+  `createInitialContentCollectionProvenance`; duplicate content
+  items (matched by `platform + externalPostId`) use
+  `mergeContentCollectionProvenance`. A merge that throws
+  `ContentCollectionProvenanceConflictError` propagates the typed
+  domain error and never persists. The legacy `sourceGroupId`
+  field and the PostgreSQL `source_group_id` column remain
+  required and unchanged for backward compatibility. A
+  source-group consistency invariant guarantees that
+  `collectionProvenance.firstCollectionSurface.kind === 'SOURCE_GROUP'`
+  and that
+  `collectionProvenance.firstCollectionSurface.sourceGroupId === sourceGroupId`
+  on every persisted content item. The HTTP DTOs and JSON schemas
+  are unchanged; `collectionProvenance` is internal-only and is
+  not exposed through HTTP. Sprint 064B does not introduce
+  home-feed ingestion or execution, does not make `sourceGroupId`
+  nullable, does not add `SourcePublisher` observation or
+  resolution, does not add a new HTTP DTO field, does not add a
+  provenance filter or index, and does not change the Collector
+  Runtime, extractor, browser, workers, scheduler, Docker, or
+  Web UI.
 - Safe read APIs.
 - Future handoff shape for Content Builder.
 

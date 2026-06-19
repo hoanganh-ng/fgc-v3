@@ -253,10 +253,12 @@ export function createSourceGroup(
 export function createContentItem(
   options: Partial<ContentItem> = {},
 ): ContentItem {
+  const sourceGroupId = options.sourceGroupId ?? "source-group-1";
+
   return {
     id: options.id ?? "content-item-1",
     platform: options.platform ?? "FACEBOOK",
-    sourceGroupId: options.sourceGroupId ?? "source-group-1",
+    sourceGroupId,
     externalPostId: options.externalPostId ?? "fb-post-1",
     sourceUrl: options.sourceUrl ?? "https://facebook.test/posts/fb-post-1",
     ...(options.title !== undefined ? { title: options.title } : {}),
@@ -280,6 +282,14 @@ export function createContentItem(
     ...(options.rawPayloadRef !== undefined
       ? { rawPayloadRef: options.rawPayloadRef }
       : {}),
+    collectionProvenance:
+      options.collectionProvenance ?? {
+        firstCollectionSurface: {
+          kind: "SOURCE_GROUP",
+          sourceGroupId,
+        },
+        managedSourceGroupId: sourceGroupId,
+      },
     createdAt: options.createdAt ?? contentManagerHttpTestNow,
     updatedAt: options.updatedAt ?? contentManagerHttpTestNow,
   };

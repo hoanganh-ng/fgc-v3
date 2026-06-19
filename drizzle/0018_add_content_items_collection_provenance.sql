@@ -1,0 +1,1 @@
+ALTER TABLE "content_items" ADD COLUMN "collection_provenance" jsonb;--> statement-breakpoint

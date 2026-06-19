@@ -9,12 +9,17 @@ import type { ContentItemRepository } from "../ports/content-item-repository.por
 import type { IdGenerator } from "../ports/id-generator.port";
 import type { SourceGroupRepository } from "../ports/source-group-repository.port";
 import {
+  createInitialContentCollectionProvenance,
   mergeCollectedContent,
+  mergeContentCollectionProvenance,
   normalizeTopComments,
 } from "../../domain";
 import type {
   CollectedContentInput,
+  CollectedContentProvenanceInput,
+  ContentCollectionProvenance,
   ContentItem,
+  SourceGroupId,
 } from "../../domain";
 
 export class IngestCollectedContentUseCase {
@@ -43,11 +48,16 @@ export class IngestCollectedContentUseCase {
     if (existingContent !== null) {
       const validExistingContent =
         validateContentItemForApplication(existingContent);
+      const mergedProvenance = mergeContentCollectionProvenance(
+        validExistingContent.collectionProvenance,
+        buildSourceGroupProvenanceInput(collectedContent.sourceGroupId),
+      );
       const mergedContent = validateContentItemForApplication(
         mergeCollectedContent(
           validExistingContent,
           preserveMissingOptionalFields(validExistingContent, collectedContent),
           { updatedAt },
+          mergedProvenance,
         ),
       );
 
@@ -56,6 +66,9 @@ export class IngestCollectedContentUseCase {
       return mergedContent;
     }
 
+    const initialProvenance = createInitialContentCollectionProvenance(
+      buildSourceGroupProvenanceInput(collectedContent.sourceGroupId),
+    );
     const newContent = validateContentItemForApplication({
       id: await this.ids.generateId(),
       platform: collectedContent.platform,
@@ -87,6 +100,7 @@ export class IngestCollectedContentUseCase {
       ...(collectedContent.rawPayloadRef !== undefined
         ? { rawPayloadRef: collectedContent.rawPayloadRef }
         : {}),
+      collectionProvenance: initialProvenance,
       createdAt: updatedAt,
       updatedAt,
     });
@@ -95,6 +109,18 @@ export class IngestCollectedContentUseCase {
 
     return newContent;
   }
+}
+
+function buildSourceGroupProvenanceInput(
+  sourceGroupId: SourceGroupId,
+): CollectedContentProvenanceInput {
+  return {
+    collectionSurface: {
+      kind: "SOURCE_GROUP",
+      sourceGroupId,
+    },
+    managedSourceGroupId: sourceGroupId,
+  };
 }
 
 function preserveMissingOptionalFields(
@@ -109,3 +135,5 @@ function preserveMissingOptionalFields(
       : {}),
   };
 }
+
+export type { ContentCollectionProvenance };

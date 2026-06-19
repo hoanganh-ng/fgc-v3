@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ContentCollectionProvenanceSchema } from "./content-collection-provenance.schemas";
 import { CONTENT_PLATFORMS } from "./content-platform";
 import { CONTENT_STATUSES } from "./content-status";
 import {
@@ -140,10 +141,49 @@ export const ContentItemSchema = z
     topComments: z.array(TopCommentSchema),
     status: ContentStatusSchema,
     rawPayloadRef: NonEmptyStringSchema.optional(),
+    collectionProvenance: ContentCollectionProvenanceSchema,
     createdAt: IsoDateTimeSchema,
     updatedAt: IsoDateTimeSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((item, context) => {
+    const provenance = item.collectionProvenance;
+    const surfaceKind = provenance.firstCollectionSurface.kind;
+
+    if (surfaceKind !== "SOURCE_GROUP") {
+      context.addIssue({
+        code: "custom",
+        path: ["collectionProvenance", "firstCollectionSurface", "kind"],
+        message:
+          "collectionProvenance.firstCollectionSurface.kind must be SOURCE_GROUP for a ContentItem.",
+      });
+      return;
+    }
+
+    const surfaceSourceGroupId =
+      provenance.firstCollectionSurface.sourceGroupId;
+
+    if (
+      provenance.managedSourceGroupId !== undefined &&
+      provenance.managedSourceGroupId !== surfaceSourceGroupId
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["collectionProvenance", "managedSourceGroupId"],
+        message:
+          "managedSourceGroupId must equal firstCollectionSurface.sourceGroupId when firstCollectionSurface.kind is SOURCE_GROUP.",
+      });
+    }
+
+    if (item.sourceGroupId !== surfaceSourceGroupId) {
+      context.addIssue({
+        code: "custom",
+        path: ["collectionProvenance", "firstCollectionSurface"],
+        message:
+          "collectionProvenance.firstCollectionSurface.sourceGroupId must equal sourceGroupId for a SOURCE_GROUP surface.",
+      });
+    }
+  });
 
 export const CollectedContentInputSchema = z
   .object({

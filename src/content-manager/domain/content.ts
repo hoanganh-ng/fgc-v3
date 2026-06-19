@@ -19,6 +19,7 @@ import {
   SOURCE_GROUP_DEFAULT_ENTRY_ROUTE_ID,
   SOURCE_GROUP_DEFAULT_ENTRY_ROUTE_RISK_LEVEL,
 } from "./source-group-entry-route";
+import type { ContentCollectionProvenance } from "./content-collection-provenance";
 
 export const DEFAULT_TOP_COMMENT_LIMIT = 10;
 
@@ -44,6 +45,7 @@ export type CollectedContentInput = zInfer<typeof CollectedContentInputSchema>;
 export interface MergeCollectedContentOptions {
   readonly updatedAt: IsoDateTime;
   readonly topCommentLimit?: number;
+  readonly collectionProvenance?: ContentCollectionProvenance;
 }
 
 export function createDefaultSourceGroupEntryRoute(
@@ -105,6 +107,7 @@ export function mergeCollectedContent(
   existing: ContentItem,
   incoming: CollectedContentInput,
   options: MergeCollectedContentOptions,
+  mergedProvenance?: ContentCollectionProvenance,
 ): ContentItem {
   return {
     ...existing,
@@ -124,6 +127,7 @@ export function mergeCollectedContent(
       options.topCommentLimit,
     ),
     rawPayloadRef: incoming.rawPayloadRef ?? existing.rawPayloadRef,
+    collectionProvenance: mergedProvenance ?? existing.collectionProvenance,
     updatedAt: options.updatedAt,
   };
 }

@@ -36,16 +36,34 @@ block) remains deferred to Sprint 066.
 - [Sprint 063C - Source Publisher HTTP Contract and E2E](SPRINT-063C-source-publisher-http-contract-and-e2e.md)
 
 Sprint 064A — Content Collection Provenance Model is
-**active and authorized**. It adds a pure Content Manager domain
-model that records the first collection surface and the optional
+**accepted**. It adds a pure Content Manager domain model that
+records the first collection surface and the optional
 `SourcePublisher` and managed `SourceGroup` associations for a
 collected content item. It does not add persistence, HTTP, runtime,
 extractor, browser, UI, scheduler, or Docker behavior, and it does
 not modify existing ingestion, persistence, HTTP, Collector Runtime,
-extractor, browser, Web UI, scheduler, or Docker behavior. Sprint
-064A is not accepted and is not complete.
+extractor, browser, Web UI, scheduler, or Docker behavior.
 
 - [Sprint 064A - Content Collection Provenance Model](SPRINT-064A-content-collection-provenance-model.md)
+
+Sprint 064B — Provenance Persistence And Compatibility is
+**active and authorized**. It persists the Sprint 064A
+`ContentCollectionProvenance` value object as part of every
+`ContentItem`, safely backfills every existing source-group content
+row from its `source_group_id`, and integrates provenance creation
+and merge into the current source-group ingestion flow without
+changing the existing `CollectedContentInput`, HTTP request, HTTP
+response, route, DTO, or JSON schema. The existing
+`sourceGroupId` field and the PostgreSQL `source_group_id` column
+remain required and unchanged for backward compatibility. Sprint
+064B does not make `sourceGroupId` nullable, does not introduce
+home-feed ingestion or execution, does not add `SourcePublisher`
+observation or resolution, does not add a new HTTP DTO field, does
+not add a provenance filter or index, and does not change the
+Collector Runtime, extractor, browser, workers, scheduler, Docker,
+or Web UI. Sprint 064B is not accepted and is not complete.
+
+- [Sprint 064B - Provenance Persistence And Compatibility](SPRINT-064B-provenance-persistence-and-compatibility.md)
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

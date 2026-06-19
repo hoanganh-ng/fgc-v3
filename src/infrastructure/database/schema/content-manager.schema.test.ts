@@ -35,6 +35,9 @@ describe("content manager database schema", () => {
     expect(contentItems.externalPostId.name).toBe("external_post_id");
     expect(contentItems.topComments.name).toBe("top_comments");
     expect(contentItems.rawPayloadRef.name).toBe("raw_payload_ref");
+    expect(contentItems.collectionProvenance.name).toBe(
+      "collection_provenance",
+    );
   });
 
   it("exports source publisher table metadata for migration generation", () => {

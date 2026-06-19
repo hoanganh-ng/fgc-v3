@@ -11,6 +11,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type {
+  ContentCollectionProvenance,
   SourceGroupEntryRoute,
   TopComment,
 } from "../../../content-manager/domain";
@@ -116,6 +117,9 @@ export const contentItems = pgTable(
     topComments: jsonb("top_comments").$type<readonly TopComment[]>().notNull(),
     status: contentStatusEnum("status").notNull(),
     rawPayloadRef: text("raw_payload_ref"),
+    collectionProvenance: jsonb("collection_provenance")
+      .$type<ContentCollectionProvenance>()
+      .notNull(),
     createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
     updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow(),
   },
