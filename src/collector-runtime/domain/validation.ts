@@ -16,6 +16,12 @@ import type {
   CategoryBrowseExerciseTarget,
 } from "./account-exercise-run";
 import type { ProfileSourceAccessCheckRun } from "./profile-source-access-check-run";
+import type {
+  ProfileHomeFeedCollectionRun,
+  ProfileHomeFeedCollectionRunFailureReason,
+  ProfileHomeFeedCollectionRunParameters,
+  ProfileHomeFeedCollectionRunSummary,
+} from "./profile-home-feed-collection-run";
 import {
   AccountExerciseRunActionBudgetSchema,
   AccountExerciseRunFailureReasonSchema,
@@ -31,6 +37,12 @@ import {
 } from "./collection-run.schemas";
 import { CollectionScheduleSchema } from "./collection-schedule.schemas";
 import { ProfileSourceAccessCheckRunSchema } from "./profile-source-access-check-run.schemas";
+import {
+  ProfileHomeFeedCollectionRunFailureReasonSchema,
+  ProfileHomeFeedCollectionRunParametersSchema,
+  ProfileHomeFeedCollectionRunSchema,
+  ProfileHomeFeedCollectionRunSummarySchema,
+} from "./profile-home-feed-collection-run.schemas";
 
 export interface ValidationIssue {
   readonly path: string;
@@ -211,6 +223,67 @@ export function validateProfileSourceAccessCheckRun(
   value: unknown,
 ): ValidationResult<ProfileSourceAccessCheckRun> {
   const result = ProfileSourceAccessCheckRunSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateProfileHomeFeedCollectionRun(
+  value: unknown,
+): ValidationResult<ProfileHomeFeedCollectionRun> {
+  const result = ProfileHomeFeedCollectionRunSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateProfileHomeFeedCollectionRunParameters(
+  value: unknown,
+): ValidationResult<ProfileHomeFeedCollectionRunParameters> {
+  const result = ProfileHomeFeedCollectionRunParametersSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateProfileHomeFeedCollectionRunSummary(
+  value: unknown,
+): ValidationResult<ProfileHomeFeedCollectionRunSummary> {
+  const result = ProfileHomeFeedCollectionRunSummarySchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateProfileHomeFeedCollectionRunFailureReason(
+  value: unknown,
+): ValidationResult<ProfileHomeFeedCollectionRunFailureReason> {
+  const result =
+    ProfileHomeFeedCollectionRunFailureReasonSchema.safeParse(value);
 
   if (!result.success) {
     return invalid(formatZodIssues(result.error.issues));

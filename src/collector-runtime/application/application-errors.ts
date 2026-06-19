@@ -1,6 +1,7 @@
 import type {
   AccountExerciseRunStatus,
   CollectionRunStatus,
+  ProfileHomeFeedCollectionRunStatus,
   ProfileSourceAccessCheckRunStatus,
   ValidationIssue,
 } from "../domain";
@@ -31,6 +32,10 @@ export type CollectorRuntimeApplicationErrorCode =
   | "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_FOUND"
   | "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_ACTIVE"
   | "PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED"
+  | "PROFILE_HOME_FEED_COLLECTION_RUN_NOT_FOUND"
+  | "INVALID_PROFILE_HOME_FEED_COLLECTION_RUN_STATUS_TRANSITION"
+  | "PROFILE_HOME_FEED_COLLECTION_RUN_VALIDATION_ERROR"
+  | "PROFILE_HOME_FEED_COLLECTION_RUN_CONFLICT"
   | "COLLECTION_SCHEDULE_VALIDATION_ERROR"
   | "COLLECTION_SCHEDULE_NOT_FOUND"
   | "COLLECTION_SCHEDULE_SOURCE_GROUP_NOT_FOUND"
@@ -392,6 +397,59 @@ export class ProfileSourceAccessCheckRunConflictError extends CollectorRuntimeAp
     );
     this.profileId = profileId;
     this.sourceGroupId = sourceGroupId;
+  }
+}
+
+export class ProfileHomeFeedCollectionRunNotFoundError extends CollectorRuntimeApplicationError {
+  public readonly runId: string;
+
+  public constructor(runId: string) {
+    super(
+      "PROFILE_HOME_FEED_COLLECTION_RUN_NOT_FOUND",
+      `Profile home-feed collection run not found: ${runId}.`,
+    );
+    this.runId = runId;
+  }
+}
+
+export class InvalidProfileHomeFeedCollectionRunStatusTransitionError extends CollectorRuntimeApplicationError {
+  public readonly from: ProfileHomeFeedCollectionRunStatus;
+  public readonly to: ProfileHomeFeedCollectionRunStatus;
+
+  public constructor(
+    from: ProfileHomeFeedCollectionRunStatus,
+    to: ProfileHomeFeedCollectionRunStatus,
+  ) {
+    super(
+      "INVALID_PROFILE_HOME_FEED_COLLECTION_RUN_STATUS_TRANSITION",
+      `Invalid profile home-feed collection run status transition: ${from} -> ${to}.`,
+    );
+    this.from = from;
+    this.to = to;
+  }
+}
+
+export class ProfileHomeFeedCollectionRunValidationError extends CollectorRuntimeApplicationError {
+  public readonly issues: readonly ValidationIssue[];
+
+  public constructor(issues: readonly ValidationIssue[]) {
+    super(
+      "PROFILE_HOME_FEED_COLLECTION_RUN_VALIDATION_ERROR",
+      "Profile home-feed collection run input is invalid.",
+    );
+    this.issues = issues;
+  }
+}
+
+export class ProfileHomeFeedCollectionRunConflictError extends CollectorRuntimeApplicationError {
+  public readonly profileId: string;
+
+  public constructor(profileId: string) {
+    super(
+      "PROFILE_HOME_FEED_COLLECTION_RUN_CONFLICT",
+      `A home-feed collection run is already queued or running for profile ${profileId}.`,
+    );
+    this.profileId = profileId;
   }
 }
 

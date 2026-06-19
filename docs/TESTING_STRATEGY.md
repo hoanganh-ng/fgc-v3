@@ -23,6 +23,10 @@ higher layer can attribute the failure correctly.
 - Sprint 065A is fixture/unit verified only: its home-feed extractor
   uses sanitized synthetic payloads, makes no live-Facebook validation
   claim, and leaves mandatory live home-feed validation to Sprint 065C.
+- Sprint 065B adds a profile-bound home-feed run model only. It is
+  verified through unit, application, mapper, schema, HTTP route, and
+  opt-in PostgreSQL repository tests, including active-run uniqueness
+  and concurrent claiming. It makes no browser or live-Facebook claim.
 
 ## Layer 2 — Database Integration Tests
 

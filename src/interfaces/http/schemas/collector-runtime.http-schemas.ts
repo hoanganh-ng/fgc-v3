@@ -13,6 +13,11 @@ import {
   CollectionRunIdSchema,
   CollectionRunSourceGroupIdSchema,
   CollectionRunStatusSchema,
+  PROFILE_HOME_FEED_COLLECTION_RUN_STATUSES,
+  PROFILE_HOME_FEED_COLLECTION_RUN_TRIGGER_TYPES,
+  ProfileHomeFeedCollectionRunIdSchema,
+  ProfileHomeFeedCollectionRunProfileIdSchema,
+  ProfileHomeFeedCollectionRunStatusSchema,
   PROFILE_SOURCE_ACCESS_CHECK_RUN_OUTCOMES,
   PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUSES,
   ProfileSourceAccessCheckRunFailureReasonSchema,
@@ -23,9 +28,11 @@ import {
   DEFAULT_ACCOUNT_EXERCISE_RUN_LIST_LIMIT,
   DEFAULT_COLLECTION_RUN_LIST_LIMIT,
   DEFAULT_COLLECTION_SCHEDULE_LIST_LIMIT,
+  DEFAULT_PROFILE_HOME_FEED_COLLECTION_RUN_LIST_LIMIT,
   MAX_ACCOUNT_EXERCISE_RUN_LIST_LIMIT,
   MAX_COLLECTION_RUN_LIST_LIMIT,
   MAX_COLLECTION_SCHEDULE_LIST_LIMIT,
+  MAX_PROFILE_HOME_FEED_COLLECTION_RUN_LIST_LIMIT,
 } from "../../../collector-runtime/application";
 export { parseHttpInput } from "./http-validation";
 
@@ -49,6 +56,12 @@ export const AccountExerciseRunIdHttpParamsSchema = z
 export const ProfileSourceAccessCheckRunIdHttpParamsSchema = z
   .object({
     checkRunId: ProfileSourceAccessCheckRunIdSchema,
+  })
+  .strict();
+
+export const ProfileHomeFeedCollectionRunIdHttpParamsSchema = z
+  .object({
+    profileHomeFeedCollectionRunId: ProfileHomeFeedCollectionRunIdSchema,
   })
   .strict();
 
@@ -101,6 +114,15 @@ export const RequestProfileSourceAccessCheckRunHttpBodySchema = z
   .object({
     profileId: NonEmptyStringHttpSchema,
     sourceGroupId: NonEmptyStringHttpSchema,
+  })
+  .strict();
+
+export const RequestProfileHomeFeedCollectionRunHttpBodySchema = z
+  .object({
+    profileId: ProfileHomeFeedCollectionRunProfileIdSchema,
+    maxScrolls: z.number().int().min(0).optional(),
+    maxDurationMs: z.number().int().min(1).optional(),
+    maxPosts: z.number().int().min(1).optional(),
   })
   .strict();
 
@@ -174,6 +196,20 @@ export const ListProfileSourceAccessCheckRunsHttpQuerySchema = z
   })
   .strict();
 
+export const ListProfileHomeFeedCollectionRunsHttpQuerySchema = z
+  .object({
+    status: ProfileHomeFeedCollectionRunStatusSchema.optional(),
+    profileId: ProfileHomeFeedCollectionRunProfileIdSchema.optional(),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_PROFILE_HOME_FEED_COLLECTION_RUN_LIST_LIMIT)
+      .default(DEFAULT_PROFILE_HOME_FEED_COLLECTION_RUN_LIST_LIMIT),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .strict();
+
 export type CollectionRunIdHttpParams = z.infer<
   typeof CollectionRunIdHttpParamsSchema
 >;
@@ -183,6 +219,9 @@ export type AccountExerciseRunIdHttpParams = z.infer<
 export type ProfileSourceAccessCheckRunIdHttpParams = z.infer<
   typeof ProfileSourceAccessCheckRunIdHttpParamsSchema
 >;
+export type ProfileHomeFeedCollectionRunIdHttpParams = z.infer<
+  typeof ProfileHomeFeedCollectionRunIdHttpParamsSchema
+>;
 export type RequestCollectionRunHttpBody = z.infer<
   typeof RequestCollectionRunHttpBodySchema
 >;
@@ -191,6 +230,9 @@ export type RequestAccountExerciseRunHttpBody = z.infer<
 >;
 export type RequestProfileSourceAccessCheckRunHttpBody = z.infer<
   typeof RequestProfileSourceAccessCheckRunHttpBodySchema
+>;
+export type RequestProfileHomeFeedCollectionRunHttpBody = z.infer<
+  typeof RequestProfileHomeFeedCollectionRunHttpBodySchema
 >;
 export type StartAccountExerciseRunHttpBody = z.infer<
   typeof StartAccountExerciseRunHttpBodySchema
@@ -213,6 +255,9 @@ export type ListAccountExerciseRunsHttpQuery = z.infer<
 >;
 export type ListProfileSourceAccessCheckRunsHttpQuery = z.infer<
   typeof ListProfileSourceAccessCheckRunsHttpQuerySchema
+>;
+export type ListProfileHomeFeedCollectionRunsHttpQuery = z.infer<
+  typeof ListProfileHomeFeedCollectionRunsHttpQuerySchema
 >;
 
 export const CollectionScheduleSourceGroupIdHttpParamsSchema = z
@@ -1022,6 +1067,239 @@ export const cancelProfileSourceAccessCheckRunHttpRouteSchema = {
       additionalProperties: false,
       properties: {
         profileSourceAccessCheckRun: profileSourceAccessCheckRunJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+const profileHomeFeedCollectionRunIdParamsJsonSchema = {
+  type: "object",
+  required: ["profileHomeFeedCollectionRunId"],
+  additionalProperties: false,
+  properties: {
+    profileHomeFeedCollectionRunId: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+const requestProfileHomeFeedCollectionRunBodyJsonSchema = {
+  type: "object",
+  required: ["profileId"],
+  additionalProperties: false,
+  properties: {
+    profileId: nonEmptyStringJsonSchema,
+    maxScrolls: {
+      type: "integer",
+      minimum: 0,
+    },
+    maxDurationMs: {
+      type: "integer",
+      minimum: 1,
+    },
+    maxPosts: {
+      type: "integer",
+      minimum: 1,
+    },
+  },
+} as const;
+
+const profileHomeFeedCollectionRunTargetJsonSchema = {
+  type: "object",
+  required: ["platform", "surface"],
+  additionalProperties: false,
+  properties: {
+    platform: {
+      type: "string",
+      enum: ["FACEBOOK"],
+    },
+    surface: {
+      type: "string",
+      enum: ["PROFILE_HOME_FEED"],
+    },
+  },
+} as const;
+
+const profileHomeFeedCollectionRunParametersJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    maxScrolls: {
+      type: "integer",
+      minimum: 0,
+    },
+    maxDurationMs: {
+      type: "integer",
+      minimum: 1,
+    },
+    maxPosts: {
+      type: "integer",
+      minimum: 1,
+    },
+  },
+} as const;
+
+const profileHomeFeedCollectionRunSummaryJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    postsSeen: {
+      type: "integer",
+      minimum: 0,
+    },
+    extractorCandidates: {
+      type: "integer",
+      minimum: 0,
+    },
+    sourcePublishersObserved: {
+      type: "integer",
+      minimum: 0,
+    },
+    contentItemsSubmitted: {
+      type: "integer",
+      minimum: 0,
+    },
+    failedSubmissions: {
+      type: "integer",
+      minimum: 0,
+    },
+  },
+} as const;
+
+const profileHomeFeedCollectionRunFailureReasonJsonSchema = {
+  type: "object",
+  required: ["code", "message"],
+  additionalProperties: false,
+  properties: {
+    code: nonEmptyStringJsonSchema,
+    message: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+const profileHomeFeedCollectionRunJsonSchema = {
+  type: "object",
+  required: [
+    "id",
+    "profileId",
+    "triggerType",
+    "status",
+    "accountStageAtRequest",
+    "target",
+    "parameters",
+    "requestedAt",
+    "createdAt",
+    "updatedAt",
+  ],
+  additionalProperties: false,
+  properties: {
+    id: nonEmptyStringJsonSchema,
+    profileId: nonEmptyStringJsonSchema,
+    triggerType: {
+      type: "string",
+      enum: PROFILE_HOME_FEED_COLLECTION_RUN_TRIGGER_TYPES,
+    },
+    status: {
+      type: "string",
+      enum: PROFILE_HOME_FEED_COLLECTION_RUN_STATUSES,
+    },
+    accountStageAtRequest: {
+      type: "string",
+      enum: COLLECTOR_RUNTIME_ACCOUNT_STAGES,
+    },
+    target: profileHomeFeedCollectionRunTargetJsonSchema,
+    parameters: profileHomeFeedCollectionRunParametersJsonSchema,
+    summary: profileHomeFeedCollectionRunSummaryJsonSchema,
+    failureReason: profileHomeFeedCollectionRunFailureReasonJsonSchema,
+    requestedAt: isoDateTimeJsonSchema,
+    startedAt: isoDateTimeJsonSchema,
+    finishedAt: isoDateTimeJsonSchema,
+    createdAt: isoDateTimeJsonSchema,
+    updatedAt: isoDateTimeJsonSchema,
+  },
+} as const;
+
+export const requestProfileHomeFeedCollectionRunHttpRouteSchema = {
+  body: requestProfileHomeFeedCollectionRunBodyJsonSchema,
+  response: {
+    201: {
+      type: "object",
+      required: ["profileHomeFeedCollectionRun"],
+      additionalProperties: false,
+      properties: {
+        profileHomeFeedCollectionRun: profileHomeFeedCollectionRunJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const listProfileHomeFeedCollectionRunsHttpRouteSchema = {
+  querystring: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      status: {
+        type: "string",
+        enum: PROFILE_HOME_FEED_COLLECTION_RUN_STATUSES,
+      },
+      profileId: nonEmptyStringJsonSchema,
+      limit: {
+        type: "integer",
+        minimum: 1,
+        maximum: MAX_PROFILE_HOME_FEED_COLLECTION_RUN_LIST_LIMIT,
+        default: DEFAULT_PROFILE_HOME_FEED_COLLECTION_RUN_LIST_LIMIT,
+      },
+      offset: {
+        type: "integer",
+        minimum: 0,
+        default: 0,
+      },
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      required: ["items", "page"],
+      additionalProperties: false,
+      properties: {
+        items: {
+          type: "array",
+          items: profileHomeFeedCollectionRunJsonSchema,
+        },
+        page: pageJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const getProfileHomeFeedCollectionRunHttpRouteSchema = {
+  params: profileHomeFeedCollectionRunIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["profileHomeFeedCollectionRun"],
+      additionalProperties: false,
+      properties: {
+        profileHomeFeedCollectionRun: profileHomeFeedCollectionRunJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const cancelProfileHomeFeedCollectionRunHttpRouteSchema = {
+  params: profileHomeFeedCollectionRunIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["profileHomeFeedCollectionRun"],
+      additionalProperties: false,
+      properties: {
+        profileHomeFeedCollectionRun: profileHomeFeedCollectionRunJsonSchema,
       },
     },
     "4xx": errorResponseJsonSchema,

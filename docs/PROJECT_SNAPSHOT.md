@@ -4,23 +4,27 @@
 The product is currently in the **Content Collector** stage (Stage 1 of 3, preceding Builder and Publisher). The core focus is collecting normalized content from configured Facebook sources while maintaining strict isolation between profile management, collection orchestration, and content storage.
 
 ## Current Active Sprint
-Sprint 065A — Facebook Home-Feed Extractor Fixtures is **active and
-authorized**. It adds a separate, pure, fixture-driven Facebook
-home-feed GraphQL extractor for group and page posts. The extractor
-produces normalized content candidates without `sourceGroupId`,
-derives a `publisherObservation` for explicit GROUP/PAGE publishers
-with stable external publisher ids, excludes explicit sponsored and
-personal-profile posts with typed warnings, handles malformed payloads
-safely, and keeps the existing source-group extractor contract
-unchanged. Sprint 065A makes no live-Facebook validation claim; live
-validation remains mandatory in Sprint 065C. It does not add browser,
-persistence, HTTP, worker, scheduler, Docker, or Web UI behavior.
-The home-feed extractor input accepts only `capturedAt` and `payload`;
-accepted candidates require a post-specific source URL extracted from
-the candidate payload and never fall back to a shared browser or feed
-URL hint.
-Sprint 065B and Sprint 065C remain future work.
-Sprint 065A — Facebook Home-Feed Extractor Fixtures (Active).
+Sprint 065A — Facebook Home-Feed Extractor Fixtures is **accepted** at
+`28906556bffa2b4052cd429b0bf5634cf74de875`. It added the separate,
+pure, fixture-driven Facebook home-feed extractor and made no
+live-Facebook validation claim.
+
+Sprint 065B — Profile-Bound Home-Feed Run Model is **active and
+authorized**. It adds a separate durable Collector Runtime
+`ProfileHomeFeedCollectionRun` aggregate and lifecycle, application
+ports/use cases, PostgreSQL persistence, safe operator HTTP
+request/list/get/cancel routes, and composition wiring. It stores
+`profileId` as the operational target reference, uses the strict
+`{ platform: "FACEBOOK", surface: "PROFILE_HOME_FEED" }` target, uses
+`MANUAL_API` only, preserves existing `CollectionRun.sourceGroupId`
+requiredness, and does not create a fake Home Feed `SourceGroup`.
+Sprint 065B does not execute a browser, connect to the Sprint 065A
+extractor, capture payloads, observe `SourcePublisher`, submit Content
+Manager items, add workers or schedulers, change Docker, add Web UI
+behavior, or make any live-Facebook claim. Sprint 065C remains future
+work and inactive.
+Sprint 065B — Profile-Bound Home-Feed Run Model (Active).
+Sprint 065A — Facebook Home-Feed Extractor Fixtures (Accepted).
 Sprint 063C — Source Publisher HTTP Contract and E2E (Accepted).
 Sprint 064A — Content Collection Provenance Model (Accepted).
 Sprint 064B — Provenance Persistence And Compatibility (Accepted).
@@ -43,7 +47,7 @@ Sprint 054A: Profile Authentication Health Foundation (Accepted).
 ## Currently Available Capabilities
 - **Profile Management**: Creation, lifecycle, session ingestion, checkout leasing, and operator-driven recovery reprovisioning for `REAUTH_REQUIRED` and `CHECKPOINT_REVIEW_REQUIRED` profiles.
 - **Content Management**: Storage of normalized Facebook knowledge group text posts and top comments, the Content Manager-owned `SourcePublisher` identity and observation behavior, and durable `ContentCollectionProvenance` on content items. Sprint 063A through 064B are accepted; status mutation (approve / ignore / block) remains deferred to Sprint 066. The existing HTTP DTOs do not expose `collectionProvenance`.
-- **Collection Execution**: Headless browser extraction using Playwright (or experimental CloakBrowser). Worker processes automatically consume queued collection runs, ambient exercise runs, and access-check runs. Collector Runtime has the existing source-group Facebook GraphQL payload extractor and, in active Sprint 065A, a separate pure home-feed fixture extractor contract for group/page candidates. Sprint 065A does not add live home-feed execution.
+- **Collection Execution**: Headless browser extraction using Playwright (or experimental CloakBrowser). Worker processes automatically consume queued collection runs, ambient exercise runs, and access-check runs. Collector Runtime has the existing source-group Facebook GraphQL payload extractor, the accepted Sprint 065A pure home-feed fixture extractor contract for group/page candidates, and active Sprint 065B's profile-bound home-feed run model. Sprint 065B does not add live home-feed execution.
 - **Collection Scheduling**: One persisted `CollectionSchedule` per source group (interval, next run, parameters). A containerized `collection-scheduler` Compose service drains due schedules into queued `SCHEDULED` collection runs on an interval; the scheduler-runtime image does not provision browser executables, Playwright browser downloads, Xvfb, browser-specific system packages, or a runnable CloakBrowser browser/system runtime, and does not launch a browser.
 - **Operator Tools**: CLI tools for profile provisioning, manual collection, worker execution, browser probing, the same provisioning CLI used for first-time and recovery login, and the containerized collection scheduler.
 - **Web UI**: Dashboard for managing profiles, source groups, categories, content items, and reviewing run status. The profile detail page now displays `authenticationHealth` and a generalized provisioning card for `Start Provisioning`, `Issue New Provisioning Token`, `Start Reauthentication`, and `Start Manual Checkpoint Recovery`. The profile inventory page now supports URL-backed Status and Authentication Health filters, a `Health Updated` column, and 25-item pagination with Previous / Next navigation.
@@ -109,13 +113,13 @@ the corresponding documentation. Status mutation (approve / ignore /
 block) is intentionally deferred to Sprint 066. Sprint 064A —
 Content Collection Provenance Model is accepted, and Sprint 064B —
 Provenance Persistence And Compatibility is accepted. Sprint 065A —
-Facebook Home-Feed Extractor Fixtures is active and authorized: it
-adds the pure, fixture-driven home-feed extractor contract and parser
-for group/page posts, publisher observations, sponsored/personal
-exclusions, malformed-payload safety, and source-group extractor
-regression coverage. Sprint 065A makes no live-Facebook claim and
-does not add browser execution, persistence, HTTP, workers,
-scheduler, Docker, or Web UI behavior. Future sprint work follows
+Facebook Home-Feed Extractor Fixtures is accepted at
+`28906556bffa2b4052cd429b0bf5634cf74de875`. Sprint 065B —
+Profile-Bound Home-Feed Run Model is active and authorized: it adds
+the durable profile-bound home-feed run aggregate, PostgreSQL
+persistence, safe operator HTTP request/list/get/cancel routes, and
+composition wiring without browser execution, extractor invocation,
+workers, scheduler, Docker, Web UI, or live-Facebook validation. Future sprint work follows
 the 064A–068 sequence documented in `docs/ROADMAP.md`, in which
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a group or a page observed while reading the feed) and is

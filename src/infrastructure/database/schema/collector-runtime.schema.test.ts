@@ -6,6 +6,9 @@ import {
   collectionRunTriggerTypeEnum,
   collectorAccountExerciseRuns,
   collectorCollectionRuns,
+  profileHomeFeedCollectionRuns,
+  profileHomeFeedCollectionRunStatusEnum,
+  profileHomeFeedCollectionRunTriggerTypeEnum,
   collectorProfileSourceAccessCheckRuns,
   profileSourceAccessCheckRunStatusEnum,
   profileSourceAccessCheckRunTriggerTypeEnum,
@@ -49,6 +52,22 @@ describe("collector runtime database schema", () => {
     );
   });
 
+  it("exports profile home-feed collection run table metadata for migration generation", () => {
+    expect(profileHomeFeedCollectionRuns.id.name).toBe("id");
+    expect(profileHomeFeedCollectionRuns.profileId.name).toBe("profile_id");
+    expect(profileHomeFeedCollectionRuns.accountStageAtRequest.name).toBe(
+      "account_stage_at_request",
+    );
+    expect(profileHomeFeedCollectionRuns.target.name).toBe("target");
+    expect(profileHomeFeedCollectionRuns.parameters.name).toBe("parameters");
+    expect(profileHomeFeedCollectionRuns.failureReason.name).toBe(
+      "failure_reason",
+    );
+    expect(profileHomeFeedCollectionRuns.requestedAt.name).toBe(
+      "requested_at",
+    );
+  });
+
   it("keeps database enum values aligned with the collection run model", () => {
     expect(collectionRunStatusEnum.enumValues).toEqual([
       "QUEUED",
@@ -78,6 +97,16 @@ describe("collector runtime database schema", () => {
     ]);
     expect(profileSourceAccessCheckRunTriggerTypeEnum.enumValues).toEqual([
       "MANUAL",
+    ]);
+    expect(profileHomeFeedCollectionRunStatusEnum.enumValues).toEqual([
+      "QUEUED",
+      "RUNNING",
+      "SUCCEEDED",
+      "FAILED",
+      "CANCELED",
+    ]);
+    expect(profileHomeFeedCollectionRunTriggerTypeEnum.enumValues).toEqual([
+      "MANUAL_API",
     ]);
   });
 });

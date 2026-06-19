@@ -7,6 +7,7 @@ export * from "./repositories/drizzle-content-category.repository";
 export * from "./repositories/drizzle-content-item.repository";
 export * from "./repositories/drizzle-profile-lease.repository";
 export * from "./repositories/drizzle-profile.repository";
+export * from "./repositories/drizzle-profile-home-feed-collection-run.repository";
 export * from "./repositories/drizzle-profile-source-access.repository";
 export * from "./repositories/drizzle-profile-source-access-check-run.repository";
 export * from "./repositories/drizzle-source-group.repository";

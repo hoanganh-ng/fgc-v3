@@ -16,6 +16,8 @@ import {
   ACCOUNT_EXERCISE_TYPES,
   COLLECTION_RUN_STATUSES,
   COLLECTION_RUN_TRIGGER_TYPES,
+  PROFILE_HOME_FEED_COLLECTION_RUN_STATUSES,
+  PROFILE_HOME_FEED_COLLECTION_RUN_TRIGGER_TYPES,
   PROFILE_SOURCE_ACCESS_CHECK_RUN_OUTCOMES,
   PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUSES,
   PROFILE_SOURCE_ACCESS_CHECK_RUN_TRIGGER_TYPES,
@@ -28,6 +30,10 @@ import type {
   CollectionRunFailureReason,
   CollectionRunParameters,
   CollectionRunSummary,
+  ProfileHomeFeedCollectionRunFailureReason,
+  ProfileHomeFeedCollectionRunParameters,
+  ProfileHomeFeedCollectionRunSummary,
+  ProfileHomeFeedCollectionRunTarget,
   ProfileSourceAccessCheckRunTarget,
   ProfileSourceAccessCheckRunFailureReason,
   ProfileSourceAccessCheckRunOutcome,
@@ -66,6 +72,16 @@ export const profileSourceAccessCheckRunTriggerTypeEnum = pgEnum(
 export const profileSourceAccessCheckRunOutcomeEnum = pgEnum(
   "profile_source_access_check_run_outcome",
   PROFILE_SOURCE_ACCESS_CHECK_RUN_OUTCOMES,
+);
+
+export const profileHomeFeedCollectionRunStatusEnum = pgEnum(
+  "profile_home_feed_collection_run_status",
+  PROFILE_HOME_FEED_COLLECTION_RUN_STATUSES,
+);
+
+export const profileHomeFeedCollectionRunTriggerTypeEnum = pgEnum(
+  "profile_home_feed_collection_run_trigger_type",
+  PROFILE_HOME_FEED_COLLECTION_RUN_TRIGGER_TYPES,
 );
 
 const timestampWithTimezone = (name: string) =>
@@ -157,6 +173,45 @@ export const collectorProfileSourceAccessCheckRuns = pgTable(
     index("collector_psa_check_runs_requested_at_idx").on(table.requestedAt),
     uniqueIndex("collector_psa_check_runs_active_unique_idx")
       .on(table.profileId, table.sourceGroupId)
+      .where(sql`status IN ('QUEUED', 'RUNNING')`),
+  ],
+);
+
+export const profileHomeFeedCollectionRuns = pgTable(
+  "profile_home_feed_collection_runs",
+  {
+    id: text("id").primaryKey(),
+    profileId: text("profile_id").notNull(),
+    triggerType: profileHomeFeedCollectionRunTriggerTypeEnum("trigger_type").notNull(),
+    status: profileHomeFeedCollectionRunStatusEnum("status").notNull(),
+    accountStageAtRequest: text("account_stage_at_request").notNull(),
+    target: jsonb("target").$type<ProfileHomeFeedCollectionRunTarget>().notNull(),
+    parameters:
+      jsonb("parameters").$type<ProfileHomeFeedCollectionRunParameters>().notNull(),
+    summary:
+      jsonb("summary").$type<ProfileHomeFeedCollectionRunSummary>(),
+    failureReason:
+      jsonb("failure_reason").$type<ProfileHomeFeedCollectionRunFailureReason>(),
+    requestedAt: timestampWithTimezone("requested_at").notNull(),
+    startedAt: timestampWithTimezone("started_at"),
+    finishedAt: timestampWithTimezone("finished_at"),
+    createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
+    updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("profile_home_feed_collection_runs_status_idx").on(table.status),
+    index("profile_home_feed_collection_runs_profile_id_idx").on(
+      table.profileId,
+    ),
+    index("profile_home_feed_collection_runs_created_at_idx").on(
+      table.createdAt,
+    ),
+    index("profile_home_feed_collection_runs_requested_at_id_idx").on(
+      table.requestedAt,
+      table.id,
+    ),
+    uniqueIndex("profile_home_feed_collection_runs_active_profile_uidx")
+      .on(table.profileId)
       .where(sql`status IN ('QUEUED', 'RUNNING')`),
   ],
 );

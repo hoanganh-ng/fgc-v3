@@ -4,22 +4,28 @@ import {
   AttachAccountExerciseRunLeaseUseCase,
   ClaimNextAccountExerciseRunUseCase,
   ClaimNextCollectionRunUseCase,
+  ClaimNextProfileHomeFeedCollectionRunUseCase,
   ClaimNextProfileSourceAccessCheckRunUseCase,
   DispatchNextDueCollectionScheduleUseCase,
   GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
   GetCollectionScheduleUseCase,
+  GetProfileHomeFeedCollectionRunUseCase,
   ListAccountExerciseRunsUseCase,
   ListCollectionRunsUseCase,
   ListCollectionSchedulesUseCase,
+  ListProfileHomeFeedCollectionRunsUseCase,
   MarkAccountExerciseRunFailedUseCase,
   MarkAccountExerciseRunRunningUseCase,
   MarkAccountExerciseRunSucceededUseCase,
   MarkCollectionRunFailedUseCase,
   MarkCollectionRunRunningUseCase,
   MarkCollectionRunSucceededUseCase,
+  MarkProfileHomeFeedCollectionRunFailedUseCase,
+  MarkProfileHomeFeedCollectionRunSucceededUseCase,
   RequestAccountExerciseRunUseCase,
   RequestCollectionRunUseCase,
+  RequestProfileHomeFeedCollectionRunUseCase,
   RequestProfileSourceAccessCheckRunUseCase,
   GetProfileSourceAccessCheckRunUseCase,
   ListProfileSourceAccessCheckRunsUseCase,
@@ -27,6 +33,7 @@ import {
   MarkProfileSourceAccessCheckRunRunningUseCase,
   MarkProfileSourceAccessCheckRunSucceededUseCase,
   CancelProfileSourceAccessCheckRunUseCase,
+  CancelProfileHomeFeedCollectionRunUseCase,
   UpsertCollectionScheduleUseCase,
 } from "../../collector-runtime/application";
 import type {
@@ -37,6 +44,7 @@ import type {
   DispatchNextDueCollectionScheduleRepositoryPort,
   IdGenerator,
   SourceGroupLookupPort,
+  ProfileHomeFeedCollectionRunRepository,
   ProfileSourceAccessCheckRunRepository,
   ProfileReferencePort,
 } from "../../collector-runtime/application";
@@ -46,6 +54,7 @@ export interface CollectorRuntimeDependencies {
   readonly collectionRuns: CollectionRunRepository;
   readonly collectionSchedules: CollectionScheduleRepository;
   readonly dispatchNextDueCollectionSchedules: DispatchNextDueCollectionScheduleRepositoryPort;
+  readonly homeFeedRuns: ProfileHomeFeedCollectionRunRepository;
   readonly checkRuns: ProfileSourceAccessCheckRunRepository;
   readonly profiles: ProfileReferencePort;
   readonly sourceGroups: SourceGroupLookupPort;
@@ -74,6 +83,12 @@ export interface CollectorRuntimeContainer {
   readonly getCollectionSchedule: GetCollectionScheduleUseCase;
   readonly listCollectionSchedules: ListCollectionSchedulesUseCase;
   readonly dispatchNextDueCollectionSchedule: DispatchNextDueCollectionScheduleUseCase;
+  readonly requestProfileHomeFeedCollectionRun: RequestProfileHomeFeedCollectionRunUseCase;
+  readonly getProfileHomeFeedCollectionRun: GetProfileHomeFeedCollectionRunUseCase;
+  readonly listProfileHomeFeedCollectionRuns: ListProfileHomeFeedCollectionRunsUseCase;
+  readonly markProfileHomeFeedCollectionRunSucceeded: MarkProfileHomeFeedCollectionRunSucceededUseCase;
+  readonly markProfileHomeFeedCollectionRunFailed: MarkProfileHomeFeedCollectionRunFailedUseCase;
+  readonly cancelProfileHomeFeedCollectionRun: CancelProfileHomeFeedCollectionRunUseCase;
   readonly requestProfileSourceAccessCheckRun: RequestProfileSourceAccessCheckRunUseCase;
   readonly getProfileSourceAccessCheckRun: GetProfileSourceAccessCheckRunUseCase;
   readonly listProfileSourceAccessCheckRuns: ListProfileSourceAccessCheckRunsUseCase;
@@ -83,6 +98,7 @@ export interface CollectorRuntimeContainer {
   readonly cancelProfileSourceAccessCheckRun: CancelProfileSourceAccessCheckRunUseCase;
   readonly claimNextAccountExerciseRun: ClaimNextAccountExerciseRunUseCase;
   readonly claimNextCollectionRun: ClaimNextCollectionRunUseCase;
+  readonly claimNextProfileHomeFeedCollectionRun: ClaimNextProfileHomeFeedCollectionRunUseCase;
   readonly claimNextProfileSourceAccessCheckRun: ClaimNextProfileSourceAccessCheckRunUseCase;
   close(): Promise<void>;
 }
@@ -95,6 +111,7 @@ export function createCollectorRuntime(
     collectionRuns,
     collectionSchedules,
     dispatchNextDueCollectionSchedules,
+    homeFeedRuns,
     checkRuns,
     profiles,
     sourceGroups,
@@ -175,6 +192,30 @@ export function createCollectorRuntime(
       clock,
       idGenerator,
     ),
+    requestProfileHomeFeedCollectionRun: new RequestProfileHomeFeedCollectionRunUseCase(
+      homeFeedRuns,
+      profiles,
+      idGenerator,
+      clock,
+    ),
+    getProfileHomeFeedCollectionRun: new GetProfileHomeFeedCollectionRunUseCase(
+      homeFeedRuns,
+    ),
+    listProfileHomeFeedCollectionRuns: new ListProfileHomeFeedCollectionRunsUseCase(
+      homeFeedRuns,
+    ),
+    markProfileHomeFeedCollectionRunSucceeded: new MarkProfileHomeFeedCollectionRunSucceededUseCase(
+      homeFeedRuns,
+      clock,
+    ),
+    markProfileHomeFeedCollectionRunFailed: new MarkProfileHomeFeedCollectionRunFailedUseCase(
+      homeFeedRuns,
+      clock,
+    ),
+    cancelProfileHomeFeedCollectionRun: new CancelProfileHomeFeedCollectionRunUseCase(
+      homeFeedRuns,
+      clock,
+    ),
     requestProfileSourceAccessCheckRun: new RequestProfileSourceAccessCheckRunUseCase(
       checkRuns,
       profiles,
@@ -210,6 +251,10 @@ export function createCollectorRuntime(
     ),
     claimNextCollectionRun: new ClaimNextCollectionRunUseCase(
       collectionRuns,
+      clock,
+    ),
+    claimNextProfileHomeFeedCollectionRun: new ClaimNextProfileHomeFeedCollectionRunUseCase(
+      homeFeedRuns,
       clock,
     ),
     claimNextProfileSourceAccessCheckRun: new ClaimNextProfileSourceAccessCheckRunUseCase(

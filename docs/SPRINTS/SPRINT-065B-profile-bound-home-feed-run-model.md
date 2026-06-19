@@ -1,0 +1,147 @@
+# Sprint 065B: Profile-Bound Home-Feed Run Model
+
+## Goal
+
+Add a separate durable Collector Runtime aggregate for profile-bound
+Facebook home-feed collection run requests. The run model records a
+profile as the operational target, exposes a safe operator request /
+list / get / cancel HTTP surface, and prepares internal application
+seams for future execution without invoking browser automation or the
+Sprint 065A extractor.
+
+Sprint 065B does not execute a browser, navigate Facebook, capture
+payloads, invoke the home-feed extractor, submit Content Manager items,
+observe `SourcePublisher`, run a worker or scheduler, modify Docker, or
+add Web UI behavior. It makes no live-Facebook validation claim.
+
+## Required Context
+
+- `docs/SPRINTS/active.md`
+- `docs/SPRINTS/SPRINT-065A-facebook-home-feed-extractor-fixtures.md`
+- `src/collector-runtime/domain/collection-run*`
+- `src/collector-runtime/domain/profile-source-access-check-run*`
+- `src/collector-runtime/application/*collection-run*`
+- `src/collector-runtime/application/*profile-source-access-check-run*`
+- `src/infrastructure/database/schema/collector-runtime.schema.ts`
+- `src/infrastructure/database/mappers/collector-runtime.mapper.ts`
+- `src/infrastructure/database/mappers/profile-source-access-check-run.mapper.ts`
+- `src/infrastructure/database/repositories/drizzle-collection-run.repository.ts`
+- `src/infrastructure/database/repositories/drizzle-profile-source-access-check-run.repository.ts`
+- `src/interfaces/http/routes/collector-runtime.routes.ts`
+- `src/interfaces/http/schemas/collector-runtime.http-schemas.ts`
+- `src/composition/collector-runtime/**`
+- Relevant nearby tests for the files above
+
+## Capability Summary
+
+- Adds `ProfileHomeFeedCollectionRun` as a separate Collector Runtime
+  aggregate. It does not reuse `CollectionRun`, does not make
+  `CollectionRun.sourceGroupId` optional, and does not create a fake
+  home-feed `SourceGroup`.
+- The target is strict:
+  `{ platform: "FACEBOOK", surface: "PROFILE_HOME_FEED" }`.
+- The operational target reference is `profileId`.
+- The trigger type is `MANUAL_API` only.
+- Statuses are `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED`, and
+  `CANCELED`.
+- Valid transitions are:
+  `QUEUED -> RUNNING | CANCELED`,
+  `RUNNING -> SUCCEEDED | FAILED`; terminal states cannot transition.
+- Request parameters are optional and strictly validated:
+  `maxScrolls`, `maxDurationMs`, and `maxPosts`.
+- Persisted summaries and failure reasons are sanitized allowlists:
+  summary count fields only, and failure `{ code, message }` only.
+- `ProfileReferencePort` is used only to confirm profile existence,
+  reject mismatched profile ids, and record `accountStageAtRequest`.
+  Sprint 065B does not duplicate Profile Manager checkout,
+  authentication health, account-stage, or eligibility rules.
+- PostgreSQL enforces at most one `QUEUED` or `RUNNING` home-feed run
+  per profile with a partial unique index.
+- `claimNextQueued` is atomic, oldest-first by `requestedAt` then `id`,
+  and safe under concurrent claimers with `FOR UPDATE SKIP LOCKED`.
+- Internal application seams exist for claim-next, mark-succeeded, and
+  mark-failed. They are not exposed as public HTTP routes.
+
+## HTTP Surface
+
+Safe operator routes:
+
+- `POST /collector/profile-home-feed-collection-runs`
+- `GET /collector/profile-home-feed-collection-runs`
+- `GET /collector/profile-home-feed-collection-runs/:id`
+- `POST /collector/profile-home-feed-collection-runs/:id/cancel`
+
+The DTO allowlist includes only run identity, profile id,
+trigger/status, request-time account stage, strict target, safe
+parameters, safe summary/failure fields, and timestamps.
+
+## Persistence
+
+Sprint 065B adds the `profile_home_feed_collection_runs` table with:
+
+- dedicated status and trigger PostgreSQL enum types;
+- `profile_id`, strict `target`, strict `parameters`, optional
+  `summary`, optional `failure_reason`, and lifecycle timestamps;
+- indexes on `status`, `profile_id`, `created_at`, and
+  `(requested_at, id)`;
+- partial unique index
+  `profile_home_feed_collection_runs_active_profile_uidx` on
+  `profile_id` where `status IN ('QUEUED', 'RUNNING')`.
+
+## Security
+
+The run model, DTOs, logs, docs, tests, and migration must not expose or
+persist cookies, localStorage, tokens, authorization headers, proxy
+credentials, fingerprint values, trusted runtime configuration, raw
+HTML, raw GraphQL payloads, raw upstream exceptions, private screenshots,
+or viewer data.
+
+## Out Of Scope
+
+- Browser execution or Facebook navigation.
+- Profile checkout and lease release.
+- Payload capture.
+- Sprint 065A extractor invocation.
+- `SourcePublisher` observation.
+- Content Manager submission or provenance changes.
+- Workers and schedulers.
+- Web UI.
+- Docker service changes.
+- Manual live-Facebook validation.
+- Scheduled triggers.
+- Sprint 065C activation.
+- Generalizing existing run abstractions.
+- Unrelated refactoring.
+
+## Verification Commands
+
+```bash
+pnpm exec vitest run \
+  src/collector-runtime/application/profile-home-feed-collection-run-application.test.ts \
+  src/infrastructure/database/mappers/profile-home-feed-collection-run.mapper.test.ts \
+  src/infrastructure/database/schema/collector-runtime.schema.test.ts \
+  src/interfaces/http/profile-home-feed-collection-run.server.test.ts \
+  src/composition/collector-runtime/collector-runtime.container.test.ts
+pnpm exec vitest run \
+  src/infrastructure/database/repositories/drizzle-profile-home-feed-collection-run.repository.integration.test.ts
+pnpm exec vitest run \
+  src/interfaces/http/profile-home-feed-collection-run.server.test.ts
+pnpm typecheck
+pnpm test
+pnpm test:db
+pnpm test:http:db
+git diff --check
+git status --short
+```
+
+Database and HTTP database tests remain opt-in and require the existing
+PostgreSQL environment variables described by repository scripts.
+
+## Status
+
+Sprint 065A was accepted at
+`28906556bffa2b4052cd429b0bf5634cf74de875`.
+
+Sprint 065B is **active and authorized**. It is not accepted.
+
+Sprint 065C remains inactive and is not authorized by Sprint 065B.

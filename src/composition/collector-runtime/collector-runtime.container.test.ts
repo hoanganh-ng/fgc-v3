@@ -5,21 +5,28 @@ import {
   AttachAccountExerciseRunLeaseUseCase,
   ClaimNextAccountExerciseRunUseCase,
   ClaimNextCollectionRunUseCase,
+  ClaimNextProfileHomeFeedCollectionRunUseCase,
   DispatchNextDueCollectionScheduleUseCase,
   GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
   GetCollectionScheduleUseCase,
+  GetProfileHomeFeedCollectionRunUseCase,
   ListAccountExerciseRunsUseCase,
   ListCollectionRunsUseCase,
   ListCollectionSchedulesUseCase,
+  ListProfileHomeFeedCollectionRunsUseCase,
   MarkAccountExerciseRunFailedUseCase,
   MarkAccountExerciseRunRunningUseCase,
   MarkAccountExerciseRunSucceededUseCase,
   MarkCollectionRunFailedUseCase,
   MarkCollectionRunRunningUseCase,
   MarkCollectionRunSucceededUseCase,
+  MarkProfileHomeFeedCollectionRunFailedUseCase,
+  MarkProfileHomeFeedCollectionRunSucceededUseCase,
   RequestCollectionRunUseCase,
   RequestAccountExerciseRunUseCase,
+  RequestProfileHomeFeedCollectionRunUseCase,
+  CancelProfileHomeFeedCollectionRunUseCase,
   UpsertCollectionScheduleUseCase,
 } from "../../collector-runtime/application";
 import type {
@@ -34,6 +41,7 @@ import { InMemoryCollectionRunRepository } from "../../collector-runtime/applica
 import { InMemoryAccountExerciseRunRepository } from "../../collector-runtime/application/test-support/in-memory-account-exercise-run-repository";
 import { InMemoryCollectionScheduleRepository } from "../../collector-runtime/application/test-support/in-memory-collection-schedule-repository";
 import { InMemoryDispatchNextDueCollectionScheduleRepository } from "../../collector-runtime/application/test-support/in-memory-dispatch-next-due-collection-schedule.repository";
+import { InMemoryProfileHomeFeedCollectionRunRepository } from "../../collector-runtime/application/test-support/in-memory-profile-home-feed-collection-run-repository";
 import { InMemoryProfileSourceAccessCheckRunRepository } from "../../collector-runtime/application/test-support/in-memory-profile-source-access-check-run-repository";
 import { createCollectorRuntime } from "./collector-runtime.container";
 
@@ -46,6 +54,7 @@ describe("collector runtime composition container", () => {
       collectionSchedules: new InMemoryCollectionScheduleRepository(),
       dispatchNextDueCollectionSchedules:
         new InMemoryDispatchNextDueCollectionScheduleRepository(),
+      homeFeedRuns: new InMemoryProfileHomeFeedCollectionRunRepository(),
       checkRuns: new InMemoryProfileSourceAccessCheckRunRepository(),
       sourceGroups: new FakeSourceGroupLookupPort(),
       profiles: new FakeProfileReferencePort(),
@@ -116,6 +125,27 @@ describe("collector runtime composition container", () => {
     );
     expect(services.dispatchNextDueCollectionSchedule).toBeInstanceOf(
       DispatchNextDueCollectionScheduleUseCase,
+    );
+    expect(services.requestProfileHomeFeedCollectionRun).toBeInstanceOf(
+      RequestProfileHomeFeedCollectionRunUseCase,
+    );
+    expect(services.getProfileHomeFeedCollectionRun).toBeInstanceOf(
+      GetProfileHomeFeedCollectionRunUseCase,
+    );
+    expect(services.listProfileHomeFeedCollectionRuns).toBeInstanceOf(
+      ListProfileHomeFeedCollectionRunsUseCase,
+    );
+    expect(
+      services.markProfileHomeFeedCollectionRunSucceeded,
+    ).toBeInstanceOf(MarkProfileHomeFeedCollectionRunSucceededUseCase);
+    expect(services.markProfileHomeFeedCollectionRunFailed).toBeInstanceOf(
+      MarkProfileHomeFeedCollectionRunFailedUseCase,
+    );
+    expect(services.cancelProfileHomeFeedCollectionRun).toBeInstanceOf(
+      CancelProfileHomeFeedCollectionRunUseCase,
+    );
+    expect(services.claimNextProfileHomeFeedCollectionRun).toBeInstanceOf(
+      ClaimNextProfileHomeFeedCollectionRunUseCase,
     );
 
     await services.close();

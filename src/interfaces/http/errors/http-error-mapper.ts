@@ -23,6 +23,7 @@ import {
 import {
   CollectionRunValidationError,
   AccountExerciseRunValidationError,
+  ProfileHomeFeedCollectionRunValidationError,
   ProfileSourceAccessCheckRunValidationError,
   CollectionScheduleValidationError,
   CollectorRuntimeApplicationError,
@@ -163,6 +164,7 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
   if (
     error instanceof CollectionRunValidationError ||
     error instanceof AccountExerciseRunValidationError ||
+    error instanceof ProfileHomeFeedCollectionRunValidationError ||
     error instanceof ProfileSourceAccessCheckRunValidationError
   ) {
     return {
@@ -365,6 +367,10 @@ const collectorRuntimeApplicationErrorStatus: Record<
   PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_FOUND: 404,
   PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_NOT_ACTIVE: 409,
   PROFILE_SOURCE_ACCESS_CHECK_RUN_SOURCE_GROUP_PLATFORM_UNSUPPORTED: 409,
+  PROFILE_HOME_FEED_COLLECTION_RUN_NOT_FOUND: 404,
+  INVALID_PROFILE_HOME_FEED_COLLECTION_RUN_STATUS_TRANSITION: 409,
+  PROFILE_HOME_FEED_COLLECTION_RUN_VALIDATION_ERROR: 400,
+  PROFILE_HOME_FEED_COLLECTION_RUN_CONFLICT: 409,
   // Collection schedule errors are mapped here for the Sprint 061
   // /collector/collection-schedules routes. The validation error is also
   // handled explicitly above so the structured issues list reaches the
@@ -389,6 +395,7 @@ const collectorRuntimeDomainErrorStatus: Record<
   INVALID_COLLECTION_RUN_STATUS_TRANSITION: 409,
   INVALID_ACCOUNT_EXERCISE_RUN_STATUS_TRANSITION: 409,
   INVALID_PROFILE_SOURCE_ACCESS_CHECK_RUN_STATUS_TRANSITION: 409,
+  INVALID_PROFILE_HOME_FEED_COLLECTION_RUN_STATUS_TRANSITION: 409,
 };
 
 function mapKnownError(

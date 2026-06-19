@@ -2,6 +2,7 @@ import type {
   AccountExerciseRun,
   CollectionRun,
   CollectionSchedule,
+  ProfileHomeFeedCollectionRun,
   ProfileSourceAccessCheckRun,
 } from "../../../collector-runtime/domain";
 import type {
@@ -81,6 +82,29 @@ export interface FakeCollectorRuntimeHttpService
     }
   >;
   readonly cancelCollectionRun: StubUseCase<unknown, CollectionRun>;
+  readonly requestProfileHomeFeedCollectionRun: StubUseCase<
+    unknown,
+    ProfileHomeFeedCollectionRun
+  >;
+  readonly getProfileHomeFeedCollectionRun: StubUseCase<
+    unknown,
+    ProfileHomeFeedCollectionRun
+  >;
+  readonly listProfileHomeFeedCollectionRuns: StubUseCase<
+    unknown,
+    {
+      readonly items: readonly ProfileHomeFeedCollectionRun[];
+      readonly page: {
+        readonly limit: number;
+        readonly offset: number;
+        readonly total: number;
+      };
+    }
+  >;
+  readonly cancelProfileHomeFeedCollectionRun: StubUseCase<
+    unknown,
+    ProfileHomeFeedCollectionRun
+  >;
   readonly requestProfileSourceAccessCheckRun: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
   readonly getProfileSourceAccessCheckRun: StubUseCase<unknown, ProfileSourceAccessCheckRun>;
   readonly listProfileSourceAccessCheckRuns: StubUseCase<
@@ -113,6 +137,7 @@ export interface FakeCollectorRuntimeHttpService
 export function createFakeCollectorRuntimeHttpService(): FakeCollectorRuntimeHttpService {
   const collectionRun = createCollectionRun();
   const accountExerciseRun = createAccountExerciseRun();
+  const profileHomeFeedCollectionRun = createProfileHomeFeedCollectionRun();
 
   return {
     requestAccountExerciseRun: new StubUseCase(accountExerciseRun),
@@ -191,6 +216,27 @@ export function createFakeCollectorRuntimeHttpService(): FakeCollectorRuntimeHtt
         updatedAt: collectorRuntimeHttpTestNow,
       }),
     ),
+    requestProfileHomeFeedCollectionRun: new StubUseCase(
+      profileHomeFeedCollectionRun,
+    ),
+    getProfileHomeFeedCollectionRun: new StubUseCase(
+      profileHomeFeedCollectionRun,
+    ),
+    listProfileHomeFeedCollectionRuns: new StubUseCase({
+      items: [profileHomeFeedCollectionRun],
+      page: {
+        limit: 50,
+        offset: 0,
+        total: 1,
+      },
+    }),
+    cancelProfileHomeFeedCollectionRun: new StubUseCase(
+      createProfileHomeFeedCollectionRun({
+        status: "CANCELED",
+        finishedAt: collectorRuntimeHttpTestNow,
+        updatedAt: collectorRuntimeHttpTestNow,
+      }),
+    ),
     requestProfileSourceAccessCheckRun: new StubUseCase(createProfileSourceAccessCheckRun()),
     getProfileSourceAccessCheckRun: new StubUseCase(createProfileSourceAccessCheckRun()),
     listProfileSourceAccessCheckRuns: new StubUseCase({
@@ -235,6 +281,10 @@ export function createUnusedCollectorRuntimeHttpService(): CollectorRuntimeHttpS
     getCollectionRun: useCase,
     listCollectionRuns: useCase,
     cancelCollectionRun: useCase,
+    requestProfileHomeFeedCollectionRun: useCase,
+    getProfileHomeFeedCollectionRun: useCase,
+    listProfileHomeFeedCollectionRuns: useCase,
+    cancelProfileHomeFeedCollectionRun: useCase,
     requestProfileSourceAccessCheckRun: useCase,
     getProfileSourceAccessCheckRun: useCase,
     listProfileSourceAccessCheckRuns: useCase,
@@ -332,6 +382,36 @@ export function createProfileSourceAccessCheckRun(
       url: "https://www.facebook.com/groups/source-group-1",
     },
     ...(options.outcome !== undefined ? { outcome: options.outcome } : {}),
+    ...(options.failureReason !== undefined
+      ? { failureReason: options.failureReason }
+      : {}),
+    requestedAt: options.requestedAt ?? collectorRuntimeHttpTestNow,
+    ...(options.startedAt !== undefined ? { startedAt: options.startedAt } : {}),
+    ...(options.finishedAt !== undefined ? { finishedAt: options.finishedAt } : {}),
+    createdAt: options.createdAt ?? collectorRuntimeHttpTestNow,
+    updatedAt: options.updatedAt ?? collectorRuntimeHttpTestNow,
+  };
+}
+
+export function createProfileHomeFeedCollectionRun(
+  options: Partial<ProfileHomeFeedCollectionRun> = {},
+): ProfileHomeFeedCollectionRun {
+  return {
+    id: options.id ?? "profile-home-feed-run-1",
+    profileId: options.profileId ?? "profile-1",
+    triggerType: options.triggerType ?? "MANUAL_API",
+    status: options.status ?? "QUEUED",
+    accountStageAtRequest: options.accountStageAtRequest ?? "WARMING",
+    target: options.target ?? {
+      platform: "FACEBOOK",
+      surface: "PROFILE_HOME_FEED",
+    },
+    parameters: options.parameters ?? {
+      maxScrolls: 3,
+      maxDurationMs: 30_000,
+      maxPosts: 10,
+    },
+    ...(options.summary !== undefined ? { summary: options.summary } : {}),
     ...(options.failureReason !== undefined
       ? { failureReason: options.failureReason }
       : {}),
