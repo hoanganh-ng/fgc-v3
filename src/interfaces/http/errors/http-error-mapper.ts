@@ -371,6 +371,7 @@ const collectorRuntimeApplicationErrorStatus: Record<
   INVALID_PROFILE_HOME_FEED_COLLECTION_RUN_STATUS_TRANSITION: 409,
   PROFILE_HOME_FEED_COLLECTION_RUN_VALIDATION_ERROR: 400,
   PROFILE_HOME_FEED_COLLECTION_RUN_CONFLICT: 409,
+  PROFILE_HOME_FEED_COLLECTION_RUN_ALREADY_EXISTS: 409,
   // Collection schedule errors are mapped here for the Sprint 061
   // /collector/collection-schedules routes. The validation error is also
   // handled explicitly above so the structured issues list reaches the

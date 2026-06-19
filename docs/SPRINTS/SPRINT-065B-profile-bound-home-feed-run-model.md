@@ -109,6 +109,13 @@ Sprint 065B adds the `profile_home_feed_collection_runs` table with:
 - partial unique index
   `profile_home_feed_collection_runs_active_profile_uidx` on
   `profile_id` where `status IN ('QUEUED', 'RUNNING')`.
+- The repository port exposes an **insert-only** `create(run)` operation
+  for new run creation. `create` performs a plain `INSERT` (no
+  `onConflictDoUpdate`) and rejects duplicate run ids by throwing a
+  typed `ProfileHomeFeedCollectionRunAlreadyExistsError`. Lifecycle
+  updates are exclusively owned by `claimNextQueued` and
+  `transitionStatus`, which perform compare-and-set at the persistence
+  layer. Creation never replaces a running or terminal aggregate.
 - Durable and in-memory list ordering is `requestedAt DESC`, then
   `id DESC` for deterministic ties.
 

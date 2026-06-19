@@ -46,7 +46,7 @@ export type ProfileHomeFeedCollectionRunStatusTransitionResult =
     };
 
 export interface ProfileHomeFeedCollectionRunRepository {
-  save(run: ProfileHomeFeedCollectionRun): Promise<void>;
+  create(run: ProfileHomeFeedCollectionRun): Promise<void>;
   findById(
     id: ProfileHomeFeedCollectionRunId,
   ): Promise<ProfileHomeFeedCollectionRun | null>;

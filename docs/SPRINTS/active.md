@@ -98,11 +98,14 @@ wiring. It keeps existing `CollectionRun.sourceGroupId` required and
 unchanged, does not create a fake Home Feed `SourceGroup`, stores
 `profileId` as the operational target reference, uses strict
 `{ platform: "FACEBOOK", surface: "PROFILE_HOME_FEED" }` targets, and
-uses `MANUAL_API` only. Sprint 065B does not execute a browser,
-connect to the Sprint 065A extractor, capture payloads, observe
-`SourcePublisher`, submit Content Manager items, add workers or
-schedulers, change Docker, add Web UI behavior, or make any
-live-Facebook claim. Sprint 065C remains inactive and unauthorized.
+uses `MANUAL_API` only. Run creation uses an insert-only repository
+`create` operation (no `onConflictDoUpdate`); lifecycle updates are
+exclusively owned by `claimNextQueued` and `transitionStatus`
+compare-and-set. Sprint 065B does not execute a browser, connect to
+the Sprint 065A extractor, capture payloads, observe `SourcePublisher`,
+submit Content Manager items, add workers or schedulers, change
+Docker, add Web UI behavior, or make any live-Facebook claim. Sprint
+065C remains inactive and unauthorized.
 
 - [Sprint 065B - Profile-Bound Home-Feed Run Model](SPRINT-065B-profile-bound-home-feed-run-model.md)
 

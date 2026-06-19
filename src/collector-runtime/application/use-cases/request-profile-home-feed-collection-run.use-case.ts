@@ -64,7 +64,7 @@ export class RequestProfileHomeFeedCollectionRunUseCase {
       updatedAt: now,
     });
 
-    await this.runs.save(run);
+    await this.runs.create(run);
 
     return run;
   }

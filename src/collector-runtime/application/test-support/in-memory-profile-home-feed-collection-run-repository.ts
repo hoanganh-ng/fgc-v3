@@ -1,4 +1,7 @@
-import { ProfileHomeFeedCollectionRunConflictError } from "../application-errors";
+import {
+  ProfileHomeFeedCollectionRunAlreadyExistsError,
+  ProfileHomeFeedCollectionRunConflictError,
+} from "../application-errors";
 import type {
   ProfileHomeFeedCollectionRun,
   ProfileHomeFeedCollectionRunId,
@@ -20,11 +23,14 @@ export class InMemoryProfileHomeFeedCollectionRunRepository
     ProfileHomeFeedCollectionRun
   >();
 
-  public async save(run: ProfileHomeFeedCollectionRun): Promise<void> {
+  public async create(run: ProfileHomeFeedCollectionRun): Promise<void> {
+    if (this.runs.has(run.id)) {
+      throw new ProfileHomeFeedCollectionRunAlreadyExistsError(run.id);
+    }
+
     if (run.status === "QUEUED" || run.status === "RUNNING") {
       const conflictingRun = [...this.runs.values()].find(
         (candidate) =>
-          candidate.id !== run.id &&
           candidate.profileId === run.profileId &&
           (candidate.status === "QUEUED" || candidate.status === "RUNNING"),
       );

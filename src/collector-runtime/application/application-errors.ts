@@ -36,6 +36,7 @@ export type CollectorRuntimeApplicationErrorCode =
   | "INVALID_PROFILE_HOME_FEED_COLLECTION_RUN_STATUS_TRANSITION"
   | "PROFILE_HOME_FEED_COLLECTION_RUN_VALIDATION_ERROR"
   | "PROFILE_HOME_FEED_COLLECTION_RUN_CONFLICT"
+  | "PROFILE_HOME_FEED_COLLECTION_RUN_ALREADY_EXISTS"
   | "COLLECTION_SCHEDULE_VALIDATION_ERROR"
   | "COLLECTION_SCHEDULE_NOT_FOUND"
   | "COLLECTION_SCHEDULE_SOURCE_GROUP_NOT_FOUND"
@@ -450,6 +451,18 @@ export class ProfileHomeFeedCollectionRunConflictError extends CollectorRuntimeA
       `A home-feed collection run is already queued or running for profile ${profileId}.`,
     );
     this.profileId = profileId;
+  }
+}
+
+export class ProfileHomeFeedCollectionRunAlreadyExistsError extends CollectorRuntimeApplicationError {
+  public readonly runId: string;
+
+  public constructor(runId: string) {
+    super(
+      "PROFILE_HOME_FEED_COLLECTION_RUN_ALREADY_EXISTS",
+      `Profile home-feed collection run already exists: ${runId}.`,
+    );
+    this.runId = runId;
   }
 }
 

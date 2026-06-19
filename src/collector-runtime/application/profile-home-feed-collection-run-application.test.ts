@@ -7,6 +7,7 @@ import {
   ListProfileHomeFeedCollectionRunsUseCase,
   MarkProfileHomeFeedCollectionRunFailedUseCase,
   MarkProfileHomeFeedCollectionRunSucceededUseCase,
+  ProfileHomeFeedCollectionRunAlreadyExistsError,
   ProfileHomeFeedCollectionRunConflictError,
   ProfileHomeFeedCollectionRunNotFoundError,
   ProfileHomeFeedCollectionRunValidationError,
@@ -67,6 +68,105 @@ describe("collector runtime profile home-feed collection run application use cas
     });
     expect(context.profiles.calls).toEqual(["profile-1"]);
     await expect(context.runs.findById(run.id)).resolves.toEqual(run);
+  });
+
+  it("rejects duplicate run ids without overwriting the existing row", async () => {
+    const context = createTestContext();
+    const existing = createRunFixture({
+      id: "duplicate-run",
+      status: "SUCCEEDED",
+      startedAt: "2026-06-19T10:01:00.000Z",
+      finishedAt: updatedAt,
+      summary: createSummary(),
+    });
+    await context.runs.create(existing);
+
+    await expect(
+      context.runs.create(
+        createRunFixture({
+          id: "duplicate-run",
+          status: "QUEUED",
+          profileId: "different-profile",
+          requestedAt: "2026-06-19T11:00:00.000Z",
+          createdAt: "2026-06-19T11:00:00.000Z",
+          updatedAt: "2026-06-19T11:00:00.000Z",
+        }),
+      ),
+    ).rejects.toThrow(ProfileHomeFeedCollectionRunAlreadyExistsError);
+
+    await expect(context.runs.findById("duplicate-run")).resolves.toEqual(
+      existing,
+    );
+  });
+
+  it("does not allow a queued run to replace a terminal run with the same id", async () => {
+    const context = createTestContext();
+    const terminal = createRunFixture({
+      id: "terminal-id",
+      status: "FAILED",
+      startedAt: "2026-06-19T10:01:00.000Z",
+      finishedAt: "2026-06-19T10:02:00.000Z",
+      failureReason: {
+        code: "CAPTURE_FAILED",
+        message: "Home-feed collection failed.",
+      },
+    });
+    await context.runs.create(terminal);
+
+    await expect(
+      context.runs.create(
+        createRunFixture({
+          id: "terminal-id",
+          status: "QUEUED",
+        }),
+      ),
+    ).rejects.toThrow(ProfileHomeFeedCollectionRunAlreadyExistsError);
+
+    await expect(context.runs.findById("terminal-id")).resolves.toMatchObject({
+      status: "FAILED",
+      finishedAt: "2026-06-19T10:02:00.000Z",
+    });
+  });
+
+  it("does not let the request use case return a run whose immutable fields diverge from the durable row on id collision", async () => {
+    const context = createTestContext(["collision-run"]);
+    context.profiles.result = {
+      ok: true,
+      profileId: "profile-1",
+      accountStage: "WARMING",
+    };
+
+    const firstRun = await new RequestProfileHomeFeedCollectionRunUseCase(
+      context.runs,
+      context.profiles,
+      context.ids,
+      context.clock,
+    ).execute({ profileId: "profile-1" });
+    context.clock.setNow(updatedAt);
+
+    // A second request would mint a different id with the in-memory
+    // FakeIdGenerator configured for a single id, so reuse the same id
+    // explicitly to simulate an external id collision.
+    await expect(
+      context.runs.create(
+        createRunFixture({
+          id: firstRun.id,
+          status: "SUCCEEDED",
+          profileId: "different-profile",
+          startedAt: "2026-06-19T11:00:00.000Z",
+          finishedAt: "2026-06-19T11:01:00.000Z",
+          summary: createSummary(),
+          requestedAt: "2026-06-19T11:00:00.000Z",
+          createdAt: "2026-06-19T11:00:00.000Z",
+          updatedAt: "2026-06-19T11:01:00.000Z",
+        }),
+      ),
+    ).rejects.toThrow(ProfileHomeFeedCollectionRunAlreadyExistsError);
+
+    // The durable row still matches the originally-requested run.
+    await expect(context.runs.findById(firstRun.id)).resolves.toEqual(
+      firstRun,
+    );
   });
 
   it("rejects profile home-feed requests when profile lookup returns not found", async () => {
@@ -174,14 +274,14 @@ describe("collector runtime profile home-feed collection run application use cas
 
   it("gets and lists profile home-feed runs with filters and pagination", async () => {
     const context = createTestContext();
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "home-feed-run-older",
         profileId: "profile-1",
         createdAt: "2026-06-19T10:00:00.000Z",
       }),
     );
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "home-feed-run-newer",
         profileId: "profile-2",
@@ -212,21 +312,21 @@ describe("collector runtime profile home-feed collection run application use cas
 
   it("lists profile home-feed runs by requestedAt descending then id descending", async () => {
     const context = createTestContext();
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "a-run",
         profileId: "profile-a",
         requestedAt: "2026-06-19T10:00:00.000Z",
       }),
     );
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "b-run",
         profileId: "profile-b",
         requestedAt: "2026-06-19T10:00:00.000Z",
       }),
     );
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "older-run",
         profileId: "profile-c",
@@ -250,7 +350,7 @@ describe("collector runtime profile home-feed collection run application use cas
 
   it("claims the oldest queued profile home-feed run by requestedAt then id", async () => {
     const context = createTestContext();
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "b-run",
         profileId: "profile-b",
@@ -258,7 +358,7 @@ describe("collector runtime profile home-feed collection run application use cas
         createdAt: "2026-06-19T10:01:00.000Z",
       }),
     );
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "a-run",
         profileId: "profile-a",
@@ -283,7 +383,7 @@ describe("collector runtime profile home-feed collection run application use cas
 
   it("does not claim the same queued home-feed run twice", async () => {
     const context = createTestContext();
-    await context.runs.save(createRunFixture({ id: "home-feed-run-1" }));
+    await context.runs.create(createRunFixture({ id: "home-feed-run-1" }));
     const claim = new ClaimNextProfileHomeFeedCollectionRunUseCase(
       context.runs,
       context.clock,
@@ -298,7 +398,7 @@ describe("collector runtime profile home-feed collection run application use cas
 
   it("marks running home-feed runs succeeded and failed with safe contracts", async () => {
     const successContext = createTestContext();
-    await successContext.runs.save(
+    await successContext.runs.create(
       createRunFixture({
         id: "success-run",
         status: "RUNNING",
@@ -334,7 +434,7 @@ describe("collector runtime profile home-feed collection run application use cas
     });
 
     const failureContext = createTestContext();
-    await failureContext.runs.save(
+    await failureContext.runs.create(
       createRunFixture({
         id: "failed-run",
         status: "RUNNING",
@@ -372,7 +472,7 @@ describe("collector runtime profile home-feed collection run application use cas
 
   it("rejects successful completion without a summary at the application boundary", async () => {
     const context = createTestContext();
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "success-run",
         status: "RUNNING",
@@ -395,7 +495,7 @@ describe("collector runtime profile home-feed collection run application use cas
 
   it("keeps a claimed run running when cancellation loses a claim race", async () => {
     const runs = new ClaimBeforeCancelRepository();
-    await runs.save(createRunFixture({ id: "race-run" }));
+    await runs.create(createRunFixture({ id: "race-run" }));
     const clock = new FixedClock(updatedAt);
 
     await expect(
@@ -411,7 +511,7 @@ describe("collector runtime profile home-feed collection run application use cas
 
   it("allows only one terminal transition when success and failure race", async () => {
     const context = createTestContext();
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "terminal-race-run",
         status: "RUNNING",
@@ -458,7 +558,7 @@ describe("collector runtime profile home-feed collection run application use cas
 
   it("rejects invalid terminal transitions", async () => {
     const context = createTestContext();
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "succeeded-run",
         status: "SUCCEEDED",
@@ -478,7 +578,7 @@ describe("collector runtime profile home-feed collection run application use cas
 
   it("rejects repeated terminal transitions", async () => {
     const context = createTestContext();
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "failed-run",
         status: "FAILED",
@@ -521,7 +621,7 @@ describe("collector runtime profile home-feed collection run application use cas
 
   it("rejects stale expected-status transitions without overwriting current status", async () => {
     const context = createTestContext();
-    await context.runs.save(
+    await context.runs.create(
       createRunFixture({
         id: "stale-run",
         status: "RUNNING",

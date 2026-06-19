@@ -1,6 +1,9 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import { ProfileHomeFeedCollectionRunConflictError } from "../../../collector-runtime/application";
+import {
+  ProfileHomeFeedCollectionRunAlreadyExistsError,
+  ProfileHomeFeedCollectionRunConflictError,
+} from "../../../collector-runtime/application";
 import type {
   ProfileHomeFeedCollectionRunListQuery,
   ProfileHomeFeedCollectionRunListResult,
@@ -27,27 +30,18 @@ export class DrizzleProfileHomeFeedCollectionRunRepository
 {
   public constructor(private readonly db: DatabaseSession) {}
 
-  public async save(run: ProfileHomeFeedCollectionRun): Promise<void> {
+  public async create(run: ProfileHomeFeedCollectionRun): Promise<void> {
     const record = toProfileHomeFeedCollectionRunRecord(run);
 
     try {
-      await this.db
-        .insert(profileHomeFeedCollectionRuns)
-        .values(record)
-        .onConflictDoUpdate({
-          target: profileHomeFeedCollectionRuns.id,
-          set: {
-            status: record.status,
-            summary: record.summary,
-            failureReason: record.failureReason,
-            startedAt: record.startedAt,
-            finishedAt: record.finishedAt,
-            updatedAt: record.updatedAt,
-          },
-        });
+      await this.db.insert(profileHomeFeedCollectionRuns).values(record);
     } catch (error: unknown) {
       if (isActiveRunUniqueConflict(error)) {
         throw new ProfileHomeFeedCollectionRunConflictError(run.profileId);
+      }
+
+      if (isPrimaryKeyConflict(error)) {
+        throw new ProfileHomeFeedCollectionRunAlreadyExistsError(run.id);
       }
 
       throw error;
@@ -215,6 +209,19 @@ function isActiveRunUniqueConflict(error: unknown): boolean {
         error.cause,
         "profile_home_feed_collection_runs_active_profile_uidx",
       ))
+  );
+}
+
+function isPrimaryKeyConflict(error: unknown): boolean {
+  return (
+    hasPostgresConstraint(
+      error,
+      "profile_home_feed_collection_runs_pkey",
+    ) ||
+    (typeof error === "object" &&
+      error !== null &&
+      "cause" in error &&
+      hasPostgresConstraint(error.cause, "profile_home_feed_collection_runs_pkey"))
   );
 }
 

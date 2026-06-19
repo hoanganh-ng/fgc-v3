@@ -1,6 +1,9 @@
 import { inArray } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ProfileHomeFeedCollectionRunConflictError } from "../../../collector-runtime/application";
+import {
+  ProfileHomeFeedCollectionRunAlreadyExistsError,
+  ProfileHomeFeedCollectionRunConflictError,
+} from "../../../collector-runtime/application";
 import type { ProfileHomeFeedCollectionRun } from "../../../collector-runtime/domain";
 import { createDatabaseClient, type DatabaseClient } from "../client";
 import { profileHomeFeedCollectionRuns } from "../schema/collector-runtime.schema";
@@ -46,14 +49,14 @@ if (!shouldRunDbTests) {
       await client?.close();
     });
 
-    it("saves and reloads a profile home-feed collection run", async () => {
+    it("creates and reloads a profile home-feed collection run", async () => {
       const run = trackRun(
         createRun({
           id: nextTestId("basic"),
         }),
       );
 
-      await runs.save(run);
+      await runs.create(run);
 
       await expect(runs.findById(run.id)).resolves.toEqual(run);
     });
@@ -77,8 +80,8 @@ if (!shouldRunDbTests) {
         }),
       );
 
-      await runs.save(run1);
-      await runs.save(run2);
+      await runs.create(run1);
+      await runs.create(run2);
 
       const listed = await runs.list({
         status: "RUNNING",
@@ -110,8 +113,8 @@ if (!shouldRunDbTests) {
       );
 
       const results = await Promise.allSettled([
-        runs.save(run1),
-        runs.save(run2),
+        runs.create(run1),
+        runs.create(run2),
       ]);
 
       const fulfilled = results.filter(
@@ -148,8 +151,8 @@ if (!shouldRunDbTests) {
         }),
       );
 
-      await runs.save(run1);
-      await runs.save(run2);
+      await runs.create(run1);
+      await runs.create(run2);
 
       await expect(runs.findById(run2.id)).resolves.toEqual(run2);
     });
@@ -171,8 +174,8 @@ if (!shouldRunDbTests) {
         }),
       );
 
-      await runs.save(run1);
-      await runs.save(run2);
+      await runs.create(run1);
+      await runs.create(run2);
 
       const [claim1, claim2, claim3] = await Promise.all([
         runs.claimNextQueued(startedAt),
@@ -207,8 +210,8 @@ if (!shouldRunDbTests) {
         }),
       );
 
-      await runs.save(bRun);
-      await runs.save(aRun);
+      await runs.create(bRun);
+      await runs.create(aRun);
 
       const claimed = await runs.claimNextQueued(startedAt);
 
@@ -225,7 +228,7 @@ if (!shouldRunDbTests) {
         }),
       );
 
-      await runs.save(run);
+      await runs.create(run);
 
       const [claimResult, cancelResult] = await Promise.all([
         runs.claimNextQueued(startedAt),
@@ -274,7 +277,7 @@ if (!shouldRunDbTests) {
         }),
       );
 
-      await runs.save(run);
+      await runs.create(run);
 
       const results = await Promise.all([
         runs.transitionStatus({
@@ -318,7 +321,7 @@ if (!shouldRunDbTests) {
         }),
       );
 
-      await runs.save(run);
+      await runs.create(run);
 
       const result = await runs.transitionStatus({
         runId: run.id,
@@ -345,6 +348,63 @@ if (!shouldRunDbTests) {
       });
     });
 
+    it("rejects a duplicate primary key without modifying the existing row", async () => {
+      const id = nextTestId("duplicate-pkey");
+      const original = trackRun(
+        createRun({
+          id,
+          profileId: nextTestId("profile-duplicate-original"),
+          status: "SUCCEEDED",
+          startedAt: "2026-06-19T10:01:00.000Z",
+          finishedAt: "2026-06-19T10:02:00.000Z",
+          summary: createSummary(),
+        }),
+      );
+
+      await runs.create(original);
+
+      await expect(
+        runs.create(
+          createRun({
+            id,
+            profileId: nextTestId("profile-duplicate-attempt"),
+            status: "QUEUED",
+          }),
+        ),
+      ).rejects.toBeInstanceOf(ProfileHomeFeedCollectionRunAlreadyExistsError);
+
+      await expect(runs.findById(id)).resolves.toEqual(original);
+    });
+
+    it("does not let a fresh queued create replace a terminal run with the same id", async () => {
+      const id = nextTestId("terminal-no-replace");
+      const terminal = trackRun(
+        createRun({
+          id,
+          profileId: nextTestId("profile-terminal-no-replace"),
+          status: "CANCELED",
+          finishedAt: "2026-06-19T10:05:00.000Z",
+        }),
+      );
+
+      await runs.create(terminal);
+
+      await expect(
+        runs.create(
+          createRun({
+            id,
+            profileId: nextTestId("profile-terminal-replacement"),
+            status: "QUEUED",
+          }),
+        ),
+      ).rejects.toBeInstanceOf(ProfileHomeFeedCollectionRunAlreadyExistsError);
+
+      await expect(runs.findById(id)).resolves.toMatchObject({
+        status: "CANCELED",
+        finishedAt: "2026-06-19T10:05:00.000Z",
+      });
+    });
+
     it("distinguishes not-found transitions from stale expected status conflicts", async () => {
       const missing = await runs.transitionStatus({
         runId: nextTestId("missing-transition"),
@@ -363,7 +423,7 @@ if (!shouldRunDbTests) {
         }),
       );
 
-      await runs.save(run);
+      await runs.create(run);
 
       const stale = await runs.transitionStatus({
         runId: run.id,
