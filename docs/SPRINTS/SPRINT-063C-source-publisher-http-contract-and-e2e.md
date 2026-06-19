@@ -269,8 +269,7 @@ handler maps known errors to HTTP responses.
 - `tests/e2e/fixtures/synthetic-payloads.ts` — add
   `buildSourcePublisherObservationFixture` and
   `buildSourcePublisherSecondObservationFixture` builders.
-- `docs/SPRINTS/active.md` — record Sprint 063C as active,
-  implemented, awaiting review.
+- `docs/SPRINTS/active.md` — record Sprint 063C as accepted.
 - `docs/PROJECT_SNAPSHOT.md` — record the Sprint 063C HTTP and E2E
   capability; correct any Sprint 063B “awaiting review” wording.
 - `docs/modules/content-manager.md` — record the new HTTP routes
@@ -366,31 +365,36 @@ pnpm test:e2e:docker
 
 ## Verification Results
 
-Recorded at Sprint 063C review (awaiting Architect acceptance):
+Recorded at Sprint 063C acceptance:
 
 - `pnpm typecheck` exited 0.
-- `pnpm test` exited 0.
 - `pnpm exec tsc -p tests/tsconfig.json --noEmit` exited 0.
 - `git diff --check` exited 0.
-- `pnpm db:migrate` exited 0 against the isolated Sprint 063C
-  PostgreSQL 16 instance.
-- `pnpm test:http:db` (`RUN_HTTP_DB_TESTS=true`) exited 0. The
-  PostgreSQL-backed `Content Manager HTTP PostgreSQL integration`
-  suite ran rather than skipped; the new SourcePublisher flow
-  passed.
-- `pnpm test:e2e:docker` exited 0. The existing
-  `stack-baseline.spec.ts` remained green, the new
-  `source-publisher-http.spec.ts` ran and passed, all requests
-  went through `http://web-gateway`, no host port was published,
-  E2E cleanup removed containers, network, and volume, and no
-  sensitive environment values appeared in logs.
+- `pnpm test` exited 0:
+  - Test Files: 98 passed, 12 skipped, 110 total.
+  - Tests: 1348 passed, 12 skipped, 1360 total.
+- `pnpm db:migrate` exited 0 against an isolated PostgreSQL 16
+  instance.
+- `pnpm test:http:db` (`RUN_HTTP_DB_TESTS=true`) exited 0:
+  - Test Files: 7 passed.
+  - Tests: 154 passed.
+  - The Content Manager PostgreSQL HTTP suite ran rather than
+    skipped.
+  - The Source Publisher observation, re-observation, get, and
+    list flow passed.
+- `pnpm test:e2e:docker` exited 0:
+  - 8 tests passed.
+  - The seven existing stack-baseline tests passed.
+  - The new `source-publisher-http.spec.ts` test passed.
+  - All traffic used `web-gateway`.
+  - No host port was published.
+  - Cleanup removed the E2E containers, network, and volume.
+  - No sensitive environment values were logged.
 
-The isolated database used a dedicated local-only container, role,
-database, port, and named Docker volume distinct from dev, preview,
-shared, and existing project databases. Credentials and the
-connection URL were supplied only via local `DATABASE_URL` (and
-Sprint-specific equivalents) and were never committed to the
-repository.
+The PostgreSQL verification used an isolated local container and
+volume and did not touch dev, preview, shared, or existing project
+databases. Credentials and connection URLs were never recorded in
+this document or committed to the repository.
 
 ## Assumptions and Deviations
 
@@ -407,6 +411,5 @@ is reserved for Sprint 066 (review UI).
 
 ## Status
 
-Sprint 063C is **implemented and awaiting review**. Sprint 063B
-remains accepted; Sprint 063C is not accepted; Sprint 064A is not
-active or authorized.
+Sprint 063C is **accepted**. Sprint 063B remains accepted;
+Sprint 064A is not active or authorized.

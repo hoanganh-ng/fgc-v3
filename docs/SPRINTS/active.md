@@ -26,17 +26,17 @@ Sprint 063B.
 - [Sprint 063B - Source Publisher Persistence and Atomic Observation](SPRINT-063B-source-publisher-persistence-and-atomic-observation.md)
 
 Sprint 063C — Source Publisher HTTP Contract and E2E is
-**active and implemented, awaiting Architect review**. It exposes
-safe HTTP contracts for observing, listing, and reading Content
-Manager-owned `SourcePublisher` aggregates and proves the flow
-through Nginx web-gateway → Fastify HTTP adapter → Content Manager
-application → PostgreSQL using only synthetic fixtures. Sprint
-063B is closed; Sprint 063C does not mark Sprint 063B “awaiting
-review” and does not advance to Sprint 064A. No commit, push, or
-pull request has been created for Sprint 063C; the changes remain
-in the working tree for Architect review.
+**accepted**. It exposes safe HTTP contracts for observing,
+listing, and reading Content Manager-owned `SourcePublisher`
+aggregates and proves the flow through Nginx web-gateway →
+Fastify HTTP adapter → Content Manager application → PostgreSQL
+using only synthetic fixtures. Status mutation (approve / ignore /
+block) remains deferred to Sprint 066.
 
 - [Sprint 063C - Source Publisher HTTP Contract and E2E](SPRINT-063C-source-publisher-http-contract-and-e2e.md)
+
+Sprint 064A — Content Collection Provenance Model is
+**awaiting definition**. It is not active and is not authorized.
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)
