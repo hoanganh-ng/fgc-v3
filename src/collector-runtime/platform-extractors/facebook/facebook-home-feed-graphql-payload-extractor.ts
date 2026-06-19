@@ -298,7 +298,6 @@ interface ObjectVisit {
 
 interface ExtractionContext {
   readonly collectedAt: string;
-  readonly sourceUrlHint?: string;
   readonly topCommentLimit: number;
   readonly warnings: FacebookHomeFeedExtractionWarning[];
 }
@@ -432,11 +431,8 @@ function createExtractionContext(
   input: FacebookHomeFeedGraphQLPayloadExtractionInput,
   options: FacebookHomeFeedGraphQLPayloadExtractorOptions,
 ): ExtractionContext {
-  const sourceUrlHint = cleanString(input.sourceUrlHint ?? "");
-
   return {
     collectedAt: input.capturedAt.toISOString(),
-    ...(sourceUrlHint !== undefined ? { sourceUrlHint } : {}),
     topCommentLimit: normalizeTopCommentLimit(options.topCommentLimit),
     warnings: [],
   };
@@ -519,13 +515,13 @@ function parsePostCandidate(
     return null;
   }
 
-  const sourceUrl = extractSourceUrl(visit.value) ?? context.sourceUrlHint;
+  const sourceUrl = extractSourceUrl(visit.value);
 
   if (sourceUrl === undefined) {
     context.warnings.push(
       createWarning(
         "MISSING_SOURCE_URL",
-        `Skipped Facebook home-feed post ${externalPostId} because no source URL or sourceUrlHint was available.`,
+        `Skipped Facebook home-feed post ${externalPostId} because no post-specific source URL could be extracted.`,
         { externalPostId, path: visit.path },
       ),
     );

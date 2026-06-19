@@ -23,6 +23,63 @@ const sourceGroupId = "source-group-1";
 const capturedAt = new Date("2026-04-03T12:00:00.000Z");
 
 describe("FacebookHomeFeedGraphQLPayloadExtractor", () => {
+  it("rejects an invalid capturedAt", () => {
+    const result = new FacebookHomeFeedGraphQLPayloadExtractor().extract({
+      capturedAt: new Date("invalid"),
+      payload: syntheticHomeFeedGroupPostByIndividualPayload,
+    });
+
+    expect(result).toEqual({
+      valid: false,
+      issues: [
+        expect.objectContaining({
+          code: "INVALID_CAPTURED_AT",
+          path: "capturedAt",
+        }),
+      ],
+    });
+  });
+
+  it("rejects a negative topCommentLimit", () => {
+    const result = new FacebookHomeFeedGraphQLPayloadExtractor().extract(
+      {
+        capturedAt,
+        payload: syntheticHomeFeedGroupPostByIndividualPayload,
+      },
+      { topCommentLimit: -1 },
+    );
+
+    expect(result).toEqual({
+      valid: false,
+      issues: [
+        expect.objectContaining({
+          code: "INVALID_TOP_COMMENT_LIMIT",
+          path: "topCommentLimit",
+        }),
+      ],
+    });
+  });
+
+  it("rejects a non-finite topCommentLimit", () => {
+    const result = new FacebookHomeFeedGraphQLPayloadExtractor().extract(
+      {
+        capturedAt,
+        payload: syntheticHomeFeedGroupPostByIndividualPayload,
+      },
+      { topCommentLimit: Number.POSITIVE_INFINITY },
+    );
+
+    expect(result).toEqual({
+      valid: false,
+      issues: [
+        expect.objectContaining({
+          code: "INVALID_TOP_COMMENT_LIMIT",
+          path: "topCommentLimit",
+        }),
+      ],
+    });
+  });
+
   it("extracts a group post authored by an individual with the group as publisher", () => {
     const candidate = onlyCandidate(
       extract(syntheticHomeFeedGroupPostByIndividualPayload),
@@ -192,6 +249,105 @@ describe("FacebookHomeFeedGraphQLPayloadExtractor", () => {
     );
   });
 
+  it("keeps the default top-comment limit at ten when more comments are present", () => {
+    const candidate = onlyCandidate(extract(buildCommentOrderingPayload()));
+
+    expect(candidate.topComments).toHaveLength(10);
+    expect(candidate.topComments.map((comment) => comment.externalCommentId))
+      .toEqual([
+        "comment-11",
+        "comment-12",
+        "comment-03",
+        "comment-04",
+        "comment-05",
+        "comment-06",
+        "comment-07",
+        "comment-08",
+        "comment-09",
+        "comment-10",
+      ]);
+  });
+
+  it("orders equal-reaction top comments deterministically by comment id", () => {
+    const candidate = onlyCandidate(extract(buildCommentOrderingPayload()));
+
+    expect(
+      candidate.topComments
+        .filter((comment) => comment.reactionCount === 5)
+        .map((comment) => comment.externalCommentId),
+    ).toEqual([
+      "comment-03",
+      "comment-04",
+      "comment-05",
+      "comment-06",
+      "comment-07",
+      "comment-08",
+      "comment-09",
+      "comment-10",
+    ]);
+  });
+
+  it("honors a custom topCommentLimit", () => {
+    const candidate = onlyCandidate(
+      new FacebookHomeFeedGraphQLPayloadExtractor().extract(
+        {
+          capturedAt,
+          payload: buildCommentOrderingPayload(),
+        },
+        { topCommentLimit: 3 },
+      ),
+    );
+
+    expect(candidate.topComments.map((comment) => comment.externalCommentId))
+      .toEqual(["comment-11", "comment-12", "comment-03"]);
+  });
+
+  it("skips otherwise valid group/page posts that have no post-specific source URL", () => {
+    const result = requireValid(extract(buildPostWithoutSourceUrlPayload()));
+
+    expect(result.candidates).toEqual([]);
+    expect(result.warnings).toEqual([
+      expect.objectContaining({
+        code: "MISSING_SOURCE_URL",
+        externalPostId: "post-without-source-url",
+      }),
+    ]);
+  });
+
+  it("does not assign a home-feed browser URL as a candidate post URL", () => {
+    const browserUrl = "https://www.facebook.com/";
+    const candidate = onlyCandidate(
+      extract({
+        browserUrl,
+        data: {
+          home_feed: {
+            edges: [
+              {
+                node: {
+                  __typename: "CometFeedStory",
+                  post_id: "post-with-post-specific-url",
+                  url: "https://www.facebook.com/groups/synthetic-home-feed-group/posts/post-with-post-specific-url/",
+                  sourcePublisher: {
+                    kind: "GROUP",
+                    group_id: "stable-group-123",
+                  },
+                  message: {
+                    text: "A group post with its own post-specific URL.",
+                  },
+                },
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(candidate.sourceUrl).toBe(
+      "https://www.facebook.com/groups/synthetic-home-feed-group/posts/post-with-post-specific-url/",
+    );
+    expect(candidate.sourceUrl).not.toBe(browserUrl);
+  });
+
   it("does not exclude normal body text merely containing the word sponsored", () => {
     const result = requireValid(extract(syntheticHomeFeedSponsoredWordOnlyPayload));
     const candidate = onlyCandidate(result);
@@ -283,6 +439,83 @@ function extract(payload: unknown): FacebookHomeFeedGraphQLExtractionResult {
     capturedAt,
     payload,
   });
+}
+
+function buildCommentOrderingPayload(): unknown {
+  return {
+    data: {
+      home_feed: {
+        edges: [
+          {
+            node: {
+              __typename: "CometFeedStory",
+              post_id: "home-feed-comment-ordering-post",
+              url: "https://www.facebook.com/groups/synthetic-home-feed-group/posts/home-feed-comment-ordering-post/",
+              sourcePublisher: {
+                kind: "GROUP",
+                group_id: "stable-group-123",
+              },
+              message: {
+                text: "A group post with more than ten top-level comments.",
+              },
+              comments: {
+                nodes: [
+                  buildComment("comment-10", 5),
+                  buildComment("comment-03", 5),
+                  buildComment("comment-12", 8),
+                  buildComment("comment-01", 1),
+                  buildComment("comment-07", 5),
+                  buildComment("comment-05", 5),
+                  buildComment("comment-02", 2),
+                  buildComment("comment-11", 9),
+                  buildComment("comment-09", 5),
+                  buildComment("comment-08", 5),
+                  buildComment("comment-06", 5),
+                  buildComment("comment-04", 5),
+                ],
+              },
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+function buildComment(commentId: string, reactionCount: number): unknown {
+  return {
+    __typename: "Comment",
+    comment_id: commentId,
+    body: {
+      text: `Synthetic comment ${commentId}.`,
+    },
+    reaction_count: reactionCount,
+  };
+}
+
+function buildPostWithoutSourceUrlPayload(): unknown {
+  return {
+    sourceUrl: "https://www.facebook.com/",
+    data: {
+      home_feed: {
+        edges: [
+          {
+            node: {
+              __typename: "CometFeedStory",
+              post_id: "post-without-source-url",
+              sourcePublisher: {
+                kind: "PAGE",
+                page_id: "stable-page-456",
+              },
+              message: {
+                text: "A valid page post with identity and body but no source URL.",
+              },
+            },
+          },
+        ],
+      },
+    },
+  };
 }
 
 function onlyCandidate(

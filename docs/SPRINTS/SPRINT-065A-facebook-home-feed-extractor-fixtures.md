@@ -34,13 +34,17 @@ validated. Manual live-Facebook validation remains mandatory in Sprint
 - Adds `FacebookHomeFeedGraphQLPayloadExtractor` beside the existing
   source-group `FacebookGraphQLPayloadExtractor`.
 - Adds a dedicated home-feed input/result/candidate contract. The
-  input accepts only `capturedAt`, `payload`, and optional
-  `sourceUrlHint`; it does not accept or invent `sourceGroupId`.
+  input accepts only `capturedAt` and `payload`; it does not accept a
+  shared URL hint, and it does not accept or invent `sourceGroupId`.
 - Emits normalized content candidate fields without `sourceGroupId`:
   platform, external post id, source URL, optional title, body text,
   optional author metadata, optional posted timestamp, collected
   timestamp, engagement counts, optional share count, and sorted top
   comments.
+- Requires every accepted home-feed candidate to include a
+  post-specific source URL extracted from that candidate's payload.
+  Otherwise valid group/page posts without an extractable post URL are
+  skipped with `MISSING_SOURCE_URL`.
 - Emits a required `publisherObservation` on every candidate:
   `platform: FACEBOOK`, `kind: GROUP | PAGE`,
   `externalPublisherId`, `observedAt`, and optional `displayName`
@@ -150,6 +154,7 @@ covers:
 - Explicit personal-profile post exclusion.
 - Unknown publisher kind warning.
 - Missing stable publisher id warning.
+- Missing source URL warning.
 - Malformed payload safety.
 - Duplicate candidate deduplication.
 - Body text containing "sponsored" without sponsored metadata.

@@ -8,7 +8,6 @@ export type FacebookHomeFeedPublisherKind = "GROUP" | "PAGE";
 export interface FacebookHomeFeedGraphQLPayloadExtractionInput {
   readonly capturedAt: Date;
   readonly payload: unknown;
-  readonly sourceUrlHint?: string;
 }
 
 export interface FacebookHomeFeedGraphQLPayloadExtractorOptions {

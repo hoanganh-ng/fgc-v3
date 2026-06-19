@@ -15,6 +15,10 @@ safely, and keeps the existing source-group extractor contract
 unchanged. Sprint 065A makes no live-Facebook validation claim; live
 validation remains mandatory in Sprint 065C. It does not add browser,
 persistence, HTTP, worker, scheduler, Docker, or Web UI behavior.
+The home-feed extractor input accepts only `capturedAt` and `payload`;
+accepted candidates require a post-specific source URL extracted from
+the candidate payload and never fall back to a shared browser or feed
+URL hint.
 Sprint 065B and Sprint 065C remain future work.
 Sprint 065A — Facebook Home-Feed Extractor Fixtures (Active).
 Sprint 063C — Source Publisher HTTP Contract and E2E (Accepted).
