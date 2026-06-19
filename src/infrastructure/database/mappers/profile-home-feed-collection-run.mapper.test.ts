@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProfileHomeFeedCollectionRun } from "../../../collector-runtime/domain";
 import {
+  InvalidPersistedProfileHomeFeedCollectionRunRecordError,
   toDomainProfileHomeFeedCollectionRun,
   toProfileHomeFeedCollectionRunRecord,
 } from "./profile-home-feed-collection-run.mapper";
@@ -15,11 +16,13 @@ describe("profile home-feed collection run database mapper", () => {
       startedAt: "2026-06-19T10:01:00.000Z",
       finishedAt: "2026-06-19T10:02:00.000Z",
       summary: {
-        postsSeen: 2,
+        capturedPayloads: 2,
         extractorCandidates: 1,
         sourcePublishersObserved: 1,
         contentItemsSubmitted: 0,
-        failedSubmissions: 1,
+        failedPublisherObservations: 1,
+        failedContentSubmissions: 1,
+        leaseReleased: true,
       },
       failureReason: {
         code: "CAPTURE_FAILED",
@@ -45,8 +48,9 @@ describe("profile home-feed collection run database mapper", () => {
         maxPosts: 12,
       },
       summary: {
-        postsSeen: 2,
-        failedSubmissions: 1,
+        capturedPayloads: 2,
+        failedPublisherObservations: 1,
+        failedContentSubmissions: 1,
       },
       failureReason: {
         code: "CAPTURE_FAILED",
@@ -65,6 +69,163 @@ describe("profile home-feed collection run database mapper", () => {
     expect(record.failureReason).toBeNull();
     expect(toDomainProfileHomeFeedCollectionRun(toSelectRow(record, run))).toEqual(
       run,
+    );
+  });
+
+  it.each([
+    ["QUEUED", "startedAt", rowFor({ status: "QUEUED" }, { startedAt: now })],
+    ["QUEUED", "finishedAt", rowFor({ status: "QUEUED" }, { finishedAt: now })],
+    [
+      "QUEUED",
+      "summary",
+      rowFor({ status: "QUEUED" }, { summary: createSummary() }),
+    ],
+    [
+      "QUEUED",
+      "failureReason",
+      rowFor(
+        { status: "QUEUED" },
+        { failureReason: { code: "FAILED", message: "Failed." } },
+      ),
+    ],
+    ["RUNNING", "startedAt", rowFor({ status: "RUNNING", startedAt: now }, { startedAt: null })],
+    [
+      "RUNNING",
+      "finishedAt",
+      rowFor({ status: "RUNNING", startedAt: now }, { finishedAt: now }),
+    ],
+    [
+      "RUNNING",
+      "summary",
+      rowFor(
+        { status: "RUNNING", startedAt: now },
+        { summary: createSummary() },
+      ),
+    ],
+    [
+      "RUNNING",
+      "failureReason",
+      rowFor(
+        { status: "RUNNING", startedAt: now },
+        { failureReason: { code: "FAILED", message: "Failed." } },
+      ),
+    ],
+    [
+      "SUCCEEDED",
+      "startedAt",
+      rowFor(
+        {
+          status: "SUCCEEDED",
+          startedAt: now,
+          finishedAt: now,
+          summary: createSummary(),
+        },
+        { startedAt: null },
+      ),
+    ],
+    [
+      "SUCCEEDED",
+      "finishedAt",
+      rowFor(
+        {
+          status: "SUCCEEDED",
+          startedAt: now,
+          finishedAt: now,
+          summary: createSummary(),
+        },
+        { finishedAt: null },
+      ),
+    ],
+    [
+      "SUCCEEDED",
+      "summary",
+      rowFor(
+        {
+          status: "SUCCEEDED",
+          startedAt: now,
+          finishedAt: now,
+          summary: createSummary(),
+        },
+        { summary: null },
+      ),
+    ],
+    [
+      "SUCCEEDED",
+      "failureReason",
+      rowFor(
+        {
+          status: "SUCCEEDED",
+          startedAt: now,
+          finishedAt: now,
+          summary: createSummary(),
+        },
+        { failureReason: { code: "FAILED", message: "Failed." } },
+      ),
+    ],
+    [
+      "FAILED",
+      "startedAt",
+      rowFor(
+        {
+          status: "FAILED",
+          startedAt: now,
+          finishedAt: now,
+          failureReason: { code: "FAILED", message: "Failed." },
+        },
+        { startedAt: null },
+      ),
+    ],
+    [
+      "FAILED",
+      "finishedAt",
+      rowFor(
+        {
+          status: "FAILED",
+          startedAt: now,
+          finishedAt: now,
+          failureReason: { code: "FAILED", message: "Failed." },
+        },
+        { finishedAt: null },
+      ),
+    ],
+    [
+      "FAILED",
+      "failureReason",
+      rowFor(
+        {
+          status: "FAILED",
+          startedAt: now,
+          finishedAt: now,
+          failureReason: { code: "FAILED", message: "Failed." },
+        },
+        { failureReason: null },
+      ),
+    ],
+    ["CANCELED", "finishedAt", rowFor({ status: "CANCELED", finishedAt: now }, { finishedAt: null })],
+    [
+      "CANCELED",
+      "startedAt",
+      rowFor({ status: "CANCELED", finishedAt: now }, { startedAt: now }),
+    ],
+    [
+      "CANCELED",
+      "summary",
+      rowFor(
+        { status: "CANCELED", finishedAt: now },
+        { summary: createSummary() },
+      ),
+    ],
+    [
+      "CANCELED",
+      "failureReason",
+      rowFor(
+        { status: "CANCELED", finishedAt: now },
+        { failureReason: { code: "FAILED", message: "Failed." } },
+      ),
+    ],
+  ])("rejects malformed persisted %s row with invalid %s", (_status, _field, row) => {
+    expect(() => toDomainProfileHomeFeedCollectionRun(row)).toThrow(
+      InvalidPersistedProfileHomeFeedCollectionRunRecordError,
     );
   });
 });
@@ -120,5 +281,30 @@ function createRun(
       : {}),
     createdAt: options.createdAt ?? now,
     updatedAt: options.updatedAt ?? now,
+  };
+}
+
+function createSummary(): NonNullable<ProfileHomeFeedCollectionRun["summary"]> {
+  return {
+    capturedPayloads: 2,
+    extractorCandidates: 1,
+    sourcePublishersObserved: 1,
+    contentItemsSubmitted: 0,
+    failedPublisherObservations: 1,
+    failedContentSubmissions: 1,
+    leaseReleased: true,
+  };
+}
+
+function rowFor(
+  options: Partial<ProfileHomeFeedCollectionRun>,
+  rowOverrides: Partial<ProfileHomeFeedCollectionRunRow>,
+): ProfileHomeFeedCollectionRunRow {
+  const run = createRun(options);
+  const record = toProfileHomeFeedCollectionRunRecord(run);
+
+  return {
+    ...toSelectRow(record, run),
+    ...rowOverrides,
   };
 }

@@ -8,6 +8,7 @@ import {
   MarkProfileHomeFeedCollectionRunFailedUseCase,
   MarkProfileHomeFeedCollectionRunSucceededUseCase,
   ProfileHomeFeedCollectionRunConflictError,
+  ProfileHomeFeedCollectionRunNotFoundError,
   ProfileHomeFeedCollectionRunValidationError,
   ProfileNotFoundError,
   ProfileReferenceLookupFailedError,
@@ -21,6 +22,10 @@ import type {
 } from "./index";
 import { InMemoryProfileHomeFeedCollectionRunRepository } from "./test-support/in-memory-profile-home-feed-collection-run-repository";
 import type { ProfileHomeFeedCollectionRun } from "../domain";
+import type {
+  ProfileHomeFeedCollectionRunStatusTransition,
+  ProfileHomeFeedCollectionRunStatusTransitionResult,
+} from "./ports/profile-home-feed-collection-run-repository.port";
 
 const createdAt = "2026-06-19T10:00:00.000Z";
 const updatedAt = "2026-06-19T10:05:00.000Z";
@@ -205,6 +210,44 @@ describe("collector runtime profile home-feed collection run application use cas
     expect(got.id).toBe("home-feed-run-newer");
   });
 
+  it("lists profile home-feed runs by requestedAt descending then id descending", async () => {
+    const context = createTestContext();
+    await context.runs.save(
+      createRunFixture({
+        id: "a-run",
+        profileId: "profile-a",
+        requestedAt: "2026-06-19T10:00:00.000Z",
+      }),
+    );
+    await context.runs.save(
+      createRunFixture({
+        id: "b-run",
+        profileId: "profile-b",
+        requestedAt: "2026-06-19T10:00:00.000Z",
+      }),
+    );
+    await context.runs.save(
+      createRunFixture({
+        id: "older-run",
+        profileId: "profile-c",
+        requestedAt: "2026-06-19T09:00:00.000Z",
+      }),
+    );
+
+    const listed = await new ListProfileHomeFeedCollectionRunsUseCase(
+      context.runs,
+    ).execute({
+      limit: 10,
+      offset: 0,
+    });
+
+    expect(listed.items.map((item) => item.id)).toEqual([
+      "b-run",
+      "a-run",
+      "older-run",
+    ]);
+  });
+
   it("claims the oldest queued profile home-feed run by requestedAt then id", async () => {
     const context = createTestContext();
     await context.runs.save(
@@ -271,18 +314,20 @@ describe("collector runtime profile home-feed collection run application use cas
       ).execute({
         runId: "success-run",
         summary: {
-          postsSeen: 4,
+          capturedPayloads: 4,
           extractorCandidates: 3,
           sourcePublishersObserved: 2,
           contentItemsSubmitted: 1,
-          failedSubmissions: 0,
+          failedPublisherObservations: 0,
+          failedContentSubmissions: 0,
+          leaseReleased: true,
         },
       });
 
     expect(succeeded).toMatchObject({
       status: "SUCCEEDED",
       summary: {
-        postsSeen: 4,
+        capturedPayloads: 4,
         contentItemsSubmitted: 1,
       },
       finishedAt: updatedAt,
@@ -308,7 +353,7 @@ describe("collector runtime profile home-feed collection run application use cas
         message: "Home-feed collection failed.",
       },
       summary: {
-        postsSeen: 0,
+        capturedPayloads: 0,
       },
     });
 
@@ -319,10 +364,96 @@ describe("collector runtime profile home-feed collection run application use cas
         message: "Home-feed collection failed.",
       },
       summary: {
-        postsSeen: 0,
+        capturedPayloads: 0,
       },
       finishedAt: updatedAt,
     });
+  });
+
+  it("rejects successful completion without a summary at the application boundary", async () => {
+    const context = createTestContext();
+    await context.runs.save(
+      createRunFixture({
+        id: "success-run",
+        status: "RUNNING",
+        startedAt: createdAt,
+      }),
+    );
+
+    const useCase = new MarkProfileHomeFeedCollectionRunSucceededUseCase(
+      context.runs,
+      context.clock,
+    );
+
+    await expect(
+      // @ts-expect-error summary is intentionally omitted for runtime validation coverage.
+      useCase.execute({
+        runId: "success-run",
+      }),
+    ).rejects.toThrow(ProfileHomeFeedCollectionRunValidationError);
+  });
+
+  it("keeps a claimed run running when cancellation loses a claim race", async () => {
+    const runs = new ClaimBeforeCancelRepository();
+    await runs.save(createRunFixture({ id: "race-run" }));
+    const clock = new FixedClock(updatedAt);
+
+    await expect(
+      new CancelProfileHomeFeedCollectionRunUseCase(runs, clock).execute({
+        runId: "race-run",
+      }),
+    ).rejects.toThrow(InvalidProfileHomeFeedCollectionRunStatusTransitionError);
+    await expect(runs.findById("race-run")).resolves.toMatchObject({
+      status: "RUNNING",
+      startedAt: updatedAt,
+    });
+  });
+
+  it("allows only one terminal transition when success and failure race", async () => {
+    const context = createTestContext();
+    await context.runs.save(
+      createRunFixture({
+        id: "terminal-race-run",
+        status: "RUNNING",
+        startedAt: createdAt,
+      }),
+    );
+    context.clock.setNow(updatedAt);
+    const succeed = new MarkProfileHomeFeedCollectionRunSucceededUseCase(
+      context.runs,
+      context.clock,
+    );
+    const fail = new MarkProfileHomeFeedCollectionRunFailedUseCase(
+      context.runs,
+      context.clock,
+    );
+
+    const results = await Promise.allSettled([
+      succeed.execute({
+        runId: "terminal-race-run",
+        summary: createSummary(),
+      }),
+      fail.execute({
+        runId: "terminal-race-run",
+        failureReason: {
+          code: "CAPTURE_FAILED",
+          message: "Home-feed collection failed.",
+        },
+      }),
+    ]);
+
+    const fulfilled = results.filter(
+      (result) => result.status === "fulfilled",
+    );
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.reason).toBeInstanceOf(
+      InvalidProfileHomeFeedCollectionRunStatusTransitionError,
+    );
   });
 
   it("rejects invalid terminal transitions", async () => {
@@ -333,6 +464,7 @@ describe("collector runtime profile home-feed collection run application use cas
         status: "SUCCEEDED",
         startedAt: createdAt,
         finishedAt: updatedAt,
+        summary: createSummary(),
       }),
     );
 
@@ -342,6 +474,79 @@ describe("collector runtime profile home-feed collection run application use cas
         context.clock,
       ).execute({ runId: "succeeded-run" }),
     ).rejects.toThrow(InvalidProfileHomeFeedCollectionRunStatusTransitionError);
+  });
+
+  it("rejects repeated terminal transitions", async () => {
+    const context = createTestContext();
+    await context.runs.save(
+      createRunFixture({
+        id: "failed-run",
+        status: "FAILED",
+        startedAt: createdAt,
+        finishedAt: updatedAt,
+        failureReason: {
+          code: "CAPTURE_FAILED",
+          message: "Home-feed collection failed.",
+        },
+      }),
+    );
+
+    await expect(
+      new MarkProfileHomeFeedCollectionRunSucceededUseCase(
+        context.runs,
+        context.clock,
+      ).execute({
+        runId: "failed-run",
+        summary: createSummary(),
+      }),
+    ).rejects.toThrow(InvalidProfileHomeFeedCollectionRunStatusTransitionError);
+  });
+
+  it("distinguishes not-found transitions from status conflicts", async () => {
+    const context = createTestContext();
+
+    await expect(
+      new MarkProfileHomeFeedCollectionRunFailedUseCase(
+        context.runs,
+        context.clock,
+      ).execute({
+        runId: "missing-run",
+        failureReason: {
+          code: "CAPTURE_FAILED",
+          message: "Home-feed collection failed.",
+        },
+      }),
+    ).rejects.toThrow(ProfileHomeFeedCollectionRunNotFoundError);
+  });
+
+  it("rejects stale expected-status transitions without overwriting current status", async () => {
+    const context = createTestContext();
+    await context.runs.save(
+      createRunFixture({
+        id: "stale-run",
+        status: "RUNNING",
+        startedAt: createdAt,
+      }),
+    );
+
+    const result = await context.runs.transitionStatus({
+      runId: "stale-run",
+      expectedStatus: "QUEUED",
+      nextStatus: "CANCELED",
+      finishedAt: updatedAt,
+      updatedAt,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "status_conflict",
+      currentRun: {
+        status: "RUNNING",
+      },
+    });
+    await expect(context.runs.findById("stale-run")).resolves.toMatchObject({
+      status: "RUNNING",
+    });
   });
 });
 
@@ -362,20 +567,33 @@ function createTestContext(ids: readonly string[] = ["home-feed-run-1"]): {
 function createRunFixture(
   options: Partial<ProfileHomeFeedCollectionRun> = {},
 ): ProfileHomeFeedCollectionRun {
+  const status = options.status ?? "QUEUED";
+
   return {
     id: options.id ?? "home-feed-run-1",
     profileId: options.profileId ?? "profile-1",
     triggerType: options.triggerType ?? "MANUAL_API",
-    status: options.status ?? "QUEUED",
+    status,
     accountStageAtRequest: options.accountStageAtRequest ?? "WARMING",
     target: options.target ?? {
       platform: "FACEBOOK",
       surface: "PROFILE_HOME_FEED",
     },
     parameters: options.parameters ?? {},
-    ...(options.summary !== undefined ? { summary: options.summary } : {}),
+    ...(options.summary !== undefined
+      ? { summary: options.summary }
+      : status === "SUCCEEDED"
+        ? { summary: createSummary() }
+        : {}),
     ...(options.failureReason !== undefined
       ? { failureReason: options.failureReason }
+      : status === "FAILED"
+        ? {
+            failureReason: {
+              code: "CAPTURE_FAILED",
+              message: "Home-feed collection failed.",
+            },
+          }
       : {}),
     requestedAt: options.requestedAt ?? createdAt,
     ...(options.startedAt !== undefined ? { startedAt: options.startedAt } : {}),
@@ -430,5 +648,32 @@ class FakeProfileReferencePort implements ProfileReferencePort {
     this.calls.push(profileId);
 
     return this.result;
+  }
+}
+
+function createSummary(): NonNullable<ProfileHomeFeedCollectionRun["summary"]> {
+  return {
+    capturedPayloads: 4,
+    extractorCandidates: 3,
+    sourcePublishersObserved: 2,
+    contentItemsSubmitted: 1,
+    failedPublisherObservations: 0,
+    failedContentSubmissions: 0,
+    leaseReleased: true,
+  };
+}
+
+class ClaimBeforeCancelRepository extends InMemoryProfileHomeFeedCollectionRunRepository {
+  public override async transitionStatus(
+    transition: ProfileHomeFeedCollectionRunStatusTransition,
+  ): Promise<ProfileHomeFeedCollectionRunStatusTransitionResult> {
+    if (
+      transition.expectedStatus === "QUEUED" &&
+      transition.nextStatus === "CANCELED"
+    ) {
+      await this.claimNextQueued(transition.updatedAt);
+    }
+
+    return super.transitionStatus(transition);
   }
 }

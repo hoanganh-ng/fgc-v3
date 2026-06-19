@@ -155,6 +155,13 @@
       "when": 1781884676875,
       "tag": "0021_profile_home_feed_collection_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1781884676876,
+      "tag": "0022_profile_home_feed_collection_run_indexes",
+      "breakpoints": true
     }
   ]
 }

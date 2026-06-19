@@ -1143,7 +1143,7 @@ const profileHomeFeedCollectionRunSummaryJsonSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    postsSeen: {
+    capturedPayloads: {
       type: "integer",
       minimum: 0,
     },
@@ -1159,9 +1159,16 @@ const profileHomeFeedCollectionRunSummaryJsonSchema = {
       type: "integer",
       minimum: 0,
     },
-    failedSubmissions: {
+    failedPublisherObservations: {
       type: "integer",
       minimum: 0,
+    },
+    failedContentSubmissions: {
+      type: "integer",
+      minimum: 0,
+    },
+    leaseReleased: {
+      type: "boolean",
     },
   },
 } as const;

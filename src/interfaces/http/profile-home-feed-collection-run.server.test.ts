@@ -41,8 +41,18 @@ describe("ProfileHomeFeedCollectionRun HTTP routes", () => {
     service.getProfileHomeFeedCollectionRun.setOutput(
       createProfileHomeFeedCollectionRun({
         id: "run-2",
-        status: "RUNNING",
+        status: "SUCCEEDED",
         startedAt: "2026-04-01T10:00:00.000Z",
+        finishedAt: "2026-04-01T10:05:00.000Z",
+        summary: {
+          capturedPayloads: 4,
+          extractorCandidates: 3,
+          sourcePublishersObserved: 2,
+          contentItemsSubmitted: 1,
+          failedPublisherObservations: 0,
+          failedContentSubmissions: 0,
+          leaseReleased: true,
+        },
       }),
     );
     service.cancelProfileHomeFeedCollectionRun.setOutput(
@@ -130,8 +140,20 @@ describe("ProfileHomeFeedCollectionRun HTTP routes", () => {
         page: { limit: 10, offset: 5, total: 1 },
       });
       expect(getResponse.json()).toMatchObject({
-        profileHomeFeedCollectionRun: { id: "run-2", status: "RUNNING" },
+        profileHomeFeedCollectionRun: {
+          id: "run-2",
+          status: "SUCCEEDED",
+          summary: {
+            capturedPayloads: 4,
+            failedContentSubmissions: 0,
+            leaseReleased: true,
+          },
+        },
       });
+      expect(JSON.stringify(getResponse.json())).not.toContain("postsSeen");
+      expect(JSON.stringify(getResponse.json())).not.toContain(
+        "failedSubmissions",
+      );
       expect(cancelResponse.json()).toMatchObject({
         profileHomeFeedCollectionRun: { id: "run-1", status: "CANCELED" },
       });

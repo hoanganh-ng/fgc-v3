@@ -215,6 +215,177 @@ if (!shouldRunDbTests) {
       expect(claimed?.id).toBe(aRun.id);
     });
 
+    it("keeps claim and cancel transitions atomic under competition", async () => {
+      const startedAt = "2026-06-19T11:00:00.000Z";
+      const canceledAt = "2026-06-19T11:00:01.000Z";
+      const run = trackRun(
+        createRun({
+          id: nextTestId("claim-cancel"),
+          profileId: nextTestId("profile-claim-cancel"),
+        }),
+      );
+
+      await runs.save(run);
+
+      const [claimResult, cancelResult] = await Promise.all([
+        runs.claimNextQueued(startedAt),
+        runs.transitionStatus({
+          runId: run.id,
+          expectedStatus: "QUEUED",
+          nextStatus: "CANCELED",
+          finishedAt: canceledAt,
+          updatedAt: canceledAt,
+        }),
+      ]);
+      const persisted = await runs.findById(run.id);
+
+      if (claimResult !== null) {
+        expect(claimResult.status).toBe("RUNNING");
+        expect(cancelResult).toMatchObject({
+          ok: false,
+          reason: "status_conflict",
+        });
+        expect(persisted).toMatchObject({
+          status: "RUNNING",
+          startedAt,
+        });
+      } else {
+        expect(cancelResult).toMatchObject({
+          ok: true,
+          run: {
+            status: "CANCELED",
+          },
+        });
+        expect(persisted).toMatchObject({
+          status: "CANCELED",
+          finishedAt: canceledAt,
+        });
+      }
+    });
+
+    it("allows only one terminal transition under success and failure competition", async () => {
+      const finishedAt = "2026-06-19T11:00:00.000Z";
+      const run = trackRun(
+        createRun({
+          id: nextTestId("succeed-fail"),
+          profileId: nextTestId("profile-succeed-fail"),
+          status: "RUNNING",
+          startedAt: "2026-06-19T10:01:00.000Z",
+        }),
+      );
+
+      await runs.save(run);
+
+      const results = await Promise.all([
+        runs.transitionStatus({
+          runId: run.id,
+          expectedStatus: "RUNNING",
+          nextStatus: "SUCCEEDED",
+          summary: createSummary(),
+          finishedAt,
+          updatedAt: finishedAt,
+        }),
+        runs.transitionStatus({
+          runId: run.id,
+          expectedStatus: "RUNNING",
+          nextStatus: "FAILED",
+          failureReason: {
+            code: "CAPTURE_FAILED",
+            message: "Home-feed collection failed.",
+          },
+          finishedAt,
+          updatedAt: finishedAt,
+        }),
+      ]);
+
+      expect(results.filter((result) => result.ok)).toHaveLength(1);
+      expect(
+        results.filter(
+          (result) => !result.ok && result.reason === "status_conflict",
+        ),
+      ).toHaveLength(1);
+      expect(["SUCCEEDED", "FAILED"]).toContain((await runs.findById(run.id))?.status);
+    });
+
+    it("rejects repeated terminal transitions without overwriting the row", async () => {
+      const run = trackRun(
+        createRun({
+          id: nextTestId("repeat-terminal"),
+          profileId: nextTestId("profile-repeat-terminal"),
+          status: "SUCCEEDED",
+          startedAt: "2026-06-19T10:01:00.000Z",
+          finishedAt: "2026-06-19T10:02:00.000Z",
+        }),
+      );
+
+      await runs.save(run);
+
+      const result = await runs.transitionStatus({
+        runId: run.id,
+        expectedStatus: "RUNNING",
+        nextStatus: "FAILED",
+        failureReason: {
+          code: "CAPTURE_FAILED",
+          message: "Home-feed collection failed.",
+        },
+        finishedAt: "2026-06-19T11:00:00.000Z",
+        updatedAt: "2026-06-19T11:00:00.000Z",
+      });
+
+      expect(result).toMatchObject({
+        ok: false,
+        reason: "status_conflict",
+        currentRun: {
+          status: "SUCCEEDED",
+        },
+      });
+      await expect(runs.findById(run.id)).resolves.toMatchObject({
+        status: "SUCCEEDED",
+        finishedAt: "2026-06-19T10:02:00.000Z",
+      });
+    });
+
+    it("distinguishes not-found transitions from stale expected status conflicts", async () => {
+      const missing = await runs.transitionStatus({
+        runId: nextTestId("missing-transition"),
+        expectedStatus: "RUNNING",
+        nextStatus: "SUCCEEDED",
+        summary: createSummary(),
+        finishedAt: "2026-06-19T11:00:00.000Z",
+        updatedAt: "2026-06-19T11:00:00.000Z",
+      });
+      const run = trackRun(
+        createRun({
+          id: nextTestId("stale-transition"),
+          profileId: nextTestId("profile-stale-transition"),
+          status: "RUNNING",
+          startedAt: "2026-06-19T10:01:00.000Z",
+        }),
+      );
+
+      await runs.save(run);
+
+      const stale = await runs.transitionStatus({
+        runId: run.id,
+        expectedStatus: "QUEUED",
+        nextStatus: "CANCELED",
+        finishedAt: "2026-06-19T11:00:00.000Z",
+        updatedAt: "2026-06-19T11:00:00.000Z",
+      });
+
+      expect(missing).toEqual({
+        ok: false,
+        reason: "not_found",
+      });
+      expect(stale).toMatchObject({
+        ok: false,
+        reason: "status_conflict",
+        currentRun: {
+          status: "RUNNING",
+        },
+      });
+    });
+
     function nextTestId(prefix: string): string {
       nextId += 1;
 
@@ -234,18 +405,24 @@ if (!shouldRunDbTests) {
 function createRun(
   options: Partial<ProfileHomeFeedCollectionRun> = {},
 ): ProfileHomeFeedCollectionRun {
+  const status = options.status ?? "QUEUED";
+
   return {
     id: options.id ?? "home-feed-run-1",
     profileId: options.profileId ?? "profile-1",
     triggerType: options.triggerType ?? "MANUAL_API",
-    status: options.status ?? "QUEUED",
+    status,
     accountStageAtRequest: options.accountStageAtRequest ?? "WARMING",
     target: options.target ?? {
       platform: "FACEBOOK",
       surface: "PROFILE_HOME_FEED",
     },
     parameters: options.parameters ?? {},
-    ...(options.summary !== undefined ? { summary: options.summary } : {}),
+    ...(options.summary !== undefined
+      ? { summary: options.summary }
+      : status === "SUCCEEDED"
+        ? { summary: createSummary() }
+        : {}),
     ...(options.failureReason !== undefined
       ? { failureReason: options.failureReason }
       : {}),
@@ -256,5 +433,17 @@ function createRun(
       : {}),
     createdAt: options.createdAt ?? "2026-06-19T10:00:00.000Z",
     updatedAt: options.updatedAt ?? "2026-06-19T10:00:00.000Z",
+  };
+}
+
+function createSummary(): NonNullable<ProfileHomeFeedCollectionRun["summary"]> {
+  return {
+    capturedPayloads: 2,
+    extractorCandidates: 1,
+    sourcePublishersObserved: 1,
+    contentItemsSubmitted: 0,
+    failedPublisherObservations: 0,
+    failedContentSubmissions: 0,
+    leaseReleased: true,
   };
 }

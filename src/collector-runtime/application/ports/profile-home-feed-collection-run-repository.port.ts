@@ -4,6 +4,8 @@ import type {
   ProfileHomeFeedCollectionRunIsoDateTime,
   ProfileHomeFeedCollectionRunProfileId,
   ProfileHomeFeedCollectionRunStatus,
+  ProfileHomeFeedCollectionRunSummary,
+  ProfileHomeFeedCollectionRunFailureReason,
 } from "../../domain";
 
 export interface ProfileHomeFeedCollectionRunListQuery {
@@ -18,6 +20,31 @@ export interface ProfileHomeFeedCollectionRunListResult {
   readonly total: number;
 }
 
+export interface ProfileHomeFeedCollectionRunStatusTransition {
+  readonly runId: ProfileHomeFeedCollectionRunId;
+  readonly expectedStatus: ProfileHomeFeedCollectionRunStatus;
+  readonly nextStatus: ProfileHomeFeedCollectionRunStatus;
+  readonly updatedAt: ProfileHomeFeedCollectionRunIsoDateTime;
+  readonly finishedAt?: ProfileHomeFeedCollectionRunIsoDateTime;
+  readonly summary?: ProfileHomeFeedCollectionRunSummary;
+  readonly failureReason?: ProfileHomeFeedCollectionRunFailureReason;
+}
+
+export type ProfileHomeFeedCollectionRunStatusTransitionResult =
+  | {
+      readonly ok: true;
+      readonly run: ProfileHomeFeedCollectionRun;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: "not_found";
+    }
+  | {
+      readonly ok: false;
+      readonly reason: "status_conflict";
+      readonly currentRun: ProfileHomeFeedCollectionRun;
+    };
+
 export interface ProfileHomeFeedCollectionRunRepository {
   save(run: ProfileHomeFeedCollectionRun): Promise<void>;
   findById(
@@ -29,4 +56,7 @@ export interface ProfileHomeFeedCollectionRunRepository {
   claimNextQueued(
     startedAt: ProfileHomeFeedCollectionRunIsoDateTime,
   ): Promise<ProfileHomeFeedCollectionRun | null>;
+  transitionStatus(
+    transition: ProfileHomeFeedCollectionRunStatusTransition,
+  ): Promise<ProfileHomeFeedCollectionRunStatusTransitionResult>;
 }

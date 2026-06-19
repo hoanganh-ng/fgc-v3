@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getTableConfig } from "drizzle-orm/pg-core";
 import {
   accountExerciseRunStatusEnum,
   accountExerciseTypeEnum,
@@ -65,6 +66,16 @@ describe("collector runtime database schema", () => {
     );
     expect(profileHomeFeedCollectionRuns.requestedAt.name).toBe(
       "requested_at",
+    );
+    expect(
+      getTableConfig(profileHomeFeedCollectionRuns).indexes.map(
+        (index) => index.config.name,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "profile_home_feed_collection_runs_claim_idx",
+        "profile_home_feed_collection_runs_profile_history_idx",
+      ]),
     );
   });
 

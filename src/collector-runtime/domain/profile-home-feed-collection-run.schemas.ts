@@ -42,11 +42,13 @@ export const ProfileHomeFeedCollectionRunParametersSchema = z
 
 export const ProfileHomeFeedCollectionRunSummarySchema = z
   .object({
-    postsSeen: NonNegativeIntegerSchema.optional(),
+    capturedPayloads: NonNegativeIntegerSchema.optional(),
     extractorCandidates: NonNegativeIntegerSchema.optional(),
     sourcePublishersObserved: NonNegativeIntegerSchema.optional(),
     contentItemsSubmitted: NonNegativeIntegerSchema.optional(),
-    failedSubmissions: NonNegativeIntegerSchema.optional(),
+    failedPublisherObservations: NonNegativeIntegerSchema.optional(),
+    failedContentSubmissions: NonNegativeIntegerSchema.optional(),
+    leaseReleased: z.boolean().optional(),
   })
   .strict();
 
@@ -76,47 +78,75 @@ export const ProfileHomeFeedCollectionRunSchema = z
   })
   .strict()
   .superRefine((run, context) => {
+    if (run.status === "QUEUED") {
+      rejectPresent(context, "startedAt", run.startedAt);
+      rejectPresent(context, "finishedAt", run.finishedAt);
+      rejectPresent(context, "summary", run.summary);
+      rejectPresent(context, "failureReason", run.failureReason);
+
+      return;
+    }
+
+    if (run.status === "RUNNING") {
+      requirePresent(context, "startedAt", run.startedAt);
+      rejectPresent(context, "finishedAt", run.finishedAt);
+      rejectPresent(context, "summary", run.summary);
+      rejectPresent(context, "failureReason", run.failureReason);
+
+      return;
+    }
+
     if (run.status === "SUCCEEDED") {
-      if (run.failureReason !== undefined) {
-        context.addIssue({
-          code: "custom",
-          path: ["failureReason"],
-          message:
-            "Succeeded home-feed collection runs must not contain a failure reason.",
-        });
-      }
+      requirePresent(context, "startedAt", run.startedAt);
+      requirePresent(context, "finishedAt", run.finishedAt);
+      requirePresent(context, "summary", run.summary);
+      rejectPresent(context, "failureReason", run.failureReason);
 
       return;
     }
 
     if (run.status === "FAILED") {
-      if (run.failureReason === undefined) {
-        context.addIssue({
-          code: "custom",
-          path: ["failureReason"],
-          message:
-            "Failed home-feed collection runs require a failure reason.",
-        });
-      }
+      requirePresent(context, "startedAt", run.startedAt);
+      requirePresent(context, "finishedAt", run.finishedAt);
+      requirePresent(context, "failureReason", run.failureReason);
 
       return;
     }
 
-    if (run.summary !== undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["summary"],
-        message:
-          "Queued, running, and canceled home-feed collection runs must not contain a summary.",
-      });
-    }
-
-    if (run.failureReason !== undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["failureReason"],
-        message:
-          "Queued, running, and canceled home-feed collection runs must not contain a failure reason.",
-      });
-    }
+    requirePresent(context, "finishedAt", run.finishedAt);
+    rejectPresent(context, "startedAt", run.startedAt);
+    rejectPresent(context, "summary", run.summary);
+    rejectPresent(context, "failureReason", run.failureReason);
   });
+
+function requirePresent(
+  context: z.RefinementCtx,
+  path: string,
+  value: unknown,
+): void {
+  if (value !== undefined) {
+    return;
+  }
+
+  context.addIssue({
+    code: "custom",
+    path: [path],
+    message: `${path} is required for this home-feed collection run status.`,
+  });
+}
+
+function rejectPresent(
+  context: z.RefinementCtx,
+  path: string,
+  value: unknown,
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  context.addIssue({
+    code: "custom",
+    path: [path],
+    message: `${path} is not allowed for this home-feed collection run status.`,
+  });
+}

@@ -47,10 +47,24 @@ add Web UI behavior. It makes no live-Facebook validation claim.
 - Valid transitions are:
   `QUEUED -> RUNNING | CANCELED`,
   `RUNNING -> SUCCEEDED | FAILED`; terminal states cannot transition.
+- Lifecycle timestamp and payload invariants are exact:
+  `QUEUED` has no `startedAt`, no `finishedAt`, no `summary`, and no
+  `failureReason`; `RUNNING` requires `startedAt` and has no
+  `finishedAt`, no `summary`, and no `failureReason`; `SUCCEEDED`
+  requires `startedAt`, `finishedAt`, and `summary`, and has no
+  `failureReason`; `FAILED` requires `startedAt`, `finishedAt`, and
+  `failureReason`, with optional `summary`; `CANCELED` requires
+  `finishedAt` and has no `startedAt`, no `summary`, and no
+  `failureReason`.
 - Request parameters are optional and strictly validated:
   `maxScrolls`, `maxDurationMs`, and `maxPosts`.
 - Persisted summaries and failure reasons are sanitized allowlists:
-  summary count fields only, and failure `{ code, message }` only.
+  summary count/boolean fields only, and failure `{ code, message }`
+  only. The exact summary fields are `capturedPayloads`,
+  `extractorCandidates`, `sourcePublishersObserved`,
+  `contentItemsSubmitted`, `failedPublisherObservations`,
+  `failedContentSubmissions`, and `leaseReleased`; count fields must be
+  non-negative integers and unknown fields are rejected.
 - `ProfileReferencePort` is used only to confirm profile existence,
   reject mismatched profile ids, and record `accountStageAtRequest`.
   Sprint 065B does not duplicate Profile Manager checkout,
@@ -59,6 +73,11 @@ add Web UI behavior. It makes no live-Facebook validation claim.
   per profile with a partial unique index.
 - `claimNextQueued` is atomic, oldest-first by `requestedAt` then `id`,
   and safe under concurrent claimers with `FOR UPDATE SKIP LOCKED`.
+- Terminal lifecycle transitions use persistence-level compare-and-set:
+  cancel updates only rows still `QUEUED`, while succeed and fail update
+  only rows still `RUNNING`. A stale expected status returns a typed
+  status-transition conflict, not-found remains distinct, and terminal
+  rows cannot be overwritten by another terminal result.
 - Internal application seams exist for claim-next, mark-succeeded, and
   mark-failed. They are not exposed as public HTTP routes.
 
@@ -84,9 +103,14 @@ Sprint 065B adds the `profile_home_feed_collection_runs` table with:
   `summary`, optional `failure_reason`, and lifecycle timestamps;
 - indexes on `status`, `profile_id`, `created_at`, and
   `(requested_at, id)`;
+- correction indexes on `(status, requested_at, id)` for atomic claim
+  selection and `(profile_id, requested_at DESC, id DESC)` for profile
+  history listing;
 - partial unique index
   `profile_home_feed_collection_runs_active_profile_uidx` on
   `profile_id` where `status IN ('QUEUED', 'RUNNING')`.
+- Durable and in-memory list ordering is `requestedAt DESC`, then
+  `id DESC` for deterministic ties.
 
 ## Security
 
@@ -145,3 +169,5 @@ Sprint 065A was accepted at
 Sprint 065B is **active and authorized**. It is not accepted.
 
 Sprint 065C remains inactive and is not authorized by Sprint 065B.
+
+Sprint 065B makes no live-Facebook validation claim.

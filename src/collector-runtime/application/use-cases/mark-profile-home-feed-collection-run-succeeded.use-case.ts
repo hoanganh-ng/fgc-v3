@@ -1,4 +1,7 @@
-import { InvalidProfileHomeFeedCollectionRunStatusTransitionError } from "../application-errors";
+import {
+  InvalidProfileHomeFeedCollectionRunStatusTransitionError,
+  ProfileHomeFeedCollectionRunNotFoundError,
+} from "../application-errors";
 import {
   loadValidatedProfileHomeFeedCollectionRunById,
   toProfileHomeFeedCollectionRunIsoDateTime,
@@ -16,7 +19,7 @@ import {
 
 export interface MarkProfileHomeFeedCollectionRunSucceededInput {
   readonly runId: ProfileHomeFeedCollectionRunId;
-  readonly summary?: ProfileHomeFeedCollectionRunSummary;
+  readonly summary: ProfileHomeFeedCollectionRunSummary;
 }
 
 export class MarkProfileHomeFeedCollectionRunSucceededUseCase {
@@ -40,24 +43,39 @@ export class MarkProfileHomeFeedCollectionRunSucceededUseCase {
       );
     }
 
-    const summary =
-      input.summary === undefined
-        ? undefined
-        : validateProfileHomeFeedCollectionRunSummaryForApplication(
-            input.summary,
-          );
+    const summary = validateProfileHomeFeedCollectionRunSummaryForApplication(
+      input.summary,
+    );
     const { failureReason: _failureReason, ...runWithoutFailureReason } = run;
     const now = toProfileHomeFeedCollectionRunIsoDateTime(this.clock.now());
     const succeeded = validateProfileHomeFeedCollectionRunForApplication({
       ...runWithoutFailureReason,
       status: "SUCCEEDED",
-      ...(summary !== undefined ? { summary } : {}),
+      summary,
       finishedAt: now,
       updatedAt: now,
     });
 
-    await this.runs.save(succeeded);
+    const result = await this.runs.transitionStatus({
+      runId: succeeded.id,
+      expectedStatus: "RUNNING",
+      nextStatus: "SUCCEEDED",
+      summary,
+      finishedAt: now,
+      updatedAt: now,
+    });
 
-    return succeeded;
+    if (result.ok) {
+      return result.run;
+    }
+
+    if (result.reason === "not_found") {
+      throw new ProfileHomeFeedCollectionRunNotFoundError(input.runId);
+    }
+
+    throw new InvalidProfileHomeFeedCollectionRunStatusTransitionError(
+      result.currentRun.status,
+      "SUCCEEDED",
+    );
   }
 }

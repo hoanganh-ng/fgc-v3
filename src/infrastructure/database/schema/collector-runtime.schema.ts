@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import {
   boolean,
   check,
@@ -209,6 +209,16 @@ export const profileHomeFeedCollectionRuns = pgTable(
     index("profile_home_feed_collection_runs_requested_at_id_idx").on(
       table.requestedAt,
       table.id,
+    ),
+    index("profile_home_feed_collection_runs_claim_idx").on(
+      table.status,
+      table.requestedAt,
+      table.id,
+    ),
+    index("profile_home_feed_collection_runs_profile_history_idx").on(
+      table.profileId,
+      desc(table.requestedAt),
+      desc(table.id),
     ),
     uniqueIndex("profile_home_feed_collection_runs_active_profile_uidx")
       .on(table.profileId)

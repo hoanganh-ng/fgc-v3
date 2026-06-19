@@ -1,4 +1,5 @@
 import { InvalidProfileHomeFeedCollectionRunStatusTransitionError } from "../application-errors";
+import { ProfileHomeFeedCollectionRunNotFoundError } from "../application-errors";
 import {
   loadValidatedProfileHomeFeedCollectionRunById,
   toProfileHomeFeedCollectionRunIsoDateTime,
@@ -45,8 +46,25 @@ export class CancelProfileHomeFeedCollectionRunUseCase {
       updatedAt: now,
     });
 
-    await this.runs.save(canceled);
+    const result = await this.runs.transitionStatus({
+      runId: canceled.id,
+      expectedStatus: "QUEUED",
+      nextStatus: "CANCELED",
+      finishedAt: now,
+      updatedAt: now,
+    });
 
-    return canceled;
+    if (result.ok) {
+      return result.run;
+    }
+
+    if (result.reason === "not_found") {
+      throw new ProfileHomeFeedCollectionRunNotFoundError(input.runId);
+    }
+
+    throw new InvalidProfileHomeFeedCollectionRunStatusTransitionError(
+      result.currentRun.status,
+      "CANCELED",
+    );
   }
 }

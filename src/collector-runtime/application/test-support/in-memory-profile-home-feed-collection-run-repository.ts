@@ -8,6 +8,8 @@ import type {
   ProfileHomeFeedCollectionRunListQuery,
   ProfileHomeFeedCollectionRunListResult,
   ProfileHomeFeedCollectionRunRepository,
+  ProfileHomeFeedCollectionRunStatusTransition,
+  ProfileHomeFeedCollectionRunStatusTransitionResult,
 } from "../ports/profile-home-feed-collection-run-repository.port";
 
 export class InMemoryProfileHomeFeedCollectionRunRepository
@@ -50,7 +52,7 @@ export class InMemoryProfileHomeFeedCollectionRunRepository
         (run) =>
           query.profileId === undefined || run.profileId === query.profileId,
       )
-      .sort(compareProfileHomeFeedCollectionRunsByCreatedAtDesc);
+      .sort(compareProfileHomeFeedCollectionRunsByRequestedAtDesc);
 
     return {
       items: matchingRuns.slice(query.offset, query.offset + query.limit),
@@ -80,17 +82,60 @@ export class InMemoryProfileHomeFeedCollectionRunRepository
 
     return claimedRun;
   }
+
+  public async transitionStatus(
+    transition: ProfileHomeFeedCollectionRunStatusTransition,
+  ): Promise<ProfileHomeFeedCollectionRunStatusTransitionResult> {
+    const run = this.runs.get(transition.runId);
+
+    if (run === undefined) {
+      return {
+        ok: false,
+        reason: "not_found",
+      };
+    }
+
+    if (run.status !== transition.expectedStatus) {
+      return {
+        ok: false,
+        reason: "status_conflict",
+        currentRun: run,
+      };
+    }
+
+    const transitioned: ProfileHomeFeedCollectionRun = {
+      ...run,
+      status: transition.nextStatus,
+      ...(transition.summary !== undefined
+        ? { summary: transition.summary }
+        : {}),
+      ...(transition.failureReason !== undefined
+        ? { failureReason: transition.failureReason }
+        : {}),
+      ...(transition.finishedAt !== undefined
+        ? { finishedAt: transition.finishedAt }
+        : {}),
+      updatedAt: transition.updatedAt,
+    };
+
+    this.runs.set(transitioned.id, transitioned);
+
+    return {
+      ok: true,
+      run: transitioned,
+    };
+  }
 }
 
-function compareProfileHomeFeedCollectionRunsByCreatedAtDesc(
+function compareProfileHomeFeedCollectionRunsByRequestedAtDesc(
   left: ProfileHomeFeedCollectionRun,
   right: ProfileHomeFeedCollectionRun,
 ): number {
-  const createdAtComparison =
-    Date.parse(right.createdAt) - Date.parse(left.createdAt);
+  const requestedAtComparison =
+    Date.parse(right.requestedAt) - Date.parse(left.requestedAt);
 
-  if (createdAtComparison !== 0) {
-    return createdAtComparison;
+  if (requestedAtComparison !== 0) {
+    return requestedAtComparison;
   }
 
   return right.id.localeCompare(left.id);

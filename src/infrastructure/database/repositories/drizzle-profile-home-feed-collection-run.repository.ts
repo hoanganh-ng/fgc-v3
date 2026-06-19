@@ -5,6 +5,8 @@ import type {
   ProfileHomeFeedCollectionRunListQuery,
   ProfileHomeFeedCollectionRunListResult,
   ProfileHomeFeedCollectionRunRepository,
+  ProfileHomeFeedCollectionRunStatusTransition,
+  ProfileHomeFeedCollectionRunStatusTransitionResult,
 } from "../../../collector-runtime/application";
 import type {
   ProfileHomeFeedCollectionRun,
@@ -13,6 +15,7 @@ import type {
 } from "../../../collector-runtime/domain";
 import type { DatabaseSession } from "../client";
 import {
+  type ProfileHomeFeedCollectionRunInsert,
   type ProfileHomeFeedCollectionRunRow,
   toDomainProfileHomeFeedCollectionRun,
   toProfileHomeFeedCollectionRunRecord,
@@ -76,7 +79,7 @@ export class DrizzleProfileHomeFeedCollectionRunRepository
       .from(profileHomeFeedCollectionRuns)
       .where(where)
       .orderBy(
-        desc(profileHomeFeedCollectionRuns.createdAt),
+        desc(profileHomeFeedCollectionRuns.requestedAt),
         desc(profileHomeFeedCollectionRuns.id),
       )
       .limit(query.limit)
@@ -126,6 +129,60 @@ export class DrizzleProfileHomeFeedCollectionRunRepository
     const [row] = result.rows;
 
     return row === undefined ? null : toDomainProfileHomeFeedCollectionRun(row);
+  }
+
+  public async transitionStatus(
+    transition: ProfileHomeFeedCollectionRunStatusTransition,
+  ): Promise<ProfileHomeFeedCollectionRunStatusTransitionResult> {
+    const updateSet: Partial<ProfileHomeFeedCollectionRunInsert> = {
+      status: transition.nextStatus,
+      updatedAt: transition.updatedAt,
+    };
+
+    if (transition.finishedAt !== undefined) {
+      updateSet.finishedAt = transition.finishedAt;
+    }
+
+    if (transition.summary !== undefined) {
+      updateSet.summary = transition.summary;
+    }
+
+    if (transition.failureReason !== undefined) {
+      updateSet.failureReason = transition.failureReason;
+    }
+
+    const [updatedRow] = await this.db
+      .update(profileHomeFeedCollectionRuns)
+      .set(updateSet)
+      .where(
+        and(
+          eq(profileHomeFeedCollectionRuns.id, transition.runId),
+          eq(profileHomeFeedCollectionRuns.status, transition.expectedStatus),
+        ),
+      )
+      .returning();
+
+    if (updatedRow !== undefined) {
+      return {
+        ok: true,
+        run: toDomainProfileHomeFeedCollectionRun(updatedRow),
+      };
+    }
+
+    const currentRun = await this.findById(transition.runId);
+
+    if (currentRun === null) {
+      return {
+        ok: false,
+        reason: "not_found",
+      };
+    }
+
+    return {
+      ok: false,
+      reason: "status_conflict",
+      currentRun,
+    };
   }
 }
 
