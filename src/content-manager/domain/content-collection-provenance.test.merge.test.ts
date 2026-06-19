@@ -28,18 +28,28 @@ function createProvenance(
   };
 }
 
+function createHomeFeedProvenance(
+  sourceGroupId: string,
+): ContentCollectionProvenance {
+  return {
+    firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
+    managedSourceGroupId: sourceGroupId,
+  };
+}
+
 function createContentItem(
   overrides: Partial<ContentItem> = {},
 ): ContentItem {
   const sourceGroupId = overrides.sourceGroupId ?? "source-group-1";
-  const provenance = createProvenance(sourceGroupId);
+  const provenance =
+    overrides.collectionProvenance ?? createProvenance(sourceGroupId);
 
   return {
     id: "content-1",
     platform: "FACEBOOK",
     sourceGroupId,
     externalPostId: "post-1",
-    sourceUrl: "https://www.facebook.com/groups/group-1/posts/post-1",
+    sourceUrl: "https://www.facebook.com/groups/source-group-1/posts/post-1",
     title: "Useful post",
     bodyText: "A useful knowledge-rich post.",
     authorDisplayName: "Post Author",
@@ -81,7 +91,7 @@ function createCollectedContentInput(
     platform: "FACEBOOK",
     sourceGroupId: "source-group-1",
     externalPostId: "post-1",
-    sourceUrl: "https://www.facebook.com/groups/group-1/posts/post-1",
+    sourceUrl: "https://www.facebook.com/groups/source-group-1/posts/post-1",
     title: "Useful post",
     bodyText: "A useful knowledge-rich post.",
     authorDisplayName: "Post Author",
@@ -119,6 +129,25 @@ describe("ContentItem with collectionProvenance (Sprint 064B)", () => {
     expect(result.value.collectionProvenance.sourcePublisherId).toBeUndefined();
   });
 
+  it("round-trips a content item with a PROFILE_HOME_FEED first surface and a managed group equal to sourceGroupId", () => {
+    const item = createContentItem({
+      collectionProvenance: createHomeFeedProvenance("source-group-1"),
+    });
+
+    const result = validateContentItem(item);
+
+    expect(result.valid).toBe(true);
+    if (!result.valid) {
+      return;
+    }
+    expect(result.value.collectionProvenance.firstCollectionSurface.kind).toBe(
+      "PROFILE_HOME_FEED",
+    );
+    expect(result.value.collectionProvenance.managedSourceGroupId).toBe(
+      "source-group-1",
+    );
+  });
+
   it("rejects a content item missing collectionProvenance", () => {
     const { collectionProvenance: _provenance, ...withoutProvenance } =
       createContentItem();
@@ -128,15 +157,9 @@ describe("ContentItem with collectionProvenance (Sprint 064B)", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects a content item whose collectionProvenance disagrees with sourceGroupId", () => {
+  it("rejects a content item whose SOURCE_GROUP collectionProvenance disagrees with sourceGroupId", () => {
     const item = createContentItem({
-      collectionProvenance: {
-        firstCollectionSurface: {
-          kind: "SOURCE_GROUP",
-          sourceGroupId: "different-source-group",
-        },
-        managedSourceGroupId: "different-source-group",
-      },
+      collectionProvenance: createProvenance("different-source-group"),
     });
 
     const result = validateContentItem(item);
@@ -153,7 +176,7 @@ describe("ContentItem with collectionProvenance (Sprint 064B)", () => {
     ).toBe(true);
   });
 
-  it("rejects a content item with a PROFILE_HOME_FEED first surface", () => {
+  it("rejects a PROFILE_HOME_FEED content item with no managed group (bare home feed)", () => {
     const item = createContentItem({
       collectionProvenance: {
         firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
@@ -169,23 +192,44 @@ describe("ContentItem with collectionProvenance (Sprint 064B)", () => {
     const paths = result.issues.map((issue) => issue.path);
     expect(
       paths.some((path) =>
-        path.startsWith("collectionProvenance.firstCollectionSurface.kind"),
+        path.startsWith("collectionProvenance.managedSourceGroupId"),
       ),
     ).toBe(true);
   });
 
-  it("mergeCollectedContent preserves the merged provenance override", () => {
+  it("rejects a PROFILE_HOME_FEED content item whose managed group disagrees with sourceGroupId", () => {
+    const item = createContentItem({
+      collectionProvenance: createHomeFeedProvenance("different-source-group"),
+    });
+
+    const result = validateContentItem(item);
+
+    expect(result.valid).toBe(false);
+    if (result.valid) {
+      return;
+    }
+    const paths = result.issues.map((issue) => issue.path);
+    expect(
+      paths.some((path) =>
+        path.startsWith("collectionProvenance.managedSourceGroupId"),
+      ),
+    ).toBe(true);
+  });
+
+  it("mergeCollectedContent preserves the merged provenance override via options.collectionProvenance", () => {
     const existing = createContentItem();
     const merged = mergeCollectedContent(
       existing,
       createCollectedContentInput(),
-      { updatedAt: laterUpdatedAt },
       {
-        firstCollectionSurface: {
-          kind: "SOURCE_GROUP",
-          sourceGroupId: "source-group-1",
+        updatedAt: laterUpdatedAt,
+        collectionProvenance: {
+          firstCollectionSurface: {
+            kind: "SOURCE_GROUP",
+            sourceGroupId: "source-group-1",
+          },
+          managedSourceGroupId: "source-group-1",
         },
-        managedSourceGroupId: "source-group-1",
       },
     );
 
@@ -215,6 +259,26 @@ describe("ContentItem with collectionProvenance (Sprint 064B)", () => {
     expect(merged.collectionProvenance).toEqual(
       existing.collectionProvenance,
     );
+  });
+
+  it("mergeCollectedContent accepts a PROFILE_HOME_FEED home-feed-first provenance with a managed group via options.collectionProvenance", () => {
+    const existing = createContentItem({
+      collectionProvenance: createHomeFeedProvenance("source-group-1"),
+    });
+
+    const merged = mergeCollectedContent(
+      existing,
+      createCollectedContentInput(),
+      {
+        updatedAt: laterUpdatedAt,
+        collectionProvenance: createHomeFeedProvenance("source-group-1"),
+      },
+    );
+
+    expect(merged.collectionProvenance).toEqual(
+      createHomeFeedProvenance("source-group-1"),
+    );
+    expect(merged.sourceGroupId).toBe("source-group-1");
   });
 
   it("the merged result is strict-schema-valid against ContentItemSchema", () => {

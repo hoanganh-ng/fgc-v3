@@ -9,7 +9,6 @@ import type {
 } from "../../../content-manager/domain";
 import {
   validateContentCategory,
-  validateContentCollectionProvenance,
   validateContentItem,
   validateSourceGroup,
   validateSourcePublisher,
@@ -157,10 +156,7 @@ export function toContentItemRow(contentItem: ContentItem): ContentItemInsert {
     topComments: validContentItem.topComments.map((comment) => ({ ...comment })),
     status: validContentItem.status,
     rawPayloadRef: validContentItem.rawPayloadRef ?? null,
-    collectionProvenance: parseCollectionProvenanceForPersistence(
-      validContentItem.collectionProvenance,
-      validContentItem.sourceGroupId,
-    ),
+    collectionProvenance: { ...validContentItem.collectionProvenance },
     createdAt: validContentItem.createdAt,
     updatedAt: validContentItem.updatedAt,
   };
@@ -186,11 +182,7 @@ export function toContentItemDomain(row: ContentItemRow): ContentItem {
     topComments: row.topComments,
     status: row.status,
     ...optional("rawPayloadRef", row.rawPayloadRef),
-    collectionProvenance: parseCollectionProvenanceForRead(
-      row.collectionProvenance,
-      row.sourceGroupId,
-      row.id,
-    ),
+    collectionProvenance: row.collectionProvenance,
     createdAt: normalizeIsoDateTime(row.createdAt),
     updatedAt: normalizeIsoDateTime(row.updatedAt),
   };
@@ -298,94 +290,6 @@ function parseContentItemForPersistence(contentItem: ContentItem): ContentItem {
   }
 
   return result.value;
-}
-
-function parseCollectionProvenanceForPersistence(
-  provenance: ContentCollectionProvenance,
-  sourceGroupId: string,
-): ContentCollectionProvenance {
-  const result = validateContentCollectionProvenance(provenance);
-
-  if (!result.valid) {
-    throw invalidPersisted(
-      "content item",
-      sourceGroupId,
-      result.issues,
-    );
-  }
-
-  assertSourceGroupConsistency(result.value, sourceGroupId, sourceGroupId);
-
-  return { ...result.value };
-}
-
-function parseCollectionProvenanceForRead(
-  provenance: unknown,
-  sourceGroupId: string,
-  contentItemId: string,
-): ContentCollectionProvenance {
-  const result = validateContentCollectionProvenance(provenance);
-
-  if (!result.valid) {
-    throw invalidPersisted("content item", contentItemId, result.issues);
-  }
-
-  assertSourceGroupConsistency(result.value, sourceGroupId, contentItemId);
-
-  return { ...result.value };
-}
-
-function assertSourceGroupConsistency(
-  provenance: ContentCollectionProvenance,
-  sourceGroupId: string,
-  contentItemId: string,
-): void {
-  const surface = provenance.firstCollectionSurface;
-
-  if (surface.kind !== "SOURCE_GROUP") {
-    throw new InvalidPersistedContentManagerRecordError(
-      "content item",
-      contentItemId,
-      [
-        {
-          path: "collectionProvenance.firstCollectionSurface.kind",
-          message:
-            "collectionProvenance.firstCollectionSurface.kind must be SOURCE_GROUP for a source-group content item.",
-        },
-      ],
-    );
-  }
-
-  if (surface.sourceGroupId !== sourceGroupId) {
-    throw new InvalidPersistedContentManagerRecordError(
-      "content item",
-      contentItemId,
-      [
-        {
-          path: "collectionProvenance.firstCollectionSurface.sourceGroupId",
-          message:
-            "collectionProvenance.firstCollectionSurface.sourceGroupId must equal sourceGroupId.",
-        },
-      ],
-    );
-  }
-
-  if (
-    provenance.managedSourceGroupId !== undefined &&
-    provenance.managedSourceGroupId !== surface.sourceGroupId
-  ) {
-    throw new InvalidPersistedContentManagerRecordError(
-      "content item",
-      contentItemId,
-      [
-        {
-          path: "collectionProvenance.managedSourceGroupId",
-          message:
-            "collectionProvenance.managedSourceGroupId must equal firstCollectionSurface.sourceGroupId.",
-        },
-      ],
-    );
-  }
 }
 
 function invalidPersisted(

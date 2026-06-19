@@ -107,7 +107,6 @@ export function mergeCollectedContent(
   existing: ContentItem,
   incoming: CollectedContentInput,
   options: MergeCollectedContentOptions,
-  mergedProvenance?: ContentCollectionProvenance,
 ): ContentItem {
   return {
     ...existing,
@@ -127,7 +126,8 @@ export function mergeCollectedContent(
       options.topCommentLimit,
     ),
     rawPayloadRef: incoming.rawPayloadRef ?? existing.rawPayloadRef,
-    collectionProvenance: mergedProvenance ?? existing.collectionProvenance,
+    collectionProvenance:
+      options.collectionProvenance ?? existing.collectionProvenance,
     updatedAt: options.updatedAt,
   };
 }

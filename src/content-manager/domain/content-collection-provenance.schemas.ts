@@ -1,19 +1,8 @@
 import { z } from "zod";
-
-// The `SourcePublisherIdSchema` is inlined here to break a circular
-// import chain through `source-publisher.schemas.ts`. The validation
-// semantics are intentionally identical: a non-empty trimmed string.
-// `source-publisher.schemas.ts` re-exports the same schema for
-// callers that import it directly.
-
-const NonEmptyStringSchema = z
-  .string()
-  .refine((value) => value.trim().length > 0, {
-    message: "Expected non-empty string.",
-  });
-
-const SourcePublisherIdSchema = NonEmptyStringSchema;
-const SourceGroupIdSchema = NonEmptyStringSchema;
+import {
+  SourceGroupIdSchema,
+  SourcePublisherIdSchema,
+} from "./shared-identifier.schemas";
 
 export const CollectionSurfaceKindSchema = z.enum([
   "SOURCE_GROUP",

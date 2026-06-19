@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ContentCollectionProvenanceSchema } from "./content-collection-provenance.schemas";
 import { CONTENT_PLATFORMS } from "./content-platform";
 import { CONTENT_STATUSES } from "./content-status";
+import { SourceGroupIdSchema } from "./shared-identifier.schemas";
 import {
   SOURCE_GROUP_ENTRY_ROUTE_RISK_LEVELS,
   SOURCE_GROUP_ENTRY_ROUTE_TYPES,
@@ -21,7 +22,10 @@ const NonNegativeIntegerSchema = z.number().int().min(0);
 export const IsoDateTimeSchema = z.iso.datetime({ offset: true });
 export const ContentIdSchema = NonEmptyStringSchema;
 export const ContentCategoryIdSchema = NonEmptyStringSchema;
-export const SourceGroupIdSchema = NonEmptyStringSchema;
+// `SourceGroupIdSchema` is re-exported below for callers that still
+// import it from `content.schemas`. The schema itself is owned by
+// `./shared-identifier.schemas`.
+export { SourceGroupIdSchema };
 export const SourceGroupEntryRouteIdSchema = NonEmptyStringSchema;
 export const ExternalGroupIdSchema = NonEmptyStringSchema;
 export const ExternalPostIdSchema = NonEmptyStringSchema;
@@ -148,39 +152,57 @@ export const ContentItemSchema = z
   .strict()
   .superRefine((item, context) => {
     const provenance = item.collectionProvenance;
-    const surfaceKind = provenance.firstCollectionSurface.kind;
+    const surface = provenance.firstCollectionSurface;
 
-    if (surfaceKind !== "SOURCE_GROUP") {
-      context.addIssue({
-        code: "custom",
-        path: ["collectionProvenance", "firstCollectionSurface", "kind"],
-        message:
-          "collectionProvenance.firstCollectionSurface.kind must be SOURCE_GROUP for a ContentItem.",
-      });
+    if (surface.kind === "SOURCE_GROUP") {
+      const surfaceSourceGroupId = surface.sourceGroupId;
+
+      if (
+        provenance.managedSourceGroupId !== undefined &&
+        provenance.managedSourceGroupId !== surfaceSourceGroupId
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["collectionProvenance", "managedSourceGroupId"],
+          message:
+            "managedSourceGroupId must equal firstCollectionSurface.sourceGroupId when firstCollectionSurface.kind is SOURCE_GROUP.",
+        });
+      }
+
+      if (item.sourceGroupId !== surfaceSourceGroupId) {
+        context.addIssue({
+          code: "custom",
+          path: ["collectionProvenance", "firstCollectionSurface"],
+          message:
+            "collectionProvenance.firstCollectionSurface.sourceGroupId must equal sourceGroupId for a SOURCE_GROUP surface.",
+        });
+      }
+
       return;
     }
 
-    const surfaceSourceGroupId =
-      provenance.firstCollectionSurface.sourceGroupId;
-
-    if (
-      provenance.managedSourceGroupId !== undefined &&
-      provenance.managedSourceGroupId !== surfaceSourceGroupId
-    ) {
+    // PROFILE_HOME_FEED first surface.
+    // The legacy `sourceGroupId` field remains required for
+    // compatibility. When the first surface is a home feed, the
+    // durable provenance must carry a `managedSourceGroupId` that
+    // equals the legacy `sourceGroupId`; bare home-feed ingestion is
+    // still unsupported.
+    if (provenance.managedSourceGroupId === undefined) {
       context.addIssue({
         code: "custom",
         path: ["collectionProvenance", "managedSourceGroupId"],
         message:
-          "managedSourceGroupId must equal firstCollectionSurface.sourceGroupId when firstCollectionSurface.kind is SOURCE_GROUP.",
+          "managedSourceGroupId is required when firstCollectionSurface.kind is PROFILE_HOME_FEED for a ContentItem.",
       });
+      return;
     }
 
-    if (item.sourceGroupId !== surfaceSourceGroupId) {
+    if (provenance.managedSourceGroupId !== item.sourceGroupId) {
       context.addIssue({
         code: "custom",
-        path: ["collectionProvenance", "firstCollectionSurface"],
+        path: ["collectionProvenance", "managedSourceGroupId"],
         message:
-          "collectionProvenance.firstCollectionSurface.sourceGroupId must equal sourceGroupId for a SOURCE_GROUP surface.",
+          "managedSourceGroupId must equal sourceGroupId when firstCollectionSurface.kind is PROFILE_HOME_FEED.",
       });
     }
   });

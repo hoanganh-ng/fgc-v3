@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { infer as zInfer } from "zod";
 import { ContentPlatformSchema, IsoDateTimeSchema } from "./content.schemas";
+import { SourcePublisherIdSchema } from "./shared-identifier.schemas";
 import { SOURCE_PUBLISHER_KINDS } from "./source-publisher-kind";
 import { SOURCE_PUBLISHER_STATUSES } from "./source-publisher-status";
 
@@ -13,7 +14,10 @@ const NonEmptyStringSchema = z
 const PositiveIntegerSchema = z.number().int().min(1);
 
 export const ExternalPublisherIdSchema = NonEmptyStringSchema;
-export const SourcePublisherIdSchema = NonEmptyStringSchema;
+// `SourcePublisherIdSchema` is owned by
+// `./shared-identifier.schemas` and re-exported here for callers
+// that import it from this module.
+export { SourcePublisherIdSchema };
 export const SourcePublisherKindSchema = z.enum(SOURCE_PUBLISHER_KINDS);
 export const SourcePublisherStatusSchema = z.enum(SOURCE_PUBLISHER_STATUSES);
 

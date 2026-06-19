@@ -56,8 +56,7 @@ export class IngestCollectedContentUseCase {
         mergeCollectedContent(
           validExistingContent,
           preserveMissingOptionalFields(validExistingContent, collectedContent),
-          { updatedAt },
-          mergedProvenance,
+          { updatedAt, collectionProvenance: mergedProvenance },
         ),
       );
 

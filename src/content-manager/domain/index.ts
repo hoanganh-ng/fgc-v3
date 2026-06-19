@@ -6,6 +6,7 @@ export * from "./content-platform";
 export * from "./content-state-machine";
 export * from "./content-status";
 export * from "./content.schemas";
+export * from "./shared-identifier.schemas";
 export * from "./source-group-entry-route";
 export * from "./source-group-status";
 export * from "./source-publisher";

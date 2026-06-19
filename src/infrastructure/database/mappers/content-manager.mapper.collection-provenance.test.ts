@@ -39,6 +39,15 @@ function createProvenance(
   };
 }
 
+function createHomeFeedProvenance(
+  managedSourceGroupId: string,
+): ContentCollectionProvenance {
+  return {
+    firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
+    managedSourceGroupId,
+  };
+}
+
 function makeDomainItem(
   overrides: Partial<ContentItem> = {},
 ): ContentItem {
@@ -49,7 +58,7 @@ function makeDomainItem(
     platform: "FACEBOOK",
     sourceGroupId,
     externalPostId: "post-1",
-    sourceUrl: "https://www.facebook.com/groups/group-1/posts/post-1",
+    sourceUrl: "https://www.facebook.com/groups/source-group-1/posts/post-1",
     title: "Title",
     bodyText: "Body text",
     authorDisplayName: "Author",
@@ -76,7 +85,7 @@ function makeRow(overrides: Partial<ContentItemRow> = {}): ContentItemRow {
     platform: "FACEBOOK",
     sourceGroupId: "source-group-1",
     externalPostId: "post-1",
-    sourceUrl: "https://www.facebook.com/groups/group-1/posts/post-1",
+    sourceUrl: "https://www.facebook.com/groups/source-group-1/posts/post-1",
     title: "Title",
     bodyText: "Body text",
     authorDisplayName: "Author",
@@ -122,7 +131,30 @@ describe("content-manager mapper — content item collection provenance", () => 
     expect(back.sourceGroupId).toBe("source-group-1");
   });
 
-  it("rejects a domain item whose collectionProvenance sourceGroupId disagrees with sourceGroupId", () => {
+  it("round-trips a valid PROFILE_HOME_FEED first surface with a managed group", () => {
+    const item = makeDomainItem({
+      collectionProvenance: createHomeFeedProvenance("source-group-1"),
+    });
+
+    const row = toContentItemRow(item);
+    const persistedRow: ContentItemRow = {
+      ...row,
+      createdAt: row.createdAt as string,
+      updatedAt: row.updatedAt as string,
+      postedAt: row.postedAt as string,
+      firstCollectedAt: row.firstCollectedAt as string,
+      lastCollectedAt: row.lastCollectedAt as string,
+    } as ContentItemRow;
+    const back = toContentItemDomain(persistedRow);
+
+    expect(back.collectionProvenance).toEqual({
+      firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
+      managedSourceGroupId: "source-group-1",
+    });
+    expect(back.sourceGroupId).toBe("source-group-1");
+  });
+
+  it("rejects a domain item whose SOURCE_GROUP collectionProvenance sourceGroupId disagrees with sourceGroupId", () => {
     const item = makeDomainItem({
       collectionProvenance: createProvenance("different-source-group"),
     });
@@ -132,11 +164,9 @@ describe("content-manager mapper — content item collection provenance", () => 
     );
   });
 
-  it("rejects a domain item with a PROFILE_HOME_FEED first surface", () => {
+  it("rejects a domain item whose PROFILE_HOME_FEED managed group disagrees with sourceGroupId", () => {
     const item = makeDomainItem({
-      collectionProvenance: {
-        firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
-      },
+      collectionProvenance: createHomeFeedProvenance("different-source-group"),
     });
 
     expect(() => toContentItemRow(item)).toThrow(
@@ -150,6 +180,44 @@ describe("content-manager mapper — content item collection provenance", () => 
 
     expect(() => toContentItemRow(withoutProvenance as ContentItem)).toThrow(
       InvalidPersistedContentManagerRecordError,
+    );
+  });
+
+  it("reports the real content item id when persistence validation fails", () => {
+    const item = makeDomainItem({
+      id: "content-real-id-42",
+      collectionProvenance: createProvenance("different-source-group"),
+    });
+
+    let caught: unknown;
+    try {
+      toContentItemRow(item);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(InvalidPersistedContentManagerRecordError);
+    expect((caught as InvalidPersistedContentManagerRecordError).recordId).toBe(
+      "content-real-id-42",
+    );
+  });
+
+  it("reports the real content item id when read validation fails", () => {
+    const row = makeRow({
+      id: "content-real-id-99",
+      collectionProvenance: createProvenance("different-source-group"),
+    });
+
+    let caught: unknown;
+    try {
+      toContentItemDomain(row);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(InvalidPersistedContentManagerRecordError);
+    expect((caught as InvalidPersistedContentManagerRecordError).recordId).toBe(
+      "content-real-id-99",
     );
   });
 
