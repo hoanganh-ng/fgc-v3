@@ -3,6 +3,7 @@ import type {
   CollectedContentInput,
   ContentCategory,
   ContentItem,
+  HomeFeedCollectedContentInput,
   SourceGroup,
   TopComment,
 } from "./content";
@@ -10,6 +11,7 @@ import {
   CollectedContentInputSchema,
   ContentCategorySchema,
   ContentItemSchema,
+  HomeFeedCollectedContentInputSchema,
   SourceGroupSchema,
   TopCommentSchema,
 } from "./content.schemas";
@@ -129,6 +131,27 @@ export function parseCollectedContentInput(
   value: unknown,
 ): ValidationResult<CollectedContentInput> {
   const result = CollectedContentInputSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateHomeFeedCollectedContentInput(
+  value: unknown,
+): ValidationResult<HomeFeedCollectedContentInput> {
+  return parseHomeFeedCollectedContentInput(value);
+}
+
+export function parseHomeFeedCollectedContentInput(
+  value: unknown,
+): ValidationResult<HomeFeedCollectedContentInput> {
+  const result = HomeFeedCollectedContentInputSchema.safeParse(value);
 
   if (!result.success) {
     return invalid(formatZodIssues(result.error.issues));

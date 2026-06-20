@@ -22,6 +22,7 @@ import type {
   ContentCategory,
   ContentItem,
   ContentStatus,
+  HomeFeedCollectedContentInput,
   SourceGroup,
   SourceGroupStatus,
   SourcePublisher,
@@ -120,6 +121,10 @@ export interface FakeContentManagerHttpService
     CollectedContentInput,
     ContentItem
   >;
+  readonly ingestHomeFeedCollectedContent: StubUseCase<
+    HomeFeedCollectedContentInput,
+    ContentItem
+  >;
   readonly updateContentStatus: StubUseCase<
     UpdateContentStatusInput,
     ContentItem
@@ -185,6 +190,9 @@ export function createFakeContentManagerHttpService(): FakeContentManagerHttpSer
       },
     }),
     ingestCollectedContent: new StubUseCase(contentItem),
+    ingestHomeFeedCollectedContent: new StubUseCase(
+      createContentItem({ sourceGroupId: undefined }),
+    ),
     updateContentStatus: new StubUseCase(
       createContentItem({ status: "SELECTED" }),
     ),
@@ -253,12 +261,20 @@ export function createSourceGroup(
 export function createContentItem(
   options: Partial<ContentItem> = {},
 ): ContentItem {
-  const sourceGroupId = options.sourceGroupId ?? "source-group-1";
+  const hasSourceGroupIdOverride = Object.prototype.hasOwnProperty.call(
+    options,
+    "sourceGroupId",
+  );
+  const sourceGroupId = hasSourceGroupIdOverride
+    ? options.sourceGroupId
+    : "source-group-1";
+  const effectiveSourceGroupId =
+    sourceGroupId ?? "source-group-1";
 
   return {
     id: options.id ?? "content-item-1",
     platform: options.platform ?? "FACEBOOK",
-    sourceGroupId,
+    ...(sourceGroupId !== undefined ? { sourceGroupId } : {}),
     externalPostId: options.externalPostId ?? "fb-post-1",
     sourceUrl: options.sourceUrl ?? "https://facebook.test/posts/fb-post-1",
     ...(options.title !== undefined ? { title: options.title } : {}),
@@ -286,9 +302,9 @@ export function createContentItem(
       options.collectionProvenance ?? {
         firstCollectionSurface: {
           kind: "SOURCE_GROUP",
-          sourceGroupId,
+          sourceGroupId: effectiveSourceGroupId,
         },
-        managedSourceGroupId: sourceGroupId,
+        managedSourceGroupId: effectiveSourceGroupId,
       },
     createdAt: options.createdAt ?? contentManagerHttpTestNow,
     updatedAt: options.updatedAt ?? contentManagerHttpTestNow,
@@ -341,6 +357,33 @@ export function createCollectedContentInput(
     ...(options.rawPayloadRef !== undefined
       ? { rawPayloadRef: options.rawPayloadRef }
       : {}),
+  };
+}
+
+export function createHomeFeedCollectedContentInput(
+  options: Partial<HomeFeedCollectedContentInput> = {},
+): HomeFeedCollectedContentInput {
+  return {
+    sourcePublisherId: options.sourcePublisherId ?? "source-publisher-1",
+    platform: options.platform ?? "FACEBOOK",
+    externalPostId: options.externalPostId ?? "fb-post-1",
+    sourceUrl: options.sourceUrl ?? "https://facebook.test/posts/fb-post-1",
+    ...(options.title !== undefined ? { title: options.title } : {}),
+    bodyText: options.bodyText ?? "A normalized collected post body.",
+    ...(options.authorDisplayName !== undefined
+      ? { authorDisplayName: options.authorDisplayName }
+      : {}),
+    ...(options.authorExternalId !== undefined
+      ? { authorExternalId: options.authorExternalId }
+      : {}),
+    ...(options.postedAt !== undefined ? { postedAt: options.postedAt } : {}),
+    collectedAt: options.collectedAt ?? contentManagerHttpTestNow,
+    reactionCount: options.reactionCount ?? 42,
+    commentCount: options.commentCount ?? 7,
+    ...(options.shareCount !== undefined
+      ? { shareCount: options.shareCount }
+      : {}),
+    topComments: options.topComments ?? [createTopComment()],
   };
 }
 

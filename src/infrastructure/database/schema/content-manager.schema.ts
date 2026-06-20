@@ -100,7 +100,6 @@ export const contentItems = pgTable(
     id: text("id").primaryKey(),
     platform: contentPlatformEnum("platform").notNull(),
     sourceGroupId: text("source_group_id")
-      .notNull()
       .references(() => sourceGroups.id, { onDelete: "restrict" }),
     externalPostId: text("external_post_id").notNull(),
     sourceUrl: text("source_url").notNull(),

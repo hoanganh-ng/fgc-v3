@@ -11,6 +11,7 @@ import {
   ExternalGroupIdSchema,
   ExternalPostIdSchema,
   ExternalPublisherIdSchema,
+  HomeFeedCollectedContentInputSchema,
   IsoDateTimeSchema,
   SourceGroupEntryRouteIdSchema,
   SourceGroupEntryRouteRiskLevelSchema,
@@ -126,6 +127,9 @@ export const UpdateSourceGroupEntryRouteHttpBodySchema = z
 
 export const IngestCollectedContentHttpBodySchema = CollectedContentInputSchema;
 
+export const IngestHomeFeedCollectedContentHttpBodySchema =
+  HomeFeedCollectedContentInputSchema;
+
 export const ListContentItemsHttpQuerySchema = z
   .object({
     status: ContentStatusSchema.optional(),
@@ -207,6 +211,9 @@ export type UpdateSourceGroupEntryRouteHttpBody = z.infer<
 >;
 export type IngestCollectedContentHttpBody = z.infer<
   typeof IngestCollectedContentHttpBodySchema
+>;
+export type IngestHomeFeedCollectedContentHttpBody = z.infer<
+  typeof IngestHomeFeedCollectedContentHttpBodySchema
 >;
 export type ListContentItemsHttpQuery = z.infer<
   typeof ListContentItemsHttpQuerySchema
@@ -368,7 +375,6 @@ const contentItemJsonSchema = {
   required: [
     "id",
     "platform",
-    "sourceGroupId",
     "externalPostId",
     "sourceUrl",
     "bodyText",
@@ -674,6 +680,53 @@ const contentItemIngestBodyJsonSchema = {
   },
 } as const;
 
+const contentItemHomeFeedIngestBodyJsonSchema = {
+  type: "object",
+  required: [
+    "sourcePublisherId",
+    "platform",
+    "externalPostId",
+    "sourceUrl",
+    "bodyText",
+    "collectedAt",
+    "reactionCount",
+    "commentCount",
+    "topComments",
+  ],
+  additionalProperties: false,
+  properties: {
+    sourcePublisherId: nonEmptyStringJsonSchema,
+    platform: {
+      type: "string",
+      enum: CONTENT_PLATFORMS,
+    },
+    externalPostId: nonEmptyStringJsonSchema,
+    sourceUrl: nonEmptyStringJsonSchema,
+    title: nonEmptyStringJsonSchema,
+    bodyText: nonEmptyStringJsonSchema,
+    authorDisplayName: nonEmptyStringJsonSchema,
+    authorExternalId: nonEmptyStringJsonSchema,
+    postedAt: nonEmptyStringJsonSchema,
+    collectedAt: nonEmptyStringJsonSchema,
+    reactionCount: {
+      type: "integer",
+      minimum: 0,
+    },
+    commentCount: {
+      type: "integer",
+      minimum: 0,
+    },
+    shareCount: {
+      type: "integer",
+      minimum: 0,
+    },
+    topComments: {
+      type: "array",
+      items: topCommentBodyJsonSchema,
+    },
+  },
+} as const;
+
 const contentStatusBodyJsonSchema = {
   type: "object",
   required: ["status"],
@@ -964,6 +1017,22 @@ export const removeSourceGroupEntryRouteHttpRouteSchema = {
 
 export const ingestCollectedContentHttpRouteSchema = {
   body: contentItemIngestBodyJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["contentItem"],
+      additionalProperties: false,
+      properties: {
+        contentItem: contentItemJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const ingestHomeFeedCollectedContentHttpRouteSchema = {
+  body: contentItemHomeFeedIngestBodyJsonSchema,
   response: {
     200: {
       type: "object",

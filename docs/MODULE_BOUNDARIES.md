@@ -120,6 +120,45 @@ Owns:
   provenance filter or index, and does not change the Collector
   Runtime, extractor, browser, workers, scheduler, Docker, or
   Web UI.
+- Sprint 065C1 (active and authorized) makes
+  `ContentItem.sourceGroupId` optional in the domain schema and DTOs
+  and `NULL`-tolerant in PostgreSQL while preserving the existing
+  `sourceGroupId`-required source-group ingestion contract.
+  `SOURCE_GROUP` first surfaces still require `sourceGroupId` and a
+  matching `managedSourceGroupId`. `PROFILE_HOME_FEED` first surfaces
+  may omit both `sourceGroupId` and `managedSourceGroupId`; when
+  either is present both must be present and equal.
+  `CollectionProvenance` does not gain `profileId`, `runId`, URLs,
+  raw payloads, or event history. The dedicated
+  `IngestHomeFeedCollectedContentUseCase` accepts an input carrying
+  only `sourcePublisherId` and normalized safe content (no
+  `sourceGroupId`, `managedSourceGroupId`, `profileId`, `runId`,
+  provenance, raw GraphQL, cookies, localStorage, tokens, headers,
+  proxy details, viewer data, or unknown fields), verifies the
+  publisher exists and its platform matches, and persists the item
+  with `firstCollectionSurface.kind = "PROFILE_HOME_FEED"`, no
+  `sourceGroupId`, no `managedSourceGroupId`, and no fake Home Feed
+  `SourceGroup`. The use case preserves the immutable first surface
+  on duplicates, fills absent associations on later merges, is
+  idempotent for identical associations, and rejects conflicting
+  associations through the existing typed
+  `ContentCollectionProvenanceConflictError`. The existing
+  `IngestCollectedContentUseCase` is extended so a later source-group
+  collection can fill `sourceGroupId` and `managedSourceGroupId` on
+  a home-feed-first item while preserving its
+  `PROFILE_HOME_FEED` first surface. The new
+  `POST /collector/content-items/home-feed` route uses a strict
+  allowlist body schema; `ContentItemDto.sourceGroupId` is optional
+  and omitted when absent; `collectionProvenance` remains internal
+  and is not exposed through HTTP. Sprint 065C1 extends the Web UI
+  `ContentItem` schema and the list/detail pages to render "No
+  managed source group" safely when `sourceGroupId` is omitted. It
+  does not add browser execution, Facebook navigation, capture,
+  extractor orchestration, Collector Runtime HTTP client changes,
+  workers, schedulers, Docker service changes, live-Facebook
+  validation, `SourcePublisher` review or status mutation,
+  source-group promotion, Content Builder, or Content Publisher
+  behavior.
 - Safe read APIs.
 - Future handoff shape for Content Builder.
 

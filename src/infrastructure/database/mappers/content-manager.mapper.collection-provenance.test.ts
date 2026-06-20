@@ -44,6 +44,7 @@ function createHomeFeedProvenance(
 ): ContentCollectionProvenance {
   return {
     firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
+    sourcePublisherId: "source-publisher-1",
     managedSourceGroupId,
   };
 }
@@ -149,6 +150,7 @@ describe("content-manager mapper — content item collection provenance", () => 
 
     expect(back.collectionProvenance).toEqual({
       firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
+      sourcePublisherId: "source-publisher-1",
       managedSourceGroupId: "source-group-1",
     });
     expect(back.sourceGroupId).toBe("source-group-1");

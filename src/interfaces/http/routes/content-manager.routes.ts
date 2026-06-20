@@ -25,6 +25,7 @@ import type {
   ContentItem,
   ContentPlatform,
   ContentStatus,
+  HomeFeedCollectedContentInput,
   IsoDateTime,
   SourceGroup,
   SourceGroupEntryRoute,
@@ -43,6 +44,7 @@ import {
   CreateSourceGroupEntryRouteHttpBodySchema,
   CreateSourceGroupHttpBodySchema,
   IngestCollectedContentHttpBodySchema,
+  IngestHomeFeedCollectedContentHttpBodySchema,
   ListContentItemsHttpQuerySchema,
   ListSourceGroupsHttpQuerySchema,
   ListSourcePublishersHttpQuerySchema,
@@ -60,6 +62,7 @@ import {
   getSourceGroupHttpRouteSchema,
   getSourcePublisherHttpRouteSchema,
   ingestCollectedContentHttpRouteSchema,
+  ingestHomeFeedCollectedContentHttpRouteSchema,
   listContentCategoriesHttpRouteSchema,
   listContentItemsHttpRouteSchema,
   listSourceGroupsHttpRouteSchema,
@@ -115,6 +118,10 @@ export interface ContentManagerHttpService {
   >;
   readonly ingestCollectedContent: ExecutableUseCase<
     CollectedContentInput,
+    ContentItem
+  >;
+  readonly ingestHomeFeedCollectedContent: ExecutableUseCase<
+    HomeFeedCollectedContentInput,
     ContentItem
   >;
   readonly updateContentStatus: ExecutableUseCase<
@@ -194,7 +201,7 @@ export interface TopCommentDto {
 export interface ContentItemDto {
   readonly id: ContentId;
   readonly platform: ContentPlatform;
-  readonly sourceGroupId: SourceGroupId;
+  readonly sourceGroupId?: SourceGroupId;
   readonly externalPostId: string;
   readonly sourceUrl: string;
   readonly title?: string;
@@ -464,6 +471,23 @@ export function registerContentManagerRoutes(
     },
   );
 
+  server.post(
+    "/collector/content-items/home-feed",
+    { schema: ingestHomeFeedCollectedContentHttpRouteSchema },
+    async (request) => {
+      const body = parseHttpInput(
+        IngestHomeFeedCollectedContentHttpBodySchema,
+        request.body,
+      );
+      const contentItem =
+        await contentManager.ingestHomeFeedCollectedContent.execute(body);
+
+      return {
+        contentItem: toContentItemDto(contentItem),
+      };
+    },
+  );
+
   server.get(
     "/collector/content-items",
     { schema: listContentItemsHttpRouteSchema },
@@ -658,7 +682,9 @@ export function toContentItemDto(contentItem: ContentItem): ContentItemDto {
   return {
     id: contentItem.id,
     platform: contentItem.platform,
-    sourceGroupId: contentItem.sourceGroupId,
+    ...(contentItem.sourceGroupId !== undefined
+      ? { sourceGroupId: contentItem.sourceGroupId }
+      : {}),
     externalPostId: contentItem.externalPostId,
     sourceUrl: contentItem.sourceUrl,
     ...(contentItem.title !== undefined ? { title: contentItem.title } : {}),

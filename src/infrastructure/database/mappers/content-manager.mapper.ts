@@ -140,7 +140,7 @@ export function toContentItemRow(contentItem: ContentItem): ContentItemInsert {
   return {
     id: validContentItem.id,
     platform: validContentItem.platform,
-    sourceGroupId: validContentItem.sourceGroupId,
+    sourceGroupId: validContentItem.sourceGroupId ?? null,
     externalPostId: validContentItem.externalPostId,
     sourceUrl: validContentItem.sourceUrl,
     title: validContentItem.title ?? null,
@@ -166,7 +166,7 @@ export function toContentItemDomain(row: ContentItemRow): ContentItem {
   const candidate = {
     id: row.id,
     platform: row.platform,
-    sourceGroupId: row.sourceGroupId,
+    ...optional("sourceGroupId", row.sourceGroupId),
     externalPostId: row.externalPostId,
     sourceUrl: row.sourceUrl,
     ...optional("title", row.title),

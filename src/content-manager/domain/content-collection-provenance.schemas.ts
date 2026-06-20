@@ -58,6 +58,17 @@ export const CollectedContentProvenanceInputSchema = z
             "managedSourceGroupId must equal collectionSurface.sourceGroupId when collectionSurface.kind is SOURCE_GROUP.",
         });
       }
+
+      return;
+    }
+
+    if (value.sourcePublisherId === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["sourcePublisherId"],
+        message:
+          "sourcePublisherId is required when collectionSurface.kind is PROFILE_HOME_FEED.",
+      });
     }
   });
 
@@ -90,6 +101,17 @@ export const ContentCollectionProvenanceSchema = z
             "managedSourceGroupId must equal firstCollectionSurface.sourceGroupId when firstCollectionSurface.kind is SOURCE_GROUP.",
         });
       }
+
+      return;
+    }
+
+    if (value.sourcePublisherId === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["sourcePublisherId"],
+        message:
+          "sourcePublisherId is required when firstCollectionSurface.kind is PROFILE_HOME_FEED.",
+      });
     }
   });
 

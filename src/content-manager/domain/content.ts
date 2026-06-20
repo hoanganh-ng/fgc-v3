@@ -8,6 +8,7 @@ import type {
   ExternalCommentIdSchema,
   ExternalGroupIdSchema,
   ExternalPostIdSchema,
+  HomeFeedCollectedContentInputSchema,
   IsoDateTimeSchema,
   SourceGroupEntryRouteIdSchema,
   SourceGroupEntryRouteSchema,
@@ -41,11 +42,15 @@ export type SourceGroup = zInfer<typeof SourceGroupSchema>;
 export type TopComment = zInfer<typeof TopCommentSchema>;
 export type ContentItem = zInfer<typeof ContentItemSchema>;
 export type CollectedContentInput = zInfer<typeof CollectedContentInputSchema>;
+export type HomeFeedCollectedContentInput = zInfer<
+  typeof HomeFeedCollectedContentInputSchema
+>;
 
 export interface MergeCollectedContentOptions {
   readonly updatedAt: IsoDateTime;
   readonly topCommentLimit?: number;
   readonly collectionProvenance?: ContentCollectionProvenance;
+  readonly sourceGroupId?: SourceGroupId;
 }
 
 export function createDefaultSourceGroupEntryRoute(
@@ -108,8 +113,15 @@ export function mergeCollectedContent(
   incoming: CollectedContentInput,
   options: MergeCollectedContentOptions,
 ): ContentItem {
+  const nextSourceGroupId =
+    options.sourceGroupId ?? existing.sourceGroupId;
+  const { sourceGroupId: _existingSourceGroupId, ...existingRest } = existing;
+
   return {
-    ...existing,
+    ...existingRest,
+    ...(nextSourceGroupId !== undefined
+      ? { sourceGroupId: nextSourceGroupId }
+      : {}),
     sourceUrl: incoming.sourceUrl,
     title: incoming.title,
     bodyText: incoming.bodyText,

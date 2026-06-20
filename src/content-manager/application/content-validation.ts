@@ -13,6 +13,7 @@ import {
   validateCollectedContentInput,
   validateContentCategory,
   validateContentItem,
+  validateHomeFeedCollectedContentInput,
   validateObserveSourcePublisherInput,
   validateSourceGroup,
   validateSourcePublisher,
@@ -25,6 +26,7 @@ import type {
   ContentItem,
   ContentPlatform,
   ExternalPublisherId,
+  HomeFeedCollectedContentInput,
   IsoDateTime,
   ObserveSourcePublisherApplicationInput,
   SourceGroup,
@@ -149,6 +151,18 @@ export function validateCollectedContentInputForApplication(
   input: CollectedContentInput,
 ): CollectedContentInput {
   const result = validateCollectedContentInput(input);
+
+  if (!result.valid) {
+    throw new ContentValidationError(result.issues);
+  }
+
+  return result.value;
+}
+
+export function validateHomeFeedCollectedContentInputForApplication(
+  input: HomeFeedCollectedContentInput,
+): HomeFeedCollectedContentInput {
+  const result = validateHomeFeedCollectedContentInput(input);
 
   if (!result.valid) {
     throw new ContentValidationError(result.issues);

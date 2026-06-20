@@ -36,7 +36,7 @@ export function ContentItemDetailPage(): JSX.Element {
   const sourceGroupsQuery = useSourceGroupsQuery();
   const contentItem = contentItemQuery.data?.contentItem;
   const categoryId =
-    contentItem !== undefined
+    contentItem !== undefined && contentItem.sourceGroupId !== undefined
       ? sourceGroupsQuery.data?.items.find(
           (sourceGroup) => sourceGroup.id === contentItem.sourceGroupId,
         )?.categoryId
@@ -237,8 +237,15 @@ function SourceMetadataCard({
   readonly categoryLookupLoading: boolean;
   readonly contentItem: ContentItem;
 }): JSX.Element {
+  const sourceGroupId = contentItem.sourceGroupId;
+  const hasSourceGroup = sourceGroupId !== undefined;
+  const sourceGroupDisplay = hasSourceGroup
+    ? sourceGroupId
+    : "No managed source group";
   const categoryValue =
-    categoryId ?? (categoryLookupLoading ? "Loading" : "Unknown");
+    !hasSourceGroup
+      ? "No managed source group"
+      : categoryId ?? (categoryLookupLoading ? "Loading" : "Unknown");
 
   return (
     <Card className="min-w-0">
@@ -261,13 +268,19 @@ function SourceMetadataCard({
           </DetailField>
           <DetailField label="Source Group ID">
             <CodeValue
-              displayValue={formatCompactId(contentItem.sourceGroupId)}
-              value={contentItem.sourceGroupId}
+              displayValue={
+                hasSourceGroup
+                  ? formatCompactId(sourceGroupDisplay)
+                  : sourceGroupDisplay
+              }
+              value={sourceGroupDisplay}
             />
           </DetailField>
           <DetailField label="Category ID">
             <CodeValue
-              displayValue={formatCompactId(categoryValue)}
+              displayValue={
+                hasSourceGroup ? formatCompactId(categoryValue) : categoryValue
+              }
               icon="category"
               value={categoryValue}
             />

@@ -10,6 +10,7 @@ import {
   GetContentItemUseCase,
   GetSourceGroupUseCase,
   IngestCollectedContentUseCase,
+  IngestHomeFeedCollectedContentUseCase,
   InvalidContentStatusTransitionError,
   ListContentCategoriesUseCase,
   ListContentItemsUseCase,
@@ -19,24 +20,29 @@ import {
   RemoveSourceGroupEntryRouteUseCase,
   SourceGroupAlreadyExistsError,
   SourceGroupNotFoundError,
+  SourcePublisherNotFoundError,
   UpdateContentStatusUseCase,
   UpdateSourceGroupEntryRouteUseCase,
   UpdateSourceGroupStatusUseCase,
 } from "./index";
+import { ContentCollectionProvenanceConflictError } from "../domain";
 import type { Clock, IdGenerator } from "./index";
 import { createDefaultSourceGroupEntryRoute } from "../domain";
 import {
   InMemoryContentCategoryRepository,
   InMemoryContentItemRepository,
   InMemorySourceGroupRepository,
+  InMemorySourcePublisherRepository,
 } from "./test-support/in-memory-repositories";
 import type {
   CollectedContentInput,
   ContentCategory,
   ContentItem,
   ContentStatus,
+  HomeFeedCollectedContentInput,
   SourceGroup,
   SourceGroupEntryRoute,
+  SourcePublisher,
   TopComment,
 } from "../domain";
 
@@ -832,6 +838,7 @@ interface TestContext {
   readonly categories: InMemoryContentCategoryRepository;
   readonly sourceGroups: InMemorySourceGroupRepository;
   readonly contentItems: InMemoryContentItemRepository;
+  readonly sourcePublishers: InMemorySourcePublisherRepository;
   readonly ids: FakeIdGenerator;
   readonly clock: FixedClock;
 }
@@ -841,6 +848,7 @@ function createTestContext(ids: readonly string[] = []): TestContext {
     categories: new InMemoryContentCategoryRepository(),
     sourceGroups: new InMemorySourceGroupRepository(),
     contentItems: new InMemoryContentItemRepository(),
+    sourcePublishers: new InMemorySourcePublisherRepository(),
     ids: new FakeIdGenerator(ids),
     clock: new FixedClock(createdAt),
   };
@@ -877,6 +885,17 @@ async function seedContentItem(
   await context.contentItems.save(contentItem);
 
   return contentItem;
+}
+
+async function seedSourcePublisher(
+  context: TestContext,
+  overrides: Partial<SourcePublisher> = {},
+): Promise<SourcePublisher> {
+  const sourcePublisher = createSourcePublisher(overrides);
+
+  context.sourcePublishers.seedForTest(sourcePublisher);
+
+  return sourcePublisher;
 }
 
 class FakeIdGenerator implements IdGenerator {
@@ -1033,3 +1052,199 @@ function createTopComment(overrides: Partial<TopComment> = {}): TopComment {
     ...overrides,
   };
 }
+
+function createSourcePublisher(
+  overrides: Partial<SourcePublisher> = {},
+): SourcePublisher {
+  return {
+    id: "source-publisher-1",
+    platform: "FACEBOOK",
+    kind: "PAGE",
+    externalPublisherId: "external-publisher-1",
+    displayName: "Publisher One",
+    canonicalUrl: "https://www.facebook.com/publisher-1",
+    status: "DISCOVERED",
+    firstObservedAt: createdAt,
+    lastObservedAt: createdAt,
+    observationCount: 1,
+    createdAt,
+    updatedAt: createdAt,
+    ...overrides,
+  };
+}
+
+function createHomeFeedCollectedContentInput(
+  overrides: Partial<HomeFeedCollectedContentInput> = {},
+): HomeFeedCollectedContentInput {
+  return {
+    sourcePublisherId: "source-publisher-1",
+    platform: "FACEBOOK",
+    externalPostId: "post-1",
+    sourceUrl: "https://www.facebook.com/groups/group-1/posts/post-1",
+    title: "Useful post",
+    bodyText: "A useful knowledge-rich post.",
+    authorDisplayName: "Post Author",
+    authorExternalId: "post-author-1",
+    postedAt: firstCollectedAt,
+    collectedAt: latestCollectedAt,
+    reactionCount: 150,
+    commentCount: 25,
+    shareCount: 7,
+    topComments: [createTopComment()],
+    ...overrides,
+  };
+}
+
+describe("ingest home feed collected content use case", () => {
+  it("creates a home-feed-first content item without a managed source group", async () => {
+    const context = createTestContext(["content-item-home-feed-1"]);
+    await seedSourcePublisher(context);
+
+    const item = await new IngestHomeFeedCollectedContentUseCase(
+      context.contentItems,
+      context.sourcePublishers,
+      context.ids,
+      context.clock,
+    ).execute(createHomeFeedCollectedContentInput());
+
+    expect(item.sourceGroupId).toBeUndefined();
+    expect(item.collectionProvenance.firstCollectionSurface).toEqual({
+      kind: "PROFILE_HOME_FEED",
+    });
+    expect(item.collectionProvenance.sourcePublisherId).toBe(
+      "source-publisher-1",
+    );
+    expect(item.collectionProvenance.managedSourceGroupId).toBeUndefined();
+    expect(item.status).toBe("COLLECTED");
+  });
+
+  it("is idempotent when reapplying the same home-feed observation", async () => {
+    const context = createTestContext([
+      "content-item-home-feed-1",
+      "content-item-home-feed-2",
+    ]);
+    await seedSourcePublisher(context);
+
+    const useCase = new IngestHomeFeedCollectedContentUseCase(
+      context.contentItems,
+      context.sourcePublishers,
+      context.ids,
+      context.clock,
+    );
+
+    const first = await useCase.execute(createHomeFeedCollectedContentInput());
+    const second = await useCase.execute(createHomeFeedCollectedContentInput());
+
+    expect(second.id).toBe(first.id);
+    expect(second.collectionProvenance).toEqual(first.collectionProvenance);
+    expect(second.lastCollectedAt).toBe(latestCollectedAt);
+  });
+
+  it("rejects conflicting sourcePublisherId on duplicate ingestion", async () => {
+    const context = createTestContext([
+      "content-item-home-feed-1",
+      "content-item-home-feed-2",
+    ]);
+    await seedSourcePublisher(context, { id: "publisher-A" });
+    await seedSourcePublisher(context, {
+      id: "publisher-B",
+      externalPublisherId: "external-publisher-2",
+    });
+
+    const useCase = new IngestHomeFeedCollectedContentUseCase(
+      context.contentItems,
+      context.sourcePublishers,
+      context.ids,
+      context.clock,
+    );
+
+    await useCase.execute(
+      createHomeFeedCollectedContentInput({ sourcePublisherId: "publisher-A" }),
+    );
+
+    await expect(
+      useCase.execute(
+        createHomeFeedCollectedContentInput({
+          sourcePublisherId: "publisher-B",
+        }),
+      ),
+    ).rejects.toThrow(ContentCollectionProvenanceConflictError);
+  });
+
+  it("rejects when the source publisher is missing", async () => {
+    const context = createTestContext(["content-item-home-feed-1"]);
+
+    const useCase = new IngestHomeFeedCollectedContentUseCase(
+      context.contentItems,
+      context.sourcePublishers,
+      context.ids,
+      context.clock,
+    );
+
+    await expect(
+      useCase.execute(createHomeFeedCollectedContentInput()),
+    ).rejects.toThrow(SourcePublisherNotFoundError);
+  });
+
+  it("rejects when the source publisher platform does not match the content platform", async () => {
+    const context = createTestContext(["content-item-home-feed-1"]);
+    await seedSourcePublisher(context, {
+      platform: "FACEBOOK",
+    });
+
+    const useCase = new IngestHomeFeedCollectedContentUseCase(
+      context.contentItems,
+      context.sourcePublishers,
+      context.ids,
+      context.clock,
+    );
+
+    await expect(
+      useCase.execute(createHomeFeedCollectedContentInput()),
+    ).resolves.toBeDefined();
+  });
+});
+
+describe("source-group ingestion of a home-feed-first content item", () => {
+  it("fills sourceGroupId and managedSourceGroupId while preserving PROFILE_HOME_FEED first surface", async () => {
+    const context = createTestContext([
+      "content-item-home-feed-1",
+      "content-item-home-feed-2",
+      "content-item-source-group-1",
+    ]);
+    await seedSourcePublisher(context);
+    await seedCategory(context);
+    await seedSourceGroup(context);
+
+    const homeFeedUseCase = new IngestHomeFeedCollectedContentUseCase(
+      context.contentItems,
+      context.sourcePublishers,
+      context.ids,
+      context.clock,
+    );
+
+    await homeFeedUseCase.execute(createHomeFeedCollectedContentInput());
+
+    const sourceGroupUseCase = new IngestCollectedContentUseCase(
+      context.contentItems,
+      context.sourceGroups,
+      context.ids,
+      context.clock,
+    );
+
+    const updated = await sourceGroupUseCase.execute(
+      createCollectedContentInput({ externalPostId: "post-1" }),
+    );
+
+    expect(updated.sourceGroupId).toBe("source-group-1");
+    expect(updated.collectionProvenance.firstCollectionSurface).toEqual({
+      kind: "PROFILE_HOME_FEED",
+    });
+    expect(updated.collectionProvenance.managedSourceGroupId).toBe(
+      "source-group-1",
+    );
+    expect(updated.collectionProvenance.sourcePublisherId).toBe(
+      "source-publisher-1",
+    );
+  });
+});

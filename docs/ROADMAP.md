@@ -115,6 +115,36 @@ Add sanitized, fixture-driven extraction for Facebook group posts, page posts, s
 
 Introduce a profile-bound home-feed collection target and run lifecycle. Do not overload `sourceGroupId` and do not create a fake "Home Feed" source group.
 
+## Sprint 065C1: Bare Home-Feed Content Ingestion
+
+Close the gap between the Sprint 065A home-feed extractor (which
+produces normalized candidates without `sourceGroupId` and with a
+required `publisherObservation`) and Content Manager ingestion (which
+still requires `sourceGroupId`). Make `ContentItem.sourceGroupId`
+optional in the domain schema and DTOs and `NULL`-tolerant in
+PostgreSQL while keeping the existing `sourceGroupId`-required
+source-group ingestion contract. Add a dedicated
+`IngestHomeFeedCollectedContentUseCase` whose input carries only
+`sourcePublisherId` and normalized safe content, validates that the
+publisher exists and its platform matches, and persists the resulting
+item with `firstCollectionSurface.kind = "PROFILE_HOME_FEED"`, no
+`sourceGroupId`, no `managedSourceGroupId`, and no fake Home Feed
+`SourceGroup`. Add `POST /collector/content-items/home-feed` with a
+strict allowlist body schema and make `ContentItemDto.sourceGroupId`
+optional and omitted when absent. Extend the existing source-group
+ingestion so a later source-group collection can fill `sourceGroupId`
+and `managedSourceGroupId` on a home-feed-first item while preserving
+its `PROFILE_HOME_FEED` first surface. Update the Web UI to render
+"No managed source group" safely when `sourceGroupId` is omitted.
+Sprint 065C1 does not add browser execution, Facebook navigation,
+capture, extractor orchestration, Collector Runtime HTTP client
+changes, workers, schedulers, Docker service changes, live-Facebook
+validation, `SourcePublisher` review or status mutation,
+source-group promotion, Content Builder, or Content Publisher
+behavior. The Sprint 065C "Manual Home-Feed Execution" work is
+decomposed into 065C1, 065C2, and 065C3; only 065C1 is active and
+authorized here, and 065C2 / 065C3 remain inactive and unauthorized.
+
 ## Sprint 065C: Manual Home-Feed Execution
 
 Implement actual bounded browser execution against the collector profile's Facebook home feed: profile checkout, feed navigation, max-scroll / max-duration / max-post bounds, payload capture, extraction, source-publisher observation, content submission, lease release, and sanitized summaries. Finish with opt-in manual live-Facebook validation. This sprint must not claim that it only runs synthetic fixtures.

@@ -33,6 +33,7 @@ function createHomeFeedProvenance(
 ): ContentCollectionProvenance {
   return {
     firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
+    sourcePublisherId: "source-publisher-1",
     managedSourceGroupId: sourceGroupId,
   };
 }

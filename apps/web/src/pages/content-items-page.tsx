@@ -111,8 +111,10 @@ function ContentItemsReviewQueue({
       <div className="grid gap-3">
         {contentItems.map((contentItem) => {
           const categoryId =
-            categoryIdBySourceGroupId.get(contentItem.sourceGroupId) ??
-            (categoryLookupLoading ? "Loading" : "Unknown");
+            contentItem.sourceGroupId !== undefined
+              ? categoryIdBySourceGroupId.get(contentItem.sourceGroupId) ??
+                (categoryLookupLoading ? "Loading" : "Unknown")
+              : "No managed source group";
 
           return (
             <ContentItemReviewCard
@@ -188,7 +190,9 @@ function ContentItemReviewCard({
             <dl className="flex min-w-0 flex-wrap gap-x-4 gap-y-2">
               <CompactMetadata
                 label="Source"
-                value={contentItem.sourceGroupId}
+                value={
+                  contentItem.sourceGroupId ?? "No managed source group"
+                }
               />
               <CompactMetadata label="Category" value={categoryId} />
             </dl>

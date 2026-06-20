@@ -13,6 +13,7 @@ export * from "./use-cases/get-content-item.use-case";
 export * from "./use-cases/get-source-group.use-case";
 export * from "./use-cases/get-source-publisher.use-case";
 export * from "./use-cases/ingest-collected-content.use-case";
+export * from "./use-cases/ingest-home-feed-collected-content.use-case";
 export * from "./use-cases/list-content-categories.use-case";
 export * from "./use-cases/list-content-items.use-case";
 export * from "./use-cases/list-source-groups.use-case";

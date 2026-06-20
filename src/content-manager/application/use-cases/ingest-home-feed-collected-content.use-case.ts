@@ -1,42 +1,53 @@
 import {
-  loadValidatedSourceGroupById,
+  HomeFeedCollectedContentPlatformMismatchError,
+} from "../application-errors";
+import {
+  loadValidatedSourcePublisherById,
   toIsoDateTime,
-  validateCollectedContentInputForApplication,
   validateContentItemForApplication,
+  validateHomeFeedCollectedContentInputForApplication,
 } from "../content-validation";
 import type { Clock } from "../ports/clock.port";
 import type { ContentItemRepository } from "../ports/content-item-repository.port";
 import type { IdGenerator } from "../ports/id-generator.port";
-import type { SourceGroupRepository } from "../ports/source-group-repository.port";
+import type { SourcePublisherRepository } from "../ports/source-publisher-repository.port";
 import {
   createInitialContentCollectionProvenance,
-  mergeCollectedContent,
   mergeContentCollectionProvenance,
   normalizeTopComments,
 } from "../../domain";
 import type {
-  CollectedContentInput,
-  CollectedContentProvenanceInput,
-  ContentCollectionProvenance,
   ContentItem,
-  SourceGroupId,
+  HomeFeedCollectedContentInput,
+  IsoDateTime,
 } from "../../domain";
 
-export class IngestCollectedContentUseCase {
+export class IngestHomeFeedCollectedContentUseCase {
   public constructor(
     private readonly contentItems: ContentItemRepository,
-    private readonly sourceGroups: SourceGroupRepository,
+    private readonly sourcePublishers: SourcePublisherRepository,
     private readonly ids: IdGenerator,
     private readonly clock: Clock,
   ) {}
 
-  public async execute(input: CollectedContentInput): Promise<ContentItem> {
-    const collectedContent = validateCollectedContentInputForApplication(input);
+  public async execute(
+    input: HomeFeedCollectedContentInput,
+  ): Promise<ContentItem> {
+    const collectedContent =
+      validateHomeFeedCollectedContentInputForApplication(input);
 
-    await loadValidatedSourceGroupById(
-      this.sourceGroups,
-      collectedContent.sourceGroupId,
+    const publisher = await loadValidatedSourcePublisherById(
+      this.sourcePublishers,
+      collectedContent.sourcePublisherId,
     );
+
+    if (publisher.platform !== collectedContent.platform) {
+      throw new HomeFeedCollectedContentPlatformMismatchError(
+        collectedContent.sourcePublisherId,
+        publisher.platform,
+        collectedContent.platform,
+      );
+    }
 
     const existingContent =
       await this.contentItems.findByPlatformAndExternalPostId(
@@ -50,17 +61,14 @@ export class IngestCollectedContentUseCase {
         validateContentItemForApplication(existingContent);
       const mergedProvenance = mergeContentCollectionProvenance(
         validExistingContent.collectionProvenance,
-        buildSourceGroupProvenanceInput(collectedContent.sourceGroupId),
+        buildHomeFeedProvenanceInput(collectedContent.sourcePublisherId),
       );
+
       const mergedContent = validateContentItemForApplication(
-        mergeCollectedContent(
+        applyHomeFeedObservation(
           validExistingContent,
-          preserveMissingOptionalFields(validExistingContent, collectedContent),
-          {
-            updatedAt,
-            collectionProvenance: mergedProvenance,
-            sourceGroupId: collectedContent.sourceGroupId,
-          },
+          collectedContent,
+          { updatedAt, collectionProvenance: mergedProvenance },
         ),
       );
 
@@ -70,12 +78,11 @@ export class IngestCollectedContentUseCase {
     }
 
     const initialProvenance = createInitialContentCollectionProvenance(
-      buildSourceGroupProvenanceInput(collectedContent.sourceGroupId),
+      buildHomeFeedProvenanceInput(collectedContent.sourcePublisherId),
     );
     const newContent = validateContentItemForApplication({
       id: await this.ids.generateId(),
       platform: collectedContent.platform,
-      sourceGroupId: collectedContent.sourceGroupId,
       externalPostId: collectedContent.externalPostId,
       sourceUrl: collectedContent.sourceUrl,
       ...(collectedContent.title !== undefined
@@ -100,9 +107,6 @@ export class IngestCollectedContentUseCase {
         : {}),
       topComments: normalizeTopComments(collectedContent.topComments),
       status: "COLLECTED",
-      ...(collectedContent.rawPayloadRef !== undefined
-        ? { rawPayloadRef: collectedContent.rawPayloadRef }
-        : {}),
       collectionProvenance: initialProvenance,
       createdAt: updatedAt,
       updatedAt,
@@ -114,29 +118,38 @@ export class IngestCollectedContentUseCase {
   }
 }
 
-function buildSourceGroupProvenanceInput(
-  sourceGroupId: SourceGroupId,
-): CollectedContentProvenanceInput {
+interface ApplyHomeFeedObservationOptions {
+  readonly updatedAt: IsoDateTime;
+  readonly collectionProvenance: ContentItem["collectionProvenance"];
+}
+
+function applyHomeFeedObservation(
+  existing: ContentItem,
+  incoming: HomeFeedCollectedContentInput,
+  options: ApplyHomeFeedObservationOptions,
+): ContentItem {
   return {
-    collectionSurface: {
-      kind: "SOURCE_GROUP",
-      sourceGroupId,
-    },
-    managedSourceGroupId: sourceGroupId,
+    ...existing,
+    sourceUrl: incoming.sourceUrl,
+    title: incoming.title ?? existing.title,
+    bodyText: incoming.bodyText,
+    authorDisplayName:
+      incoming.authorDisplayName ?? existing.authorDisplayName,
+    authorExternalId: incoming.authorExternalId ?? existing.authorExternalId,
+    postedAt: incoming.postedAt ?? existing.postedAt,
+    lastCollectedAt: incoming.collectedAt,
+    reactionCount: incoming.reactionCount,
+    commentCount: incoming.commentCount,
+    shareCount: incoming.shareCount ?? existing.shareCount,
+    topComments: normalizeTopComments(incoming.topComments),
+    collectionProvenance: options.collectionProvenance,
+    updatedAt: options.updatedAt,
   };
 }
 
-function preserveMissingOptionalFields(
-  existingContent: ContentItem,
-  collectedContent: CollectedContentInput,
-): CollectedContentInput {
+function buildHomeFeedProvenanceInput(sourcePublisherId: string) {
   return {
-    ...collectedContent,
-    ...(collectedContent.title === undefined &&
-    existingContent.title !== undefined
-      ? { title: existingContent.title }
-      : {}),
+    collectionSurface: { kind: "PROFILE_HOME_FEED" as const },
+    sourcePublisherId,
   };
 }
-
-export type { ContentCollectionProvenance };

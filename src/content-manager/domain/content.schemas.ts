@@ -2,7 +2,10 @@ import { z } from "zod";
 import { ContentCollectionProvenanceSchema } from "./content-collection-provenance.schemas";
 import { CONTENT_PLATFORMS } from "./content-platform";
 import { CONTENT_STATUSES } from "./content-status";
-import { SourceGroupIdSchema } from "./shared-identifier.schemas";
+import {
+  SourceGroupIdSchema,
+  SourcePublisherIdSchema,
+} from "./shared-identifier.schemas";
 import {
   SOURCE_GROUP_ENTRY_ROUTE_RISK_LEVELS,
   SOURCE_GROUP_ENTRY_ROUTE_TYPES,
@@ -129,7 +132,7 @@ export const ContentItemSchema = z
   .object({
     id: ContentIdSchema,
     platform: ContentPlatformSchema,
-    sourceGroupId: SourceGroupIdSchema,
+    sourceGroupId: SourceGroupIdSchema.optional(),
     externalPostId: ExternalPostIdSchema,
     sourceUrl: NonEmptyStringSchema,
     title: NonEmptyStringSchema.optional(),
@@ -159,8 +162,19 @@ export const ContentItemSchema = z
     // SOURCE_GROUP provenance carries `managedSourceGroupId` and that
     // `managedSourceGroupId` equals `firstCollectionSurface.sourceGroupId`.
     // The cross-field invariant for SOURCE_GROUP is that the
-    // legacy `sourceGroupId` matches the surface `sourceGroupId`.
+    // legacy `sourceGroupId` is present and matches the surface
+    // `sourceGroupId`.
     if (surface.kind === "SOURCE_GROUP") {
+      if (item.sourceGroupId === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["sourceGroupId"],
+          message:
+            "sourceGroupId is required when firstCollectionSurface.kind is SOURCE_GROUP.",
+        });
+        return;
+      }
+
       if (item.sourceGroupId !== surface.sourceGroupId) {
         context.addIssue({
           code: "custom",
@@ -174,27 +188,35 @@ export const ContentItemSchema = z
     }
 
     // PROFILE_HOME_FEED first surface.
-    // The legacy `sourceGroupId` field remains required for
-    // compatibility. When the first surface is a home feed, the
-    // durable provenance must carry a `managedSourceGroupId` that
-    // equals the legacy `sourceGroupId`; bare home-feed ingestion is
-    // still unsupported.
-    if (provenance.managedSourceGroupId === undefined) {
+    // The legacy `sourceGroupId` field is optional. The
+    // `sourceGroupId` and `managedSourceGroupId` associations may
+    // both be omitted (bare home-feed ingestion), or both be present
+    // and equal (a later source-group collection filled them in).
+    // Either present without the other, or both present but unequal,
+    // is a cross-field invariant violation.
+    const hasLegacySourceGroupId = item.sourceGroupId !== undefined;
+    const hasManagedSourceGroupId =
+      provenance.managedSourceGroupId !== undefined;
+
+    if (hasLegacySourceGroupId !== hasManagedSourceGroupId) {
       context.addIssue({
         code: "custom",
         path: ["collectionProvenance", "managedSourceGroupId"],
         message:
-          "managedSourceGroupId is required when firstCollectionSurface.kind is PROFILE_HOME_FEED for a ContentItem.",
+          "sourceGroupId and managedSourceGroupId must both be present or both be omitted when firstCollectionSurface.kind is PROFILE_HOME_FEED.",
       });
       return;
     }
 
-    if (provenance.managedSourceGroupId !== item.sourceGroupId) {
+    if (
+      hasLegacySourceGroupId &&
+      item.sourceGroupId !== provenance.managedSourceGroupId
+    ) {
       context.addIssue({
         code: "custom",
         path: ["collectionProvenance", "managedSourceGroupId"],
         message:
-          "managedSourceGroupId must equal sourceGroupId when firstCollectionSurface.kind is PROFILE_HOME_FEED.",
+          "sourceGroupId must equal managedSourceGroupId when firstCollectionSurface.kind is PROFILE_HOME_FEED.",
       });
     }
   });
@@ -216,5 +238,24 @@ export const CollectedContentInputSchema = z
     shareCount: NonNegativeIntegerSchema.optional(),
     topComments: z.array(TopCommentSchema),
     rawPayloadRef: NonEmptyStringSchema.optional(),
+  })
+  .strict();
+
+export const HomeFeedCollectedContentInputSchema = z
+  .object({
+    sourcePublisherId: SourcePublisherIdSchema,
+    platform: ContentPlatformSchema,
+    externalPostId: ExternalPostIdSchema,
+    sourceUrl: NonEmptyStringSchema,
+    title: NonEmptyStringSchema.optional(),
+    bodyText: NonEmptyStringSchema,
+    authorDisplayName: NonEmptyStringSchema.optional(),
+    authorExternalId: NonEmptyStringSchema.optional(),
+    postedAt: IsoDateTimeSchema.optional(),
+    collectedAt: IsoDateTimeSchema,
+    reactionCount: NonNegativeIntegerSchema,
+    commentCount: NonNegativeIntegerSchema,
+    shareCount: NonNegativeIntegerSchema.optional(),
+    topComments: z.array(TopCommentSchema),
   })
   .strict();

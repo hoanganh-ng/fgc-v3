@@ -89,25 +89,72 @@ live-Facebook behavior.
 
 - [Sprint 065A - Facebook Home-Feed Extractor Fixtures](SPRINT-065A-facebook-home-feed-extractor-fixtures.md)
 
-Sprint 065B — Profile-Bound Home-Feed Run Model is **active and
-authorized**. It adds a separate durable
-`ProfileHomeFeedCollectionRun` aggregate and lifecycle in Collector
-Runtime, with application ports/use cases, PostgreSQL persistence,
-safe operator HTTP request/list/get/cancel routes, and composition
-wiring. It keeps existing `CollectionRun.sourceGroupId` required and
-unchanged, does not create a fake Home Feed `SourceGroup`, stores
-`profileId` as the operational target reference, uses strict
-`{ platform: "FACEBOOK", surface: "PROFILE_HOME_FEED" }` targets, and
-uses `MANUAL_API` only. Run creation uses an insert-only repository
-`create` operation (no `onConflictDoUpdate`); lifecycle updates are
-exclusively owned by `claimNextQueued` and `transitionStatus`
-compare-and-set. Sprint 065B does not execute a browser, connect to
-the Sprint 065A extractor, capture payloads, observe `SourcePublisher`,
-submit Content Manager items, add workers or schedulers, change
-Docker, add Web UI behavior, or make any live-Facebook claim. Sprint
-065C remains inactive and unauthorized.
+Sprint 065B — Profile-Bound Home-Feed Run Model is **accepted** at
+`b9d84cad6d48f4ef94efb5be037550a7409afa05`. It added a separate
+durable `ProfileHomeFeedCollectionRun` aggregate and lifecycle in
+Collector Runtime, with application ports/use cases, PostgreSQL
+persistence, safe operator HTTP request/list/get/cancel routes, and
+composition wiring. It kept existing `CollectionRun.sourceGroupId`
+required and unchanged, did not create a fake Home Feed
+`SourceGroup`, stored `profileId` as the operational target reference,
+used strict `{ platform: "FACEBOOK", surface: "PROFILE_HOME_FEED" }`
+targets, and used `MANUAL_API` only. Run creation uses an insert-only
+repository `create` operation (no `onConflictDoUpdate`); lifecycle
+updates are exclusively owned by `claimNextQueued` and
+`transitionStatus` compare-and-set. Sprint 065B does not execute a
+browser, connect to the Sprint 065A extractor, capture payloads,
+observe `SourcePublisher`, submit Content Manager items, add workers
+or schedulers, change Docker, add Web UI behavior, or make any
+live-Facebook claim.
 
 - [Sprint 065B - Profile-Bound Home-Feed Run Model](SPRINT-065B-profile-bound-home-feed-run-model.md)
+
+Sprint 065C1 — Bare Home-Feed Content Ingestion is **active and
+authorized**. It closes the gap between Sprint 065A's normalized
+home-feed candidates (which carry a required `publisherObservation`
+and no `sourceGroupId`) and Content Manager ingestion (which still
+required `sourceGroupId`). It makes `ContentItem.sourceGroupId`
+optional in the domain schema and DTOs and `NULL`-tolerant in
+PostgreSQL, keeps the existing `sourceGroupId`-required source-group
+ingestion contract unchanged, adds a dedicated
+`IngestHomeFeedCollectedContentUseCase` that ingests a home-feed
+candidate carrying only `sourcePublisherId` and normalized safe
+content, validates the publisher exists and its platform matches,
+and persists the resulting item with
+`firstCollectionSurface.kind = "PROFILE_HOME_FEED"`, no
+`sourceGroupId`, no `managedSourceGroupId`, and no fake Home Feed
+`SourceGroup`. The use case preserves the immutable first surface on
+duplicates, fills absent associations on later merges, is idempotent
+for identical associations, and rejects conflicting associations
+through the existing typed
+`ContentCollectionProvenanceConflictError`. It adds
+`POST /collector/content-items/home-feed` with a strict allowlist
+body schema (sourcePublisherId + normalized content only; no
+sourceGroupId, managedSourceGroupId, profileId, runId, provenance,
+raw payloads, cookies, localStorage, tokens, headers, proxy details,
+viewer data, or unknown fields). It updates the existing
+`IngestCollectedContentUseCase` so a later source-group collection can
+fill `sourceGroupId` and `managedSourceGroupId` on an
+existing home-feed-first item while preserving the original
+`PROFILE_HOME_FEED` first surface. It extends the Web UI
+`ContentItem` schema and the list/detail pages to render
+"No managed source group" safely when `sourceGroupId` is omitted.
+Sprint 065C1 does not add browser execution, Facebook navigation,
+capture, extractor orchestration, Collector Runtime HTTP client
+changes, workers, schedulers, Docker service changes, live-Facebook
+validation, `SourcePublisher` review or status mutation, source-group
+promotion, Content Builder, or Content Publisher behavior.
+`collectionProvenance` remains internal-only and is not exposed
+through HTTP DTOs.
+
+- [Sprint 065C1 - Bare Home-Feed Content Ingestion](SPRINT-065C1-bare-home-feed-content-ingestion.md)
+
+Sprint 065C2 and Sprint 065C3 remain **inactive and unauthorized**.
+They will split the Sprint 065C "Manual Home-Feed Execution" work
+(planned to include profile checkout, feed navigation, bounded
+extraction, payload capture, source-publisher observation, content
+submission, lease release, and manual live-Facebook validation) into
+the remaining 065C sequence but are not authorized by Sprint 065C1.
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

@@ -106,7 +106,7 @@ export const ContentItemSchema = z
   .object({
     id: NonEmptyStringSchema,
     platform: ContentPlatformSchema,
-    sourceGroupId: NonEmptyStringSchema,
+    sourceGroupId: NonEmptyStringSchema.optional(),
     externalPostId: NonEmptyStringSchema,
     sourceUrl: NonEmptyStringSchema,
     title: NonEmptyStringSchema.optional(),
@@ -231,6 +231,25 @@ export const UpdateContentItemStatusRequestSchema = z
   })
   .strict();
 
+export const IngestHomeFeedCollectedContentRequestSchema = z
+  .object({
+    sourcePublisherId: NonEmptyStringSchema,
+    platform: ContentPlatformSchema,
+    externalPostId: NonEmptyStringSchema,
+    sourceUrl: NonEmptyStringSchema,
+    title: NonEmptyStringSchema.optional(),
+    bodyText: NonEmptyStringSchema,
+    authorDisplayName: NonEmptyStringSchema.optional(),
+    authorExternalId: NonEmptyStringSchema.optional(),
+    postedAt: NonEmptyStringSchema.optional(),
+    collectedAt: NonEmptyStringSchema,
+    reactionCount: z.number(),
+    commentCount: z.number(),
+    shareCount: z.number().optional(),
+    topComments: z.array(TopCommentSchema),
+  })
+  .strict();
+
 export type ContentCategory = z.infer<typeof ContentCategorySchema>;
 export type SourceGroupEntryRoute = z.infer<
   typeof SourceGroupEntryRouteSchema
@@ -279,6 +298,10 @@ export type UpdateContentItemStatusRequest = z.infer<
   typeof UpdateContentItemStatusRequestSchema
 >;
 export type UpdateContentItemStatusResponse = ContentItemResponse;
+export type IngestHomeFeedCollectedContentRequest = z.infer<
+  typeof IngestHomeFeedCollectedContentRequestSchema
+>;
+export type IngestHomeFeedCollectedContentResponse = ContentItemResponse;
 
 export interface ListSourceGroupsQuery {
   readonly status?: SourceGroupStatus;
@@ -334,6 +357,9 @@ export interface ContentManagerClient {
     contentItemId: string,
     status: ContentStatus,
   ) => Promise<ApiResult<UpdateContentItemStatusResponse>>;
+  readonly ingestHomeFeedCollectedContent: (
+    request: IngestHomeFeedCollectedContentRequest,
+  ) => Promise<ApiResult<IngestHomeFeedCollectedContentResponse>>;
 }
 
 export function createContentManagerClient(
@@ -418,6 +444,14 @@ export function createContentManagerClient(
         path: `/collector/content-items/${encodeURIComponent(contentItemId)}/status`,
         method: "PATCH",
         body: { status } satisfies UpdateContentItemStatusRequest,
+        responseSchema: ContentItemResponseSchema,
+      });
+    },
+    ingestHomeFeedCollectedContent(request) {
+      return httpClient.request({
+        path: "/collector/content-items/home-feed",
+        method: "POST",
+        body: request,
         responseSchema: ContentItemResponseSchema,
       });
     },

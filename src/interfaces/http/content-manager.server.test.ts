@@ -20,6 +20,7 @@ import {
   createContentCategory,
   createContentItem,
   createFakeContentManagerHttpService,
+  createHomeFeedCollectedContentInput,
   createSourceGroup,
   createSourcePublisher,
   createTopComment,
@@ -1367,3 +1368,129 @@ function expectSourcePublisherIsSafe(payload: unknown): void {
     expect(serialized).not.toContain(`"${key}"`);
   }
 }
+
+describe("Content Manager HTTP routes — home-feed ingestion", () => {
+  it("ingests a home-feed candidate and omits sourceGroupId in the response", async () => {
+    const { server, service } = createTestServer();
+    const payload = createHomeFeedCollectedContentInput();
+
+    service.ingestHomeFeedCollectedContent.setOutput(
+      createContentItem({
+        sourceGroupId: undefined,
+        collectionProvenance: {
+          firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
+          sourcePublisherId: "source-publisher-1",
+        },
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/content-items/home-feed",
+        payload,
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(service.ingestHomeFeedCollectedContent.calls).toEqual([payload]);
+      expect(body).toMatchObject({
+        contentItem: {
+          id: "content-item-1",
+          platform: "FACEBOOK",
+          status: "COLLECTED",
+        },
+      });
+      expect(body.contentItem).not.toHaveProperty("sourceGroupId");
+      expect(body.contentItem).not.toHaveProperty("sourceGroupId:null");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects unknown fields on the home-feed ingestion body", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/content-items/home-feed",
+        payload: {
+          ...createHomeFeedCollectedContentInput(),
+          rawFacebookGraphqlPayload: { data: { feedback: "leak" } },
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(service.ingestHomeFeedCollectedContent.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects sourceGroupId on the home-feed ingestion body", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/content-items/home-feed",
+        payload: {
+          ...createHomeFeedCollectedContentInput(),
+          sourceGroupId: "source-group-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(service.ingestHomeFeedCollectedContent.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps missing source publishers to 404 on home-feed ingestion", async () => {
+    const { server, service } = createTestServer();
+
+    service.ingestHomeFeedCollectedContent.setError(
+      new SourcePublisherNotFoundError("source-publisher-missing"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/content-items/home-feed",
+        payload: createHomeFeedCollectedContentInput(),
+      });
+
+      expect(response.statusCode).toBe(404);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("keeps POST /collector/content-items requiring sourceGroupId", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/content-items",
+        payload: {
+          platform: "FACEBOOK",
+          externalPostId: "post-1",
+          sourceUrl: "https://www.facebook.com/groups/group-1/posts/post-1",
+          bodyText: "A useful post.",
+          collectedAt: "2026-02-01T12:00:00.000Z",
+          reactionCount: 0,
+          commentCount: 0,
+          topComments: [],
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(service.ingestCollectedContent.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+});

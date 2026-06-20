@@ -52,6 +52,7 @@ function createProfileHomeFeedInput(
 ): CollectedContentProvenanceInput {
   return {
     collectionSurface: PROFILE_HOME_FEED_SURFACE,
+    sourcePublisherId: "source-publisher-1",
     ...overrides,
   };
 }
@@ -166,6 +167,7 @@ describe("content collection provenance schemas", () => {
   it("accepts managedSourceGroupId when the surface is PROFILE_HOME_FEED", () => {
     const result = CollectedContentProvenanceInputSchema.safeParse({
       collectionSurface: PROFILE_HOME_FEED_SURFACE,
+      sourcePublisherId: "source-publisher-1",
       managedSourceGroupId: "source-group-1",
     });
 
@@ -175,6 +177,7 @@ describe("content collection provenance schemas", () => {
   it("accepts an absent managedSourceGroupId when the surface is PROFILE_HOME_FEED", () => {
     const result = CollectedContentProvenanceInputSchema.safeParse({
       collectionSurface: PROFILE_HOME_FEED_SURFACE,
+      sourcePublisherId: "source-publisher-1",
     });
 
     expect(result.success).toBe(true);
@@ -209,6 +212,7 @@ describe("content collection provenance schemas", () => {
   it("accepts an absent managedSourceGroupId on durable PROFILE_HOME_FEED provenance", () => {
     const result = ContentCollectionProvenanceSchema.safeParse({
       firstCollectionSurface: PROFILE_HOME_FEED_SURFACE,
+      sourcePublisherId: "source-publisher-1",
     });
 
     expect(result.success).toBe(true);
@@ -217,6 +221,7 @@ describe("content collection provenance schemas", () => {
   it("accepts a present managedSourceGroupId on durable PROFILE_HOME_FEED provenance", () => {
     const result = ContentCollectionProvenanceSchema.safeParse({
       firstCollectionSurface: PROFILE_HOME_FEED_SURFACE,
+      sourcePublisherId: "source-publisher-1",
       managedSourceGroupId: "source-group-1",
     });
 
@@ -261,6 +266,7 @@ describe("content collection provenance validation helpers", () => {
   it("returns a valid result for a PROFILE_HOME_FEED input with managedSourceGroupId", () => {
     const result = validateCollectedContentProvenanceInput({
       collectionSurface: PROFILE_HOME_FEED_SURFACE,
+      sourcePublisherId: "source-publisher-1",
       managedSourceGroupId: "source-group-1",
     });
 
@@ -270,6 +276,7 @@ describe("content collection provenance validation helpers", () => {
   it("parses a durable provenance through parseContentCollectionProvenance", () => {
     const provenance: ContentCollectionProvenance = {
       firstCollectionSurface: PROFILE_HOME_FEED_SURFACE,
+      sourcePublisherId: "source-publisher-1",
     };
 
     const result = parseContentCollectionProvenance(provenance);
@@ -332,14 +339,19 @@ describe("content collection provenance creation", () => {
     expect(provenance.managedSourceGroupId).toBe("source-group-1");
   });
 
-  it("omits an absent sourcePublisherId rather than serializing null", () => {
-    const provenance = createInitialContentCollectionProvenance(
-      createProfileHomeFeedInput(),
-    );
+  it("requires sourcePublisherId when the surface is PROFILE_HOME_FEED", () => {
+    const result = CollectedContentProvenanceInputSchema.safeParse({
+      collectionSurface: PROFILE_HOME_FEED_SURFACE,
+    });
 
-    expect(
-      Object.prototype.hasOwnProperty.call(provenance, "sourcePublisherId"),
-    ).toBe(false);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: ["sourcePublisherId"] }),
+        ]),
+      );
+    }
   });
 
   it("omits an absent managedSourceGroupId rather than serializing null", () => {
@@ -393,9 +405,11 @@ describe("content collection provenance enrichment", () => {
   });
 
   it("fills an absent managedSourceGroupId on a later SOURCE_GROUP observation", () => {
-    // First observed as PROFILE_HOME_FEED with no associations.
+    // First observed as PROFILE_HOME_FEED with sourcePublisherId.
     const existing = createInitialContentCollectionProvenance(
-      createProfileHomeFeedInput(),
+      createProfileHomeFeedInput({
+        sourcePublisherId: "publisher-1",
+      }),
     );
 
     // A later SOURCE_GROUP observation carries the managedSourceGroupId.
@@ -474,7 +488,7 @@ describe("content collection provenance different-surface recollection", () => {
 
     const merged = mergeContentCollectionProvenance(
       existing,
-      createProfileHomeFeedInput(),
+      createProfileHomeFeedInput({ sourcePublisherId: "publisher-1" }),
     );
 
     expect(merged.firstCollectionSurface).toEqual(SOURCE_GROUP_SURFACE);
@@ -485,6 +499,7 @@ describe("content collection provenance different-surface recollection", () => {
   it("home-feed-first then source-group observation produces a durable schema-valid result", () => {
     const existing = createInitialContentCollectionProvenance({
       collectionSurface: PROFILE_HOME_FEED_SURFACE,
+      sourcePublisherId: "publisher-1",
     });
 
     const merged = mergeContentCollectionProvenance(existing, {
@@ -642,8 +657,7 @@ describe("content collection provenance runtime validation", () => {
     const inputs: CollectedContentProvenanceInput[] = [
       createSourceGroupInput(),
       createSourceGroupInput({ sourcePublisherId: "publisher-1" }),
-      createProfileHomeFeedInput(),
-      createProfileHomeFeedInput({ managedSourceGroupId: "source-group-1" }),
+      createProfileHomeFeedInput({ sourcePublisherId: "publisher-1" }),
       createProfileHomeFeedInput({
         managedSourceGroupId: "source-group-1",
         sourcePublisherId: "publisher-1",
@@ -660,7 +674,7 @@ describe("content collection provenance runtime validation", () => {
 
   it("mergeContentCollectionProvenance result always passes the durable schema", () => {
     const initial = createInitialContentCollectionProvenance(
-      createProfileHomeFeedInput(),
+      createProfileHomeFeedInput({ sourcePublisherId: "publisher-1" }),
     );
 
     const cases: CollectedContentProvenanceInput[] = [
@@ -673,9 +687,11 @@ describe("content collection provenance runtime validation", () => {
         managedSourceGroupId: SOURCE_GROUP_SURFACE.sourceGroupId,
         sourcePublisherId: "publisher-1",
       },
-      createProfileHomeFeedInput(),
-      createProfileHomeFeedInput({ managedSourceGroupId: "source-group-1" }),
       createProfileHomeFeedInput({ sourcePublisherId: "publisher-1" }),
+      createProfileHomeFeedInput({
+        managedSourceGroupId: "source-group-1",
+        sourcePublisherId: "publisher-1",
+      }),
     ];
 
     for (const incoming of cases) {

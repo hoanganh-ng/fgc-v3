@@ -336,6 +336,7 @@ const contentApplicationErrorStatus: Record<
   INVALID_CONTENT_STATUS_TRANSITION: 409,
   CONTENT_VALIDATION_ERROR: 400,
   SOURCE_PUBLISHER_NOT_FOUND: 404,
+  HOME_FEED_CONTENT_PLATFORM_MISMATCH: 400,
 };
 
 const collectorRuntimeApplicationErrorStatus: Record<

@@ -13,7 +13,8 @@ export type ContentManagerApplicationErrorCode =
   | "CONTENT_ITEM_NOT_FOUND"
   | "INVALID_CONTENT_STATUS_TRANSITION"
   | "CONTENT_VALIDATION_ERROR"
-  | "SOURCE_PUBLISHER_NOT_FOUND";
+  | "SOURCE_PUBLISHER_NOT_FOUND"
+  | "HOME_FEED_CONTENT_PLATFORM_MISMATCH";
 
 export abstract class ContentManagerApplicationError extends Error {
   public readonly code: ContentManagerApplicationErrorCode;
@@ -133,5 +134,25 @@ export class SourcePublisherNotFoundError extends ContentManagerApplicationError
       `Source publisher not found: ${sourcePublisherId}.`,
     );
     this.sourcePublisherId = sourcePublisherId;
+  }
+}
+
+export class HomeFeedCollectedContentPlatformMismatchError extends ContentManagerApplicationError {
+  public readonly existingPlatform: ContentPlatform;
+  public readonly incomingPlatform: ContentPlatform;
+  public readonly sourcePublisherId: string;
+
+  public constructor(
+    sourcePublisherId: string,
+    existingPlatform: ContentPlatform,
+    incomingPlatform: ContentPlatform,
+  ) {
+    super(
+      "HOME_FEED_CONTENT_PLATFORM_MISMATCH",
+      `Home-feed content platform mismatch: publisher=${existingPlatform} content=${incomingPlatform}.`,
+    );
+    this.sourcePublisherId = sourcePublisherId;
+    this.existingPlatform = existingPlatform;
+    this.incomingPlatform = incomingPlatform;
   }
 }

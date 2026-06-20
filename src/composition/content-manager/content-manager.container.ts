@@ -6,6 +6,7 @@ import {
   GetSourceGroupUseCase,
   GetSourcePublisherUseCase,
   IngestCollectedContentUseCase,
+  IngestHomeFeedCollectedContentUseCase,
   ListContentCategoriesUseCase,
   ListContentItemsUseCase,
   ListSourceGroupsUseCase,
@@ -47,6 +48,7 @@ export interface ContentManagerContainer {
   readonly updateSourceGroupStatus: UpdateSourceGroupStatusUseCase;
   readonly listSourceGroups: ListSourceGroupsUseCase;
   readonly ingestCollectedContent: IngestCollectedContentUseCase;
+  readonly ingestHomeFeedCollectedContent: IngestHomeFeedCollectedContentUseCase;
   readonly updateContentStatus: UpdateContentStatusUseCase;
   readonly getContentItem: GetContentItemUseCase;
   readonly listContentItems: ListContentItemsUseCase;
@@ -104,6 +106,12 @@ export function createContentManager(
     ingestCollectedContent: new IngestCollectedContentUseCase(
       contentItems,
       sourceGroups,
+      idGenerator,
+      clock,
+    ),
+    ingestHomeFeedCollectedContent: new IngestHomeFeedCollectedContentUseCase(
+      contentItems,
+      sourcePublishers,
       idGenerator,
       clock,
     ),
