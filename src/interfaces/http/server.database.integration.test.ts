@@ -945,6 +945,140 @@ if (!shouldRunHttpDbTests) {
       expect(releasedRuntimeConfigurationResponse.statusCode).toBe(409);
     });
 
+    it("checks out home-feed collection through HTTP and persists the home-feed lease purpose", async () => {
+      const profileId = trackProfileId(nextTestId("home-feed-profile"));
+      const displayName = `HTTP DB Home Feed ${profileId}`;
+      const sessionPayload = createSessionPayload();
+
+      const createProfileResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/profiles",
+        payload: {
+          id: profileId,
+          displayName,
+        },
+      });
+      expect(createProfileResponse.statusCode).toBe(201);
+
+      const configureResponse = await getServer().inject({
+        method: "PATCH",
+        url: `/collector/profiles/${profileId}/configuration`,
+        payload: createConfiguration(),
+      });
+      expect(configureResponse.statusCode).toBe(200);
+
+      const provisioningStartResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/profiles/${profileId}/provisioning/start`,
+      });
+      const provisioningStartBody = provisioningStartResponse.json() as {
+        readonly provisioningToken: string;
+      };
+      expect(provisioningStartResponse.statusCode).toBe(200);
+
+      const sessionResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/provisioning/${encodeURIComponent(
+          provisioningStartBody.provisioningToken,
+        )}/session`,
+        payload: sessionPayload,
+      });
+      expect(sessionResponse.statusCode).toBe(200);
+
+      const warmingResponse = await getServer().inject({
+        method: "PATCH",
+        url: `/collector/profiles/${profileId}/account-stage`,
+        payload: {
+          accountStage: "WARMING",
+        },
+      });
+      expect(warmingResponse.statusCode).toBe(200);
+
+      const readyResponse = await getServer().inject({
+        method: "PATCH",
+        url: `/collector/profiles/${profileId}/account-stage`,
+        payload: {
+          accountStage: "COLLECTION_READY",
+        },
+      });
+      expect(readyResponse.statusCode).toBe(200);
+
+      const checkoutResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/profiles/${profileId}/home-feed/checkout`,
+      });
+      const checkoutBody = checkoutResponse.json();
+      const leaseId =
+        typeof checkoutBody.lease?.id === "string"
+          ? trackLeaseId(checkoutBody.lease.id)
+          : undefined;
+      expect(checkoutResponse.statusCode).toBe(200);
+      expect(leaseId).toBeDefined();
+      const activeLeaseId = leaseId ?? "missing-home-feed-lease-id";
+      expect(checkoutBody).toMatchObject({
+        lease: {
+          id: activeLeaseId,
+          profileId,
+          purpose: "HOME_FEED_COLLECTION",
+          status: "ACTIVE",
+        },
+        profile: {
+          profileId,
+          accountStage: "COLLECTION_READY",
+        },
+      });
+      const checkoutText = JSON.stringify(checkoutBody);
+      expect(checkoutText).not.toContain("sourceGroupId");
+      expect(checkoutText).not.toContain("cookie");
+      expect(checkoutText).not.toContain("localStorage");
+      expect(checkoutText).not.toContain("proxy");
+
+      const [leaseRow] = await getClient()
+        .db.select()
+        .from(collectorProfileLeases)
+        .where(eq(collectorProfileLeases.id, activeLeaseId));
+      expect(leaseRow).toMatchObject({
+        id: activeLeaseId,
+        profileId,
+        purpose: "HOME_FEED_COLLECTION",
+        status: "ACTIVE",
+      });
+
+      const runtimeConfigurationResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/profile-leases/${activeLeaseId}/runtime-configuration`,
+      });
+      expect(runtimeConfigurationResponse.statusCode).toBe(200);
+      expect(runtimeConfigurationResponse.json()).toMatchObject({
+        profileId,
+        leaseId: activeLeaseId,
+      });
+
+      const duplicateCheckoutResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/profiles/${profileId}/home-feed/checkout`,
+      });
+      expect(duplicateCheckoutResponse.statusCode).toBe(409);
+
+      const releaseResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/profile-leases/${activeLeaseId}/release`,
+        payload: {},
+      });
+      expect(releaseResponse.statusCode).toBe(200);
+      expect(releaseResponse.json()).toMatchObject({
+        lease: {
+          id: activeLeaseId,
+          purpose: "HOME_FEED_COLLECTION",
+          status: "RELEASED",
+        },
+        profile: {
+          id: profileId,
+          status: "READY",
+        },
+      });
+    });
+
     // Sprint 055 review finding 3: DB-backed round trip proving
     // recovery start persists PENDING_LOGIN, retains the unhealthy
     // health value, rotates the provisioning token, and that

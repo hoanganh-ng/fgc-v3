@@ -68,7 +68,7 @@ Root-level columns:
 - `lease_id`: primary key, maps to `ProfileLease.id`.
 - `profile_id`: foreign key candidate to `collector_profiles.profile_id`.
 - `status`: maps to `ProfileLease.status`.
-- `purpose`: maps to `ProfileLease.purpose`; `COLLECTION` remains the default for normal checkout, `AMBIENT_EXERCISE` is used only for read-only account exercise checkout, and `ASSISTED_GROUP_ACCESS` is used for future operator-assisted group access checkout.
+- `purpose`: maps to `ProfileLease.purpose`; `COLLECTION` remains the default for normal checkout, `AMBIENT_EXERCISE` is used only for read-only account exercise checkout, `ASSISTED_GROUP_ACCESS` is used for operator-assisted group access checkout, and `HOME_FEED_COLLECTION` is used for profile-bound home-feed checkout (Sprint 065C2, migration `0024`, no `Source Group`, no profile-source access record).
 - `leased_at`: maps to `ProfileLease.leasedAt`.
 - `expires_at`: maps to `ProfileLease.expiresAt`.
 - `released_at`: maps to `ProfileLease.releasedAt`.

@@ -2,8 +2,8 @@
 
 ## Ownership
 - Execution of collection workflows (queues, workers).
-- Durable run records for collection, ambient exercise, and profile-source access checks.
-- Orchestrating profile checkout from Collector Profile Manager.
+- Durable run records for collection, ambient exercise, profile-source access checks, and profile-bound home-feed runs.
+- Orchestrating profile checkout from Collector Profile Manager (including profile-bound home-feed checkout via the new `ProfileHomeFeedCheckoutPort`).
 - Orchestrating browser automation, network payload capture, and page context interaction.
 - Platform Extractors (e.g. Facebook GraphQL Payload Extractor) converting raw artifacts to normalized inputs.
 - Submitting normalized collected content to Content Manager.

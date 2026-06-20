@@ -3,6 +3,7 @@ import {
   InvalidApplicationOperationError,
   ProfileSourceAccessNotFoundError,
   ProfileLeaseAlreadyClosedError,
+  ProfileNotCheckoutEligibleError,
   ProfileNotFoundError,
   SourceGroupNotFoundError,
   type ProfileSourceAccessDto,
@@ -16,6 +17,8 @@ import type {
   CheckoutProfileForAssistedGroupAccessOutput,
   CheckoutProfileForExerciseInput,
   CheckoutProfileForExerciseOutput,
+  CheckoutProfileForHomeFeedCollectionInput,
+  CheckoutProfileForHomeFeedCollectionOutput,
   CreateProfileInput,
   GetProfileInput,
   GetProvisioningConfigurationInput,
@@ -1512,6 +1515,85 @@ describe("HTTP server", () => {
     }
   });
 
+  it("checks out a profile for home-feed collection without source group", async () => {
+    const { server, service } = createTestServer();
+    const checkoutOutput = createHomeFeedCheckoutOutput();
+
+    service.checkoutProfileForHomeFeedCollection.setOutput(checkoutOutput);
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/profile-1/home-feed/checkout",
+      });
+      const body = response.json();
+      const bodyText = JSON.stringify(body);
+
+      expect(response.statusCode).toBe(200);
+      expect(service.checkoutProfileForHomeFeedCollection.calls).toEqual([
+        {
+          profileId: "profile-1",
+        },
+      ]);
+      expect(body).toEqual(checkoutOutput);
+      expect(bodyText).not.toContain("cookie");
+      expect(bodyText).not.toContain("localStorage");
+      expect(bodyText).not.toContain("proxy");
+      expect(bodyText).not.toContain("sourceGroupId");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 for home-feed checkout with unexpected body fields", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/profile-1/home-feed/checkout",
+        payload: {
+          sourceGroupId: "source-group-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(service.checkoutProfileForHomeFeedCollection.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 409 for home-feed checkout when profile is not eligible", async () => {
+    const { server, service } = createTestServer();
+    service.checkoutProfileForHomeFeedCollection.setError(
+      new ProfileNotCheckoutEligibleError("profile-1", [
+        {
+          code: "ACCOUNT_STAGE_NOT_COLLECTION_READY",
+          message:
+            "Profile account stage must be COLLECTION_READY before checkout.",
+        },
+      ]),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/profile-1/home-feed/checkout",
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "PROFILE_NOT_CHECKOUT_ELIGIBLE",
+          message: "Collector profile is not checkout eligible: profile-1.",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("releases a profile lease", async () => {
     const { server, service } = createTestServer();
     const lease = createReleasedLease();
@@ -2043,6 +2125,10 @@ interface FakeCollectorProfileManager extends CollectorProfileManagerHttpService
     CheckoutProfileForAssistedGroupAccessInput,
     CheckoutProfileForAssistedGroupAccessOutput
   >;
+  readonly checkoutProfileForHomeFeedCollection: StubUseCase<
+    CheckoutProfileForHomeFeedCollectionInput,
+    CheckoutProfileForHomeFeedCollectionOutput
+  >;
   readonly releaseProfileLease: StubUseCase<
     ReleaseProfileLeaseInput,
     ReleaseProfileLeaseOutput
@@ -2112,6 +2198,9 @@ function createTestServer(): {
     checkoutProfileForExercise: new StubUseCase(createExerciseCheckoutOutput()),
     checkoutProfileForAssistedGroupAccess: new StubUseCase(
       createAssistedGroupAccessCheckoutOutput(),
+    ),
+    checkoutProfileForHomeFeedCollection: new StubUseCase(
+      createHomeFeedCheckoutOutput(),
     ),
     releaseProfileLease: new StubUseCase({
       lease: createReleasedLease(),
@@ -2283,6 +2372,19 @@ function createAssistedGroupAccessCheckoutOutput(): CheckoutProfileForAssistedGr
     profile: {
       profileId: "profile-1",
       accountStage: "WARMING",
+    },
+  };
+}
+
+function createHomeFeedCheckoutOutput(): CheckoutProfileForHomeFeedCollectionOutput {
+  return {
+    lease: {
+      ...createActiveLease(),
+      purpose: "HOME_FEED_COLLECTION",
+    },
+    profile: {
+      profileId: "profile-1",
+      accountStage: "COLLECTION_READY",
     },
   };
 }

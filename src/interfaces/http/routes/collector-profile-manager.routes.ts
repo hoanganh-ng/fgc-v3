@@ -9,6 +9,8 @@ import type {
   CheckoutProfileForAssistedGroupAccessOutput,
   CheckoutProfileForExerciseInput,
   CheckoutProfileForExerciseOutput,
+  CheckoutProfileForHomeFeedCollectionInput,
+  CheckoutProfileForHomeFeedCollectionOutput,
   CreateProfileInput,
   GetProfileInput,
   GetProvisioningConfigurationInput,
@@ -49,6 +51,7 @@ import { SourceGroupNotFoundError } from "../../../content-manager/application";
 import {
   CheckoutProfileHttpBodySchema,
   CheckoutProfileForAssistedGroupAccessHttpBodySchema,
+  CheckoutProfileForHomeFeedCollectionHttpBodySchema,
   CreateProfileHttpBodySchema,
   ListProfilesHttpQuerySchema,
   IngestProfileSessionHttpBodySchema,
@@ -64,6 +67,7 @@ import {
   checkoutProfileHttpRouteSchema,
   checkoutProfileForAssistedGroupAccessHttpRouteSchema,
   checkoutProfileForExerciseHttpRouteSchema,
+  checkoutProfileForHomeFeedCollectionHttpRouteSchema,
   createProfileHttpRouteSchema,
   getProfileSourceAccessHttpRouteSchema,
   getProvisioningConfigurationHttpRouteSchema,
@@ -130,6 +134,10 @@ export interface CollectorProfileManagerHttpService {
   readonly checkoutProfileForAssistedGroupAccess: ExecutableUseCase<
     CheckoutProfileForAssistedGroupAccessInput,
     CheckoutProfileForAssistedGroupAccessOutput
+  >;
+  readonly checkoutProfileForHomeFeedCollection: ExecutableUseCase<
+    CheckoutProfileForHomeFeedCollectionInput,
+    CheckoutProfileForHomeFeedCollectionOutput
   >;
   readonly releaseProfileLease: ExecutableUseCase<
     ReleaseProfileLeaseInput,
@@ -420,6 +428,27 @@ export function registerCollectorProfileManagerRoutes(
         {
           profileId: params.profileId,
           sourceGroupId: body.sourceGroupId,
+        },
+      );
+    },
+  );
+
+  server.post(
+    "/collector/profiles/:profileId/home-feed/checkout",
+    { schema: checkoutProfileForHomeFeedCollectionHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileIdHttpParamsSchema,
+        request.params,
+      );
+      parseHttpInput(
+        CheckoutProfileForHomeFeedCollectionHttpBodySchema,
+        request.body ?? {},
+      );
+
+      return collectorProfileManager.checkoutProfileForHomeFeedCollection.execute(
+        {
+          profileId: params.profileId,
         },
       );
     },

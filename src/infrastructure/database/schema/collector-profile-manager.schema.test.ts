@@ -11,6 +11,23 @@ import {
   provisioningTokenStatusEnum,
 } from "./collector-profile-manager.schema";
 
+describe("collector profile manager lease purpose enum", () => {
+  it("includes HOME_FEED_COLLECTION alongside the existing purposes", () => {
+    expect(collectorProfileLeasePurposeEnum.enumValues).toContain(
+      "HOME_FEED_COLLECTION",
+    );
+    expect(collectorProfileLeasePurposeEnum.enumValues).toContain(
+      "COLLECTION",
+    );
+    expect(collectorProfileLeasePurposeEnum.enumValues).toContain(
+      "AMBIENT_EXERCISE",
+    );
+    expect(collectorProfileLeasePurposeEnum.enumValues).toContain(
+      "ASSISTED_GROUP_ACCESS",
+    );
+  });
+});
+
 describe("collector profile manager database schema", () => {
   it("exports profile table metadata for migration generation", () => {
     expect(collectorProfiles.id.name).toBe("profile_id");
@@ -73,6 +90,7 @@ describe("collector profile manager database schema", () => {
       "COLLECTION",
       "AMBIENT_EXERCISE",
       "ASSISTED_GROUP_ACCESS",
+      "HOME_FEED_COLLECTION",
     ]);
     expect(collectorProfileSourceAccessStateEnum.enumValues).toEqual([
       "UNKNOWN",

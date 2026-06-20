@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  CheckoutProfileForAssistedGroupAccessUseCase,
   CheckoutProfileForExerciseUseCase,
+  CheckoutProfileForHomeFeedCollectionUseCase,
   CheckoutProfileUseCase,
   CreateProfileUseCase,
   GetProfileUseCase,
@@ -73,6 +75,12 @@ describe("collector profile manager composition container", () => {
     expect(services.checkoutProfile).toBeInstanceOf(CheckoutProfileUseCase);
     expect(services.checkoutProfileForExercise).toBeInstanceOf(
       CheckoutProfileForExerciseUseCase,
+    );
+    expect(services.checkoutProfileForAssistedGroupAccess).toBeInstanceOf(
+      CheckoutProfileForAssistedGroupAccessUseCase,
+    );
+    expect(services.checkoutProfileForHomeFeedCollection).toBeInstanceOf(
+      CheckoutProfileForHomeFeedCollectionUseCase,
     );
     expect(services.releaseProfileLease).toBeInstanceOf(
       ReleaseProfileLeaseUseCase,

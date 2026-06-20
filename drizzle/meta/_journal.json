@@ -169,6 +169,13 @@
       "when": 1781884676877,
       "tag": "0023_content_items_source_group_id_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1781884676878,
+      "tag": "0024_collector_profile_lease_purpose_home_feed",
+      "breakpoints": true
     }
   ]
 }

@@ -71,7 +71,7 @@ export function evaluateCheckoutEligibility(
   }
 
   if (
-    purpose === "COLLECTION" &&
+    (purpose === "COLLECTION" || purpose === "HOME_FEED_COLLECTION") &&
     profile.identity.accountStage !== "COLLECTION_READY"
   ) {
     reasons.push({

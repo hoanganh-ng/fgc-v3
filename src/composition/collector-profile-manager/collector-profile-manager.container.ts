@@ -1,6 +1,7 @@
 import {
   CheckoutProfileForAssistedGroupAccessUseCase,
   CheckoutProfileForExerciseUseCase,
+  CheckoutProfileForHomeFeedCollectionUseCase,
   CheckoutProfileUseCase,
   CreateProfileUseCase,
   GetProfileUseCase,
@@ -55,6 +56,7 @@ export interface CollectorProfileManagerContainer {
   readonly checkoutProfile: CheckoutProfileUseCase;
   readonly checkoutProfileForExercise: CheckoutProfileForExerciseUseCase;
   readonly checkoutProfileForAssistedGroupAccess: CheckoutProfileForAssistedGroupAccessUseCase;
+  readonly checkoutProfileForHomeFeedCollection: CheckoutProfileForHomeFeedCollectionUseCase;
   readonly releaseProfileLease: ReleaseProfileLeaseUseCase;
   readonly upsertProfileSourceAccess: UpsertProfileSourceAccessUseCase;
   readonly getProfileSourceAccess: GetProfileSourceAccessUseCase;
@@ -128,6 +130,14 @@ export function createCollectorProfileManager(
         leaseIdGenerator,
         clock,
         sourceGroupReference,
+        transactionManager,
+      ),
+    checkoutProfileForHomeFeedCollection:
+      new CheckoutProfileForHomeFeedCollectionUseCase(
+        profiles,
+        leases,
+        leaseIdGenerator,
+        clock,
         transactionManager,
       ),
     releaseProfileLease: new ReleaseProfileLeaseUseCase(

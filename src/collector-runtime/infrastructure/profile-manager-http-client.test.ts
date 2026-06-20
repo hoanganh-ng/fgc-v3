@@ -383,6 +383,169 @@ describe("ProfileManagerHttpClient", () => {
     });
   });
 
+  it("posts home-feed checkout requests for a specific profile and rejects mismatches", async () => {
+    const successFetch = new FakeFetch(createHomeFeedCheckoutResponse());
+    const successClient = createClient(successFetch.fetch);
+
+    const result = await successClient.checkoutProfileForHomeFeedCollection(
+      "profile-1",
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      profileId: "profile-1",
+      accountStage: "COLLECTION_READY",
+      leaseId: "lease-1",
+      leaseExpiresAt: "2026-01-05T18:45:00.000Z",
+    });
+    expect(successFetch.calls[0]).toMatchObject({
+      input:
+        "https://profile-manager.test/collector/profiles/profile-1/home-feed/checkout",
+      init: {
+        method: "POST",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("cookie");
+    expect(JSON.stringify(result)).not.toContain("localStorage");
+    expect(JSON.stringify(result)).not.toContain("proxy");
+    expect(JSON.stringify(result)).not.toContain("sourceGroupId");
+
+    const mismatchedProfileFetch = new FakeFetch(
+      createResponse(200, {
+        lease: {
+          id: "lease-1",
+          profileId: "profile-1",
+          purpose: "HOME_FEED_COLLECTION",
+          leasedAt: "2026-01-05T18:00:00.000Z",
+          expiresAt: "2026-01-05T18:45:00.000Z",
+          releasedAt: null,
+          status: "ACTIVE",
+        },
+        profile: {
+          profileId: "other-profile",
+          accountStage: "COLLECTION_READY",
+        },
+      }),
+    );
+    await expect(
+      createClient(mismatchedProfileFetch.fetch).checkoutProfileForHomeFeedCollection(
+        "profile-1",
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      statusCode: 200,
+      errorCode: "PROFILE_MANAGER_RESPONSE_ERROR",
+      errorMessage: "Profile Manager home-feed checkout response is invalid.",
+    });
+
+    const wrongPurposeFetch = new FakeFetch(
+      createResponse(200, {
+        lease: {
+          id: "lease-1",
+          profileId: "profile-1",
+          purpose: "COLLECTION",
+          leasedAt: "2026-01-05T18:00:00.000Z",
+          expiresAt: "2026-01-05T18:45:00.000Z",
+          releasedAt: null,
+          status: "ACTIVE",
+        },
+        profile: {
+          profileId: "profile-1",
+          accountStage: "COLLECTION_READY",
+        },
+      }),
+    );
+    await expect(
+      createClient(wrongPurposeFetch.fetch).checkoutProfileForHomeFeedCollection(
+        "profile-1",
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      statusCode: 200,
+      errorCode: "PROFILE_MANAGER_RESPONSE_ERROR",
+      errorMessage: "Profile Manager home-feed checkout response is invalid.",
+    });
+
+    const wrongStatusFetch = new FakeFetch(
+      createResponse(200, {
+        lease: {
+          id: "lease-1",
+          profileId: "profile-1",
+          purpose: "HOME_FEED_COLLECTION",
+          leasedAt: "2026-01-05T18:00:00.000Z",
+          expiresAt: "2026-01-05T18:45:00.000Z",
+          releasedAt: "2026-01-05T18:10:00.000Z",
+          status: "RELEASED",
+        },
+        profile: {
+          profileId: "profile-1",
+          accountStage: "COLLECTION_READY",
+        },
+      }),
+    );
+    await expect(
+      createClient(wrongStatusFetch.fetch).checkoutProfileForHomeFeedCollection(
+        "profile-1",
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      statusCode: 200,
+      errorCode: "PROFILE_MANAGER_RESPONSE_ERROR",
+      errorMessage: "Profile Manager home-feed checkout response is invalid.",
+    });
+  });
+
+  it("maps home-feed checkout not-found, conflict, and server errors", async () => {
+    const cases = [
+      [
+        404,
+        "PROFILE_NOT_FOUND",
+        "Collector profile not found: profile-1.",
+      ],
+      [
+        409,
+        "PROFILE_NOT_CHECKOUT_ELIGIBLE",
+        "Collector profile is not checkout eligible: profile-1.",
+      ],
+      [
+        409,
+        "PROFILE_LEASE_STATE_CONFLICT",
+        "Profile profile-1 already has active lease lease-1.",
+      ],
+      [503, "INTERNAL_SERVER_ERROR", "Profile Manager is unavailable."],
+    ] as const;
+
+    for (const [statusCode, errorCode, errorMessage] of cases) {
+      const fetch = new FakeFetch(
+        createErrorResponse(statusCode, errorCode, errorMessage),
+      );
+      const client = createClient(fetch.fetch);
+
+      await expect(
+        client.checkoutProfileForHomeFeedCollection("profile-1"),
+      ).resolves.toEqual({
+        ok: false,
+        statusCode,
+        errorCode,
+        errorMessage,
+      });
+    }
+  });
+
+  it("maps home-feed checkout network failures to structured failures", async () => {
+    const fetch = new FakeFetch(createHomeFeedCheckoutResponse());
+    fetch.setError(new Error("home-feed connect refused"));
+    const client = createClient(fetch.fetch);
+
+    await expect(
+      client.checkoutProfileForHomeFeedCollection("profile-1"),
+    ).resolves.toEqual({
+      ok: false,
+      errorCode: "PROFILE_MANAGER_NETWORK_ERROR",
+      errorMessage: "home-feed connect refused",
+    });
+  });
+
   it("posts release requests to /collector/profile-leases/:leaseId/release", async () => {
     const fetch = new FakeFetch(createReleaseResponse());
     const client = new ProfileManagerHttpClient(
@@ -999,6 +1162,32 @@ function createAssistedGroupAccessCheckoutResponse(): FetchLikeResponse {
           },
         },
       },
+    },
+  });
+}
+
+function createHomeFeedCheckoutResponse(): FetchLikeResponse {
+  return createResponse(200, {
+    lease: {
+      id: "lease-1",
+      profileId: "profile-1",
+      purpose: "HOME_FEED_COLLECTION",
+      leasedAt: "2026-01-05T18:00:00.000Z",
+      expiresAt: "2026-01-05T18:45:00.000Z",
+      releasedAt: null,
+      status: "ACTIVE",
+    },
+    profile: {
+      profileId: "profile-1",
+      accountStage: "COLLECTION_READY",
+      networkContext: {
+        proxy: {
+          credentials: {
+            password: "secret",
+          },
+        },
+      },
+      sourceGroupId: "should-not-leak",
     },
   });
 }

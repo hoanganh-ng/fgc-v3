@@ -22,6 +22,7 @@ export function createUnusedCollectorProfileManagerHttpService(): CollectorProfi
     checkoutProfile: useCase,
     checkoutProfileForExercise: useCase,
     checkoutProfileForAssistedGroupAccess: useCase,
+    checkoutProfileForHomeFeedCollection: useCase,
     releaseProfileLease: useCase,
     upsertProfileSourceAccess: useCase,
     getProfileSourceAccess: useCase,

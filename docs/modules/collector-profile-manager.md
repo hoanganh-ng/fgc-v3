@@ -7,7 +7,7 @@
 - Provisioning token lifecycle.
 - Session ingestion rules.
 - Checkout eligibility rules (including temporal windows, cooldowns, safety thresholds, and `authenticationHealth === HEALTHY` for every checkout purpose).
-- Profile lease management and lease purpose rules (`COLLECTION`, `AMBIENT_EXERCISE`, `ASSISTED_GROUP_ACCESS`).
+- Profile lease management and lease purpose rules (`COLLECTION`, `AMBIENT_EXERCISE`, `ASSISTED_GROUP_ACCESS`, `HOME_FEED_COLLECTION`).
 - Profile authentication-health transition policy (`REAUTH_REQUIRED`, `CHECKPOINT_REVIEW_REQUIRED`) driven only by the optional `authenticationObservation` accepted on lease release.
 - Guarded reprovisioning eligibility (`StartProfileProvisioningUseCase`): `PENDING_CONFIG` initial, `PENDING_LOGIN` token restart, and `READY` recovery only when `authenticationHealth` is `REAUTH_REQUIRED` or `CHECKPOINT_REVIEW_REQUIRED`. `READY` with `HEALTHY` or `NOT_PROVISIONED` and `BUSY` are rejected. `accountStage`, hardware fingerprint, configuration, and `authenticationState` are never modified by start or restart. Successful session ingestion is the only path that restores `HEALTHY`.
 - Profile-source access state (mapping profileId + sourceGroupId).

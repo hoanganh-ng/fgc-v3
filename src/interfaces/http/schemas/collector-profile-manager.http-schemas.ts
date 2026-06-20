@@ -132,6 +132,10 @@ export const CheckoutProfileForAssistedGroupAccessHttpBodySchema = z
   })
   .strict();
 
+export const CheckoutProfileForHomeFeedCollectionHttpBodySchema = z
+  .object({})
+  .strict();
+
 export const ReleaseProfileLeaseHttpBodySchema = z
   .object({
     macroActionsPerformed: z.number().int().min(0).optional(),
@@ -214,6 +218,9 @@ export type CheckoutProfileHttpBody = z.infer<
 >;
 export type CheckoutProfileForAssistedGroupAccessHttpBody = z.infer<
   typeof CheckoutProfileForAssistedGroupAccessHttpBodySchema
+>;
+export type CheckoutProfileForHomeFeedCollectionHttpBody = z.infer<
+  typeof CheckoutProfileForHomeFeedCollectionHttpBodySchema
 >;
 export type ReleaseProfileLeaseHttpBody = z.infer<
   typeof ReleaseProfileLeaseHttpBodySchema
@@ -497,7 +504,12 @@ const profileLeaseJsonSchema = {
     profileId: nonEmptyStringJsonSchema,
     purpose: {
       type: "string",
-      enum: ["COLLECTION", "AMBIENT_EXERCISE", "ASSISTED_GROUP_ACCESS"],
+      enum: [
+        "COLLECTION",
+        "AMBIENT_EXERCISE",
+        "ASSISTED_GROUP_ACCESS",
+        "HOME_FEED_COLLECTION",
+      ],
     },
     leasedAt: nonEmptyStringJsonSchema,
     expiresAt: nonEmptyStringJsonSchema,
@@ -893,6 +905,31 @@ export const checkoutProfileForAssistedGroupAccessHttpRouteSchema = {
       sourceGroupId: nonEmptyStringJsonSchema,
     },
   },
+  response: {
+    200: {
+      type: "object",
+      required: ["lease", "profile"],
+      additionalProperties: false,
+      properties: {
+        lease: profileLeaseJsonSchema,
+        profile: {
+          type: "object",
+          required: ["profileId", "accountStage"],
+          additionalProperties: false,
+          properties: {
+            profileId: nonEmptyStringJsonSchema,
+            accountStage: profileSummaryJsonSchema.properties.accountStage,
+          },
+        },
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const checkoutProfileForHomeFeedCollectionHttpRouteSchema = {
+  params: profileIdParamsJsonSchema,
   response: {
     200: {
       type: "object",

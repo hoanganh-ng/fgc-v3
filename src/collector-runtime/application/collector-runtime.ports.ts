@@ -76,6 +76,27 @@ export interface ProfileLeasePort {
   ): Promise<ProfileLeaseReleaseResult>;
 }
 
+export type ProfileHomeFeedCheckoutResult =
+  | {
+      readonly ok: true;
+      readonly profileId: string;
+      readonly accountStage: string;
+      readonly leaseId: string;
+      readonly leaseExpiresAt?: string;
+    }
+  | {
+      readonly ok: false;
+      readonly statusCode?: number;
+      readonly errorCode: string;
+      readonly errorMessage: string;
+    };
+
+export interface ProfileHomeFeedCheckoutPort {
+  checkoutProfileForHomeFeedCollection(
+    profileId: string,
+  ): Promise<ProfileHomeFeedCheckoutResult>;
+}
+
 export interface RuntimeProfileConfigurationPort {
   getRuntimeProfileConfiguration(
     leaseId: string,

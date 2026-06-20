@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   createActiveProfileLease,
@@ -433,6 +433,35 @@ if (!shouldRunDbTests) {
       await leases.save(lease);
 
       await expect(leases.findById(lease.id)).resolves.toEqual(lease);
+    });
+
+    it("persists home-feed collection lease purpose", async () => {
+      const profile = trackProfile(
+        createReadyProfile(nextTestId("home-feed-lease-profile")),
+      );
+      const lease = trackLease({
+        ...createLease(nextTestId("home-feed-lease"), profile.identity.id),
+        purpose: "HOME_FEED_COLLECTION",
+      });
+
+      await profiles.save(profile);
+      await leases.save(lease);
+
+      const persisted = await leases.findById(lease.id);
+
+      expect(persisted).toEqual(lease);
+      expect(persisted?.purpose).toBe("HOME_FEED_COLLECTION");
+      expect(persisted?.status).toBe("ACTIVE");
+
+      const [rawRow] = await getClient()
+        .db
+        .select()
+        .from(collectorProfileLeases)
+        .where(eq(collectorProfileLeases.id, lease.id));
+      expect(rawRow).toMatchObject({
+        purpose: "HOME_FEED_COLLECTION",
+        status: "ACTIVE",
+      });
     });
 
     it("upserts and lists profile-source access records by profile and source group", async () => {

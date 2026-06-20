@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CheckoutProfileForAssistedGroupAccessUseCase,
   CheckoutProfileForExerciseUseCase,
+  CheckoutProfileForHomeFeedCollectionUseCase,
   CheckoutProfileUseCase,
   CreateProfileUseCase,
   IngestProfileSessionUseCase,
@@ -730,6 +731,172 @@ describe("collector profile checkout use cases", () => {
         context.clock,
       ).execute({ leaseId: checkout.lease.id }),
     ).rejects.toThrow(ProfileLeaseAlreadyClosedError);
+  });
+
+  it("checks out a COLLECTION_READY profile for home-feed collection without source-group access", async () => {
+    const context = createTestContext();
+    const readyProfile = await createReadyProfile(context, {
+      accountStage: "COLLECTION_READY",
+      sourceAccess: null,
+    });
+
+    const output = await checkoutProfileForHomeFeedCollection(
+      context,
+      readyProfile.identity.id,
+    );
+    const savedProfile = await context.profiles.findById(
+      readyProfile.identity.id,
+    );
+
+    expect(output.lease).toMatchObject({
+      id: "lease-1",
+      profileId: readyProfile.identity.id,
+      purpose: "HOME_FEED_COLLECTION",
+      status: "ACTIVE",
+    });
+    expect(output.profile).toEqual({
+      profileId: readyProfile.identity.id,
+      accountStage: "COLLECTION_READY",
+    });
+    expect(savedProfile?.identity.status).toBe("BUSY");
+    expect(context.sourceGroupReference.calls).toEqual([]);
+  });
+
+  it.each(["NEW_ACCOUNT", "WARMING", "LIMITED"] as const)(
+    "rejects home-feed checkout for %s profiles",
+    async (accountStage) => {
+      const context = createTestContext();
+
+      await createReadyProfile(context, {
+        accountStage,
+        sourceAccess: null,
+      });
+
+      await expectHomeFeedCheckoutRejection(context);
+    },
+  );
+
+  it("rejects home-feed checkout when the profile already has an active lease", async () => {
+    const context = createTestContext();
+    const readyProfile = await createReadyProfile(context, {
+      accountStage: "COLLECTION_READY",
+      sourceAccess: null,
+    });
+
+    await context.leases.save({
+      id: "lease-1",
+      profileId: readyProfile.identity.id,
+      purpose: "COLLECTION",
+      leasedAt: checkoutNow,
+      expiresAt: "2026-01-05T18:45:00.000Z",
+      releasedAt: null,
+      status: "ACTIVE",
+    });
+
+    await expect(
+      checkoutProfileForHomeFeedCollection(context, readyProfile.identity.id),
+    ).rejects.toThrow(ProfileLeaseStateConflictError);
+  });
+
+  it("uses transaction-scoped repositories during home-feed collection checkout", async () => {
+    const context = createTestContext();
+    const readyProfile = await createReadyProfile(context, {
+      accountStage: "COLLECTION_READY",
+      sourceAccess: null,
+    });
+    const transactionProfiles = new InMemoryProfileRepository();
+    const transactionLeases = new InMemoryProfileLeaseRepository();
+    const profileInTx = await context.profiles.findById(
+      readyProfile.identity.id,
+    );
+
+    if (profileInTx === null) {
+      throw new Error("Expected profile to exist.");
+    }
+
+    await transactionProfiles.save(profileInTx);
+
+    const transactionManager = {
+      runInTransaction: async <T>(
+        work: (repositories: {
+          readonly profiles: typeof transactionProfiles;
+          readonly leases: typeof transactionLeases;
+          readonly profileSourceAccess: typeof context.profileSourceAccess;
+        }) => Promise<T>,
+      ): Promise<T> =>
+        work({
+          profiles: transactionProfiles,
+          leases: transactionLeases,
+          profileSourceAccess: context.profileSourceAccess,
+        }),
+    };
+
+    const output = await new CheckoutProfileForHomeFeedCollectionUseCase(
+      context.profiles,
+      context.leases,
+      context.leaseIds,
+      context.clock,
+      transactionManager,
+    ).execute({ profileId: readyProfile.identity.id });
+
+    expect(output.lease).toMatchObject({
+      profileId: readyProfile.identity.id,
+      purpose: "HOME_FEED_COLLECTION",
+      status: "ACTIVE",
+    });
+
+    const externalLease = await context.leases.findActiveByProfileId(
+      readyProfile.identity.id,
+    );
+    expect(externalLease).toBeNull();
+
+    const transactionalLease = await transactionLeases.findActiveByProfileId(
+      readyProfile.identity.id,
+    );
+    expect(transactionalLease?.purpose).toBe("HOME_FEED_COLLECTION");
+  });
+
+  it("allows runtime configuration for active home-feed lease and rejects it after release", async () => {
+    const context = createTestContext();
+    const readyProfile = await createReadyProfile(context, {
+      accountStage: "COLLECTION_READY",
+      sourceAccess: null,
+    });
+
+    const activeCheckout = await checkoutProfileForHomeFeedCollection(
+      context,
+      readyProfile.identity.id,
+    );
+
+    await expect(
+      new GetRuntimeProfileConfigurationUseCase(
+        context.profiles,
+        context.leases,
+        context.clock,
+      ).execute({ leaseId: activeCheckout.lease.id }),
+    ).resolves.toMatchObject({
+      profileId: readyProfile.identity.id,
+      leaseId: activeCheckout.lease.id,
+    });
+
+    context.clock.setNow(releaseNow);
+
+    await new ReleaseProfileLeaseUseCase(
+      context.profiles,
+      context.leases,
+      context.clock,
+    ).execute({ leaseId: activeCheckout.lease.id });
+
+    await expect(
+      new GetRuntimeProfileConfigurationUseCase(
+        context.profiles,
+        context.leases,
+        context.clock,
+      ).execute({ leaseId: activeCheckout.lease.id }),
+    ).rejects.toThrow(ProfileLeaseAlreadyClosedError);
+
+    const profile = await context.profiles.findById(readyProfile.identity.id);
+    expect(profile?.identity.status).toBe("READY");
   });
 
   describe("source-aware checkout gate", () => {
@@ -1530,6 +1697,18 @@ async function checkoutProfileForAssistedGroupAccess(
   });
 }
 
+async function checkoutProfileForHomeFeedCollection(
+  context: TestContext,
+  profileId: ProfileId,
+): Promise<{ readonly lease: ProfileLease; readonly profile: unknown }> {
+  return new CheckoutProfileForHomeFeedCollectionUseCase(
+    context.profiles,
+    context.leases,
+    context.leaseIds,
+    context.clock,
+  ).execute({ profileId });
+}
+
 async function expectCheckoutRejection(
   context: TestContext,
   expectedCode: string,
@@ -1589,6 +1768,27 @@ async function expectAssistedGroupAccessCheckoutRejection(
         expect.arrayContaining([
           expect.objectContaining({
             code: expectedCode,
+          }),
+        ]),
+      );
+    }
+  }
+}
+
+async function expectHomeFeedCheckoutRejection(
+  context: TestContext,
+): Promise<void> {
+  try {
+    await checkoutProfileForHomeFeedCollection(context, "profile-1");
+    throw new Error("Expected home-feed checkout to fail.");
+  } catch (error) {
+    expect(error).toBeInstanceOf(ProfileNotCheckoutEligibleError);
+
+    if (error instanceof ProfileNotCheckoutEligibleError) {
+      expect(error.reasons).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: "ACCOUNT_STAGE_NOT_COLLECTION_READY",
           }),
         ]),
       );

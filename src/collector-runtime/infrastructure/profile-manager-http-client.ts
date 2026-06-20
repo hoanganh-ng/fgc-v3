@@ -1,6 +1,8 @@
 import type {
   ProfileCheckoutInput,
   ProfileCheckoutResult,
+  ProfileHomeFeedCheckoutPort,
+  ProfileHomeFeedCheckoutResult,
   ProfileLeasePort,
   ProfileLeaseReleaseInput,
   ProfileLeaseReleaseResult,
@@ -154,7 +156,10 @@ interface HttpFailure {
 }
 
 export class ProfileManagerHttpClient
-  implements ProfileLeasePort, RuntimeProfileConfigurationPort {
+  implements
+    ProfileLeasePort,
+    RuntimeProfileConfigurationPort,
+    ProfileHomeFeedCheckoutPort {
   private readonly baseUrl: string;
   private readonly fetchImplementation: FetchLike;
 
@@ -276,6 +281,46 @@ export class ProfileManagerHttpClient
         errorCode: PROFILE_MANAGER_RESPONSE_ERROR,
         errorMessage:
           "Profile Manager assisted group access checkout response is invalid.",
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        errorCode: PROFILE_MANAGER_NETWORK_ERROR,
+        errorMessage: errorToProfileManagerMessage(error),
+      };
+    }
+  }
+
+  public async checkoutProfileForHomeFeedCollection(
+    profileId: string,
+  ): Promise<ProfileHomeFeedCheckoutResult> {
+    try {
+      const response = await this.fetchImplementation(
+        buildCheckoutProfileForHomeFeedCollectionUrl(this.baseUrl, profileId),
+        {
+          method: "POST",
+          headers: jsonHeaders(),
+          body: JSON.stringify({}),
+        },
+      );
+
+      if (!isSuccessStatusCode(response.status)) {
+        return toHomeFeedCheckoutFailure(await readHttpFailure(response));
+      }
+
+      const body = await readJsonBody(response);
+      const result = toHomeFeedCheckoutSuccessResult(profileId, body);
+
+      if (result !== undefined) {
+        return result;
+      }
+
+      return {
+        ok: false,
+        statusCode: response.status,
+        errorCode: PROFILE_MANAGER_RESPONSE_ERROR,
+        errorMessage:
+          "Profile Manager home-feed checkout response is invalid.",
       };
     } catch (error) {
       return {
@@ -618,6 +663,16 @@ function buildCheckoutProfileForAssistedGroupAccessUrl(
   );
 }
 
+function buildCheckoutProfileForHomeFeedCollectionUrl(
+  baseUrl: string,
+  profileId: string,
+): string {
+  return buildUrl(
+    baseUrl,
+    `collector/profiles/${encodeURIComponent(profileId)}/home-feed/checkout`,
+  );
+}
+
 function buildRuntimeProfileConfigurationUrl(
   baseUrl: string,
   leaseId: string,
@@ -910,6 +965,72 @@ function toExerciseCheckoutFailure(
 function toAssistedGroupAccessCheckoutFailure(
   failure: HttpFailure,
 ): Extract<ProfileAssistedGroupAccessCheckoutResult, { readonly ok: false }> {
+  return {
+    ok: false,
+    statusCode: failure.statusCode,
+    errorCode: failure.errorCode,
+    errorMessage: failure.errorMessage,
+  };
+}
+
+function toHomeFeedCheckoutSuccessResult(
+  requestedProfileId: string,
+  body: unknown,
+): Extract<ProfileHomeFeedCheckoutResult, { readonly ok: true }> | undefined {
+  if (!isRecord(body) || !isRecord(body.lease) || !isRecord(body.profile)) {
+    return undefined;
+  }
+
+  const leaseId = body.lease.id;
+  const leaseProfileId = body.lease.profileId;
+  const leasePurpose = body.lease.purpose;
+  const leaseStatus = body.lease.status;
+  const leaseExpiresAt = body.lease.expiresAt;
+  const profileId = body.profile.profileId;
+  const accountStage = body.profile.accountStage;
+
+  if (typeof leaseId !== "string" || leaseId.trim().length === 0) {
+    return undefined;
+  }
+
+  if (typeof profileId !== "string" || profileId.trim().length === 0) {
+    return undefined;
+  }
+
+  if (typeof accountStage !== "string" || accountStage.trim().length === 0) {
+    return undefined;
+  }
+
+  if (profileId !== requestedProfileId) {
+    return undefined;
+  }
+
+  if (typeof leaseProfileId !== "string" || leaseProfileId !== requestedProfileId) {
+    return undefined;
+  }
+
+  if (leasePurpose !== "HOME_FEED_COLLECTION") {
+    return undefined;
+  }
+
+  if (leaseStatus !== "ACTIVE") {
+    return undefined;
+  }
+
+  return {
+    ok: true,
+    profileId,
+    accountStage,
+    leaseId,
+    ...(typeof leaseExpiresAt === "string" && leaseExpiresAt.trim().length > 0
+      ? { leaseExpiresAt }
+      : {}),
+  };
+}
+
+function toHomeFeedCheckoutFailure(
+  failure: HttpFailure,
+): Extract<ProfileHomeFeedCheckoutResult, { readonly ok: false }> {
   return {
     ok: false,
     statusCode: failure.statusCode,

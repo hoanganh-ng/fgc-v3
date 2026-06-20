@@ -161,6 +161,38 @@ Owns:
   validation, `SourcePublisher` review or status mutation,
   source-group promotion, Content Builder, or Content Publisher
   behavior.
+- Sprint 065C2 (active and authorized) adds the explicit
+  profile-bound checkout path for the exact profile referenced by a
+  `ProfileHomeFeedCollectionRun`. It extends `ProfileLeasePurpose`
+  with a fourth value, `HOME_FEED_COLLECTION`, which shares the
+  existing `COLLECTION_READY` account-stage rule and the full
+  existing safety and readiness check set (including the approved
+  `NETWORK_CONTEXT_MISSING` rule). It adds
+  `CheckoutProfileForHomeFeedCollectionUseCase` (input:
+  `{ profileId }` only — no `Source Group` reference, no
+  profile-source access record, no candidate selection) which
+  atomically marks the profile `BUSY` and saves an `ACTIVE`
+  `HOME_FEED_COLLECTION` lease through the existing transaction
+  manager. It adds `POST
+  /collector/profiles/:profileId/home-feed/checkout` with no required
+  body and a strict empty-allowlist body schema. It extends
+  `ProfileManagerHttpClient` with a dedicated
+  `checkoutProfileForHomeFeedCollection(profileId)` method backed by a
+  new application-owned `ProfileHomeFeedCheckoutPort` that returns
+  only `{ profileId, accountStage, leaseId, leaseExpiresAt? }`. It
+  adds migration `0024` (PostgreSQL `ALTER TYPE ... ADD VALUE`) to add
+  `HOME_FEED_COLLECTION` to the existing
+  `collector_profile_lease_purpose` enum. The migration preserves
+  the one-active-lease-per-profile unique partial index unchanged.
+  `GetRuntimeProfileConfigurationUseCase` accepts an active
+  `HOME_FEED_COLLECTION` lease for its matching `BUSY` profile.
+  `ReleaseProfileLeaseUseCase` releases the lease and returns the
+  profile to `READY`. Sprint 065C2 does not execute a run, navigate
+  Facebook, capture payloads, observe `SourcePublisher`, submit
+  Content Manager items, add workers or schedulers, change Docker,
+  add Web UI behavior, or make any live-Facebook claim. The new
+  `ProfileHomeFeedCheckoutPort` is not wired into a worker or
+  executor in Sprint 065C2.
 - Safe read APIs.
 - Future handoff shape for Content Builder.
 
