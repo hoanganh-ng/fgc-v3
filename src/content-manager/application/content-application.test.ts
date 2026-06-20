@@ -1186,7 +1186,14 @@ describe("ingest home feed collected content use case", () => {
     ).rejects.toThrow(SourcePublisherNotFoundError);
   });
 
-  it("rejects when the source publisher platform does not match the content platform", async () => {
+  it("accepts a matching publisher/content platform pair (FACEBOOK)", async () => {
+    // The platform enum currently contains only FACEBOOK, so a
+    // mismatched-platform case cannot be constructed end-to-end. This
+    // test exercises the matching branch and asserts that the use case
+    // does not throw HomeFeedCollectedContentPlatformMismatchError when
+    // publisher.platform equals content.platform. Direct coverage of the
+    // mismatch branch will become possible when another ContentPlatform
+    // is introduced; the defensive branch is retained in the use case.
     const context = createTestContext(["content-item-home-feed-1"]);
     await seedSourcePublisher(context, {
       platform: "FACEBOOK",
@@ -1199,9 +1206,12 @@ describe("ingest home feed collected content use case", () => {
       context.clock,
     );
 
-    await expect(
-      useCase.execute(createHomeFeedCollectedContentInput()),
-    ).resolves.toBeDefined();
+    const item = await useCase.execute(createHomeFeedCollectedContentInput());
+
+    expect(item.platform).toBe("FACEBOOK");
+    expect(item.collectionProvenance.firstCollectionSurface).toEqual({
+      kind: "PROFILE_HOME_FEED",
+    });
   });
 });
 

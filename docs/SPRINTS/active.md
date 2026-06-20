@@ -139,6 +139,11 @@ existing home-feed-first item while preserving the original
 `PROFILE_HOME_FEED` first surface. It extends the Web UI
 `ContentItem` schema and the list/detail pages to render
 "No managed source group" safely when `sourceGroupId` is omitted.
+Generic `ContentCollectionProvenance` and
+`CollectedContentProvenanceInput` continue to allow an absent
+`sourcePublisherId`; the dedicated
+`HomeFeedCollectedContentInputSchema` and
+`POST /collector/content-items/home-feed` route still require it.
 Sprint 065C1 does not add browser execution, Facebook navigation,
 capture, extractor orchestration, Collector Runtime HTTP client
 changes, workers, schedulers, Docker service changes, live-Facebook

@@ -7,6 +7,7 @@ import {
   GetSourceGroupUseCase,
   GetSourcePublisherUseCase,
   IngestCollectedContentUseCase,
+  IngestHomeFeedCollectedContentUseCase,
   ListContentCategoriesUseCase,
   ListContentItemsUseCase,
   ListSourceGroupsUseCase,
@@ -84,6 +85,7 @@ function expectContentManagerServices(services: {
   readonly updateSourceGroupStatus: unknown;
   readonly listSourceGroups: unknown;
   readonly ingestCollectedContent: unknown;
+  readonly ingestHomeFeedCollectedContent: unknown;
   readonly updateContentStatus: unknown;
   readonly getContentItem: unknown;
   readonly listContentItems: unknown;
@@ -115,6 +117,11 @@ function expectContentManagerServices(services: {
   expect(services.listSourceGroups).toBeInstanceOf(ListSourceGroupsUseCase);
   expect(services.ingestCollectedContent).toBeInstanceOf(
     IngestCollectedContentUseCase,
+  );
+  // Sprint 065C1: the dedicated home-feed ingestion use case is wired
+  // through both the in-memory and database-backed composition roots.
+  expect(services.ingestHomeFeedCollectedContent).toBeInstanceOf(
+    IngestHomeFeedCollectedContentUseCase,
   );
   expect(services.updateContentStatus).toBeInstanceOf(
     UpdateContentStatusUseCase,

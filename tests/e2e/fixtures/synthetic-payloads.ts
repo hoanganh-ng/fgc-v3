@@ -1,6 +1,7 @@
 /**
- * Synthetic fixtures for the Sprint 062 baseline E2E flow and the
- * Sprint 063C Source Publisher HTTP E2E flow.
+ * Synthetic fixtures for the Sprint 062 baseline E2E flow, the Sprint
+ * 063C Source Publisher HTTP E2E flow, and the Sprint 065C1 home-feed
+ * content ingestion E2E flow.
  *
  * These fixtures are deterministic, isolated to the E2E run, and never
  * reference real Facebook identifiers, sessions, cookies, localStorage,
@@ -33,6 +34,28 @@ export interface SyntheticSourcePublisherObservationFixture {
   readonly observedAt: string;
   readonly displayName: string;
   readonly canonicalUrl: string;
+}
+
+export interface SyntheticHomeFeedContentFixture {
+  readonly sourcePublisherId: string;
+  readonly platform: "FACEBOOK";
+  readonly externalPostId: string;
+  readonly sourceUrl: string;
+  readonly title: string;
+  readonly bodyText: string;
+  readonly authorDisplayName: string;
+  readonly authorExternalId: string;
+  readonly postedAt: string;
+  readonly collectedAt: string;
+  readonly reactionCount: number;
+  readonly commentCount: number;
+  readonly topComments: readonly {
+    readonly externalCommentId: string;
+    readonly bodyText: string;
+    readonly authorDisplayName: string;
+    readonly reactionCount: number;
+    readonly collectedAt: string;
+  }[];
 }
 
 export function buildCategoryFixture(
@@ -89,6 +112,38 @@ export function buildSourcePublisherSecondObservationFixture(
     observedAt: options.observedAt,
     displayName: `${base.displayName} (Updated)`,
     canonicalUrl: `${base.canonicalUrl}-v2`,
+  };
+}
+
+export function buildHomeFeedContentFixture(
+  runStamp: string,
+  sourcePublisherId: string,
+  options: { readonly externalPostId?: string } = {},
+): SyntheticHomeFeedContentFixture {
+  const externalPostId = options.externalPostId ?? `sprint-065c1-post-${runStamp}`;
+  return {
+    sourcePublisherId,
+    platform: "FACEBOOK",
+    externalPostId,
+    sourceUrl: `https://example.invalid/sprint-065c1-${runStamp}`,
+    title: `Sprint 065C1 Home-Feed Candidate ${runStamp}`,
+    bodyText:
+      "Synthetic normalized home-feed candidate body used by the Sprint 065C1 E2E flow. Never derived from a real Facebook payload.",
+    authorDisplayName: `Sprint 065C1 Author ${runStamp}`,
+    authorExternalId: `sprint-065c1-author-${runStamp}`,
+    postedAt: "2026-02-01T09:00:00.000Z",
+    collectedAt: "2026-02-01T10:00:00.000Z",
+    reactionCount: 12,
+    commentCount: 3,
+    topComments: [
+      {
+        externalCommentId: `sprint-065c1-comment-${runStamp}`,
+        bodyText: "Synthetic top comment for the Sprint 065C1 home-feed E2E flow.",
+        authorDisplayName: `Sprint 065C1 Commenter ${runStamp}`,
+        reactionCount: 9,
+        collectedAt: "2026-02-01T10:00:00.000Z",
+      },
+    ],
   };
 }
 

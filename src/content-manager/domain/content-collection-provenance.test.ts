@@ -339,19 +339,35 @@ describe("content collection provenance creation", () => {
     expect(provenance.managedSourceGroupId).toBe("source-group-1");
   });
 
-  it("requires sourcePublisherId when the surface is PROFILE_HOME_FEED", () => {
+  it("accepts an absent sourcePublisherId on generic PROFILE_HOME_FEED input", () => {
+    // Generic provenance remains permissive: a SOURCE_GROUP first
+    // surface backfill observation may carry a home-feed marker without
+    // inventing a `sourcePublisherId`. The dedicated
+    // HomeFeedCollectedContentInputSchema keeps the strict
+    // sourcePublisherId-required contract at the public ingestion
+    // boundary.
     const result = CollectedContentProvenanceInputSchema.safeParse({
       collectionSurface: PROFILE_HOME_FEED_SURFACE,
     });
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ path: ["sourcePublisherId"] }),
-        ]),
-      );
-    }
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts an absent sourcePublisherId on durable PROFILE_HOME_FEED provenance", () => {
+    const result = ContentCollectionProvenanceSchema.safeParse({
+      firstCollectionSurface: PROFILE_HOME_FEED_SURFACE,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("still accepts sourcePublisherId on generic PROFILE_HOME_FEED input when supplied", () => {
+    const result = CollectedContentProvenanceInputSchema.safeParse({
+      collectionSurface: PROFILE_HOME_FEED_SURFACE,
+      sourcePublisherId: "source-publisher-1",
+    });
+
+    expect(result.success).toBe(true);
   });
 
   it("omits an absent managedSourceGroupId rather than serializing null", () => {
@@ -662,6 +678,11 @@ describe("content collection provenance runtime validation", () => {
         managedSourceGroupId: "source-group-1",
         sourcePublisherId: "publisher-1",
       }),
+      // Generic provenance may omit sourcePublisherId when only the
+      // collection surface is known.
+      {
+        collectionSurface: PROFILE_HOME_FEED_SURFACE,
+      },
     ];
 
     for (const input of inputs) {

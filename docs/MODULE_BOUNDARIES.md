@@ -129,14 +129,16 @@ Owns:
   may omit both `sourceGroupId` and `managedSourceGroupId`; when
   either is present both must be present and equal.
   `CollectionProvenance` does not gain `profileId`, `runId`, URLs,
-  raw payloads, or event history. The dedicated
-  `IngestHomeFeedCollectedContentUseCase` accepts an input carrying
-  only `sourcePublisherId` and normalized safe content (no
-  `sourceGroupId`, `managedSourceGroupId`, `profileId`, `runId`,
-  provenance, raw GraphQL, cookies, localStorage, tokens, headers,
-  proxy details, viewer data, or unknown fields), verifies the
-  publisher exists and its platform matches, and persists the item
-  with `firstCollectionSurface.kind = "PROFILE_HOME_FEED"`, no
+  raw payloads, or event history. Generic PROFILE_HOME_FEED
+  provenance permits an absent `sourcePublisherId`; the dedicated
+  `IngestHomeFeedCollectedContentUseCase` boundary still requires
+  it. The use case accepts an input carrying only `sourcePublisherId`
+  and normalized safe content (no `sourceGroupId`,
+  `managedSourceGroupId`, `profileId`, `runId`, provenance, raw
+  GraphQL, cookies, localStorage, tokens, headers, proxy details,
+  viewer data, or unknown fields), verifies the publisher exists and
+  its platform matches, and persists the item with
+  `firstCollectionSurface.kind = "PROFILE_HOME_FEED"`, no
   `sourceGroupId`, no `managedSourceGroupId`, and no fake Home Feed
   `SourceGroup`. The use case preserves the immutable first surface
   on duplicates, fills absent associations on later merges, is

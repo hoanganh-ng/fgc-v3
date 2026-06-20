@@ -29,6 +29,17 @@ export const CollectionSurfaceSchema = z.discriminatedUnion("kind", [
 
 export const ManagedSourceGroupIdSchema = SourceGroupIdSchema;
 
+// Generic PROFILE_HOME_FEED provenance must permit an absent
+// `sourcePublisherId`. Source-group ingestion of a home-feed-first item
+// fills the optional `managedSourceGroupId` later; the generic contract
+// carries only the collection surface, the optional publisher
+// association, and the optional managed-source-group association.
+//
+// `HomeFeedCollectedContentInputSchema` (in `./content.schemas`) keeps
+// the strict `sourcePublisherId`-required contract at the dedicated
+// home-feed ingestion boundary so the public HTTP endpoint still
+// rejects a missing publisher id. Sprint 064A established this
+// contract; Sprint 065C1 must not widen it.
 export const CollectedContentProvenanceInputSchema = z
   .object({
     collectionSurface: CollectionSurfaceSchema,
@@ -58,17 +69,6 @@ export const CollectedContentProvenanceInputSchema = z
             "managedSourceGroupId must equal collectionSurface.sourceGroupId when collectionSurface.kind is SOURCE_GROUP.",
         });
       }
-
-      return;
-    }
-
-    if (value.sourcePublisherId === undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["sourcePublisherId"],
-        message:
-          "sourcePublisherId is required when collectionSurface.kind is PROFILE_HOME_FEED.",
-      });
     }
   });
 
@@ -101,17 +101,6 @@ export const ContentCollectionProvenanceSchema = z
             "managedSourceGroupId must equal firstCollectionSurface.sourceGroupId when firstCollectionSurface.kind is SOURCE_GROUP.",
         });
       }
-
-      return;
-    }
-
-    if (value.sourcePublisherId === undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["sourcePublisherId"],
-        message:
-          "sourcePublisherId is required when firstCollectionSurface.kind is PROFILE_HOME_FEED.",
-      });
     }
   });
 

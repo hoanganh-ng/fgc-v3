@@ -30,6 +30,7 @@ It makes no live-Facebook validation claim.
 - `src/content-manager/domain/content-collection-provenance*`
 - `src/content-manager/domain/source-publisher*`
 - `src/content-manager/application/use-cases/ingest-collected-content.use-case.ts`
+- `src/content-manager/application/use-cases/ingest-home-feed-collected-content.use-case.ts`
 - `src/content-manager/application/content-validation.ts`
 - `src/content-manager/application/ports/source-publisher-repository.port.ts`
 - `src/content-manager/application/application-errors.ts`
@@ -45,9 +46,9 @@ It makes no live-Facebook validation claim.
 - `apps/web/src/pages/content-items-page.tsx`
 - `apps/web/src/pages/content-item-detail-page.tsx`
 - Relevant nearby tests for the files above
-- `drizzle/0020_content_items_collection_provenance_not_null.sql`
+- `drizzle/0023_content_items_source_group_id_nullable.sql`
 - `drizzle/meta/_journal.json`
-- `drizzle/meta/0020_snapshot.json`
+- `drizzle/meta/0023_snapshot.json`
 
 ## Capability Summary
 
@@ -61,7 +62,9 @@ It makes no live-Facebook validation claim.
   and `managedSourceGroupId`. When either is present both must be
   present and equal.
 - `CollectionProvenance` does not gain `profileId`, `runId`, URLs,
-  raw payloads, or event history.
+  raw payloads, or event history. Generic PROFILE_HOME_FEED
+  provenance allows an absent `sourcePublisherId`; the dedicated
+  home-feed ingestion boundary still requires it.
 - A dedicated `IngestHomeFeedCollectedContentUseCase` ingests a
   home-feed candidate carrying only `sourcePublisherId` and
   normalized safe content. The use case verifies the publisher
@@ -145,9 +148,12 @@ allowlist is strict and rejects unknown fields.
 pnpm exec vitest run \
   src/content-manager/domain/content-domain.test.ts \
   src/content-manager/domain/content-collection-provenance.test.ts \
+  src/content-manager/domain/content-collection-provenance.test.merge.test.ts \
   src/content-manager/application/content-application.test.ts \
   src/infrastructure/database/mappers/content-manager.mapper.test.ts \
-  src/interfaces/http/content-manager.server.test.ts
+  src/infrastructure/database/mappers/content-manager.mapper.collection-provenance.test.ts \
+  src/interfaces/http/content-manager.server.test.ts \
+  src/composition/content-manager/content-manager.container.test.ts
 
 pnpm exec vitest run \
   apps/web/src/lib/api/content-manager-client.test.ts \
@@ -159,21 +165,35 @@ pnpm test
 pnpm web:typecheck
 pnpm web:build
 
-pnpm exec vitest run \
-  src/infrastructure/database/repositories/drizzle-content-item.repository.integration.test.ts
+compose="docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml"
+$compose down -v --remove-orphans
+$compose build api
+$compose up -d --wait postgres
+$compose run --rm --no-deps api sh -lc '
+  pnpm db:migrate &&
+  RUN_DB_TESTS=true pnpm exec vitest run \
+    src/infrastructure/database/repositories/drizzle-content-item.repository.collection-provenance.integration.test.ts \
+    src/infrastructure/database/repositories/drizzle-content-manager-repositories.integration.test.ts
+'
+$compose run --rm --no-deps api sh -lc 'pnpm test:db'
+$compose run --rm --no-deps api sh -lc 'pnpm test:http:db'
+$compose down -v --remove-orphans
 
-pnpm test:db
-pnpm test:http:db
 pnpm test:e2e:docker
 git diff --check
 git status --short
 ```
 
-`test:db`, `test:http:db`, and `test:e2e:docker` remain opt-in and
-require the existing PostgreSQL / Docker environment variables.
-Commands that cannot run because of missing opt-in infrastructure
-will be reported as unverified; verification claims will not be
-fabricated.
+`test:db`, `test:http:db`, and `test:e2e:docker` are mandatory and
+must run through the Docker-backed Compose project `fgc-v3-e2e`. The
+focused Sprint 065C1 PostgreSQL repository integration test
+extends the existing Sprint 064B file
+`drizzle-content-item.repository.collection-provenance.integration.test.ts`
+with bare home-feed coverage. The focused PostgreSQL-backed HTTP
+integration test extends the existing
+`content-manager.server.database.integration.test.ts`. The focused
+Docker E2E spec is
+`tests/e2e/home-feed-content-ingestion.spec.ts`.
 
 ## Status
 

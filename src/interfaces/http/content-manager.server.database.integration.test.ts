@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -602,7 +602,293 @@ if (!shouldRunHttpDbTests) {
       ).toBe(true);
       expectSourcePublisherIsSafe(listBody);
     });
+
+    // --------------------------------------------------------------
+    // Sprint 065C1 — bare home-feed HTTP integration through
+    // composition → repositories → PostgreSQL with end-to-end
+    // safe DTO assertions and a final source-group follow-up that
+    // preserves the PROFILE_HOME_FEED first surface.
+    // --------------------------------------------------------------
+    it("ingests a home-feed candidate, persists SQL NULL on source_group_id, and exposes a safe DTO", async () => {
+      const externalPublisherId = nextTestId("external-publisher-home-feed");
+      const externalPostId = nextTestId("external-post-home-feed");
+
+      // 1. Create or observe a synthetic SourcePublisher through the
+      // existing HTTP boundary.
+      const observeResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/source-publishers/observations",
+        payload: {
+          platform: "FACEBOOK",
+          kind: "PAGE",
+          externalPublisherId,
+          observedAt: "2026-06-18T12:00:00.000Z",
+          displayName: "Synthetic Home Feed Publisher",
+          canonicalUrl: `https://example.invalid/pages/${externalPublisherId}`,
+        },
+      });
+      const observeBody = observeResponse.json() as {
+        readonly sourcePublisher: { readonly id: string };
+      };
+      const sourcePublisherId = trackSourcePublisherId(
+        observeBody.sourcePublisher.id,
+      );
+
+      expect(observeResponse.statusCode).toBe(200);
+
+      // 2. POST /collector/content-items/home-feed using the returned
+      // publisher id and normalized synthetic content.
+      const ingestResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/content-items/home-feed",
+        payload: {
+          sourcePublisherId,
+          platform: "FACEBOOK",
+          externalPostId,
+          sourceUrl: `https://facebook.test/posts/${externalPostId}`,
+          title: "Home-feed candidate",
+          bodyText: "A normalized home-feed candidate body.",
+          authorDisplayName: "Home Author",
+          authorExternalId: "home-author-1",
+          postedAt: "2026-02-01T09:00:00.000Z",
+          collectedAt: "2026-02-01T10:00:00.000Z",
+          reactionCount: 12,
+          commentCount: 3,
+          topComments: [
+            {
+              externalCommentId: nextTestId("home-comment"),
+              bodyText: "Top home-feed comment.",
+              reactionCount: 9,
+              collectedAt: "2026-02-01T10:00:00.000Z",
+            },
+          ],
+        },
+      });
+      const ingestBody = ingestResponse.json() as {
+        readonly contentItem: {
+          readonly id: string;
+          readonly platform: string;
+          readonly status: string;
+          readonly sourceGroupId?: string;
+        };
+      };
+      const contentItemId = trackContentItemId(ingestBody.contentItem.id);
+
+      // 3. Response asserts safe envelope + omission of sourceGroupId.
+      expect(ingestResponse.statusCode).toBe(200);
+      expect(ingestBody.contentItem).not.toHaveProperty("sourceGroupId");
+      expect(ingestBody.contentItem).toMatchObject({
+        id: contentItemId,
+        platform: "FACEBOOK",
+        status: "COLLECTED",
+      });
+      expect(JSON.stringify(ingestBody)).not.toContain("collectionProvenance");
+      expect(JSON.stringify(ingestBody)).not.toContain("sourcePublisherId");
+      expectHomeFeedResponseIsSafe(ingestBody);
+
+      // 4. GET the item and confirm the same safe response behavior.
+      const getResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/content-items/${contentItemId}`,
+      });
+      const getBody = getResponse.json() as {
+        readonly contentItem: Record<string, unknown>;
+      };
+
+      expect(getResponse.statusCode).toBe(200);
+      expect(getBody.contentItem).not.toHaveProperty("sourceGroupId");
+      expect(JSON.stringify(getBody)).not.toContain("collectionProvenance");
+      expect(JSON.stringify(getBody)).not.toContain("sourcePublisherId");
+      expectHomeFeedResponseIsSafe(getBody);
+
+      // 5. List content items and confirm the item is returned safely.
+      const listResponse = await getServer().inject({
+        method: "GET",
+        url: "/collector/content-items?limit=100&offset=0",
+      });
+      const listBody = listResponse.json() as {
+        readonly items: readonly { readonly id: string }[];
+      };
+
+      expect(listResponse.statusCode).toBe(200);
+      expect(
+        listBody.items.some((item) => item.id === contentItemId),
+      ).toBe(true);
+      expectHomeFeedResponseIsSafe(listBody);
+
+      // 6. Inspect persistence through the database seam and confirm
+      // source_group_id is SQL NULL. We must NOT use the public DTO
+      // to perform this assertion — collectionProvenance is internal.
+      const [persistedRow] = await client!.db
+        .select({
+          sourceGroupId: contentItems.sourceGroupId,
+          collectionProvenance: contentItems.collectionProvenance,
+        })
+        .from(contentItems)
+        .where(sql`${contentItems.id} = ${contentItemId}`);
+      expect(persistedRow?.sourceGroupId).toBeNull();
+      expect(persistedRow?.collectionProvenance).toEqual({
+        firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
+        sourcePublisherId,
+      });
+
+      // 7. Create a synthetic Category and SourceGroup, then submit
+      // the same platform + externalPostId through the legacy
+      // source-group endpoint. The follow-up must fill
+      // `managedSourceGroupId` while preserving PROFILE_HOME_FEED as
+      // the first surface.
+      const categorySlug = nextTestSlug("home-feed-category");
+      const categoryId = trackCategoryId(
+        (
+          (await getServer().inject({
+            method: "POST",
+            url: "/collector/content-categories",
+            payload: {
+              name: "Home Feed Category",
+              slug: categorySlug,
+            },
+          })).json() as { readonly category: { readonly id: string } }
+        ).category.id,
+      );
+
+      const sourceGroupId = trackSourceGroupId(
+        (
+          (await getServer().inject({
+            method: "POST",
+            url: "/collector/source-groups",
+            payload: {
+              platform: "FACEBOOK",
+              externalGroupId: nextTestId("external-group-home-feed"),
+              name: "Home Feed Source Group",
+              url: `https://facebook.test/groups/home-feed-${categoryId}`,
+              categoryId,
+              collectionPriority: 50,
+            },
+          })).json() as { readonly sourceGroup: { readonly id: string } }
+        ).sourceGroup.id,
+      );
+
+      const followUpResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/content-items",
+        payload: createIngestPayload({
+          sourceGroupId,
+          externalPostId,
+          reactionCount: 25,
+          commentCount: 5,
+          rawPayloadRef: "s3://content-payloads/home-feed-followup.json",
+          topComments: [
+            createTopCommentPayload({
+              externalCommentId: nextTestId("home-feed-followup-comment"),
+              bodyText: "Follow-up high engagement comment.",
+              reactionCount: 21,
+            }),
+          ],
+        }),
+      });
+      const followUpBody = followUpResponse.json() as {
+        readonly contentItem: {
+          readonly id: string;
+          readonly sourceGroupId?: string;
+          readonly status: string;
+        };
+      };
+
+      // 9. Public DTO now returns sourceGroupId.
+      expect(followUpResponse.statusCode).toBe(200);
+      expect(followUpBody.contentItem).toMatchObject({
+        id: contentItemId,
+        sourceGroupId,
+      });
+
+      // 10. Internal provenance still preserves PROFILE_HOME_FEED and
+      // carries sourcePublisherId + managedSourceGroupId.
+      const [followUpRow] = await client!.db
+        .select({
+          sourceGroupId: contentItems.sourceGroupId,
+          collectionProvenance: contentItems.collectionProvenance,
+        })
+        .from(contentItems)
+        .where(sql`${contentItems.id} = ${contentItemId}`);
+      expect(followUpRow?.sourceGroupId).toBe(sourceGroupId);
+      expect(followUpRow?.collectionProvenance).toEqual({
+        firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
+        sourcePublisherId,
+        managedSourceGroupId: sourceGroupId,
+      });
+
+      // 11. Duplicate follow-up must not persist changes. Re-submit the
+      // same platform + externalPostId with a NEW (different)
+      // sourceGroupId through the legacy endpoint — the merge must
+      // throw ContentCollectionProvenanceConflictError because the
+      // existing item already carries `managedSourceGroupId`.
+      const conflictSourceGroupId = trackSourceGroupId(
+        (
+          (await getServer().inject({
+            method: "POST",
+            url: "/collector/source-groups",
+            payload: {
+              platform: "FACEBOOK",
+              externalGroupId: nextTestId("external-group-conflict"),
+              name: "Conflict Source Group",
+              url: `https://facebook.test/groups/conflict-${categoryId}`,
+              categoryId,
+              collectionPriority: 25,
+            },
+          })).json() as { readonly sourceGroup: { readonly id: string } }
+        ).sourceGroup.id,
+      );
+
+      const duplicateResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/content-items",
+        payload: createIngestPayload({
+          sourceGroupId: conflictSourceGroupId,
+          externalPostId,
+          reactionCount: 999,
+          commentCount: 999,
+          rawPayloadRef: "s3://content-payloads/conflicting.json",
+          topComments: [],
+        }),
+      });
+
+      expect(duplicateResponse.statusCode).toBe(409);
+      expect(duplicateResponse.json()).toMatchObject({
+        error: {
+          code: "CONTENT_COLLECTION_PROVENANCE_CONFLICT",
+        },
+      });
+
+      const [afterConflictRow] = await client!.db
+        .select({
+          reactionCount: contentItems.reactionCount,
+          commentCount: contentItems.commentCount,
+          sourceGroupId: contentItems.sourceGroupId,
+        })
+        .from(contentItems)
+        .where(sql`${contentItems.id} = ${contentItemId}`);
+      expect(afterConflictRow?.reactionCount).toBe(25);
+      expect(afterConflictRow?.commentCount).toBe(5);
+      expect(afterConflictRow?.sourceGroupId).toBe(sourceGroupId);
+    });
   });
+}
+
+function expectHomeFeedResponseIsSafe(payload: unknown): void {
+  const serialized = JSON.stringify(payload);
+
+  expect(serialized).not.toContain("rawPayload");
+  expect(serialized).not.toContain("rawPayloadRef");
+  expect(serialized).not.toContain("rawFacebookGraphqlPayload");
+  expect(serialized).not.toContain("s3://content-payloads");
+  expect(serialized).not.toContain("collectionProvenance");
+  expect(serialized).not.toContain("cookies");
+  expect(serialized).not.toContain("localStorage");
+  expect(serialized).not.toContain("token");
+  expect(serialized).not.toContain("authorization");
+  expect(serialized).not.toContain("proxy");
+  expect(serialized).not.toContain("viewerId");
+  expect(serialized).not.toContain("accountId");
 }
 
 interface CreateIngestPayloadOptions {

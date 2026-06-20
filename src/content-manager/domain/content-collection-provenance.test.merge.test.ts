@@ -177,11 +177,44 @@ describe("ContentItem with collectionProvenance (Sprint 064B)", () => {
     ).toBe(true);
   });
 
-  it("rejects a PROFILE_HOME_FEED content item with no managed group (bare home feed)", () => {
+  it("accepts a PROFILE_HOME_FEED content item with no managed group (bare home feed)", () => {
+    // Sprint 065C1 makes `sourceGroupId` optional. A bare home-feed
+    // content item whose first surface is `PROFILE_HOME_FEED` and
+    // whose `managedSourceGroupId` is also omitted is valid and
+    // round-trips through `validateContentItem`.
     const item = createContentItem({
+      sourceGroupId: undefined,
       collectionProvenance: {
         firstCollectionSurface: { kind: "PROFILE_HOME_FEED" },
-      } as ContentCollectionProvenance,
+        sourcePublisherId: "source-publisher-1",
+      } satisfies ContentCollectionProvenance,
+    });
+
+    const result = validateContentItem(item);
+
+    expect(result.valid).toBe(true);
+    if (!result.valid) {
+      return;
+    }
+    expect(result.value.sourceGroupId).toBeUndefined();
+    expect(
+      result.value.collectionProvenance.managedSourceGroupId,
+    ).toBeUndefined();
+    expect(result.value.collectionProvenance.firstCollectionSurface).toEqual({
+      kind: "PROFILE_HOME_FEED",
+    });
+    expect(result.value.collectionProvenance.sourcePublisherId).toBe(
+      "source-publisher-1",
+    );
+  });
+
+  it("rejects a PROFILE_HOME_FEED content item with only managedSourceGroupId (legacy missing)", () => {
+    // Cross-field invariant: when the first surface is PROFILE_HOME_FEED
+    // and `managedSourceGroupId` is supplied, `sourceGroupId` must be
+    // present and equal.
+    const item = createContentItem({
+      sourceGroupId: undefined,
+      collectionProvenance: createHomeFeedProvenance("source-group-1"),
     });
 
     const result = validateContentItem(item);
