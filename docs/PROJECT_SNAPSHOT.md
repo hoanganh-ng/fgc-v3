@@ -24,15 +24,15 @@ to the Sprint 065A extractor, capture payloads, observe
 schedulers, change Docker, add Web UI behavior, or make any
 live-Facebook claim.
 
-Sprint 065C1 — Bare Home-Feed Content Ingestion is **active and
-authorized**. It closes the gap between Sprint 065A's normalized
-home-feed candidates and Content Manager ingestion by making
-`ContentItem.sourceGroupId` optional in the domain schema and DTOs
-and `NULL`-tolerant in PostgreSQL, adding a dedicated
-`IngestHomeFeedCollectedContentUseCase` that ingests a home-feed
-candidate with `sourcePublisherId` only and persists an item whose
-`firstCollectionSurface.kind = "PROFILE_HOME_FEED"` with no
-`sourceGroupId`, no `managedSourceGroupId`, and no fake Home Feed
+Sprint 065C1 — Bare Home-Feed Content Ingestion is **accepted** at
+`40b3ce7023c126c03386994a719ae7acb7758f21`. It closes the gap
+between Sprint 065A's normalized home-feed candidates and Content
+Manager ingestion by making `ContentItem.sourceGroupId` optional in
+the domain schema and DTOs and `NULL`-tolerant in PostgreSQL, adding
+a dedicated `IngestHomeFeedCollectedContentUseCase` that ingests a
+home-feed candidate with `sourcePublisherId` only and persists an
+item whose `firstCollectionSurface.kind = "PROFILE_HOME_FEED"` with
+no `sourceGroupId`, no `managedSourceGroupId`, and no fake Home Feed
 `SourceGroup`. It adds `POST /collector/content-items/home-feed` with
 a strict allowlist body schema and extends the existing source-group
 ingestion so a later source-group collection can fill
@@ -46,28 +46,38 @@ changes, workers, schedulers, Docker service changes, live-Facebook
 validation, `SourcePublisher` review or status mutation,
 source-group promotion, Content Builder, or Content Publisher
 behavior. `collectionProvenance` remains internal-only and is not
-exposed through HTTP DTOs.
+exposed through HTTP DTOs. Sprint 065C1 makes no browser or
+live-Facebook execution claim.
 
-Sprint 065C2 — Profile-Bound Home-Feed Checkout is **active and
-authorized**. It adds the explicit profile-bound checkout path for
-the exact profile referenced by a `ProfileHomeFeedCollectionRun`.
-It extends `ProfileLeasePurpose` with a fourth value,
-`HOME_FEED_COLLECTION`, which shares the existing `COLLECTION_READY`
-account-stage rule and the full existing safety and readiness check
-set (including the approved `NETWORK_CONTEXT_MISSING` rule). It
-adds `CheckoutProfileForHomeFeedCollectionUseCase` (input:
-`{ profileId }` only — no Source Group, no profile-source access
-record, no candidate selection) which atomically marks the profile
-`BUSY` and saves an `ACTIVE` `HOME_FEED_COLLECTION` lease through the
-existing transaction manager. It adds `POST
+Sprint 065C2 — Profile-Bound Home-Feed Checkout is the **only active
+and authorized** sprint. It is the implementation authority. It
+adds the explicit profile-bound checkout path for the exact profile
+referenced by a `ProfileHomeFeedCollectionRun`. It extends
+`ProfileLeasePurpose` with a fourth value, `HOME_FEED_COLLECTION`,
+which shares the existing `COLLECTION_READY` account-stage rule and
+the full existing safety and readiness check set (including the
+approved `NETWORK_CONTEXT_MISSING` rule). It adds
+`CheckoutProfileForHomeFeedCollectionUseCase` (input: `{ profileId }`
+only — no Source Group, no profile-source access record, no
+candidate selection) which loads the exact requested profile, then
+queries the active lease, throws `ProfileLeaseStateConflictError`
+when an active lease exists, evaluates `HOME_FEED_COLLECTION`
+eligibility, and atomically marks the profile `BUSY` and saves an
+`ACTIVE` `HOME_FEED_COLLECTION` lease through the existing
+transaction manager. It adds `POST
 /collector/profiles/:profileId/home-feed/checkout` with no required
-body and a strict empty-allowlist body schema. It extends
-`ProfileManagerHttpClient` with a dedicated
-`checkoutProfileForHomeFeedCollection(profileId)` method backed by a
-new application-owned `ProfileHomeFeedCheckoutPort` that returns
-only `{ profileId, accountStage, leaseId, leaseExpiresAt? }`. It
-adds migration `0024` (PostgreSQL `ALTER TYPE ... ADD VALUE`) to add
-`HOME_FEED_COLLECTION` to the existing
+body and a strict empty-allowlist body schema. Duplicate checkouts
+of the same profile are mapped to HTTP 409 with
+`PROFILE_LEASE_STATE_CONFLICT`. It extends `ProfileManagerHttpClient`
+with a dedicated `checkoutProfileForHomeFeedCollection(profileId)`
+method backed by a new application-owned
+`ProfileHomeFeedCheckoutPort` whose `accountStage` is typed as
+`CollectorRuntimeAccountStage` (parsed through
+`CollectorRuntimeAccountStageSchema`; an unsupported or malformed
+account stage produces `PROFILE_MANAGER_RESPONSE_ERROR`). The port
+returns only `{ profileId, accountStage, leaseId, leaseExpiresAt? }`.
+It adds migration `0024` (PostgreSQL `ALTER TYPE ... ADD VALUE`) to
+add `HOME_FEED_COLLECTION` to the existing
 `collector_profile_lease_purpose` enum. The migration preserves the
 one-active-lease-per-profile unique partial index unchanged.
 `GetRuntimeProfileConfigurationUseCase` accepts an active
@@ -83,7 +93,8 @@ in Sprint 065C2.
 Sprint 065C3 remains **inactive and unauthorized**. It will split
 the Sprint 065C "Manual Home-Feed Execution" work but is not
 authorized by Sprint 065C2.
-Sprint 065C1 — Bare Home-Feed Content Ingestion (Active).
+Sprint 065C2 — Profile-Bound Home-Feed Checkout (Active).
+Sprint 065C1 — Bare Home-Feed Content Ingestion (Accepted).
 Sprint 065B — Profile-Bound Home-Feed Run Model (Accepted).
 Sprint 065A — Facebook Home-Feed Extractor Fixtures (Accepted).
 Sprint 063C — Source Publisher HTTP Contract and E2E (Accepted).
@@ -92,7 +103,7 @@ Sprint 064B — Provenance Persistence And Compatibility (Accepted).
 Sprint 063B — Source Publisher Persistence and Atomic Observation (Accepted).
 Sprint 063A — Source Publisher Domain and Application (Accepted).
 
-- **Content Management**: Storage of normalized Facebook knowledge group text posts and top comments, and the Content Manager-owned `SourcePublisher` identity and observation behavior (durable publishing-source identity for a Facebook group or page observed while reading a feed, with `DISCOVERED | APPROVED | IGNORED | BLOCKED` review status). `SourcePublisher` is distinct from managed `SourceGroup` and is not the future Content Publisher pipeline stage. Sprint 063A (accepted) shipped the domain and application foundation; Sprint 063B (accepted) shipped the durable persistence, the atomic observation algorithm, the durable status update, the durable read operations, and the Content Manager composition wiring; Sprint 063C (accepted) ships the safe observation, list, and get HTTP contracts, the safe `SourcePublisherDto` allowlist, the stub-backed HTTP unit tests, the opt-in PostgreSQL-backed HTTP integration test, the Docker E2E spec through web-gateway, and the corresponding documentation. `SourcePublisher` status mutation (approve / ignore / block) remains deferred to Sprint 066; no review UI, no Web UI changes, no Collector Runtime consumption, no browser execution, and no feed execution are part of Sprint 063C. Sprint 064A (accepted) adds the pure Content Manager `ContentCollectionProvenance` domain model: a strict, Zod-validated `CollectionSurface` discriminated union with `SOURCE_GROUP` (with `sourceGroupId`) and `PROFILE_HOME_FEED` (no profile id, no source group id) branches; a `CollectedContentProvenanceInput` with the collection surface, an optional `sourcePublisherId`, and an optional `managedSourceGroupId` (required and equal to the surface `sourceGroupId` when the surface is `SOURCE_GROUP`; absent or present when the surface is `PROFILE_HOME_FEED`); a durable `ContentCollectionProvenance` with the immutable `firstCollectionSurface` plus the optional associations (the same cross-field rule applies); pure `createInitialContentCollectionProvenance` and `mergeContentCollectionProvenance` that runtime-validate their inputs and outputs against the existing Zod domain schemas, preserve the first surface, fill absent associations later, are idempotent on identical observations, do not mutate inputs, and throw a typed `ContentCollectionProvenanceConflictError` (code `CONTENT_COLLECTION_PROVENANCE_CONFLICT`) on conflicting `sourcePublisherId` or `managedSourceGroupId`. Sprint 064B (accepted) persists the Sprint 064A `ContentCollectionProvenance` value object as a required `collectionProvenance` field on every durable `ContentItem`, adds a final `NOT NULL content_items.collection_provenance JSONB` column, safely backfills every existing source-group content row from its `source_group_id` through a split add-column → backfill → set-NOT-NULL migration sequence mirroring the existing `0011`/`0012`/`0013` split, integrates provenance creation (`createInitialContentCollectionProvenance`) and merge (`mergeContentCollectionProvenance`) into the current source-group ingestion flow, derives `SOURCE_GROUP` provenance internally from the required `sourceGroupId`, propagates typed `ContentCollectionProvenanceConflictError` on conflicting merges, never saves after a failed merge, and keeps the existing `ContentItem.sourceGroupId` field and the PostgreSQL `source_group_id` column required and unchanged for backward compatibility. The HTTP DTOs and JSON schemas are unchanged; `collectionProvenance` is internal-only and is not exposed through HTTP. Sprint 064B does not introduce home-feed ingestion or execution, does not make `sourceGroupId` nullable, does not add `SourcePublisher` observation or resolution, does not add a new HTTP DTO field, does not add a provenance filter or index, and does not change the Collector Runtime, extractor, browser, workers, scheduler, Docker, or Web UI. Sprint 065C1 (active and authorized) makes `ContentItem.sourceGroupId` optional in the domain schema and DTOs and `NULL`-tolerant in PostgreSQL while preserving the existing `sourceGroupId`-required source-group ingestion contract, adds a dedicated `IngestHomeFeedCollectedContentUseCase` whose input carries only `sourcePublisherId` and normalized safe content, validates that the publisher exists and its platform matches, and persists the resulting item with `firstCollectionSurface.kind = "PROFILE_HOME_FEED"`, no `sourceGroupId`, no `managedSourceGroupId`, and no fake Home Feed `SourceGroup`. The use case preserves the immutable first surface on duplicates, fills absent associations on later merges, is idempotent for identical associations, and rejects conflicting associations through the existing typed `ContentCollectionProvenanceConflictError`. Sprint 065C1 adds `POST /collector/content-items/home-feed` with a strict allowlist body schema, makes `ContentItemDto.sourceGroupId` optional and omits it when absent, and keeps `collectionProvenance` internal-only. It extends the existing source-group ingestion so a later source-group collection can fill `sourceGroupId` and `managedSourceGroupId` on a home-feed-first item while preserving its `PROFILE_HOME_FEED` first surface. Sprint 065C1 extends the Web UI `ContentItem` schema and list/detail pages to render "No managed source group" safely when `sourceGroupId` is omitted. Sprint 065C1 does not add browser execution, Facebook navigation, capture, extractor orchestration, Collector Runtime HTTP client changes, workers, schedulers, Docker service changes, live-Facebook validation, `SourcePublisher` review or status mutation, source-group promotion, Content Builder, or Content Publisher behavior. Sprint 065C2 and Sprint 065C3 remain inactive and unauthorized.
+- **Content Management**: Storage of normalized Facebook knowledge group text posts and top comments, and the Content Manager-owned `SourcePublisher` identity and observation behavior (durable publishing-source identity for a Facebook group or page observed while reading a feed, with `DISCOVERED | APPROVED | IGNORED | BLOCKED` review status). `SourcePublisher` is distinct from managed `SourceGroup` and is not the future Content Publisher pipeline stage. Sprint 063A (accepted) shipped the domain and application foundation; Sprint 063B (accepted) shipped the durable persistence, the atomic observation algorithm, the durable status update, the durable read operations, and the Content Manager composition wiring; Sprint 063C (accepted) ships the safe observation, list, and get HTTP contracts, the safe `SourcePublisherDto` allowlist, the stub-backed HTTP unit tests, the opt-in PostgreSQL-backed HTTP integration test, the Docker E2E spec through web-gateway, and the corresponding documentation. `SourcePublisher` status mutation (approve / ignore / block) remains deferred to Sprint 066; no review UI, no Web UI changes, no Collector Runtime consumption, no browser execution, and no feed execution are part of Sprint 063C. Sprint 064A (accepted) adds the pure Content Manager `ContentCollectionProvenance` domain model: a strict, Zod-validated `CollectionSurface` discriminated union with `SOURCE_GROUP` (with `sourceGroupId`) and `PROFILE_HOME_FEED` (no profile id, no source group id) branches; a `CollectedContentProvenanceInput` with the collection surface, an optional `sourcePublisherId`, and an optional `managedSourceGroupId` (required and equal to the surface `sourceGroupId` when the surface is `SOURCE_GROUP`; absent or present when the surface is `PROFILE_HOME_FEED`); a durable `ContentCollectionProvenance` with the immutable `firstCollectionSurface` plus the optional associations (the same cross-field rule applies); pure `createInitialContentCollectionProvenance` and `mergeContentCollectionProvenance` that runtime-validate their inputs and outputs against the existing Zod domain schemas, preserve the first surface, fill absent associations later, are idempotent on identical observations, do not mutate inputs, and throw a typed `ContentCollectionProvenanceConflictError` (code `CONTENT_COLLECTION_PROVENANCE_CONFLICT`) on conflicting `sourcePublisherId` or `managedSourceGroupId`. Sprint 064B (accepted) persists the Sprint 064A `ContentCollectionProvenance` value object as a required `collectionProvenance` field on every durable `ContentItem`, adds a final `NOT NULL content_items.collection_provenance JSONB` column, safely backfills every existing source-group content row from its `source_group_id` through a split add-column → backfill → set-NOT-NULL migration sequence mirroring the existing `0011`/`0012`/`0013` split, integrates provenance creation (`createInitialContentCollectionProvenance`) and merge (`mergeContentCollectionProvenance`) into the current source-group ingestion flow, derives `SOURCE_GROUP` provenance internally from the required `sourceGroupId`, propagates typed `ContentCollectionProvenanceConflictError` on conflicting merges, never saves after a failed merge, and keeps the existing `ContentItem.sourceGroupId` field and the PostgreSQL `source_group_id` column required and unchanged for backward compatibility. The HTTP DTOs and JSON schemas are unchanged; `collectionProvenance` is internal-only and is not exposed through HTTP. Sprint 064B does not introduce home-feed ingestion or execution, does not make `sourceGroupId` nullable, does not add `SourcePublisher` observation or resolution, does not add a new HTTP DTO field, does not add a provenance filter or index, and does not change the Collector Runtime, extractor, browser, workers, scheduler, Docker, or Web UI. Sprint 065C1 (accepted) makes `ContentItem.sourceGroupId` optional in the domain schema and DTOs and `NULL`-tolerant in PostgreSQL while preserving the existing `sourceGroupId`-required source-group ingestion contract, adds a dedicated `IngestHomeFeedCollectedContentUseCase` whose input carries only `sourcePublisherId` and normalized safe content, validates that the publisher exists and its platform matches, and persists the resulting item with `firstCollectionSurface.kind = "PROFILE_HOME_FEED"`, no `sourceGroupId`, no `managedSourceGroupId`, and no fake Home Feed `SourceGroup`. The use case preserves the immutable first surface on duplicates, fills absent associations on later merges, is idempotent for identical associations, and rejects conflicting associations through the existing typed `ContentCollectionProvenanceConflictError`. Sprint 065C1 adds `POST /collector/content-items/home-feed` with a strict allowlist body schema, makes `ContentItemDto.sourceGroupId` optional and omits it when absent, and keeps `collectionProvenance` internal-only. It extends the existing source-group ingestion so a later source-group collection can fill `sourceGroupId` and `managedSourceGroupId` on a home-feed-first item while preserving its `PROFILE_HOME_FEED` first surface. Sprint 065C1 extends the Web UI `ContentItem` schema and list/detail pages to render "No managed source group" safely when `sourceGroupId` is omitted. Sprint 065C1 does not add browser execution, Facebook navigation, capture, extractor orchestration, Collector Runtime HTTP client changes, workers, schedulers, Docker service changes, live-Facebook validation, `SourcePublisher` review or status mutation, source-group promotion, Content Builder, or Content Publisher behavior. Sprint 065C2 is the only active and authorized sprint. Sprint 065C3 remains inactive and unauthorized.
 
 - Sprint 062: Feed Discovery Delivery Plan And Docker E2E Foundation (Accepted).
 Sprint 061: Operator Collection Schedule Management Surface (Accepted).
@@ -178,7 +189,8 @@ Facebook Home-Feed Extractor Fixtures is accepted at
 `28906556bffa2b4052cd429b0bf5634cf74de875`. Sprint 065B —
 Profile-Bound Home-Feed Run Model is accepted at
 `b9d84cad6d48f4ef94efb5be037550a7409afa05`. Sprint 065C1 — Bare
-Home-Feed Content Ingestion is active and authorized: it adds the
+Home-Feed Content Ingestion is accepted at
+`40b3ce7023c126c03386994a719ae7acb7758f21`: it adds the
 nullable `ContentItem.sourceGroupId`, the dedicated
 `IngestHomeFeedCollectedContentUseCase`, the strict
 `POST /collector/content-items/home-feed` HTTP route, the
@@ -188,7 +200,8 @@ original `PROFILE_HOME_FEED` first surface, the Web UI tolerance for
 omitted `sourceGroupId`, and the matching migration / journal /
 snapshot updates — without browser execution, extractor invocation,
 workers, scheduler, Docker, or live-Facebook validation. Sprint 065C2
-and Sprint 065C3 remain inactive and unauthorized. Future sprint work follows
+is the only active and authorized sprint. Sprint 065C3 remains
+inactive and unauthorized. Future sprint work follows
 the 064A–068 sequence documented in `docs/ROADMAP.md`, in which
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a group or a page observed while reading the feed) and is

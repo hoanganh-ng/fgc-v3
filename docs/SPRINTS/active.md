@@ -109,32 +109,32 @@ live-Facebook claim.
 
 - [Sprint 065B - Profile-Bound Home-Feed Run Model](SPRINT-065B-profile-bound-home-feed-run-model.md)
 
-Sprint 065C1 — Bare Home-Feed Content Ingestion is **active and
-authorized**. It closes the gap between Sprint 065A's normalized
-home-feed candidates (which carry a required `publisherObservation`
-and no `sourceGroupId`) and Content Manager ingestion (which still
-required `sourceGroupId`). It makes `ContentItem.sourceGroupId`
-optional in the domain schema and DTOs and `NULL`-tolerant in
-PostgreSQL, keeps the existing `sourceGroupId`-required source-group
-ingestion contract unchanged, adds a dedicated
-`IngestHomeFeedCollectedContentUseCase` that ingests a home-feed
-candidate carrying only `sourcePublisherId` and normalized safe
-content, validates the publisher exists and its platform matches,
-and persists the resulting item with
+Sprint 065C1 — Bare Home-Feed Content Ingestion is **accepted** at
+`40b3ce7023c126c03386994a719ae7acb7758f21`. It closes the gap
+between Sprint 065A's normalized home-feed candidates (which carry a
+required `publisherObservation` and no `sourceGroupId`) and Content
+Manager ingestion (which still required `sourceGroupId`). It makes
+`ContentItem.sourceGroupId` optional in the domain schema and DTOs
+and `NULL`-tolerant in PostgreSQL, keeps the existing
+`sourceGroupId`-required source-group ingestion contract unchanged,
+adds a dedicated `IngestHomeFeedCollectedContentUseCase` that
+ingests a home-feed candidate carrying only `sourcePublisherId` and
+normalized safe content, validates the publisher exists and its
+platform matches, and persists the resulting item with
 `firstCollectionSurface.kind = "PROFILE_HOME_FEED"`, no
 `sourceGroupId`, no `managedSourceGroupId`, and no fake Home Feed
-`SourceGroup`. The use case preserves the immutable first surface on
-duplicates, fills absent associations on later merges, is idempotent
-for identical associations, and rejects conflicting associations
-through the existing typed
+`SourceGroup`. The use case preserves the immutable first surface
+on duplicates, fills absent associations on later merges, is
+idempotent for identical associations, and rejects conflicting
+associations through the existing typed
 `ContentCollectionProvenanceConflictError`. It adds
 `POST /collector/content-items/home-feed` with a strict allowlist
 body schema (sourcePublisherId + normalized content only; no
 sourceGroupId, managedSourceGroupId, profileId, runId, provenance,
-raw payloads, cookies, localStorage, tokens, headers, proxy details,
-viewer data, or unknown fields). It updates the existing
-`IngestCollectedContentUseCase` so a later source-group collection can
-fill `sourceGroupId` and `managedSourceGroupId` on an
+raw payloads, cookies, localStorage, tokens, headers, proxy
+details, viewer data, or unknown fields). It updates the existing
+`IngestCollectedContentUseCase` so a later source-group collection
+can fill `sourceGroupId` and `managedSourceGroupId` on an
 existing home-feed-first item while preserving the original
 `PROFILE_HOME_FEED` first surface. It extends the Web UI
 `ContentItem` schema and the list/detail pages to render
@@ -150,35 +150,46 @@ changes, workers, schedulers, Docker service changes, live-Facebook
 validation, `SourcePublisher` review or status mutation, source-group
 promotion, Content Builder, or Content Publisher behavior.
 `collectionProvenance` remains internal-only and is not exposed
-through HTTP DTOs.
+through HTTP DTOs. Sprint 065C1 makes no browser or live-Facebook
+execution claim.
 
 - [Sprint 065C1 - Bare Home-Feed Content Ingestion](SPRINT-065C1-bare-home-feed-content-ingestion.md)
 
-Sprint 065C2 — Profile-Bound Home-Feed Checkout is **active and
-authorized**. It adds the explicit profile-bound checkout path for
-the exact profile referenced by a `ProfileHomeFeedCollectionRun`. It
-extends `ProfileLeasePurpose` with a fourth value,
-`HOME_FEED_COLLECTION`, which shares the existing `COLLECTION_READY`
-account-stage rule and the full existing safety and readiness check
-set (including the approved `NETWORK_CONTEXT_MISSING` rule). It adds
+Sprint 065C2 — Profile-Bound Home-Feed Checkout is the **only active
+and authorized** sprint. It is the implementation authority. It
+adds the explicit profile-bound checkout path for the exact profile
+referenced by a `ProfileHomeFeedCollectionRun`. It extends
+`ProfileLeasePurpose` with a fourth value, `HOME_FEED_COLLECTION`,
+which shares the existing `COLLECTION_READY` account-stage rule and
+the full existing safety and readiness check set (including the
+approved `NETWORK_CONTEXT_MISSING` rule). It adds
 `CheckoutProfileForHomeFeedCollectionUseCase` (input: `{ profileId }`
 only — no Source Group, no profile-source access record, no
-candidate selection) which atomically marks the profile `BUSY` and
-saves an `ACTIVE` `HOME_FEED_COLLECTION` lease through the existing
+candidate selection) which loads the exact requested profile, then
+queries the active lease, throws `ProfileLeaseStateConflictError`
+when an active lease exists, evaluates `HOME_FEED_COLLECTION`
+eligibility, and atomically marks the profile `BUSY` and saves an
+`ACTIVE` `HOME_FEED_COLLECTION` lease through the existing
 transaction manager. It adds `POST
 /collector/profiles/:profileId/home-feed/checkout` with no required
 body, a strict empty-allowlist body schema, and the same safe
 `{ lease, profile: { profileId, accountStage } }` response
 contract that the existing assisted-group-access route already
-returns. It extends `ProfileManagerHttpClient` with a dedicated
+returns. Duplicate checkouts of the same profile are mapped to HTTP
+409 with `PROFILE_LEASE_STATE_CONFLICT`. It extends
+`ProfileManagerHttpClient` with a dedicated
 `checkoutProfileForHomeFeedCollection(profileId)` method backed by a
-new application-owned `ProfileHomeFeedCheckoutPort` that returns
-only `{ profileId, accountStage, leaseId, leaseExpiresAt? }`. It
-extends the Drizzle schema and adds migration `0024` (PostgreSQL
-`ALTER TYPE ... ADD VALUE`) to add `HOME_FEED_COLLECTION` to the
-existing `collector_profile_lease_purpose` enum. The migration
-preserves the one-active-lease-per-profile unique partial index
-unchanged. `GetRuntimeProfileConfigurationUseCase` accepts an active
+new application-owned `ProfileHomeFeedCheckoutPort` whose
+`accountStage` is typed as `CollectorRuntimeAccountStage` (parsed
+through `CollectorRuntimeAccountStageSchema`; an unsupported or
+malformed account stage produces `PROFILE_MANAGER_RESPONSE_ERROR`).
+The port returns only `{ profileId, accountStage, leaseId,
+leaseExpiresAt? }`. It extends the Drizzle schema and adds
+migration `0024` (PostgreSQL `ALTER TYPE ... ADD VALUE`) to add
+`HOME_FEED_COLLECTION` to the existing
+`collector_profile_lease_purpose` enum. The migration preserves the
+one-active-lease-per-profile unique partial index unchanged.
+`GetRuntimeProfileConfigurationUseCase` accepts an active
 `HOME_FEED_COLLECTION` lease for its matching `BUSY` profile.
 `ReleaseProfileLeaseUseCase` releases the lease and returns the
 profile to `READY`. Sprint 065C2 does not execute a run, navigate
@@ -195,7 +206,7 @@ the Sprint 065C "Manual Home-Feed Execution" work (planned to
 include profile checkout, feed navigation, bounded
 extraction, payload capture, source-publisher observation, content
 submission, lease release, and manual live-Facebook validation) into
-the remaining 065C sequence but are not authorized by Sprint 065C2.
+the remaining 065C sequence but is not authorized by Sprint 065C2.
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

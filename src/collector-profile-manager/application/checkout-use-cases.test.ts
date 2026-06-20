@@ -762,7 +762,13 @@ describe("collector profile checkout use cases", () => {
     expect(context.sourceGroupReference.calls).toEqual([]);
   });
 
-  it.each(["NEW_ACCOUNT", "WARMING", "LIMITED"] as const)(
+  it.each([
+    "NEW_ACCOUNT",
+    "WARMING",
+    "LIMITED",
+    "NEEDS_REVIEW",
+    "RETIRED",
+  ] as const)(
     "rejects home-feed checkout for %s profiles",
     async (accountStage) => {
       const context = createTestContext();

@@ -1001,6 +1001,11 @@ function toHomeFeedCheckoutSuccessResult(
     return undefined;
   }
 
+  const parsedStage = CollectorRuntimeAccountStageSchema.safeParse(accountStage);
+  if (!parsedStage.success) {
+    return undefined;
+  }
+
   if (profileId !== requestedProfileId) {
     return undefined;
   }
@@ -1020,7 +1025,7 @@ function toHomeFeedCheckoutSuccessResult(
   return {
     ok: true,
     profileId,
-    accountStage,
+    accountStage: parsedStage.data,
     leaseId,
     ...(typeof leaseExpiresAt === "string" && leaseExpiresAt.trim().length > 0
       ? { leaseExpiresAt }

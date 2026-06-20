@@ -495,6 +495,80 @@ describe("ProfileManagerHttpClient", () => {
     });
   });
 
+  it("maps home-feed checkout COLLECTION_READY account stage to typed success result", async () => {
+    const fetch = new FakeFetch(createHomeFeedCheckoutResponse());
+    const client = createClient(fetch.fetch);
+
+    const result = await client.checkoutProfileForHomeFeedCollection(
+      "profile-1",
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected typed COLLECTION_READY success.");
+    }
+    expect(result.accountStage).toBe("COLLECTION_READY");
+  });
+
+  it("maps home-feed checkout unknown account stage to PROFILE_MANAGER_RESPONSE_ERROR", async () => {
+    const fetch = new FakeFetch(
+      createResponse(200, {
+        lease: {
+          id: "lease-1",
+          profileId: "profile-1",
+          purpose: "HOME_FEED_COLLECTION",
+          leasedAt: "2026-01-05T18:00:00.000Z",
+          expiresAt: "2026-01-05T18:45:00.000Z",
+          releasedAt: null,
+          status: "ACTIVE",
+        },
+        profile: {
+          profileId: "profile-1",
+          accountStage: "UNKNOWN_STAGE",
+        },
+      }),
+    );
+    const client = createClient(fetch.fetch);
+
+    await expect(
+      client.checkoutProfileForHomeFeedCollection("profile-1"),
+    ).resolves.toEqual({
+      ok: false,
+      statusCode: 200,
+      errorCode: "PROFILE_MANAGER_RESPONSE_ERROR",
+      errorMessage: "Profile Manager home-feed checkout response is invalid.",
+    });
+  });
+
+  it("maps home-feed checkout missing account stage to PROFILE_MANAGER_RESPONSE_ERROR", async () => {
+    const fetch = new FakeFetch(
+      createResponse(200, {
+        lease: {
+          id: "lease-1",
+          profileId: "profile-1",
+          purpose: "HOME_FEED_COLLECTION",
+          leasedAt: "2026-01-05T18:00:00.000Z",
+          expiresAt: "2026-01-05T18:45:00.000Z",
+          releasedAt: null,
+          status: "ACTIVE",
+        },
+        profile: {
+          profileId: "profile-1",
+        },
+      }),
+    );
+    const client = createClient(fetch.fetch);
+
+    await expect(
+      client.checkoutProfileForHomeFeedCollection("profile-1"),
+    ).resolves.toEqual({
+      ok: false,
+      statusCode: 200,
+      errorCode: "PROFILE_MANAGER_RESPONSE_ERROR",
+      errorMessage: "Profile Manager home-feed checkout response is invalid.",
+    });
+  });
+
   it("maps home-feed checkout not-found, conflict, and server errors", async () => {
     const cases = [
       [

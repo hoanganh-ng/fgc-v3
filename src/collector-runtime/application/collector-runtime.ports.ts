@@ -2,6 +2,7 @@ import type {
   SubmitCapturedFacebookPayloadInput,
   SubmitCapturedFacebookPayloadResult,
 } from "./collector-runtime.types";
+import type { CollectorRuntimeAccountStage } from "../domain/account-stage";
 
 export interface ProfileCheckoutInput {
   readonly sourceGroupId: string;
@@ -80,7 +81,7 @@ export type ProfileHomeFeedCheckoutResult =
   | {
       readonly ok: true;
       readonly profileId: string;
-      readonly accountStage: string;
+      readonly accountStage: CollectorRuntimeAccountStage;
       readonly leaseId: string;
       readonly leaseExpiresAt?: string;
     }

@@ -70,6 +70,14 @@ export class CheckoutProfileForHomeFeedCollectionUseCase {
   ): Promise<CheckoutProfileForHomeFeedCollectionOutput> {
     const now = this.clock.now();
     const profile = await loadValidatedProfileById(profiles, input.profileId);
+    const activeLease = await leases.findActiveByProfileId(profile.identity.id);
+
+    if (activeLease !== null) {
+      throw new ProfileLeaseStateConflictError(
+        `Profile ${profile.identity.id} already has active lease ${activeLease.id}.`,
+      );
+    }
+
     const eligibility = evaluateCheckoutEligibility(profile, now, {
       purpose: "HOME_FEED_COLLECTION",
     });
@@ -78,14 +86,6 @@ export class CheckoutProfileForHomeFeedCollectionUseCase {
       throw new ProfileNotCheckoutEligibleError(
         profile.identity.id,
         eligibility.reasons,
-      );
-    }
-
-    const activeLease = await leases.findActiveByProfileId(profile.identity.id);
-
-    if (activeLease !== null) {
-      throw new ProfileLeaseStateConflictError(
-        `Profile ${profile.identity.id} already has active lease ${activeLease.id}.`,
       );
     }
 

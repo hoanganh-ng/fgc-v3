@@ -120,7 +120,8 @@ Owns:
   provenance filter or index, and does not change the Collector
   Runtime, extractor, browser, workers, scheduler, Docker, or
   Web UI.
-- Sprint 065C1 (active and authorized) makes
+- Sprint 065C1 (accepted at
+  `40b3ce7023c126c03386994a719ae7acb7758f21`) makes
   `ContentItem.sourceGroupId` optional in the domain schema and DTOs
   and `NULL`-tolerant in PostgreSQL while preserving the existing
   `sourceGroupId`-required source-group ingestion contract.
@@ -160,28 +161,36 @@ Owns:
   workers, schedulers, Docker service changes, live-Facebook
   validation, `SourcePublisher` review or status mutation,
   source-group promotion, Content Builder, or Content Publisher
-  behavior.
-- Sprint 065C2 (active and authorized) adds the explicit
-  profile-bound checkout path for the exact profile referenced by a
-  `ProfileHomeFeedCollectionRun`. It extends `ProfileLeasePurpose`
-  with a fourth value, `HOME_FEED_COLLECTION`, which shares the
-  existing `COLLECTION_READY` account-stage rule and the full
-  existing safety and readiness check set (including the approved
-  `NETWORK_CONTEXT_MISSING` rule). It adds
+  behavior. Sprint 065C1 makes no browser or live-Facebook execution
+  claim.
+- Sprint 065C2 (the only active and authorized sprint) adds the
+  explicit profile-bound checkout path for the exact profile
+  referenced by a `ProfileHomeFeedCollectionRun`. It extends
+  `ProfileLeasePurpose` with a fourth value, `HOME_FEED_COLLECTION`,
+  which shares the existing `COLLECTION_READY` account-stage rule
+  and the full existing safety and readiness check set (including
+  the approved `NETWORK_CONTEXT_MISSING` rule). It adds
   `CheckoutProfileForHomeFeedCollectionUseCase` (input:
   `{ profileId }` only — no `Source Group` reference, no
-  profile-source access record, no candidate selection) which
-  atomically marks the profile `BUSY` and saves an `ACTIVE`
-  `HOME_FEED_COLLECTION` lease through the existing transaction
-  manager. It adds `POST
+  profile-source access record, no candidate selection) which loads
+  the exact requested profile, queries the active lease, throws
+  `ProfileLeaseStateConflictError` when an active lease exists,
+  evaluates `HOME_FEED_COLLECTION` eligibility, and atomically marks
+  the profile `BUSY` and saves an `ACTIVE` `HOME_FEED_COLLECTION`
+  lease through the existing transaction manager. It adds `POST
   /collector/profiles/:profileId/home-feed/checkout` with no required
-  body and a strict empty-allowlist body schema. It extends
-  `ProfileManagerHttpClient` with a dedicated
-  `checkoutProfileForHomeFeedCollection(profileId)` method backed by a
-  new application-owned `ProfileHomeFeedCheckoutPort` that returns
-  only `{ profileId, accountStage, leaseId, leaseExpiresAt? }`. It
-  adds migration `0024` (PostgreSQL `ALTER TYPE ... ADD VALUE`) to add
-  `HOME_FEED_COLLECTION` to the existing
+  body and a strict empty-allowlist body schema. Duplicate checkouts
+  of the same profile are mapped to HTTP 409 with
+  `PROFILE_LEASE_STATE_CONFLICT`. It extends `ProfileManagerHttpClient`
+  with a dedicated `checkoutProfileForHomeFeedCollection(profileId)`
+  method backed by a new application-owned
+  `ProfileHomeFeedCheckoutPort` whose `accountStage` is typed as
+  `CollectorRuntimeAccountStage` (parsed through
+  `CollectorRuntimeAccountStageSchema`; an unsupported or malformed
+  account stage produces `PROFILE_MANAGER_RESPONSE_ERROR`). The port
+  returns only `{ profileId, accountStage, leaseId, leaseExpiresAt? }`.
+  It adds migration `0024` (PostgreSQL `ALTER TYPE ... ADD VALUE`) to
+  add `HOME_FEED_COLLECTION` to the existing
   `collector_profile_lease_purpose` enum. The migration preserves
   the one-active-lease-per-profile unique partial index unchanged.
   `GetRuntimeProfileConfigurationUseCase` accepts an active

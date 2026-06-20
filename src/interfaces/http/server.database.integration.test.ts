@@ -1059,6 +1059,10 @@ if (!shouldRunHttpDbTests) {
         url: `/collector/profiles/${profileId}/home-feed/checkout`,
       });
       expect(duplicateCheckoutResponse.statusCode).toBe(409);
+      expect(
+        (duplicateCheckoutResponse.json() as { readonly error: { readonly code: string } })
+          .error.code,
+      ).toBe("PROFILE_LEASE_STATE_CONFLICT");
 
       const releaseResponse = await getServer().inject({
         method: "POST",

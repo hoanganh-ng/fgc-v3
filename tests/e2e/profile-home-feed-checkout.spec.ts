@@ -165,8 +165,8 @@ test.describe("Sprint 065C2 — Profile-Bound Home-Feed Checkout E2E", () => {
     const duplicateBody = await duplicateResponse.json();
     expect(
       duplicateBody.error?.code,
-      "duplicate checkout is rejected with PROFILE_NOT_CHECKOUT_ELIGIBLE",
-    ).toBe("PROFILE_NOT_CHECKOUT_ELIGIBLE");
+      "duplicate checkout is rejected with PROFILE_LEASE_STATE_CONFLICT",
+    ).toBe("PROFILE_LEASE_STATE_CONFLICT");
     expectSafe(duplicateBody);
   });
 

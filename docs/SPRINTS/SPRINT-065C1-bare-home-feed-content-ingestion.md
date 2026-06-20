@@ -203,12 +203,14 @@ Sprint 065A was accepted at
 Sprint 065B was accepted at
 `b9d84cad6d48f4ef94efb5be037550a7409afa05`.
 
-Sprint 065C1 is **active and authorized**. It is not accepted.
+Sprint 065C1 is **accepted** at
+`40b3ce7023c126c03386994a719ae7acb7758f21`.
 
-Sprint 065C2 and Sprint 065C3 remain **inactive and unauthorized**
-by Sprint 065C1.
+Sprint 065C2 is **active and authorized**. It is not accepted.
 
-Sprint 065C1 makes no live-Facebook validation claim.
+Sprint 065C3 remains **inactive and unauthorized** by Sprint 065C2.
+
+Sprint 065C1 makes no browser or live-Facebook execution claim.
 
 ## Verification Results
 

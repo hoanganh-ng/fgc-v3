@@ -72,11 +72,14 @@ does not transition `ProfileHomeFeedCollectionRun` lifecycle.
 
 - New `CheckoutProfileForHomeFeedCollectionUseCase`:
   - Input: `{ profileId }` only.
-  - Loads the exact profile.
+  - Loads the exact requested profile.
+  - Queries the active lease by profile id.
+  - When an active lease exists, throws
+    `ProfileLeaseStateConflictError`. The active-lease check and all
+    subsequent writes are inside the existing transaction-manager
+    callback when a transaction manager is supplied.
   - Evaluates eligibility with `purpose: "HOME_FEED_COLLECTION"` and
     rejects ineligible profiles with `ProfileNotCheckoutEligibleError`.
-  - Rejects an existing active lease with
-    `ProfileLeaseStateConflictError`.
   - Atomically marks the profile `BUSY` and saves an `ACTIVE`
     `HOME_FEED_COLLECTION` lease through the existing transaction
     manager.
@@ -110,9 +113,10 @@ does not transition `ProfileHomeFeedCollectionRun` lifecycle.
 - Response 200: `{ lease, profile }` where `profile` is the
   `{ profileId, accountStage }` summary and `lease` is the
   `HOME_FEED_COLLECTION` lease JSON.
-- 409 is returned for eligibility rejection
-  (`PROFILE_NOT_CHECKOUT_ELIGIBLE`) and active-lease conflict
-  (`PROFILE_LEASE_STATE_CONFLICT`).
+- Duplicate checkouts of the same profile are mapped to HTTP 409
+  with `PROFILE_LEASE_STATE_CONFLICT`.
+- Genuinely ineligible profiles that do not already have an active
+  lease are mapped to HTTP 409 with `PROFILE_NOT_CHECKOUT_ELIGIBLE`.
 - Response never carries `cookies`, `localStorage`, authentication
   state, network configuration, proxy credentials, fingerprint
   data, provisioning tokens, Source Group data, source-access data,
@@ -121,15 +125,20 @@ does not transition `ProfileHomeFeedCollectionRun` lifecycle.
 
 ### `Collector Runtime` port and HTTP client
 
-- New application-owned port `ProfileHomeFeedCheckoutPort`.
+- New application-owned port `ProfileHomeFeedCheckoutPort` whose
+  `accountStage` field is typed as `CollectorRuntimeAccountStage`.
 - `ProfileManagerHttpClient` implements it with
   `checkoutProfileForHomeFeedCollection(profileId)` posting to the
   new HTTP route. The method:
   - Validates the response `profile.id`, `lease.profileId`,
     `lease.purpose`, and `lease.status`. Mismatches are mapped to
     `PROFILE_MANAGER_RESPONSE_ERROR`.
+  - Parses the response `accountStage` through
+    `CollectorRuntimeAccountStageSchema`; unsupported or malformed
+    values produce `PROFILE_MANAGER_RESPONSE_ERROR`. The
+    `Collector Runtime` account-stage enum is not broadened.
   - Returns the safe `{ profileId, accountStage, leaseId,
-    leaseExpiresAt? }`.
+    leaseExpiresAt? }` with the typed `accountStage`.
   - Preserves safe HTTP and network error mapping.
 - The port is **not** wired into a worker, executor, or operator
   tool in Sprint 065C2.
@@ -170,115 +179,126 @@ does not transition `ProfileHomeFeedCollectionRun` lifecycle.
 
 ## Verification (recorded)
 
-### Unit / application
+### Focused unit tests (post-correction)
 
 ```text
-$ pnpm exec vitest run src/collector-profile-manager/domain \
-    src/collector-profile-manager/application/checkout-use-cases.test.ts
- PASS  (123) FAIL (0)
+$ pnpm exec vitest run \
+    src/collector-profile-manager/application/checkout-use-cases.test.ts \
+    src/collector-runtime/infrastructure/profile-manager-http-client.test.ts \
+    src/interfaces/http/server.test.ts
 
-$ pnpm exec vitest run src/collector-runtime/infrastructure/profile-manager-http-client.test.ts
- PASS  (32) FAIL (0)
-
-$ pnpm exec vitest run src/composition/collector-profile-manager/collector-profile-manager.container.test.ts
- PASS  (1)  FAIL (0)
-
-$ pnpm exec vitest run src/interfaces/http/server.test.ts
- PASS  (67) FAIL (0)
+ PASS  (164) FAIL (0)
 ```
 
-### Docker-backed DB infrastructure (Layer 1, isolated)
+### Full unit verification
 
 ```text
-$ compose run --rm --no-deps api sh -lc '
-    export SPRINT_058_DATABASE_URL="${DATABASE_URL%/*}/sprint_058_isolated"
-    RUN_DB_TESTS=true pnpm exec vitest run src/infrastructure \
+$ pnpm typecheck
+(0 errors)
+
+$ pnpm test
+ Test Files  114 passed | 14 skipped (128)
+      Tests  1606 passed | 15 skipped (1621)
+   Duration  18.11s
+
+$ pnpm web:typecheck
+(0 errors)
+
+$ pnpm web:build
+dist/index.html                   0.41 kB
+dist/assets/index-rSPDjip7.css   23.60 kB
+dist/assets/index-CCdlT0L6.js   648.75 kB
+✓ built in 4.97s
+```
+
+### PostgreSQL-backed HTTP tests (docker-compose.e2e.yml)
+
+```text
+$ compose="docker compose -p fgc-v3-e2e -f docker-compose.e2e.yml"
+$ trap '$compose down -v --remove-orphans > /dev/null 2>&1 || true' EXIT INT TERM
+$ $compose down -v --remove-orphans > /dev/null 2>&1 || true
+$ $compose build api
+$ $compose up -d --wait postgres
+$ $compose run --rm --no-deps api sh -lc '
+    pnpm db:migrate &&
+    RUN_HTTP_DB_TESTS=true pnpm exec vitest run \
+      src/interfaces/http/server.database.integration.test.ts \
       --no-file-parallelism'
 
- Test Files  27 passed | 1 skipped (28)
-      Tests  224 passed | 1 skipped (225)
-   Duration  31.40s
-```
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Duration  5.49s
 
-### HTTP DB (Layer 3)
-
-```text
-$ compose run --rm --no-deps api sh -lc '
-    RUN_HTTP_DB_TESTS=true pnpm exec vitest run \
-      src/interfaces/http --no-file-parallelism'
-
+# Full src/interfaces/http HTTP DB suite
  Test Files  9 passed (9)
       Tests  176 passed (176)
-   Duration  43.40s
+   Duration  43.77s
+
+$ $compose down -v --remove-orphans > /dev/null 2>&1 || true
 ```
+
+Cleanup runs through the trap on success, failure, and
+interruption. The trap never printed `DATABASE_URL` or any
+sensitive environment value.
 
 ### Docker E2E (Layer 4, synthetic)
 
 ```text
 $ pnpm test:e2e:docker
 
- 15 passed (4.6s)
+ 15 passed (4.8s)
 ```
+
+The Sprint 065C2 spec
+(`tests/e2e/profile-home-feed-checkout.spec.ts`) asserts that
+duplicate home-feed checkout returns HTTP 409 with
+`PROFILE_LEASE_STATE_CONFLICT`.
 
 ### Other gates
 
 ```text
-$ pnpm typecheck
-(0 errors)
-
-$ pnpm web:typecheck
-(0 errors)
-
-$ pnpm web:build
-✓ built in 5.21s
-
 $ git diff --check
 (no output)
 
 $ git status --short
-~ Modified: 18 files
-? Untracked: 4 files
+ M docs/MODULE_BOUNDARIES.md
+ M docs/PROJECT_SNAPSHOT.md
+ M docs/ROADMAP.md
+ M docs/SPRINTS/SPRINT-065C1-bare-home-feed-content-ingestion.md
+ M docs/SPRINTS/SPRINT-065C2-profile-bound-home-feed-checkout.md
+ M docs/SPRINTS/active.md
+ M src/collector-profile-manager/application/checkout-use-cases.test.ts
+ M src/collector-profile-manager/application/use-cases/checkout-profile-for-home-feed-collection.use-case.ts
+ M src/collector-runtime/application/collector-runtime.ports.ts
+ M src/collector-runtime/infrastructure/profile-manager-http-client.test.ts
+ M src/collector-runtime/infrastructure/profile-manager-http-client.ts
+ M src/interfaces/http/server.database.integration.test.ts
+ M tests/e2e/profile-home-feed-checkout.spec.ts
 ```
 
-### Parallel `pnpm test:db` (known shared-database isolation limitation)
+## Changed files (correction overlay on base commit `8f4bc38`)
 
-The full serial Docker-backed infrastructure suite above passes in
-its entirety. Running `pnpm test:db` in parallel against a single
-shared PostgreSQL database produces cross-suite failures in the
-`source_publishers` cleanup path that are unrelated to Sprint 065C2
-and predate the sprint. The serial isolated infrastructure suite is
-the authoritative verification path.
+Modified in this correction:
 
-## Changed files
-
-Modified:
-
-- `drizzle/meta/_journal.json`
+- `docs/MODULE_BOUNDARIES.md`
+- `docs/PROJECT_SNAPSHOT.md`
+- `docs/ROADMAP.md`
+- `docs/SPRINTS/SPRINT-065C1-bare-home-feed-content-ingestion.md`
+- `docs/SPRINTS/SPRINT-065C2-profile-bound-home-feed-checkout.md`
+- `docs/SPRINTS/active.md`
 - `src/collector-profile-manager/application/checkout-use-cases.test.ts`
-- `src/collector-profile-manager/application/index.ts`
-- `src/collector-profile-manager/domain/checkout-eligibility.ts`
-- `src/collector-profile-manager/domain/profile-lease.ts`
+- `src/collector-profile-manager/application/use-cases/checkout-profile-for-home-feed-collection.use-case.ts`
 - `src/collector-runtime/application/collector-runtime.ports.ts`
 - `src/collector-runtime/infrastructure/profile-manager-http-client.test.ts`
 - `src/collector-runtime/infrastructure/profile-manager-http-client.ts`
-- `src/composition/collector-profile-manager/collector-profile-manager.container.test.ts`
-- `src/composition/collector-profile-manager/collector-profile-manager.container.ts`
-- `src/infrastructure/database/repositories/drizzle-repositories.integration.test.ts`
-- `src/infrastructure/database/schema/collector-profile-manager.schema.test.ts`
-- `src/interfaces/http/routes/collector-profile-manager.routes.ts`
-- `src/interfaces/http/schemas/collector-profile-manager.http-schemas.ts`
-- `src/interfaces/http/server.test.ts`
 - `src/interfaces/http/server.database.integration.test.ts`
-- `src/interfaces/http/test-support/collector-profile-manager-http-service.ts`
-- `tests/e2e/profile-home-feed-checkout.spec.ts` (new spec file)
-
-New:
-
-- `drizzle/0024_collector_profile_lease_purpose_home_feed.sql`
-- `drizzle/meta/0024_snapshot.json`
-- `src/collector-profile-manager/application/use-cases/checkout-profile-for-home-feed-collection.use-case.ts`
 - `tests/e2e/profile-home-feed-checkout.spec.ts`
-- `docs/SPRINTS/SPRINT-065C2-profile-bound-home-feed-checkout.md`
+
+The remaining Sprint 065C2 files (use case wiring, Drizzle schema,
+migration `0024`, HTTP routes, composition container, integration
+test fixtures, and the new files) were already present at the
+correction base commit `8f4bc389a4f2000b79323822ddaf33c83075dc9d`
+and were not modified in this correction.
 
 ## Remaining Risks
 
@@ -288,3 +308,10 @@ New:
 - The new `HOME_FEED_COLLECTION` purpose is exercised by HTTP DB and
   Docker E2E flows. It is intentionally not wired into a worker or
   executor; that wiring is future work.
+- The correction narrows the active-lease conflict ordering in
+  `CheckoutProfileForHomeFeedCollectionUseCase` so duplicate
+  checkouts of the same profile now produce HTTP 409
+  `PROFILE_LEASE_STATE_CONFLICT` (rather than
+  `PROFILE_NOT_CHECKOUT_ELIGIBLE`). This is consistent with the
+  existing source-group and assisted-group-access checkouts and is
+  intentional.
