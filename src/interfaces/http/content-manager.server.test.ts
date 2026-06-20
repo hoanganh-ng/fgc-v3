@@ -1493,4 +1493,23 @@ describe("Content Manager HTTP routes — home-feed ingestion", () => {
       await server.close();
     }
   });
+
+  it("rejects a home-feed ingestion body that omits sourcePublisherId", async () => {
+    const { server, service } = createTestServer();
+    const { sourcePublisherId: _omitted, ...payloadWithoutPublisherId } =
+      createHomeFeedCollectedContentInput();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/content-items/home-feed",
+        payload: payloadWithoutPublisherId,
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(service.ingestHomeFeedCollectedContent.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
 });

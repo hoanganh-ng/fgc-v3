@@ -220,25 +220,41 @@ if (!shouldRunDbTests) {
         expect(info.is_nullable).toBe("YES");
       });
 
-      it("the content_items.source_group_id foreign key remains present", async () => {
+      it("the content_items.source_group_id foreign key remains present and references source_groups.id", async () => {
         const result = await client!.db.execute<{
           constraint_name: string;
+          column_name: string;
+          foreign_table_name: string;
+          foreign_column_name: string;
         }>(sql`
-          SELECT tc.constraint_name
+          SELECT
+            tc.constraint_name,
+            kcu.column_name,
+            ccu.table_name AS foreign_table_name,
+            ccu.column_name AS foreign_column_name
           FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+          JOIN information_schema.constraint_column_usage ccu
+            ON ccu.constraint_name = tc.constraint_name
+            AND ccu.table_schema = tc.table_schema
           WHERE tc.table_schema = 'public'
             AND tc.table_name = 'content_items'
             AND tc.constraint_type = 'FOREIGN KEY'
         `);
         const rows = result.rows ?? [];
         // The Sprint 064B and Sprint 065C1 schema leaves the existing
-        // source_group_id foreign key intact. Drizzle may pick the
-        // exact constraint name at generation time; assert at least
-        // one FK exists on content_items that targets source_groups.
-        const fkRows = rows.filter((row) =>
-          row.constraint_name.includes("source_group_id"),
+        // source_group_id foreign key intact. Verify the FK actually
+        // targets source_groups.id on the source_group_id column —
+        // do not rely on the constraint name alone.
+        const sourceGroupIdFks = rows.filter(
+          (row) =>
+            row.column_name === "source_group_id" &&
+            row.foreign_table_name === "source_groups" &&
+            row.foreign_column_name === "id",
         );
-        expect(fkRows.length).toBeGreaterThanOrEqual(1);
+        expect(sourceGroupIdFks.length).toBeGreaterThanOrEqual(1);
       });
 
       it("the content_items.source_group_id index remains present", async () => {

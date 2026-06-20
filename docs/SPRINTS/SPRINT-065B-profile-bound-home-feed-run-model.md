@@ -173,8 +173,16 @@ PostgreSQL environment variables described by repository scripts.
 Sprint 065A was accepted at
 `28906556bffa2b4052cd429b0bf5634cf74de875`.
 
-Sprint 065B is **active and authorized**. It is not accepted.
+Sprint 065B is **accepted** at
+`b9d84cad6d48f4ef94efb5be037550a7409afa05`.
 
-Sprint 065C remains inactive and is not authorized by Sprint 065B.
+Sprint 065C1 is the **currently authorized** next slice and is recorded
+in `docs/SPRINTS/active.md`.
 
-Sprint 065B makes no live-Facebook validation claim.
+Sprint 065C2 and Sprint 065C3 remain **inactive and unauthorized** and
+must not be activated by Sprint 065C1 or by this acceptance record.
+
+Sprint 065B makes no browser or live-Facebook validation claim. It does
+not invoke the Sprint 065A extractor, does not capture payloads, and
+does not perform `SourcePublisher` observation or Content Manager
+submission.

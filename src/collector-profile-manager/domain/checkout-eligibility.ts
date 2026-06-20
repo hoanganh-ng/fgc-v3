@@ -131,12 +131,12 @@ export function evaluateCheckoutEligibility(
     });
   }
 
-  if (profile.networkContext.proxy === null) {
-    reasons.push({
-      code: "NETWORK_CONTEXT_MISSING",
-      message: "Profile requires a configured network context.",
-    });
-  }
+  // if (profile.networkContext.proxy === null) {
+  //   reasons.push({
+  //     code: "NETWORK_CONTEXT_MISSING",
+  //     message: "Profile requires a configured network context.",
+  //   });
+  // }
 
   if (profile.hardwareFingerprint === null) {
     reasons.push({

@@ -27,6 +27,19 @@ higher layer can attribute the failure correctly.
   verified through unit, application, mapper, schema, HTTP route, and
   opt-in PostgreSQL repository tests, including active-run uniqueness
   and concurrent claiming. It makes no browser or live-Facebook claim.
+- Sprint 065C1 verifies bare home-feed content ingestion through unit
+  tests (domain schema, generic provenance, HTTP stub), PostgreSQL
+  repository integration tests (including the strengthened
+  `content_items.source_group_id` → `source_groups.id` foreign-key
+  assertion), PostgreSQL-backed HTTP integration tests, and a focused
+  synthetic Docker E2E flow that exercises
+  `http://web-gateway/.../collector/content-items/home-feed` through
+  the existing Playwright harness. Sprint 065C1 makes no live-Facebook
+  claim.
+- Mandatory manual live-Facebook validation for bounded browser
+  execution is owned by **Sprint 065C3**, not by the undivided
+  Sprint 065C label. Sprint 065C2 and Sprint 065C3 remain inactive
+  and unauthorized; this strategy does not activate them.
 
 ## Layer 2 — Database Integration Tests
 
@@ -162,9 +175,12 @@ layer is a sprint-scope violation.
   validation only after Layers 1–4 are green. A sprint that changes
   real Facebook or browser behavior does not claim success on
   synthetic fixtures alone. Sprint 065A is intentionally limited to
-  fixture/unit extraction and makes no live-Facebook claim; Sprint
-  065C remains the mandatory live-validation sprint for home-feed
-  execution.
+  fixture/unit extraction and makes no live-Facebook claim; the
+  undivided Sprint 065C label does **not** own mandatory manual
+  live-Facebook validation. Mandatory manual live-Facebook
+  validation for bounded browser execution is owned by
+  Sprint 065C3, which remains inactive and unauthorized at the
+  time of Sprint 065C1.
 
 A sprint that adds, removes, or renames a public API surface, a
 schema, a migration, or a top-level flow must update this document

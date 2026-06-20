@@ -209,3 +209,161 @@ Sprint 065C2 and Sprint 065C3 remain **inactive and unauthorized**
 by Sprint 065C1.
 
 Sprint 065C1 makes no live-Facebook validation claim.
+
+## Verification Results
+
+The verification commands above were executed against the isolated
+PostgreSQL service from `docker-compose.e2e.yml` and the local Node
+runner. The exact executed command results are recorded below for
+audit.
+
+### Domain and application suites (Layer 1)
+
+```text
+$ pnpm exec vitest run \
+    src/content-manager/domain/content-collection-provenance.test.ts \
+    src/content-manager/domain/content-collection-provenance.test.merge.test.ts \
+    src/content-manager/domain/home-feed-source-publisher-id.boundary.test.ts \
+    src/content-manager/application/content-application.test.ts \
+    src/interfaces/http/content-manager.server.test.ts \
+    src/composition/content-manager/content-manager.container.test.ts
+
+ PASS  (154)  FAIL  (0)
+```
+
+The dedicated boundary test file
+`src/content-manager/domain/home-feed-source-publisher-id.boundary.test.ts`
+asserts that `HomeFeedCollectedContentInputSchema` rejects input with
+no `sourcePublisherId` (including the empty-string and null variants)
+and that the generic `CollectedContentProvenanceInputSchema` and
+`ContentCollectionProvenanceSchema` still accept durable
+`PROFILE_HOME_FEED` provenance with no `sourcePublisherId`. The
+stub-backed HTTP test in `src/interfaces/http/content-manager.server.test.ts`
+asserts that `POST /collector/content-items/home-feed` returns
+`HTTP 400` and that `ingestHomeFeedCollectedContent.execute` is not
+called when the body omits `sourcePublisherId`.
+
+### Web UI suites (Layer 1, web)
+
+```text
+$ pnpm exec vitest run \
+    apps/web/src/lib/api/content-manager-client.test.ts \
+    apps/web/src/pages/content-items-page.test.tsx \
+    apps/web/src/pages/content-item-detail-page.test.tsx
+
+ PASS  (9)  FAIL  (0)
+```
+
+### Docker-backed full infrastructure suite (Layer 2, serial)
+
+```text
+$ compose run --rm --no-deps api sh -lc '
+    export SPRINT_058_DATABASE_URL="${DATABASE_URL%/*}/sprint_058_isolated"
+    RUN_DB_TESTS=true pnpm exec vitest run \
+      src/infrastructure \
+      --no-file-parallelism'
+
+ Test Files  27 passed | 1 skipped (28)
+      Tests  222 passed | 1 skipped (223)
+   Duration  31.82s
+```
+
+The Sprint 065C1 repository integration test
+`drizzle-content-item.repository.collection-provenance.integration.test.ts`
+includes the strengthened foreign-key assertion. It now joins
+`information_schema.key_column_usage` and
+`information_schema.constraint_column_usage` and asserts that at
+least one row exists with `column_name = "source_group_id"`,
+`foreign_table_name = "source_groups"`, and
+`foreign_column_name = "id"`. The assertion no longer relies on
+the constraint name.
+
+### Focused affected DB suite (Layer 2, serial)
+
+```text
+$ compose run --rm --no-deps api sh -lc '
+    RUN_DB_TESTS=true pnpm exec vitest run \
+      src/infrastructure/database/repositories/drizzle-content-item.repository.collection-provenance.integration.test.ts \
+      src/infrastructure/database/repositories/drizzle-content-manager-repositories.integration.test.ts \
+      --no-file-parallelism'
+
+ Test Files  2 passed (2)
+      Tests  15 passed (15)
+   Duration  3.65s
+```
+
+### HTTP DB suite (Layer 3)
+
+```text
+$ compose run --rm --no-deps api sh -lc '
+    RUN_HTTP_DB_TESTS=true pnpm exec vitest run \
+      src/interfaces/http \
+      --no-file-parallelism'
+
+ Test Files  9 passed (9)
+      Tests  172 passed (172)
+   Duration  42.89s
+```
+
+### Docker E2E (Layer 4, synthetic)
+
+```text
+$ pnpm test:e2e:docker
+
+ Running 9 tests using 1 worker
+   ✓  [chromium] tests/e2e/home-feed-content-ingestion.spec.ts
+   ✓  [chromium] tests/e2e/source-publisher-http.spec.ts
+   ✓  [chromium] tests/e2e/stack-baseline.spec.ts (6 specs)
+   9 passed (3.9s)
+```
+
+### Parallel `pnpm test:db` (known shared-database isolation limitation)
+
+```text
+$ compose run --rm --no-deps api sh -lc 'pnpm test:db'
+
+ Test Files  12 failed | 15 passed | 1 skipped (28)
+      Tests  75 failed | 137 passed | 1 skipped (213)
+   Duration  152.80s
+```
+
+This parallel failure is an existing shared-database parallel
+isolation problem in the test harness (concurrent repository
+integration specs share a single PostgreSQL database and contend on
+`source_publishers` cleanup). The serial full infrastructure suite
+above passes in its entirety. No Sprint 065C1 test fails when
+isolated. The failure is recorded as an existing shared-database
+parallel isolation limitation and is not repaired in Sprint 065C1;
+a separate test-harness follow-up is recommended.
+
+### Other gates
+
+```text
+$ pnpm typecheck
+(0 errors)
+
+$ pnpm web:typecheck
+(0 errors)
+
+$ pnpm web:build
+dist/index.html                   0.41 kB
+dist/assets/index-rSPDjip7.css   23.60 kB
+dist/assets/index-CCdlT0L6.js   648.75 kB
+✓ built in 5.08s
+
+$ git diff --check
+(no output)
+
+$ git status --short
+ M docs/SPRINTS/SPRINT-065B-profile-bound-home-feed-run-model.md
+ M docs/SPRINTS/SPRINT-065C1-bare-home-feed-content-ingestion.md
+ M docs/TESTING_STRATEGY.md
+ M src/collector-profile-manager/domain/checkout-eligibility.ts (pre-existing, not part of Sprint 065C1)
+ M src/infrastructure/database/repositories/drizzle-content-item.repository.collection-provenance.integration.test.ts
+ M src/interfaces/http/content-manager.server.test.ts
+?? src/content-manager/domain/home-feed-source-publisher-id.boundary.test.ts
+```
+
+The pre-existing modification to
+`src/collector-profile-manager/domain/checkout-eligibility.ts` is
+preserved as instructed and is not part of Sprint 065C1.
