@@ -159,3 +159,91 @@ export interface CapturedFacebookPayloadSubmissionUseCase {
     input: SubmitCapturedFacebookPayloadInput,
   ): Promise<SubmitCapturedFacebookPayloadResult>;
 }
+
+export interface FacebookHomeFeedPayloadCaptureInput {
+  readonly profileId: string;
+  readonly leaseId: string;
+  readonly maxScrolls: number;
+  readonly maxDurationMs: number;
+}
+
+export interface FacebookHomeFeedPayloadCapturePort {
+  captureHomeFeedPayloads(
+    input: FacebookHomeFeedPayloadCaptureInput,
+  ): Promise<FacebookPayloadCaptureResult>;
+}
+
+export type SourcePublisherObservationKind = "GROUP" | "PAGE";
+
+export interface SourcePublisherObservationInput {
+  readonly platform: "FACEBOOK";
+  readonly kind: SourcePublisherObservationKind;
+  readonly externalPublisherId: string;
+  readonly observedAt: string;
+  readonly displayName?: string;
+  readonly canonicalUrl?: string;
+}
+
+export type SourcePublisherObservationResult =
+  | {
+      readonly ok: true;
+      readonly sourcePublisherId: string;
+    }
+  | {
+      readonly ok: false;
+      readonly statusCode?: number;
+      readonly errorCode: string;
+      readonly errorMessage: string;
+    };
+
+export interface SourcePublisherObservationPort {
+  observeSourcePublisher(
+    input: SourcePublisherObservationInput,
+  ): Promise<SourcePublisherObservationResult>;
+}
+
+export interface HomeFeedContentSubmissionTopComment {
+  readonly externalCommentId: string;
+  readonly bodyText: string;
+  readonly authorDisplayName?: string;
+  readonly authorExternalId?: string;
+  readonly reactionCount: number;
+  readonly replyCount?: number;
+  readonly postedAt?: string;
+  readonly collectedAt: string;
+}
+
+export interface HomeFeedContentSubmissionInput {
+  readonly sourcePublisherId: string;
+  readonly platform: "FACEBOOK";
+  readonly externalPostId: string;
+  readonly sourceUrl: string;
+  readonly title?: string;
+  readonly bodyText: string;
+  readonly authorDisplayName?: string;
+  readonly authorExternalId?: string;
+  readonly postedAt?: string;
+  readonly collectedAt: string;
+  readonly reactionCount: number;
+  readonly commentCount: number;
+  readonly shareCount?: number;
+  readonly topComments: readonly HomeFeedContentSubmissionTopComment[];
+}
+
+export type HomeFeedContentSubmissionResult =
+  | {
+      readonly ok: true;
+      readonly contentItemId?: string;
+    }
+  | {
+      readonly ok: false;
+      readonly statusCode?: number;
+      readonly errorCode: string;
+      readonly errorMessage: string;
+    };
+
+export interface HomeFeedContentSubmissionPort {
+  submitHomeFeedCollectedContent(
+    input: HomeFeedContentSubmissionInput,
+  ): Promise<HomeFeedContentSubmissionResult>;
+}

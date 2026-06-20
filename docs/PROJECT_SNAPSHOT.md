@@ -49,51 +49,60 @@ behavior. `collectionProvenance` remains internal-only and is not
 exposed through HTTP DTOs. Sprint 065C1 makes no browser or
 live-Facebook execution claim.
 
-Sprint 065C2 — Profile-Bound Home-Feed Checkout is the **only active
-and authorized** sprint. It is the implementation authority. It
-adds the explicit profile-bound checkout path for the exact profile
-referenced by a `ProfileHomeFeedCollectionRun`. It extends
-`ProfileLeasePurpose` with a fourth value, `HOME_FEED_COLLECTION`,
-which shares the existing `COLLECTION_READY` account-stage rule and
-the full existing safety and readiness check set (including the
-approved `NETWORK_CONTEXT_MISSING` rule). It adds
-`CheckoutProfileForHomeFeedCollectionUseCase` (input: `{ profileId }`
-only — no Source Group, no profile-source access record, no
-candidate selection) which loads the exact requested profile, then
-queries the active lease, throws `ProfileLeaseStateConflictError`
-when an active lease exists, evaluates `HOME_FEED_COLLECTION`
-eligibility, and atomically marks the profile `BUSY` and saves an
-`ACTIVE` `HOME_FEED_COLLECTION` lease through the existing
-transaction manager. It adds `POST
-/collector/profiles/:profileId/home-feed/checkout` with no required
-body and a strict empty-allowlist body schema. Duplicate checkouts
-of the same profile are mapped to HTTP 409 with
-`PROFILE_LEASE_STATE_CONFLICT`. It extends `ProfileManagerHttpClient`
-with a dedicated `checkoutProfileForHomeFeedCollection(profileId)`
-method backed by a new application-owned
-`ProfileHomeFeedCheckoutPort` whose `accountStage` is typed as
-`CollectorRuntimeAccountStage` (parsed through
-`CollectorRuntimeAccountStageSchema`; an unsupported or malformed
-account stage produces `PROFILE_MANAGER_RESPONSE_ERROR`). The port
-returns only `{ profileId, accountStage, leaseId, leaseExpiresAt? }`.
-It adds migration `0024` (PostgreSQL `ALTER TYPE ... ADD VALUE`) to
-add `HOME_FEED_COLLECTION` to the existing
-`collector_profile_lease_purpose` enum. The migration preserves the
-one-active-lease-per-profile unique partial index unchanged.
-`GetRuntimeProfileConfigurationUseCase` accepts an active
-`HOME_FEED_COLLECTION` lease for its matching `BUSY` profile.
-`ReleaseProfileLeaseUseCase` releases the lease and returns the
-profile to `READY`. Sprint 065C2 does not execute a run, navigate
-Facebook, capture payloads, observe `SourcePublisher`, submit
-Content Manager items, add workers or schedulers, change Docker,
-add Web UI behavior, or make any live-Facebook claim. The new
-`ProfileHomeFeedCheckoutPort` is not wired into a worker or executor
-in Sprint 065C2.
+Sprint 065C2 — Profile-Bound Home-Feed Checkout is **accepted** at
+`6591a05b3ecde7e615f824efc715c815c25bc2d2`. It adds the explicit
+profile-bound checkout path for the exact profile referenced by a
+`ProfileHomeFeedCollectionRun`. It extends `ProfileLeasePurpose`
+with a fourth value, `HOME_FEED_COLLECTION`, which shares the
+existing `COLLECTION_READY` account-stage rule and the full existing
+safety and readiness check set (including the approved
+`NETWORK_CONTEXT_MISSING` rule). It adds
+`CheckoutProfileForHomeFeedCollectionUseCase`, the
+`POST /collector/profiles/:profileId/home-feed/checkout` route, and
+the `ProfileHomeFeedCheckoutPort` plus
+`ProfileManagerHttpClient.checkoutProfileForHomeFeedCollection`
+binding. Migration `0024` extends the existing
+`collector_profile_lease_purpose` enum with `HOME_FEED_COLLECTION`
+through `ALTER TYPE ... ADD VALUE`. The
+`ProfileHomeFeedCheckoutPort` was not wired into a worker or
+executor in Sprint 065C2.
 
-Sprint 065C3 remains **inactive and unauthorized**. It will split
-the Sprint 065C "Manual Home-Feed Execution" work but is not
-authorized by Sprint 065C2.
-Sprint 065C2 — Profile-Bound Home-Feed Checkout (Active).
+Sprint 065C3 — Bounded Facebook Home-Feed Execution is the **only
+active and authorized** sprint. It is the implementation authority.
+It adds one-shot, operator-invoked execution of an existing durable
+`ProfileHomeFeedCollectionRun`. Defaults `maxScrolls=3`,
+`maxDurationMs=30000`, `maxPosts=20`; hard ceilings `maxScrolls<=10`,
+`maxDurationMs<=120000`, `maxPosts<=100`. Bounds are never silently
+clamped — exceeding a ceiling fails the RUNNING run before checkout
+with `HOME_FEED_EXECUTION_BOUNDS_EXCEEDED`. It adds
+`ExecuteProfileHomeFeedCollectionRunUseCase`, a separate
+application-owned `FacebookHomeFeedPayloadCapturePort` and its
+infrastructure adapter (navigates to the fixed internal URL
+`https://www.facebook.com/?sk=h_chr`, reuses fetch/XHR/network
+capture and page-state detection from the existing source-group
+adapter, obeys per-call bounds, closes the browser on every path),
+new `SourcePublisherObservationPort` and `HomeFeedContentSubmissionPort`
+(both implemented by `ContentManagerHttpClient` against the existing
+`POST /collector/source-publishers/observations` and
+`POST /collector/content-items/home-feed` routes with response
+identity validation), and a one-shot operator command
+`pnpm profile:home-feed:run-next -- --base-url <url> --browser-provider <provider>`.
+The runner claims at most one queued run, executes through the new
+use case (terminal CAS transitions only — no `repository.save` for
+lifecycle changes), and prints a sanitized summary. Run-wide
+deduplication is keyed on `platform + externalPostId`; publisher
+observation cache is keyed on `platform + kind + externalPublisherId`
+and is consulted once per run. A failed publisher observation blocks
+content submission for that publisher's candidates and counts in
+`failedContentSubmissions`; independent publishers continue. A
+failed lease release marks the run FAILED. Failed runs retain a safe
+partial summary. Sprint 065C3 does not add a polling loop, persistent
+worker, Docker service, scheduler integration, Web UI changes, or
+an HTTP execute route. Manual live-Facebook validation is opt-in and
+was **not performed** by this sprint.
+
+Sprint 065C3 — Bounded Facebook Home-Feed Execution (Active).
+Sprint 065C2 — Profile-Bound Home-Feed Checkout (Accepted).
 Sprint 065C1 — Bare Home-Feed Content Ingestion (Accepted).
 Sprint 065B — Profile-Bound Home-Feed Run Model (Accepted).
 Sprint 065A — Facebook Home-Feed Extractor Fixtures (Accepted).
@@ -119,7 +128,7 @@ Sprint 054A: Profile Authentication Health Foundation (Accepted).
 ## Currently Available Capabilities
 - **Profile Management**: Creation, lifecycle, session ingestion, checkout leasing, and operator-driven recovery reprovisioning for `REAUTH_REQUIRED` and `CHECKPOINT_REVIEW_REQUIRED` profiles.
 - **Content Management**: Storage of normalized Facebook knowledge group text posts and top comments, the Content Manager-owned `SourcePublisher` identity and observation behavior, durable `ContentCollectionProvenance` on content items, and Sprint 065C1's bare home-feed content ingestion. Sprint 063A through 064B and 065B are accepted; Sprint 065C1 is active and authorized; status mutation (approve / ignore / block) remains deferred to Sprint 066. The existing HTTP DTOs do not expose `collectionProvenance`; Sprint 065C1's `ContentItemDto.sourceGroupId` is optional and omitted when absent.
-- **Collection Execution**: Headless browser extraction using Playwright (or experimental CloakBrowser). Worker processes automatically consume queued collection runs, ambient exercise runs, and access-check runs. Collector Runtime has the existing source-group Facebook GraphQL payload extractor, the accepted Sprint 065A pure home-feed fixture extractor contract for group/page candidates, and accepted Sprint 065B's profile-bound home-feed run model. Sprint 065C1 adds bare home-feed content ingestion to Content Manager but does not add live home-feed execution. Sprint 065C2 and Sprint 065C3 remain inactive and unauthorized.
+- **Collection Execution**: Headless browser extraction using Playwright (or experimental CloakBrowser). Worker processes automatically consume queued collection runs, ambient exercise runs, and access-check runs. Collector Runtime has the existing source-group Facebook GraphQL payload extractor, the accepted Sprint 065A pure home-feed fixture extractor contract for group/page candidates, and accepted Sprint 065B's profile-bound home-feed run model. Sprint 065C1 (accepted) adds bare home-feed content ingestion to Content Manager. Sprint 065C2 (accepted) adds the `HOME_FEED_COLLECTION` profile-bound checkout path. Sprint 065C3 (active) adds the one-shot operator-invoked executor `pnpm profile:home-feed:run-next` that claims a queued `ProfileHomeFeedCollectionRun`, drives bounded home-feed capture against the exact `run.profileId` through `FacebookHomeFeedBrowserPayloadCaptureAdapter`, deduplicates by `platform + externalPostId`, caps `extractorCandidates` at `maxPosts`, observes each distinct publisher once via `POST /collector/source-publishers/observations`, submits accepted candidates via `POST /collector/content-items/home-feed`, releases the lease, and persists a sanitized terminal `SUCCEEDED` / `FAILED` run through the existing CAS transition path. No polling loop, persistent worker, Docker service, scheduler integration, Web UI changes, or HTTP execute route are added. Manual live-Facebook validation is opt-in and was not performed by Sprint 065C3.
 - **Collection Scheduling**: One persisted `CollectionSchedule` per source group (interval, next run, parameters). A containerized `collection-scheduler` Compose service drains due schedules into queued `SCHEDULED` collection runs on an interval; the scheduler-runtime image does not provision browser executables, Playwright browser downloads, Xvfb, browser-specific system packages, or a runnable CloakBrowser browser/system runtime, and does not launch a browser.
 - **Operator Tools**: CLI tools for profile provisioning, manual collection, worker execution, browser probing, the same provisioning CLI used for first-time and recovery login, and the containerized collection scheduler.
 - **Web UI**: Dashboard for managing profiles, source groups, categories, content items, and reviewing run status. The profile detail page now displays `authenticationHealth` and a generalized provisioning card for `Start Provisioning`, `Issue New Provisioning Token`, `Start Reauthentication`, and `Start Manual Checkpoint Recovery`. The profile inventory page now supports URL-backed Status and Authentication Health filters, a `Health Updated` column, and 25-item pagination with Previous / Next navigation.

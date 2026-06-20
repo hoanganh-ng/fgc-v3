@@ -36,6 +36,7 @@
     "profile:exercise-worker:run": "tsx src/operator-tools/account-exercise-worker/cli.ts",
     "profile-source-access-check-worker:run": "tsx src/operator-tools/profile-source-access-check-worker/cli.ts",
     "profile:assisted-access:run": "tsx src/operator-tools/assisted-group-access/cli.ts",
+    "profile:home-feed:run-next": "tsx src/operator-tools/profile-home-feed-runner/cli.ts",
     "collector:browser:probe": "tsx src/operator-tools/browser-probe/cli.ts",
     "test": "vitest run",
     "test:db": "RUN_DB_TESTS=true vitest run src/infrastructure",

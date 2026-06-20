@@ -29,6 +29,7 @@ export * from "./use-cases/claim-next-profile-source-access-check-run.use-case";
 export * from "./use-cases/claim-next-account-exercise-run.use-case";
 export * from "./use-cases/claim-next-collection-run.use-case";
 export * from "./use-cases/execute-collection-run.use-case";
+export * from "./use-cases/execute-profile-home-feed-collection-run.use-case";
 export * from "./use-cases/execute-profile-source-access-check-run.use-case";
 export * from "./use-cases/get-account-exercise-run.use-case";
 export * from "./use-cases/get-collection-run.use-case";

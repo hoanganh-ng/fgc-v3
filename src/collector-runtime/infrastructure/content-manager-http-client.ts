@@ -4,14 +4,24 @@ import type {
   CollectedContentTopCommentSubmissionInput,
   ContentManagerContentSubmissionPort,
   ContentSubmissionResult,
+  HomeFeedContentSubmissionInput,
+  HomeFeedContentSubmissionPort,
+  HomeFeedContentSubmissionResult,
+  HomeFeedContentSubmissionTopComment,
   SourceGroupLookupPort,
   SourceGroupLookupEntryRoute,
   SourceGroupLookupResult,
   SourceGroupLookupSourceGroup,
+  SourcePublisherObservationInput,
+  SourcePublisherObservationPort,
+  SourcePublisherObservationResult,
 } from "../application";
 
 const CONTENT_ITEMS_PATH = "collector/content-items";
+const CONTENT_ITEMS_HOME_FEED_PATH = "collector/content-items/home-feed";
 const SOURCE_GROUPS_PATH = "collector/source-groups";
+const SOURCE_PUBLISHER_OBSERVATIONS_PATH =
+  "collector/source-publishers/observations";
 const CONTENT_MANAGER_HTTP_ERROR = "CONTENT_MANAGER_HTTP_ERROR";
 const CONTENT_MANAGER_NETWORK_ERROR = "CONTENT_MANAGER_NETWORK_ERROR";
 const CONTENT_MANAGER_RESPONSE_ERROR = "CONTENT_MANAGER_RESPONSE_ERROR";
@@ -79,7 +89,11 @@ interface ContentManagerHttpFailure {
 }
 
 export class ContentManagerHttpClient
-  implements ContentManagerContentSubmissionPort, SourceGroupLookupPort {
+  implements
+    ContentManagerContentSubmissionPort,
+    SourceGroupLookupPort,
+    SourcePublisherObservationPort,
+    HomeFeedContentSubmissionPort {
   private readonly baseUrl: string;
   private readonly fetchImplementation: FetchLike;
 
@@ -175,6 +189,92 @@ export class ContentManagerHttpClient
       };
     }
   }
+
+  public async observeSourcePublisher(
+    input: SourcePublisherObservationInput,
+  ): Promise<SourcePublisherObservationResult> {
+    try {
+      const response = await this.fetchImplementation(
+        buildSourcePublisherObservationsUrl(this.baseUrl),
+        {
+          method: "POST",
+          headers: jsonHeaders(),
+          body: JSON.stringify(toSourcePublisherObservationRequestBody(input)),
+        },
+      );
+
+      if (!isSuccessStatusCode(response.status)) {
+        const failure = await readHttpFailure(response);
+        return {
+          ok: false,
+          statusCode: failure.statusCode,
+          errorCode: failure.errorCode,
+          errorMessage: failure.errorMessage,
+        };
+      }
+
+      const validatedId = await readValidatedSourcePublisherId(response, input);
+
+      if (validatedId !== undefined) {
+        return {
+          ok: true,
+          sourcePublisherId: validatedId,
+        };
+      }
+
+      return {
+        ok: false,
+        statusCode: response.status,
+        errorCode: CONTENT_MANAGER_RESPONSE_ERROR,
+        errorMessage:
+          "Content Manager source publisher observation response is invalid.",
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        errorCode: CONTENT_MANAGER_NETWORK_ERROR,
+        errorMessage: errorToMessage(error),
+      };
+    }
+  }
+
+  public async submitHomeFeedCollectedContent(
+    input: HomeFeedContentSubmissionInput,
+  ): Promise<HomeFeedContentSubmissionResult> {
+    try {
+      const response = await this.fetchImplementation(
+        buildHomeFeedContentItemsUrl(this.baseUrl),
+        {
+          method: "POST",
+          headers: jsonHeaders(),
+          body: JSON.stringify(toHomeFeedContentSubmissionRequestBody(input)),
+        },
+      );
+
+      if (!isSuccessStatusCode(response.status)) {
+        const failure = await readHttpFailure(response);
+        return {
+          ok: false,
+          statusCode: failure.statusCode,
+          errorCode: failure.errorCode,
+          errorMessage: failure.errorMessage,
+        };
+      }
+
+      const contentItemId = await readContentItemId(response);
+
+      return {
+        ok: true,
+        ...(contentItemId !== undefined ? { contentItemId } : {}),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        errorCode: CONTENT_MANAGER_NETWORK_ERROR,
+        errorMessage: errorToMessage(error),
+      };
+    }
+  }
 }
 
 export function createContentManagerHttpClientFromEnv(
@@ -208,6 +308,14 @@ function jsonHeaders(): Record<string, string> {
 
 function buildContentItemsUrl(baseUrl: string): string {
   return buildUrl(baseUrl, CONTENT_ITEMS_PATH);
+}
+
+function buildHomeFeedContentItemsUrl(baseUrl: string): string {
+  return buildUrl(baseUrl, CONTENT_ITEMS_HOME_FEED_PATH);
+}
+
+function buildSourcePublisherObservationsUrl(baseUrl: string): string {
+  return buildUrl(baseUrl, SOURCE_PUBLISHER_OBSERVATIONS_PATH);
 }
 
 function buildSourceGroupUrl(baseUrl: string, sourceGroupId: string): string {
@@ -272,6 +380,96 @@ function toContentManagerTopCommentRequestBody(
     ...(comment.postedAt !== undefined ? { postedAt: comment.postedAt } : {}),
     collectedAt: comment.collectedAt,
   };
+}
+
+function toSourcePublisherObservationRequestBody(
+  input: SourcePublisherObservationInput,
+): SourcePublisherObservationInput {
+  return {
+    platform: input.platform,
+    kind: input.kind,
+    externalPublisherId: input.externalPublisherId,
+    observedAt: input.observedAt,
+    ...(input.displayName !== undefined
+      ? { displayName: input.displayName }
+      : {}),
+    ...(input.canonicalUrl !== undefined
+      ? { canonicalUrl: input.canonicalUrl }
+      : {}),
+  };
+}
+
+function toHomeFeedContentSubmissionRequestBody(
+  input: HomeFeedContentSubmissionInput,
+): HomeFeedContentSubmissionInput {
+  return {
+    sourcePublisherId: input.sourcePublisherId,
+    platform: input.platform,
+    externalPostId: input.externalPostId,
+    sourceUrl: input.sourceUrl,
+    bodyText: input.bodyText,
+    collectedAt: input.collectedAt,
+    reactionCount: input.reactionCount,
+    commentCount: input.commentCount,
+    topComments: input.topComments.map(toHomeFeedTopCommentRequestBody),
+    ...(input.title !== undefined ? { title: input.title } : {}),
+    ...(input.authorDisplayName !== undefined
+      ? { authorDisplayName: input.authorDisplayName }
+      : {}),
+    ...(input.authorExternalId !== undefined
+      ? { authorExternalId: input.authorExternalId }
+      : {}),
+    ...(input.postedAt !== undefined ? { postedAt: input.postedAt } : {}),
+    ...(input.shareCount !== undefined ? { shareCount: input.shareCount } : {}),
+  };
+}
+
+function toHomeFeedTopCommentRequestBody(
+  comment: HomeFeedContentSubmissionTopComment,
+): HomeFeedContentSubmissionTopComment {
+  return {
+    externalCommentId: comment.externalCommentId,
+    bodyText: comment.bodyText,
+    reactionCount: comment.reactionCount,
+    collectedAt: comment.collectedAt,
+    ...(comment.authorDisplayName !== undefined
+      ? { authorDisplayName: comment.authorDisplayName }
+      : {}),
+    ...(comment.authorExternalId !== undefined
+      ? { authorExternalId: comment.authorExternalId }
+      : {}),
+    ...(comment.replyCount !== undefined ? { replyCount: comment.replyCount } : {}),
+    ...(comment.postedAt !== undefined ? { postedAt: comment.postedAt } : {}),
+  };
+}
+
+async function readValidatedSourcePublisherId(
+  response: FetchLikeResponse,
+  expected: SourcePublisherObservationInput,
+): Promise<string | undefined> {
+  const body = await readJsonBody(response);
+
+  if (!isRecord(body) || !isRecord(body.sourcePublisher)) {
+    return undefined;
+  }
+
+  const sourcePublisher = body.sourcePublisher;
+  const id = sourcePublisher.id;
+  const platform = sourcePublisher.platform;
+  const kind = sourcePublisher.kind;
+  const externalPublisherId = sourcePublisher.externalPublisherId;
+
+  if (
+    typeof id !== "string" ||
+    id.trim().length === 0 ||
+    platform !== expected.platform ||
+    kind !== expected.kind ||
+    externalPublisherId !== expected.externalPublisherId
+  ) {
+    return undefined;
+  }
+
+  return id;
 }
 
 async function readContentItemId(

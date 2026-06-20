@@ -71,12 +71,12 @@ export interface FacebookJsonParseResult {
 
 export class FacebookBrowserPayloadCaptureAdapter
   implements FacebookGroupPayloadCapturePort {
-  private readonly runtimeProfileConfigurationPort: RuntimeProfileConfigurationPort;
-  private readonly browserProvider: BrowserProviderPort;
+  protected readonly runtimeProfileConfigurationPort: RuntimeProfileConfigurationPort;
+  protected readonly browserProvider: BrowserProviderPort;
   private readonly maxScrolls: number;
   private readonly maxDurationMs: number;
-  private readonly abortSignal: AbortSignal | undefined;
-  private readonly now: () => Date;
+  protected readonly abortSignal: AbortSignal | undefined;
+  protected readonly now: () => Date;
 
   public constructor(options: FacebookBrowserPayloadCaptureAdapterOptions) {
     this.runtimeProfileConfigurationPort =
@@ -97,6 +97,27 @@ export class FacebookBrowserPayloadCaptureAdapter
   public async captureGroupPayloads(
     input: FacebookGroupPayloadCaptureInput,
   ): Promise<FacebookPayloadCaptureResult> {
+    return this.performCapture({
+      url: input.sourceGroupUrl,
+      profileId: input.profileId,
+      leaseId: input.leaseId,
+      maxScrolls: this.maxScrolls,
+      maxDurationMs: this.maxDurationMs,
+      navigationFailureCode: "FACEBOOK_GROUP_NAVIGATION_FAILED",
+      navigationFailureMessage: (status) =>
+        `Facebook group navigation returned HTTP ${status}.`,
+    });
+  }
+
+  protected async performCapture(input: {
+    readonly url: string;
+    readonly profileId: string;
+    readonly leaseId: string;
+    readonly maxScrolls: number;
+    readonly maxDurationMs: number;
+    readonly navigationFailureCode: string;
+    readonly navigationFailureMessage: (status: number) => string;
+  }): Promise<FacebookPayloadCaptureResult> {
     const warnings: CollectorRuntimeWarning[] = [];
     const sensitiveValues = new Set<string>();
     let captureBuffer: FacebookPayloadCaptureBuffer | undefined;
@@ -153,7 +174,7 @@ export class FacebookBrowserPayloadCaptureAdapter
       captureBuffer = pageCaptureBuffer;
       await installFacebookPageContextCapture(page, pageCaptureBuffer);
       const pendingCaptures: Promise<void>[] = [];
-      const deadlineAt = Date.now() + this.maxDurationMs;
+      const deadlineAt = Date.now() + input.maxDurationMs;
       const pageFailureWatcher = createPageFailureWatcher(
         page,
         sensitiveValues,
@@ -174,9 +195,9 @@ export class FacebookBrowserPayloadCaptureAdapter
       try {
         const navigationResponse = await Promise.race([
           page.goto({
-            url: input.sourceGroupUrl,
+            url: input.url,
             waitUntil: "domcontentloaded",
-            timeoutMs: this.maxDurationMs,
+            timeoutMs: input.maxDurationMs,
           }),
           pageFailureWatcher.promise,
         ]);
@@ -187,8 +208,10 @@ export class FacebookBrowserPayloadCaptureAdapter
           pageCaptureBuffer.recordFinalPageUrl(page.url());
           return {
             ok: false,
-            errorCode: "FACEBOOK_GROUP_NAVIGATION_FAILED",
-            errorMessage: `Facebook group navigation returned HTTP ${navigationResponse.status}.`,
+            errorCode: input.navigationFailureCode,
+            errorMessage: input.navigationFailureMessage(
+              navigationResponse.status,
+            ),
             warnings,
             diagnostics: pageCaptureBuffer.toDiagnostics(),
           };
@@ -215,7 +238,7 @@ export class FacebookBrowserPayloadCaptureAdapter
         const scrollingAccessFailure = await Promise.race([
           scrollFacebookGroupPage(
             page,
-            this.maxScrolls,
+            input.maxScrolls,
             deadlineAt,
             this.abortSignal,
           ),

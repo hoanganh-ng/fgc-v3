@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type {
   CollectedContentSubmissionInput,
+  HomeFeedContentSubmissionInput,
+  SourcePublisherObservationInput,
 } from "../application";
 import {
   ContentManagerHttpClient,
@@ -338,7 +340,236 @@ describe("ContentManagerHttpClient", () => {
       "CONTENT_MANAGER_BASE_URL is required for Content Manager HTTP client configuration.",
     );
   });
+
+  describe("observeSourcePublisher", () => {
+    it("posts to /collector/source-publishers/observations and returns the validated id", async () => {
+      const input = createObservationInput();
+      const fetch = new FakeFetch(
+        createResponse(200, {
+          sourcePublisher: {
+            id: "sp-123",
+            platform: input.platform,
+            kind: input.kind,
+            externalPublisherId: input.externalPublisherId,
+            status: "OBSERVED",
+            firstObservedAt: input.observedAt,
+            lastObservedAt: input.observedAt,
+            observationCount: 1,
+            createdAt: input.observedAt,
+            updatedAt: input.observedAt,
+          },
+        }),
+      );
+      const client = createClient(fetch.fetch);
+
+      const result = await client.observeSourcePublisher(input);
+
+      expect(result).toEqual({ ok: true, sourcePublisherId: "sp-123" });
+      expect(fetch.calls[0]?.input).toBe(
+        "https://content-manager.test/collector/source-publishers/observations",
+      );
+      expect(fetch.calls[0]?.init?.method).toBe("POST");
+    });
+
+    it("maps an identity mismatch to CONTENT_MANAGER_RESPONSE_ERROR", async () => {
+      const input = createObservationInput();
+      const fetch = new FakeFetch(
+        createResponse(200, {
+          sourcePublisher: {
+            id: "sp-mismatch",
+            platform: input.platform,
+            kind: input.kind === "GROUP" ? "PAGE" : "GROUP",
+            externalPublisherId: input.externalPublisherId,
+            status: "OBSERVED",
+            firstObservedAt: input.observedAt,
+            lastObservedAt: input.observedAt,
+            observationCount: 1,
+            createdAt: input.observedAt,
+            updatedAt: input.observedAt,
+          },
+        }),
+      );
+      const client = createClient(fetch.fetch);
+
+      const result = await client.observeSourcePublisher(input);
+
+      expect(result.ok).toBe(false);
+      if (result.ok === false) {
+        expect(result.errorCode).toBe("CONTENT_MANAGER_RESPONSE_ERROR");
+        expect(result.errorMessage).toBe(
+          "Content Manager source publisher observation response is invalid.",
+        );
+      }
+    });
+
+    it("maps HTTP 4xx and 5xx to structured failures", async () => {
+      for (const statusCode of [400, 409, 503] as const) {
+        const fetch = new FakeFetch(
+          createResponse(statusCode, {
+            error: {
+              code: "SOURCE_PUBLISHER_VALIDATION_FAILED",
+              message: "Validation failed.",
+            },
+          }),
+        );
+        const client = createClient(fetch.fetch);
+
+        const result = await client.observeSourcePublisher(
+          createObservationInput(),
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok === false) {
+          expect(result.statusCode).toBe(statusCode);
+          expect(result.errorCode).toBe("SOURCE_PUBLISHER_VALIDATION_FAILED");
+        }
+      }
+    });
+
+    it("maps a network error to CONTENT_MANAGER_NETWORK_ERROR", async () => {
+      const fetch = new FakeFetch(createResponse(200, {}));
+      fetch.setError(new Error("network refused"));
+      const client = createClient(fetch.fetch);
+
+      const result = await client.observeSourcePublisher(
+        createObservationInput(),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok === false) {
+        expect(result.errorCode).toBe("CONTENT_MANAGER_NETWORK_ERROR");
+      }
+    });
+
+    it("maps a response missing sourcePublisher.id to CONTENT_MANAGER_RESPONSE_ERROR", async () => {
+      const input = createObservationInput();
+      const fetch = new FakeFetch(
+        createResponse(200, {
+          sourcePublisher: {
+            platform: input.platform,
+            kind: input.kind,
+            externalPublisherId: input.externalPublisherId,
+          },
+        }),
+      );
+      const client = createClient(fetch.fetch);
+
+      const result = await client.observeSourcePublisher(input);
+
+      expect(result.ok).toBe(false);
+      if (result.ok === false) {
+        expect(result.errorCode).toBe("CONTENT_MANAGER_RESPONSE_ERROR");
+      }
+    });
+  });
+
+  describe("submitHomeFeedCollectedContent", () => {
+    it("posts to /collector/content-items/home-feed and returns the contentItemId on success", async () => {
+      const fetch = new FakeFetch(
+        createResponse(200, {
+          contentItem: { id: "content-item-home-1" },
+        }),
+      );
+      const client = createClient(fetch.fetch);
+
+      const result = await client.submitHomeFeedCollectedContent(
+        createHomeFeedSubmissionInput(),
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        contentItemId: "content-item-home-1",
+      });
+      expect(fetch.calls[0]?.input).toBe(
+        "https://content-manager.test/collector/content-items/home-feed",
+      );
+      expect(fetch.calls[0]?.init?.method).toBe("POST");
+
+      const sentBody = JSON.parse(
+        fetch.calls[0]?.init?.body ?? "{}",
+      ) as HomeFeedContentSubmissionInput;
+      expect(sentBody).toMatchObject({
+        sourcePublisherId: "sp-1",
+        externalPostId: "post-home-1",
+        sourceUrl: "https://www.facebook.com/post-home-1",
+      });
+      expect((sentBody as unknown as Record<string, unknown>).sourceGroupId).toBeUndefined();
+    });
+
+    it("maps HTTP error responses to structured failures", async () => {
+      const fetch = new FakeFetch(
+        createResponse(409, {
+          error: {
+            code: "HOME_FEED_INGESTION_CONFLICT",
+            message: "Conflict.",
+          },
+        }),
+      );
+      const client = createClient(fetch.fetch);
+
+      const result = await client.submitHomeFeedCollectedContent(
+        createHomeFeedSubmissionInput(),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok === false) {
+        expect(result.statusCode).toBe(409);
+        expect(result.errorCode).toBe("HOME_FEED_INGESTION_CONFLICT");
+      }
+    });
+
+    it("maps a network error to CONTENT_MANAGER_NETWORK_ERROR", async () => {
+      const fetch = new FakeFetch(createResponse(200, {}));
+      fetch.setError(new Error("network down"));
+      const client = createClient(fetch.fetch);
+
+      const result = await client.submitHomeFeedCollectedContent(
+        createHomeFeedSubmissionInput(),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok === false) {
+        expect(result.errorCode).toBe("CONTENT_MANAGER_NETWORK_ERROR");
+      }
+    });
+
+    it("returns ok without a contentItemId when the response omits it", async () => {
+      const fetch = new FakeFetch(createResponse(204, {}));
+      const client = createClient(fetch.fetch);
+
+      const result = await client.submitHomeFeedCollectedContent(
+        createHomeFeedSubmissionInput(),
+      );
+
+      expect(result).toEqual({ ok: true });
+    });
+  });
 });
+
+function createObservationInput(): SourcePublisherObservationInput {
+  return {
+    platform: "FACEBOOK",
+    kind: "GROUP",
+    externalPublisherId: "publisher-abc",
+    observedAt: "2026-06-19T10:00:00.000Z",
+    displayName: "Synthetic Publisher",
+    canonicalUrl: "https://www.facebook.com/groups/publisher-abc",
+  };
+}
+
+function createHomeFeedSubmissionInput(): HomeFeedContentSubmissionInput {
+  return {
+    sourcePublisherId: "sp-1",
+    platform: "FACEBOOK",
+    externalPostId: "post-home-1",
+    sourceUrl: "https://www.facebook.com/post-home-1",
+    bodyText: "synthetic body",
+    collectedAt: "2026-06-19T10:00:00.000Z",
+    reactionCount: 1,
+    commentCount: 0,
+    topComments: [],
+  };
+}
 
 class FakeFetch {
   public readonly calls: Array<{

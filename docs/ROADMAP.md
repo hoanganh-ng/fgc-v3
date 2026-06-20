@@ -144,52 +144,49 @@ source-group promotion, Content Builder, or Content Publisher
 behavior. Sprint 065C1 is accepted at
 `40b3ce7023c126c03386994a719ae7acb7758f21`. The Sprint 065C "Manual
 Home-Feed Execution" work is decomposed into 065C1, 065C2, and
-065C3; only 065C2 is active and authorized here, and 065C3 remains
-inactive and unauthorized.
+065C3; 065C1 and 065C2 are accepted, and 065C3 is the only active
+and authorized sprint.
 
 ## Sprint 065C2: Profile-Bound Home-Feed Checkout
 
-Add the explicit profile-bound checkout path for the exact profile
-referenced by a `ProfileHomeFeedCollectionRun`. Extend
-`ProfileLeasePurpose` with a fourth value, `HOME_FEED_COLLECTION`,
-which shares the existing `COLLECTION_READY` account-stage rule and
-the full existing safety and readiness check set (including the
-approved `NETWORK_CONTEXT_MISSING` rule). Add
-`CheckoutProfileForHomeFeedCollectionUseCase` whose input is
-`{ profileId }` only — no `Source Group` reference, no profile-source
-access record, no candidate selection — which loads the exact
-requested profile, queries the active lease, throws
-`ProfileLeaseStateConflictError` when an active lease exists,
-evaluates `HOME_FEED_COLLECTION` eligibility, and atomically marks
-the profile `BUSY` and saves an `ACTIVE` `HOME_FEED_COLLECTION`
-lease through the existing transaction manager. Add `POST
-/collector/profiles/:profileId/home-feed/checkout` with no required
-body and a strict empty-allowlist body schema. Duplicate checkouts
-of the same profile are mapped to HTTP 409 with
-`PROFILE_LEASE_STATE_CONFLICT`. Extend `ProfileManagerHttpClient`
-with a dedicated `checkoutProfileForHomeFeedCollection(profileId)`
-method backed by a new application-owned `ProfileHomeFeedCheckoutPort`
-whose `accountStage` is typed as `CollectorRuntimeAccountStage`
-(parsed through `CollectorRuntimeAccountStageSchema`; an unsupported
-or malformed account stage produces `PROFILE_MANAGER_RESPONSE_ERROR`).
-The port returns only `{ profileId, accountStage, leaseId,
-leaseExpiresAt? }`. Add migration `0024` (PostgreSQL `ALTER TYPE ...
-ADD VALUE`) to add `HOME_FEED_COLLECTION` to the existing
-`collector_profile_lease_purpose` enum; the migration preserves the
-one-active-lease-per-profile unique partial index unchanged.
-`GetRuntimeProfileConfigurationUseCase` accepts an active
-`HOME_FEED_COLLECTION` lease for its matching `BUSY` profile.
-`ReleaseProfileLeaseUseCase` releases the lease and returns the
-profile to `READY`. Sprint 065C2 does not execute a run, navigate
-Facebook, capture payloads, observe `SourcePublisher`, submit
-Content Manager items, add workers or schedulers, change Docker,
-add Web UI behavior, or make any live-Facebook claim. The new
-`ProfileHomeFeedCheckoutPort` is not wired into a worker or executor
-in Sprint 065C2.
+Accepted at `6591a05b3ecde7e615f824efc715c815c25bc2d2`. Adds the
+explicit profile-bound `HOME_FEED_COLLECTION` checkout for the exact
+profile referenced by a `ProfileHomeFeedCollectionRun`. Adds
+`CheckoutProfileForHomeFeedCollectionUseCase`, the matching
+`POST /collector/profiles/:profileId/home-feed/checkout` route, the
+`ProfileHomeFeedCheckoutPort` and its `ProfileManagerHttpClient`
+binding, and migration `0024` extending the
+`collector_profile_lease_purpose` enum. The
+`ProfileHomeFeedCheckoutPort` was not wired into a worker or
+executor in Sprint 065C2 — that wiring is Sprint 065C3.
 
-## Sprint 065C: Manual Home-Feed Execution
+## Sprint 065C3: Bounded Facebook Home-Feed Execution
 
-Implement actual bounded browser execution against the collector profile's Facebook home feed: profile checkout, feed navigation, max-scroll / max-duration / max-post bounds, payload capture, extraction, source-publisher observation, content submission, lease release, and sanitized summaries. Finish with opt-in manual live-Facebook validation. This sprint must not claim that it only runs synthetic fixtures.
+Active. Adds one-shot, operator-invoked execution of an existing
+durable `ProfileHomeFeedCollectionRun`. Claims at most one queued
+run, checks out the run's exact profile through
+`HOME_FEED_COLLECTION`, captures the authenticated Facebook home
+feed at the fixed internal URL `https://www.facebook.com/?sk=h_chr`
+under per-call bounded scroll/duration limits, invokes the existing
+Sprint 065A extractor, deduplicates across the run by
+`platform + externalPostId`, caps `extractorCandidates` at
+`maxPosts`, observes each distinct
+`platform + kind + externalPublisherId` once via
+`POST /collector/source-publishers/observations`, submits accepted
+candidates via `POST /collector/content-items/home-feed`, releases
+the lease (forwarding `LOGIN_REQUIRED` / `CHECKPOINT_REQUIRED` as
+the existing authentication observation), and persists a sanitized
+terminal `SUCCEEDED` or `FAILED` run through the existing CAS
+transition path. Defaults `maxScrolls=3`, `maxDurationMs=30000`,
+`maxPosts=20`; hard ceilings `maxScrolls<=10`,
+`maxDurationMs<=120000`, `maxPosts<=100`; bounds are never silently
+clamped — exceeding a ceiling fails the RUNNING run before checkout
+with `HOME_FEED_EXECUTION_BOUNDS_EXCEEDED`. Adds the operator
+command `pnpm profile:home-feed:run-next -- --base-url <url>
+--browser-provider <provider>`. Sprint 065C3 does not add a polling
+loop, persistent worker, Docker service, scheduler integration, Web
+UI changes, or an HTTP execute route. Manual live-Facebook
+validation is opt-in and was not performed by Sprint 065C3.
 
 ## Sprint 066: Source Publisher Discovery Review API And UI
 
