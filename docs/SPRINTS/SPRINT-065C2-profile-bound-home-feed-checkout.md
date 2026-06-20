@@ -315,3 +315,16 @@ and were not modified in this correction.
   `PROFILE_NOT_CHECKOUT_ELIGIBLE`). This is consistent with the
   existing source-group and assisted-group-access checkouts and is
   intentional.
+
+## Status
+
+Sprint 065C2 is **accepted** at
+`6591a05b3ecde7e615f824efc715c815c25bc2d2`. The required
+stub-backed HTTP regression in `src/interfaces/http/server.test.ts`
+asserts HTTP 409 `PROFILE_LEASE_STATE_CONFLICT` for duplicate home-feed
+checkout, calls `checkoutProfileForHomeFeedCollection` exactly once
+with `{ profileId: "profile-1" }`, and confirms the response contains
+no sensitive fields.
+
+Sprint 065C3 — Bounded Facebook Home-Feed Execution is the **only
+active and authorized** sprint.

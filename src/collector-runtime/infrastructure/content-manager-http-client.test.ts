@@ -533,7 +533,7 @@ describe("ContentManagerHttpClient", () => {
       }
     });
 
-    it("returns ok without a contentItemId when the response omits it", async () => {
+    it("returns CONTENT_MANAGER_RESPONSE_ERROR when the 2xx response omits the contentItem id", async () => {
       const fetch = new FakeFetch(createResponse(204, {}));
       const client = createClient(fetch.fetch);
 
@@ -541,7 +541,70 @@ describe("ContentManagerHttpClient", () => {
         createHomeFeedSubmissionInput(),
       );
 
-      expect(result).toEqual({ ok: true });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errorCode).toBe("CONTENT_MANAGER_RESPONSE_ERROR");
+      }
+    });
+
+    it("returns CONTENT_MANAGER_RESPONSE_ERROR when the contentItem.id is blank", async () => {
+      const fetch = new FakeFetch(
+        createResponse(200, { contentItem: { id: "   " } }),
+      );
+      const client = createClient(fetch.fetch);
+
+      const result = await client.submitHomeFeedCollectedContent(
+        createHomeFeedSubmissionInput(),
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errorCode).toBe("CONTENT_MANAGER_RESPONSE_ERROR");
+      }
+    });
+
+    it("returns CONTENT_MANAGER_RESPONSE_ERROR when the response body is malformed JSON", async () => {
+      const fetch = new FakeFetch({
+        status: 200,
+        async json() {
+          throw new Error("not json");
+        },
+        async text() {
+          return "{not json";
+        },
+      });
+      const client = createClient(fetch.fetch);
+
+      const result = await client.submitHomeFeedCollectedContent(
+        createHomeFeedSubmissionInput(),
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errorCode).toBe("CONTENT_MANAGER_RESPONSE_ERROR");
+      }
+    });
+
+    it("returns CONTENT_MANAGER_RESPONSE_ERROR when the response body is empty", async () => {
+      const fetch = new FakeFetch({
+        status: 200,
+        async json() {
+          return undefined;
+        },
+        async text() {
+          return "";
+        },
+      });
+      const client = createClient(fetch.fetch);
+
+      const result = await client.submitHomeFeedCollectedContent(
+        createHomeFeedSubmissionInput(),
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errorCode).toBe("CONTENT_MANAGER_RESPONSE_ERROR");
+      }
     });
   });
 });

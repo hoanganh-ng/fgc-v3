@@ -77,6 +77,11 @@ export class FacebookBrowserPayloadCaptureAdapter
   private readonly maxDurationMs: number;
   protected readonly abortSignal: AbortSignal | undefined;
   protected readonly now: () => Date;
+  protected activeAbortSignalOverride: AbortSignal | undefined = undefined;
+
+  protected get effectiveAbortSignal(): AbortSignal | undefined {
+    return this.activeAbortSignalOverride ?? this.abortSignal;
+  }
 
   public constructor(options: FacebookBrowserPayloadCaptureAdapterOptions) {
     this.runtimeProfileConfigurationPort =
@@ -125,7 +130,7 @@ export class FacebookBrowserPayloadCaptureAdapter
     let abortCloseListener: (() => void) | undefined;
 
     try {
-      throwIfAborted(this.abortSignal);
+      throwIfAborted(this.effectiveAbortSignal);
 
       const configurationResult =
         await this.runtimeProfileConfigurationPort.getRuntimeProfileConfiguration(
@@ -165,7 +170,7 @@ export class FacebookBrowserPayloadCaptureAdapter
         }),
       );
       abortCloseListener = createAbortCloseListener(
-        this.abortSignal,
+        this.effectiveAbortSignal,
         browserSession,
       );
 
@@ -202,7 +207,7 @@ export class FacebookBrowserPayloadCaptureAdapter
           pageFailureWatcher.promise,
         ]);
 
-        throwIfAborted(this.abortSignal);
+        throwIfAborted(this.effectiveAbortSignal);
 
         if (navigationResponse !== null && navigationResponse.status >= 400) {
           pageCaptureBuffer.recordFinalPageUrl(page.url());
@@ -218,7 +223,7 @@ export class FacebookBrowserPayloadCaptureAdapter
         }
 
         const initialAccessFailure = await Promise.race([
-          detectFacebookAccessFailure(page, deadlineAt, this.abortSignal),
+          detectFacebookAccessFailure(page, deadlineAt, this.effectiveAbortSignal),
           pageFailureWatcher.promise,
         ]);
         if (initialAccessFailure !== undefined) {
@@ -240,7 +245,7 @@ export class FacebookBrowserPayloadCaptureAdapter
             page,
             input.maxScrolls,
             deadlineAt,
-            this.abortSignal,
+            this.effectiveAbortSignal,
           ),
           pageFailureWatcher.promise,
         ]);
@@ -260,7 +265,7 @@ export class FacebookBrowserPayloadCaptureAdapter
         }
 
         const finalAccessFailure = await Promise.race([
-          detectFacebookAccessFailure(page, deadlineAt, this.abortSignal),
+          detectFacebookAccessFailure(page, deadlineAt, this.effectiveAbortSignal),
           pageFailureWatcher.promise,
         ]);
         if (finalAccessFailure !== undefined) {
@@ -277,7 +282,11 @@ export class FacebookBrowserPayloadCaptureAdapter
           };
         }
 
-        await settlePendingCaptures(pendingCaptures);
+        await settlePendingCaptures(
+          pendingCaptures,
+          deadlineAt,
+          this.effectiveAbortSignal,
+        );
         pageCaptureBuffer.recordFinalPageUrl(page.url());
       } finally {
         pageFailureWatcher.dispose();
@@ -300,7 +309,7 @@ export class FacebookBrowserPayloadCaptureAdapter
         diagnostics: pageCaptureBuffer.toDiagnostics(),
       };
     } catch (error) {
-      if (isAbortLikeError(error, this.abortSignal)) {
+      if (isAbortLikeError(error, this.effectiveAbortSignal)) {
         return {
           ok: false,
           errorCode: "FACEBOOK_BROWSER_CAPTURE_INTERRUPTED",
@@ -977,8 +986,62 @@ async function scrollFacebookGroupPage(
 
 async function settlePendingCaptures(
   pendingCaptures: readonly Promise<void>[],
+  deadlineAt: number,
+  abortSignal: AbortSignal | undefined,
 ): Promise<void> {
-  await Promise.allSettled(pendingCaptures);
+  if (pendingCaptures.length === 0) {
+    return;
+  }
+
+  const remainingMs = deadlineAt - Date.now();
+
+  if (remainingMs <= 0 || abortSignal?.aborted === true) {
+    return;
+  }
+
+  let resolveSettle: (() => void) | undefined;
+  const settled = new Promise<void>((resolve) => {
+    resolveSettle = resolve;
+  });
+
+  const tracked = pendingCaptures.map((promise) =>
+    promise.finally(() => {
+      if (resolveSettle !== undefined) {
+        resolveSettle();
+      }
+    }),
+  );
+
+  const timer = setTimeout(() => {
+    if (resolveSettle !== undefined) {
+      resolveSettle();
+    }
+  }, remainingMs);
+
+  const onAbort = (): void => {
+    if (resolveSettle !== undefined) {
+      resolveSettle();
+    }
+  };
+
+  if (abortSignal !== undefined) {
+    abortSignal.addEventListener("abort", onAbort, { once: true });
+  }
+
+  try {
+    await settled;
+  } finally {
+    clearTimeout(timer);
+    if (abortSignal !== undefined) {
+      abortSignal.removeEventListener("abort", onAbort);
+    }
+  }
+
+  // Detach tracking handlers so unresolved network reads do not retain
+  // references after the bounded drain window has elapsed.
+  for (const trackedPromise of tracked) {
+    void trackedPromise.catch(() => undefined);
+  }
 }
 
 function createAbortCloseListener(

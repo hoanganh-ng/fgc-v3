@@ -33,6 +33,11 @@ export interface ExecuteProfileHomeFeedCollectionRunInput {
   readonly abortSignal?: AbortSignal;
 }
 
+interface AcquiredLease {
+  readonly profileId: string;
+  readonly leaseId: string;
+}
+
 export interface HomeFeedExtractorLike {
   extract(
     input: FacebookHomeFeedGraphQLPayloadExtractionInput,
@@ -117,6 +122,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
   public async execute(
     input: ExecuteProfileHomeFeedCollectionRunInput,
   ): Promise<ProfileHomeFeedCollectionRun> {
+    const abortSignal = input.abortSignal;
     const run = await loadValidatedProfileHomeFeedCollectionRunById(
       this.runs,
       input.runId,
@@ -135,7 +141,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       return this.failRun(run.id, FAILURE_BOUNDS_EXCEEDED, undefined);
     }
 
-    if (input.abortSignal?.aborted === true) {
+    if (abortSignal?.aborted === true) {
       return this.failRun(run.id, FAILURE_INTERRUPTED, undefined);
     }
 
@@ -145,33 +151,118 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       return this.failRun(run.id, FAILURE_CHECKOUT_FAILED, undefined);
     }
 
-    if (checkoutResult.profileId !== run.profileId) {
-      return this.failRun(run.id, FAILURE_PROFILE_MISMATCH, undefined);
-    }
-
-    const leaseId = checkoutResult.leaseId;
+    const acquiredLease: AcquiredLease = {
+      profileId: checkoutResult.profileId,
+      leaseId: checkoutResult.leaseId,
+    };
     const summary: MutableSummary = createEmptySummary();
+    const readAbortSignal = (): AbortSignal | undefined => abortSignal;
 
+    try {
+      if (acquiredLease.profileId !== run.profileId) {
+        const release = await safeRelease(
+          this.leasePort,
+          acquiredLease.profileId,
+          acquiredLease.leaseId,
+          undefined,
+        );
+        summary.leaseReleased = release.ok;
+
+        if (!release.ok) {
+          return this.failRun(
+            run.id,
+            FAILURE_LEASE_RELEASE_FAILED,
+            summary,
+          );
+        }
+
+        return this.failRun(run.id, FAILURE_PROFILE_MISMATCH, summary);
+      }
+
+      return await this.executeAfterCheckout(
+        run,
+        acquiredLease,
+        bounds,
+        readAbortSignal,
+        summary,
+      );
+    } catch (error) {
+      const interrupted = isAbortInterruption(abortSignal, error);
+      const release = await safeRelease(
+        this.leasePort,
+        acquiredLease.profileId,
+        acquiredLease.leaseId,
+        undefined,
+      );
+      summary.leaseReleased = release.ok;
+
+      if (!release.ok) {
+        return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+      }
+
+      if (interrupted) {
+        return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
+      }
+
+      throw error;
+    }
+  }
+
+  private async executeAfterCheckout(
+    run: ProfileHomeFeedCollectionRun,
+    acquiredLease: AcquiredLease,
+    bounds: EffectiveBounds,
+    readAbortSignal: () => AbortSignal | undefined,
+    summary: MutableSummary,
+  ): Promise<ProfileHomeFeedCollectionRun> {
+    const captureSignal = readAbortSignal();
     const captureResult = await safeCapture(this.capturePort, {
-      profileId: run.profileId,
-      leaseId,
+      profileId: acquiredLease.profileId,
+      leaseId: acquiredLease.leaseId,
       maxScrolls: bounds.maxScrolls,
       maxDurationMs: bounds.maxDurationMs,
+      ...(captureSignal !== undefined ? { abortSignal: captureSignal } : {}),
     });
 
     if (!captureResult.ok) {
-      const authObs = toAuthenticationObservation(captureResult.errorCode);
+      const interrupted = readAbortSignal()?.aborted === true;
+      const authObs = interrupted
+        ? undefined
+        : toAuthenticationObservation(captureResult.errorCode);
       const release = await safeRelease(
         this.leasePort,
-        run.profileId,
-        leaseId,
+        acquiredLease.profileId,
+        acquiredLease.leaseId,
         authObs,
       );
       summary.leaseReleased = release.ok;
+
+      if (!release.ok) {
+        return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+      }
+
+      if (interrupted) {
+        return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
+      }
+
       return this.failRun(run.id, FAILURE_CAPTURE_FAILED, summary);
     }
 
     summary.capturedPayloads = captureResult.capturedPayloads.length;
+
+    if (readAbortSignal()?.aborted === true) {
+      const release = await safeRelease(
+        this.leasePort,
+        acquiredLease.profileId,
+        acquiredLease.leaseId,
+        undefined,
+      );
+      summary.leaseReleased = release.ok;
+      if (!release.ok) {
+        return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+      }
+      return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
+    }
 
     const candidates = collectCandidates(
       captureResult.capturedPayloads,
@@ -184,11 +275,39 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     const observedAt = this.clock.now().toISOString();
 
     for (const candidate of candidates) {
+      if (readAbortSignal()?.aborted === true) {
+        const release = await safeRelease(
+          this.leasePort,
+          acquiredLease.profileId,
+          acquiredLease.leaseId,
+          undefined,
+        );
+        summary.leaseReleased = release.ok;
+        if (!release.ok) {
+          return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+        }
+        return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
+      }
+
       const publisherKey = buildPublisherKey(candidate);
       const cached = publisherCache.get(publisherKey);
       let sourcePublisherId: string | undefined;
 
       if (cached === undefined) {
+        if (readAbortSignal()?.aborted === true) {
+          const release = await safeRelease(
+            this.leasePort,
+            acquiredLease.profileId,
+            acquiredLease.leaseId,
+            undefined,
+          );
+          summary.leaseReleased = release.ok;
+          if (!release.ok) {
+            return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+          }
+          return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
+        }
+
         const observation = await safeObservePublisher(
           this.publisherObservationPort,
           candidate,
@@ -215,6 +334,20 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
         continue;
       }
 
+      if (readAbortSignal()?.aborted === true) {
+        const release = await safeRelease(
+          this.leasePort,
+          acquiredLease.profileId,
+          acquiredLease.leaseId,
+          undefined,
+        );
+        summary.leaseReleased = release.ok;
+        if (!release.ok) {
+          return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+        }
+        return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
+      }
+
       const submission = await safeSubmitContent(
         this.contentSubmissionPort,
         candidate,
@@ -231,8 +364,8 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
 
     const release = await safeRelease(
       this.leasePort,
-      run.profileId,
-      leaseId,
+      acquiredLease.profileId,
+      acquiredLease.leaseId,
       undefined,
     );
     summary.leaseReleased = release.ok;
@@ -358,6 +491,7 @@ async function safeCapture(
     readonly leaseId: string;
     readonly maxScrolls: number;
     readonly maxDurationMs: number;
+    readonly abortSignal?: AbortSignal;
   },
 ): Promise<
   | {
@@ -389,6 +523,17 @@ async function safeCapture(
   } catch {
     return { ok: false, errorCode: "HOME_FEED_CAPTURE_PORT_ERROR" };
   }
+}
+
+function isAbortInterruption(
+  abortSignal: AbortSignal | undefined,
+  error: unknown,
+): boolean {
+  if (abortSignal?.aborted === true) {
+    return true;
+  }
+
+  return error instanceof Error && error.name === "AbortError";
 }
 
 function toAuthenticationObservation(

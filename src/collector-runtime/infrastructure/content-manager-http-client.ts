@@ -261,11 +261,21 @@ export class ContentManagerHttpClient
         };
       }
 
-      const contentItemId = await readContentItemId(response);
+      const validatedId = await readValidatedHomeFeedContentItemId(response);
+
+      if (validatedId !== undefined) {
+        return {
+          ok: true,
+          contentItemId: validatedId,
+        };
+      }
 
       return {
-        ok: true,
-        ...(contentItemId !== undefined ? { contentItemId } : {}),
+        ok: false,
+        statusCode: response.status,
+        errorCode: CONTENT_MANAGER_RESPONSE_ERROR,
+        errorMessage:
+          "Content Manager home-feed response is missing a valid contentItem.id.",
       };
     } catch (error) {
       return {
@@ -484,6 +494,36 @@ async function readContentItemId(
   const id = body.contentItem.id;
 
   return typeof id === "string" && id.trim().length > 0 ? id : undefined;
+}
+
+async function readValidatedHomeFeedContentItemId(
+  response: FetchLikeResponse,
+): Promise<string | undefined> {
+  let responseText: string;
+  try {
+    responseText = await response.text();
+  } catch {
+    return undefined;
+  }
+
+  if (responseText.trim().length === 0) {
+    return undefined;
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(responseText);
+  } catch {
+    return undefined;
+  }
+
+  if (!isRecord(body) || !isRecord(body.contentItem)) {
+    return undefined;
+  }
+
+  const id = body.contentItem.id;
+
+  return typeof id === "string" && id.trim().length > 0 ? id.trim() : undefined;
 }
 
 async function readFailureMessage(response: FetchLikeResponse): Promise<string> {

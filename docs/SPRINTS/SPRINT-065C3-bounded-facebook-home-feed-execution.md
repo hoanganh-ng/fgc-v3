@@ -56,15 +56,24 @@ performed** by this sprint.
      `markFailed` with `HOME_FEED_EXECUTION_BOUNDS_EXCEEDED`.
   3. Checkout the exact `run.profileId` through
      `ProfileHomeFeedCheckoutPort`. Mismatched profile id ⇒
-     `PROFILE_HOME_FEED_CHECKOUT_PROFILE_MISMATCH`. Failed checkout ⇒
-     `HOME_FEED_CHECKOUT_FAILED`. No lease release on either path
-     because no lease was acquired.
+     `PROFILE_HOME_FEED_CHECKOUT_PROFILE_MISMATCH` after releasing
+     the returned lease; if that release itself fails, the terminal
+     failure is `HOME_FEED_LEASE_RELEASE_FAILED` (release failure
+     takes precedence because the profile may remain BUSY). Failed
+     checkout ⇒ `HOME_FEED_CHECKOUT_FAILED`. No lease is acquired
+     when `ok: false` is returned, so no release is attempted on the
+     checkout-failure path.
   4. Capture payloads via `FacebookHomeFeedPayloadCapturePort` with the
-     effective per-call bounds. On failure, derive the
+     effective per-call bounds (including the per-call `abortSignal`
+     which is honored in addition to the constructor-level signal).
+     `maxDurationMs` is a real capture deadline that bounds the
+     pending network-response drainage. On failure, derive the
      `authenticationObservation` (`LOGIN_REQUIRED` /
      `CHECKPOINT_REQUIRED`) from the capture errorCode, release the
      lease, record a partial summary, and terminal
-     `HOME_FEED_CAPTURE_FAILED`.
+     `HOME_FEED_CAPTURE_FAILED`. A release failure on this path
+     takes precedence and is classified as
+     `HOME_FEED_LEASE_RELEASE_FAILED`.
   5. Run each captured payload through the existing Sprint 065A
      `extractFacebookHomeFeedGraphQLPayload`. Deduplicate across the
      entire run by `platform + externalPostId`. Cap accepted
@@ -77,16 +86,33 @@ performed** by this sprint.
      `failedContentSubmissions`. Independent publishers and candidates
      continue.
   7. Submit accepted candidates through `HomeFeedContentSubmissionPort`.
-     Failed submissions count in `failedContentSubmissions` and the run
-     continues.
-  8. Always release the lease through `ProfileLeasePort` after
-     successful checkout. A failed release marks the run FAILED with
-     `HOME_FEED_LEASE_RELEASE_FAILED`.
-  9. Success requires successful checkout, capture, all publisher
-     observations, all content submissions, and lease release. Zero
-     captured or accepted candidates is a valid success when capture
-     and release succeeded.
-  10. Failed runs retain a safe partial summary where available. A
+     `HomeFeedContentSubmissionResult` requires a validated
+     non-empty `contentItemId` on every successful response (the
+     content manager HTTP client returns
+     `CONTENT_MANAGER_RESPONSE_ERROR` when the success body is
+     missing, blank, malformed, or unreadable). A submission that
+     does not return a `contentItemId` is counted in
+     `failedContentSubmissions`; `contentItemsSubmitted` only
+     increments after a validated non-empty ID.
+  8. Always release the lease through `ProfileLeasePort` exactly
+     once on every acquired-lease path (mismatch, capture failure,
+     mid-capture interruption, mid-delivery interruption, or terminal
+     success). A failed release marks the run FAILED with
+     `HOME_FEED_LEASE_RELEASE_FAILED` and takes precedence over
+     every other terminal reason because the profile may remain
+     BUSY.
+  9. The use case checks `abortSignal.aborted` between capture,
+     between publisher observations, and between content
+     submissions. A mid-capture or mid-delivery abort is classified
+     as `HOME_FEED_EXECUTION_INTERRUPTED` after the lease is
+     released; a release failure on that path is classified as
+     `HOME_FEED_LEASE_RELEASE_FAILED`. An unexpected post-checkout
+     exception cannot bypass lease release.
+  10. Success requires successful checkout, capture, all publisher
+      observations, all content submissions with validated IDs, and
+      lease release. Zero captured or accepted candidates is a valid
+      success when capture and release succeeded.
+  11. Failed runs retain a safe partial summary where available. A
       partial failure terminal uses
       `HOME_FEED_EXECUTION_PARTIAL_FAILURE`.
 
@@ -95,14 +121,21 @@ performed** by this sprint.
 Added to `src/collector-runtime/application/collector-runtime.ports.ts`:
 
 - `FacebookHomeFeedPayloadCapturePort.captureHomeFeedPayloads(input)` —
-  `input = { profileId, leaseId, maxScrolls, maxDurationMs }`. Returns
-  the existing `FacebookPayloadCaptureResult`.
+  `input = { profileId, leaseId, maxScrolls, maxDurationMs,
+  abortSignal? }`. The per-call `abortSignal` is honored explicitly
+  in addition to the constructor-level signal. Returns the existing
+  `FacebookPayloadCaptureResult`.
 - `SourcePublisherObservationPort.observeSourcePublisher(input)` —
   input `{ platform: "FACEBOOK", kind: "GROUP" | "PAGE",
   externalPublisherId, observedAt, displayName?, canonicalUrl? }`.
 - `HomeFeedContentSubmissionPort.submitHomeFeedCollectedContent(input)`
   — mirrors the strict allowlist body of
-  `POST /collector/content-items/home-feed` from Sprint 065C1.
+  `POST /collector/content-items/home-feed` from Sprint 065C1. The
+  success branch is `{ ok: true; contentItemId: string }`; the
+  content manager HTTP client returns
+  `CONTENT_MANAGER_RESPONSE_ERROR` for missing, blank, malformed,
+  or unreadable success bodies and never returns `ok: true`
+  without a non-empty `contentItemId`.
 
 ### Infrastructure
 

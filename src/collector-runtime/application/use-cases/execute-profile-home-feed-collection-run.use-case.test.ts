@@ -111,7 +111,7 @@ describe("ExecuteProfileHomeFeedCollectionRunUseCase", () => {
     );
   });
 
-  it("fails when checkout returns a mismatched profile id and skips capture", async () => {
+  it("releases the returned lease on a mismatched successful checkout and records leaseReleased", async () => {
     const ctx = await createContext();
     ctx.checkout.next = {
       ok: true,
@@ -126,8 +126,194 @@ describe("ExecuteProfileHomeFeedCollectionRunUseCase", () => {
     expect(result.failureReason?.code).toBe(
       "PROFILE_HOME_FEED_CHECKOUT_PROFILE_MISMATCH",
     );
+    expect(result.summary).toMatchObject({ leaseReleased: true });
     expect(ctx.capture.calls).toEqual([]);
-    expect(ctx.lease.releases).toEqual([]);
+    expect(ctx.lease.releases).toEqual([
+      {
+        profileId: "different-profile",
+        leaseId: "lease-1",
+      },
+    ]);
+  });
+
+  it("classifies mismatch with release failure as HOME_FEED_LEASE_RELEASE_FAILED", async () => {
+    const ctx = await createContext();
+    ctx.checkout.next = {
+      ok: true,
+      profileId: "different-profile",
+      accountStage: "WARMING",
+      leaseId: "lease-1",
+    };
+    ctx.lease.releaseResult = {
+      ok: false,
+      statusCode: 503,
+      errorCode: "PROFILE_LEASE_RELEASE_FAILED",
+      errorMessage: "this should not leak",
+    };
+
+    const result = await ctx.useCase.execute({ runId: ctx.runId });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.failureReason?.code).toBe(
+      "HOME_FEED_LEASE_RELEASE_FAILED",
+    );
+    expect(result.summary).toMatchObject({ leaseReleased: false });
+    expect(ctx.lease.releases).toHaveLength(1);
+    expect(ctx.capture.calls).toEqual([]);
+  });
+
+  it("releases the acquired lease when an unexpected post-checkout exception is thrown", async () => {
+    const ctx = await createContext({
+      capturedPayloads: [{ payload: {}, capturedAt: new Date(createdAt) }],
+      extractions: [
+        {
+          valid: true,
+          candidates: [
+            createCandidate({ externalPostId: "post-1" }),
+          ],
+          warnings: [],
+        },
+      ],
+    });
+    ctx.publisher.handler = () => {
+      throw new Error("publisher boom");
+    };
+    ctx.lease.releaseResult = {
+      ok: false,
+      statusCode: 503,
+      errorCode: "PROFILE_LEASE_RELEASE_FAILED",
+      errorMessage: "this should not leak",
+    };
+
+    const result = await ctx.useCase.execute({ runId: ctx.runId });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.failureReason?.code).toBe(
+      "HOME_FEED_LEASE_RELEASE_FAILED",
+    );
+    expect(result.summary).toMatchObject({
+      capturedPayloads: 1,
+      extractorCandidates: 1,
+      leaseReleased: false,
+    });
+    expect(ctx.lease.releases).toHaveLength(1);
+  });
+
+  it("attempts lease release exactly once on the happy path", async () => {
+    const ctx = await createContext({
+      capturedPayloads: [{ payload: {}, capturedAt: new Date(createdAt) }],
+      extractions: [
+        {
+          valid: true,
+          candidates: [createCandidate({ externalPostId: "post-1" })],
+          warnings: [],
+        },
+      ],
+    });
+
+    await ctx.useCase.execute({ runId: ctx.runId });
+
+    expect(ctx.lease.releases).toHaveLength(1);
+  });
+
+  it("attempts lease release exactly once on mid-capture interruption", async () => {
+    const ctx = await createContext();
+    const abortController = new AbortController();
+    ctx.capture.next = async () => {
+      abortController.abort();
+      return {
+        ok: false,
+        errorCode: "FACEBOOK_BROWSER_CAPTURE_INTERRUPTED",
+        errorMessage: "interrupted",
+        warnings: [],
+      };
+    };
+
+    const result = await ctx.useCase.execute({
+      runId: ctx.runId,
+      abortSignal: abortController.signal,
+    });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.failureReason?.code).toBe(
+      "HOME_FEED_EXECUTION_INTERRUPTED",
+    );
+    expect(ctx.lease.releases).toHaveLength(1);
+  });
+
+  it("attempts lease release exactly once on mid-delivery interruption", async () => {
+    const ctx = await createContext({
+      capturedPayloads: [{ payload: {}, capturedAt: new Date(createdAt) }],
+      extractions: [
+        {
+          valid: true,
+          candidates: [
+            createCandidate({ externalPostId: "post-1" }),
+            createCandidate({ externalPostId: "post-2" }),
+          ],
+          warnings: [],
+        },
+      ],
+    });
+    const abortController = new AbortController();
+    let observedCount = 0;
+    ctx.submission.handler = (input) => {
+      observedCount += 1;
+      if (input.externalPostId === "post-1") {
+        abortController.abort();
+      }
+      return { ok: true, contentItemId: `ci-${input.externalPostId}` };
+    };
+
+    const result = await ctx.useCase.execute({
+      runId: ctx.runId,
+      abortSignal: abortController.signal,
+    });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.failureReason?.code).toBe(
+      "HOME_FEED_EXECUTION_INTERRUPTED",
+    );
+    expect(observedCount).toBe(1);
+    expect(ctx.lease.releases).toHaveLength(1);
+  });
+
+  it("treats a lease-release failure on a mid-delivery interruption as the terminal failure", async () => {
+    const ctx = await createContext({
+      capturedPayloads: [{ payload: {}, capturedAt: new Date(createdAt) }],
+      extractions: [
+        {
+          valid: true,
+          candidates: [createCandidate({ externalPostId: "post-1" })],
+          warnings: [],
+        },
+      ],
+    });
+    const abortController = new AbortController();
+    ctx.submission.handler = () => {
+      abortController.abort();
+      return {
+        ok: false,
+        errorCode: "CONTENT_MANAGER_HTTP_ERROR",
+        errorMessage: "interrupted",
+      };
+    };
+    ctx.lease.releaseResult = {
+      ok: false,
+      statusCode: 503,
+      errorCode: "PROFILE_LEASE_RELEASE_FAILED",
+      errorMessage: "this should not leak",
+    };
+
+    const result = await ctx.useCase.execute({
+      runId: ctx.runId,
+      abortSignal: abortController.signal,
+    });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.failureReason?.code).toBe(
+      "HOME_FEED_LEASE_RELEASE_FAILED",
+    );
   });
 
   it("fails when checkout port returns !ok and skips capture and release", async () => {
@@ -614,7 +800,11 @@ class FakeLeasePort implements ProfileLeasePort {
 
 class FakeCapturePort implements FacebookHomeFeedPayloadCapturePort {
   public readonly calls: FacebookHomeFeedPayloadCaptureInput[] = [];
-  public next: FacebookPayloadCaptureResult = {
+  public next:
+    | FacebookPayloadCaptureResult
+    | ((
+        input: FacebookHomeFeedPayloadCaptureInput,
+      ) => Promise<FacebookPayloadCaptureResult>) = {
     ok: true,
     capturedPayloads: [],
     warnings: [],
@@ -624,6 +814,9 @@ class FakeCapturePort implements FacebookHomeFeedPayloadCapturePort {
     input: FacebookHomeFeedPayloadCaptureInput,
   ): Promise<FacebookPayloadCaptureResult> {
     this.calls.push(input);
+    if (typeof this.next === "function") {
+      return this.next(input);
+    }
     return this.next;
   }
 }

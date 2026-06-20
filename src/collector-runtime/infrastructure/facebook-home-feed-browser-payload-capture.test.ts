@@ -129,6 +129,57 @@ describe("FacebookHomeFeedBrowserPayloadCaptureAdapter", () => {
       expect(result.errorCode).toBe("FACEBOOK_BROWSER_CAPTURE_INTERRUPTED");
     }
   });
+
+  it("returns within the configured maxDurationMs even with a never-resolving response body", async () => {
+    const browserProvider = new FakeBrowserProvider({
+      pageLoaded: true,
+      blockingState: "NONE_DETECTED",
+    });
+    browserProvider.page.scheduleResponseBody(new Promise<string>(() => {}));
+
+    const maxDurationMs = 250;
+    const capture = new FacebookHomeFeedBrowserPayloadCaptureAdapter({
+      runtimeProfileConfigurationPort: new FakeRuntimeProfileConfigurationPort(),
+      browserProvider,
+    });
+
+    const start = Date.now();
+    const result = await capture.captureHomeFeedPayloads({
+      ...captureInput(),
+      maxScrolls: 0,
+      maxDurationMs,
+    });
+    const elapsed = Date.now() - start;
+
+    expect(result.ok).toBe(true);
+    expect(elapsed).toBeLessThan(maxDurationMs + 1_500);
+    expect(elapsed).toBeGreaterThanOrEqual(0);
+    expect(browserProvider.session.closeCalls).toBe(1);
+  });
+
+  it("honors a per-call abortSignal in addition to the constructor signal", async () => {
+    const browserProvider = new FakeBrowserProvider({
+      pageLoaded: true,
+      blockingState: "NONE_DETECTED",
+    });
+    const perCallController = new AbortController();
+    perCallController.abort();
+
+    const result = await new FacebookHomeFeedBrowserPayloadCaptureAdapter({
+      runtimeProfileConfigurationPort: new FakeRuntimeProfileConfigurationPort(),
+      browserProvider,
+    }).captureHomeFeedPayloads({
+      ...captureInput(),
+      maxScrolls: 0,
+      maxDurationMs: 1_000,
+      abortSignal: perCallController.signal,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errorCode).toBe("FACEBOOK_BROWSER_CAPTURE_INTERRUPTED");
+    }
+  });
 });
 
 function captureInput() {
@@ -200,6 +251,11 @@ class FakeBrowserPage implements BrowserProviderPage {
   public blockAfterScrollCount: number | undefined;
   public blockingStateAfterScroll: FacebookPageState["blockingState"] =
     "NONE_DETECTED";
+  private pendingResponseBody: Promise<string> | undefined;
+  private responseListener:
+    | ((response: BrowserProviderResponse) => void)
+    | undefined;
+  public responsesEmitted = 0;
 
   public constructor(private readonly pageState: FacebookPageState) {}
 
@@ -212,6 +268,14 @@ class FakeBrowserPage implements BrowserProviderPage {
   }): Promise<{ readonly status: number }> {
     this.currentUrl = options.url;
     this.gotoUrls.push(options.url);
+    if (this.responseListener !== undefined && this.pendingResponseBody !== undefined) {
+      this.responsesEmitted += 1;
+      this.responseListener({
+        url: () => "https://www.facebook.com/api/graphql/",
+        headers: () => ({ "content-type": "application/json" }),
+        text: () => this.pendingResponseBody as Promise<string>,
+      });
+    }
     return { status: 200 };
   }
 
@@ -239,7 +303,13 @@ class FakeBrowserPage implements BrowserProviderPage {
 
   public async addInitScript(): Promise<void> {}
 
-  public onResponse(_listener: (response: BrowserProviderResponse) => void): void {}
+  public onResponse(listener: (response: BrowserProviderResponse) => void): void {
+    this.responseListener = listener;
+  }
+
+  public scheduleResponseBody(body: Promise<string>): void {
+    this.pendingResponseBody = body;
+  }
 
   public oncePageError(_listener: (error: Error) => void): void {}
 

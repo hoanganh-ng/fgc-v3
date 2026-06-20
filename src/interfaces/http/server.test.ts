@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   InvalidApplicationOperationError,
+  ProfileLeaseStateConflictError,
   ProfileSourceAccessNotFoundError,
   ProfileLeaseAlreadyClosedError,
   ProfileNotCheckoutEligibleError,
@@ -1589,6 +1590,43 @@ describe("HTTP server", () => {
           message: "Collector profile is not checkout eligible: profile-1.",
         },
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 409 for home-feed checkout when the profile already has an active lease (Sprint 065C2 regression)", async () => {
+    const { server, service } = createTestServer();
+    service.checkoutProfileForHomeFeedCollection.setError(
+      new ProfileLeaseStateConflictError(
+        "Profile profile-1 already has active lease lease-1.",
+      ),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/profiles/profile-1/home-feed/checkout",
+      });
+      const body = response.json();
+      const bodyText = JSON.stringify(body);
+
+      expect(response.statusCode).toBe(409);
+      expect(body).toMatchObject({
+        error: {
+          code: "PROFILE_LEASE_STATE_CONFLICT",
+        },
+      });
+      expect(service.checkoutProfileForHomeFeedCollection.calls).toEqual([
+        {
+          profileId: "profile-1",
+        },
+      ]);
+      expect(bodyText).not.toContain("cookie");
+      expect(bodyText).not.toContain("localStorage");
+      expect(bodyText).not.toContain("authorization");
+      expect(bodyText).not.toContain("proxy");
+      expect(bodyText).not.toContain("fingerprint");
     } finally {
       await server.close();
     }

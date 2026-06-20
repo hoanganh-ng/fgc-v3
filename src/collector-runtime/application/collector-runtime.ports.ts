@@ -165,6 +165,7 @@ export interface FacebookHomeFeedPayloadCaptureInput {
   readonly leaseId: string;
   readonly maxScrolls: number;
   readonly maxDurationMs: number;
+  readonly abortSignal?: AbortSignal;
 }
 
 export interface FacebookHomeFeedPayloadCapturePort {
@@ -233,7 +234,7 @@ export interface HomeFeedContentSubmissionInput {
 export type HomeFeedContentSubmissionResult =
   | {
       readonly ok: true;
-      readonly contentItemId?: string;
+      readonly contentItemId: string;
     }
   | {
       readonly ok: false;

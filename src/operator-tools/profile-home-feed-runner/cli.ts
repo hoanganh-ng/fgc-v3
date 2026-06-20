@@ -76,11 +76,12 @@ function applyProcessExitCode(
   process.exitCode = interrupted ? 130 : 1;
 }
 
-void main().catch((error: unknown) => {
+export const UNEXPECTED_CLI_FAILURE_MESSAGE =
+  "Profile home-feed runner failed unexpectedly.";
+
+export function reportUnexpectedCliFailure(_error: unknown): void {
   process.exitCode = 1;
-  console.error(
-    error instanceof Error
-      ? error.message
-      : "Profile home-feed run failed.",
-  );
-});
+  console.error(UNEXPECTED_CLI_FAILURE_MESSAGE);
+}
+
+void main().catch(reportUnexpectedCliFailure);
