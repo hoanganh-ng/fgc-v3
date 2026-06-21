@@ -250,9 +250,11 @@ invents a Facebook URL. The strict body carries only `categoryId`,
 `collectionPriority` (integer `0..100`), and the optional `name`,
 `url`, and `notes`; unknown fields, missing required fields,
 blank strings, `null` values, and an out-of-range priority map to
-HTTP 400 `VALIDATION_ERROR`. A missing publisher, a missing
-category, a `PAGE` publisher, an unapproved status, and a missing
-URL each map to a typed application error. Promotion is
+HTTP 400 `VALIDATION_ERROR`. A missing publisher maps to
+`SourcePublisherNotFoundError` (HTTP 404); a missing category maps
+to `ContentCategoryNotFoundError` (HTTP 404); a `PAGE` publisher,
+an unapproved status, and a missing URL each map to
+`SourcePublisherNotPromotableError` (HTTP 409). Promotion is
 review-status neutral; a `CREATED` outcome persists a new `PAUSED`
 `SourceGroup`, an `ALREADY_EXISTS` outcome returns the existing
 matching `SourceGroup`. Sprint 067 does not add Web UI, browser

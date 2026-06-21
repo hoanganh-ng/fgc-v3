@@ -1146,7 +1146,10 @@ describe("PromoteSourcePublisherToSourceGroupUseCase", () => {
         categoryId: "category-1",
         collectionPriority: 50,
       }),
-    ).rejects.toBeInstanceOf(SourcePublisherNotFoundError);
+    ).rejects.toMatchObject({
+      code: "SOURCE_PUBLISHER_NOT_PROMOTABLE",
+      reason: "MISSING_URL",
+    });
 
     const storedAfter = await context.sourceGroups.list({
       limit: 50,

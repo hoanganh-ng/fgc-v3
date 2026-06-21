@@ -95,7 +95,10 @@ export class PromoteSourcePublisherToSourceGroupUseCase {
     const resolvedUrl = input.url ?? sourcePublisher.canonicalUrl;
 
     if (resolvedUrl === undefined || resolvedUrl.trim().length === 0) {
-      throw new SourcePublisherNotFoundError(sourcePublisher.id);
+      throw new SourcePublisherNotPromotableError(
+        sourcePublisher.id,
+        "MISSING_URL",
+      );
     }
 
     await loadValidatedContentCategoryById(

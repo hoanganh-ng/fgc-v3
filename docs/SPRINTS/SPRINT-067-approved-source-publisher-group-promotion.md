@@ -79,8 +79,10 @@ distinct from the future `Content Publisher` pipeline stage.
   - `ContentCategoryRepository.findById` returning `null` raises
     `ContentCategoryNotFoundError`.
   - Missing URL (neither input nor `canonicalUrl`) raises
-    `SourcePublisherNotFoundError` so the new `SourceGroup` is never
-    persisted without an entry-route URL.
+    `SourcePublisherNotPromotableError(reason = "MISSING_URL")` so
+    the new `SourceGroup` is never persisted without an entry-route
+    URL. The missing-URL failure is a promotion precondition, not
+    a missing publisher.
 
 - `SourceGroup` fields are resolved deterministically:
 
@@ -102,8 +104,10 @@ distinct from the future `Content Publisher` pipeline stage.
   `outcome = "ALREADY_EXISTS"`. When none is found a new `PAUSED`
   `SourceGroup` is saved and the use case returns
   `outcome = "CREATED"`. The same identity check is repeated
-  immediately before save so a concurrent insert returns
-  `ALREADY_EXISTS` instead of double-persisting.
+  immediately before save as a best-effort duplicate short-circuit;
+  the tested interleaving returns `ALREADY_EXISTS` instead of
+  double-persisting, but the use case does not implement a full
+  concurrency-safe duplicate-save handler.
 
 - The `SourcePublisher` review status and observation counts are
   never mutated by the use case. Promotion is review-status neutral.
@@ -254,13 +258,15 @@ typed `outcome` value.
 
 `SOURCE_PUBLISHER_NOT_PROMOTABLE` is a new mapping rule. The typed
 `reason` field is held on the application error object only; it is
-not serialized into the HTTP body. The HTTP 404 `SOURCE_PUBLISHER_NOT_FOUND`
-is also reused when neither the input URL nor the publisher
-`canonicalUrl` can supply the new `SourceGroup` URL, so a missing
-URL never silently produces a `SourceGroup` without an entry route.
-The mapping is otherwise fully provided by the existing Content
-Manager error mapper. Stack traces, database errors, and sensitive
-payloads are never serialized into HTTP responses.
+not serialized into the HTTP body. When neither the input URL nor
+the publisher `canonicalUrl` can supply the new `SourceGroup` URL
+the use case raises
+`SourcePublisherNotPromotableError(reason = "MISSING_URL")` and the
+HTTP route maps it to HTTP 409 `SOURCE_PUBLISHER_NOT_PROMOTABLE`, so
+a missing URL never silently produces a `SourceGroup` without an
+entry route. The mapping is otherwise fully provided by the existing
+Content Manager error mapper. Stack traces, database errors, and
+sensitive payloads are never serialized into HTTP responses.
 
 ## Constraints
 

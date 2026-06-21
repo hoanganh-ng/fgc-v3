@@ -146,10 +146,12 @@
   `VALIDATION_ERROR`. The use case enforces the
   `platform === "FACEBOOK"`, `kind === "GROUP"`,
   `status === "APPROVED"` preconditions on the durable
-  `SourcePublisher`; `PAGE` publishers, unapproved statuses, a
-  missing publisher, a missing category, and a missing URL each
-  raise a typed application error (`SOURCE_PUBLISHER_NOT_PROMOTABLE`,
-  `SOURCE_PUBLISHER_NOT_FOUND`, `CONTENT_CATEGORY_NOT_FOUND`).
+  `SourcePublisher`; `PAGE` publishers, unapproved statuses, and
+  a missing URL each raise `SourcePublisherNotPromotableError`
+  (`SOURCE_PUBLISHER_NOT_PROMOTABLE`); a missing publisher raises
+  `SourcePublisherNotFoundError` (`SOURCE_PUBLISHER_NOT_FOUND`);
+  a missing category raises `ContentCategoryNotFoundError`
+  (`CONTENT_CATEGORY_NOT_FOUND`).
   Promotion resolves the new `SourceGroup` fields from the
   publisher plus the body without inventing a Facebook URL,
   short-circuits on

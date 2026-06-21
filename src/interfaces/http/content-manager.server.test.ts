@@ -1966,6 +1966,35 @@ describe("Content Manager HTTP routes — promote source publisher to source gro
     }
   });
 
+  it("maps a missing URL to 409 SOURCE_PUBLISHER_NOT_PROMOTABLE", async () => {
+    const { server, service } = createTestServer();
+
+    service.promoteSourcePublisherToSourceGroup.setError(
+      new SourcePublisherNotPromotableError(
+        "source-publisher-1",
+        "MISSING_URL",
+      ),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-1/promote-to-source-group",
+        payload: {
+          categoryId: "category-1",
+          collectionPriority: 50,
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: { code: "SOURCE_PUBLISHER_NOT_PROMOTABLE" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("maps a missing category to 404 CONTENT_CATEGORY_NOT_FOUND", async () => {
     const { server, service } = createTestServer();
 
