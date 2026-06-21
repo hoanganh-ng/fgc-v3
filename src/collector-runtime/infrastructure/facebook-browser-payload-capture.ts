@@ -1000,10 +1000,9 @@ async function settlePendingCaptures(
   }
 
   // Wait for ALL pending captures to settle, OR for the deadline to elapse,
-  // OR for the abort signal to fire — whichever comes first. We deliberately
-  // resolve on the first capture so that a slow response body does not block
-  // the bounded drain window. Unresolved network reads are left to detach in
-  // the background; the `Promise.allSettled` body retains no listeners.
+  // OR for the abort signal to fire — whichever comes first. Unresolved
+  // network reads are left to detach in the background; the
+  // `Promise.allSettled` body retains no listeners.
   const allSettled = Promise.allSettled(pendingCaptures);
 
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined;

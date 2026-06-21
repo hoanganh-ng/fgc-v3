@@ -190,7 +190,6 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     const summary: MutableSummary = createEmptySummary();
     const readAbortSignal = (): AbortSignal | undefined => abortSignal;
     let outcome: FinalOutcome;
-    let unexpectedError: unknown;
 
     try {
       outcome = await this.decideOutcome(
@@ -200,8 +199,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
         readAbortSignal,
         summary,
       );
-    } catch (error) {
-      unexpectedError = error;
+    } catch {
       const finalization = await this.finalizeAcquiredLease(
         acquiredLease,
         undefined,
@@ -219,40 +217,31 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
             };
     }
 
-    return this.persistOutcome(run.id, outcome, summary, unexpectedError);
+    return this.persistOutcome(run.id, outcome, summary);
   }
 
   private async persistOutcome(
     runId: ProfileHomeFeedCollectionRunId,
     outcome: FinalOutcome,
     summary: MutableSummary,
-    unexpectedError: unknown,
   ): Promise<ProfileHomeFeedCollectionRun> {
     if (!isFinalOutcomeReleased(outcome)) {
-      try {
-        // Release failure always takes precedence because the profile may
-        // remain BUSY. We persist HOME_FEED_LEASE_RELEASE_FAILED exactly once
-        // on the FAILED terminal; the operationally-decided reason is
-        // discarded and not persisted a second time.
-        summary.leaseReleased = false;
-        return await this.failRun(runId, FAILURE_LEASE_RELEASE_FAILED, summary);
-      } catch (terminalError) {
-        if (unexpectedError !== undefined) {
-          throw unexpectedError;
-        }
-        throw terminalError;
-      }
+      // Release failure always takes precedence because the profile may
+      // remain BUSY. We persist HOME_FEED_LEASE_RELEASE_FAILED exactly once
+      // on the FAILED terminal; the operationally-decided reason is
+      // discarded and not persisted a second time. If terminal persistence
+      // itself throws after the lease has already been finalized, the
+      // terminal-persistence error is the relevant signal and is propagated
+      // by `failRun` directly.
+      summary.leaseReleased = false;
+      return await this.failRun(runId, FAILURE_LEASE_RELEASE_FAILED, summary);
     }
 
     summary.leaseReleased = true;
-    try {
-      return await this.persistTerminal(runId, outcome.terminal, summary);
-    } catch (terminalError) {
-      if (unexpectedError !== undefined) {
-        throw unexpectedError;
-      }
-      throw terminalError;
-    }
+    // The lease has been finalized; any terminal persistence error here is
+    // propagated consistently after lease finalization rather than being
+    // overridden by an earlier operational error.
+    return await this.persistTerminal(runId, outcome.terminal, summary);
   }
 
   private async persistTerminal(
