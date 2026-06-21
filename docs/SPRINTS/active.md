@@ -179,8 +179,8 @@ in Sprint 065C2.
 
 - [Sprint 065C2 - Profile-Bound Home-Feed Checkout](SPRINT-065C2-profile-bound-home-feed-checkout.md)
 
-Sprint 065C3 — Bounded Facebook Home-Feed Execution is the **only
-active and authorized** sprint. It is the implementation authority. It
+Sprint 065C3 — Bounded Facebook Home-Feed Execution is **accepted** at
+`e60e5a8f0167cad84d7fac4545fdda2e29feea99`. It
 adds one-shot, operator-invoked execution of an existing durable
 `ProfileHomeFeedCollectionRun`: claim at most one queued run, checkout
 the run's exact profile through `HOME_FEED_COLLECTION`, capture the
@@ -214,9 +214,13 @@ observation. A failed lease release marks the run FAILED. Failed runs
 retain a safe partial summary. Sprint 065C3 does not add a polling
 loop, persistent worker, Docker service, scheduler integration, Web
 UI changes, or an HTTP execute route. Manual live-Facebook validation
-is opt-in and was **not performed** by this sprint.
+was **not performed** by Sprint 065C3.
 
 - [Sprint 065C3 - Bounded Facebook Home-Feed Execution](SPRINT-065C3-bounded-facebook-home-feed-execution.md)
+
+No sprint is currently active. Sprint 066 and the remaining 067–068
+feed-discovery items are documented placeholders and are **not
+active** until the Product Owner explicitly approves the next sprint.
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

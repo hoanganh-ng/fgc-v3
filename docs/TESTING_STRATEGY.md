@@ -49,8 +49,10 @@ higher layer can attribute the failure correctly.
   claim.
 - Mandatory manual live-Facebook validation for bounded browser
   execution is owned by **Sprint 065C3**, not by the undivided
-  Sprint 065C label. Sprint 065C3 remains inactive and unauthorized;
-  this strategy does not activate it.
+  Sprint 065C label. Sprint 065C3 is accepted at
+  `e60e5a8f0167cad84d7fac4545fdda2e29feea99`; manual
+  live-Facebook validation was **not performed** by Sprint 065C3
+  and remains opt-in for a future operator-driven validation pass.
 
 ## Layer 2 — Database Integration Tests
 
@@ -190,8 +192,9 @@ layer is a sprint-scope violation.
   undivided Sprint 065C label does **not** own mandatory manual
   live-Facebook validation. Mandatory manual live-Facebook
   validation for bounded browser execution is owned by
-  Sprint 065C3, which remains inactive and unauthorized at the
-  time of Sprint 065C2.
+  Sprint 065C3, which is accepted at
+  `e60e5a8f0167cad84d7fac4545fdda2e29feea99` without a manual
+  live-Facebook validation pass.
 
 A sprint that adds, removes, or renames a public API surface, a
 schema, a migration, or a top-level flow must update this document

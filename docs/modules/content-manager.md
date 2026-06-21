@@ -84,7 +84,7 @@
   provenance filter or index, and does not change the Collector
   Runtime, extractor, browser, workers, scheduler, Docker, or
   Web UI.
-- Sprint 065C1 (active and authorized) makes
+- Sprint 065C1 (accepted) makes
   `ContentItem.sourceGroupId` optional in the domain schema and DTOs
   and `NULL`-tolerant in PostgreSQL while preserving the existing
   `sourceGroupId`-required source-group ingestion contract.

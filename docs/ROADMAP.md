@@ -144,8 +144,7 @@ source-group promotion, Content Builder, or Content Publisher
 behavior. Sprint 065C1 is accepted at
 `40b3ce7023c126c03386994a719ae7acb7758f21`. The Sprint 065C "Manual
 Home-Feed Execution" work is decomposed into 065C1, 065C2, and
-065C3; 065C1 and 065C2 are accepted, and 065C3 is the only active
-and authorized sprint.
+065C3; 065C1, 065C2, and 065C3 are accepted.
 
 ## Sprint 065C2: Profile-Bound Home-Feed Checkout
 
@@ -162,7 +161,8 @@ executor in Sprint 065C2 — that wiring is Sprint 065C3.
 
 ## Sprint 065C3: Bounded Facebook Home-Feed Execution
 
-Active. Adds one-shot, operator-invoked execution of an existing
+Accepted at `e60e5a8f0167cad84d7fac4545fdda2e29feea99`. Adds one-shot,
+operator-invoked execution of an existing
 durable `ProfileHomeFeedCollectionRun`. Claims at most one queued
 run, checks out the run's exact profile through
 `HOME_FEED_COLLECTION`, captures the authenticated Facebook home
@@ -186,7 +186,7 @@ command `pnpm profile:home-feed:run-next -- --base-url <url>
 --browser-provider <provider>`. Sprint 065C3 does not add a polling
 loop, persistent worker, Docker service, scheduler integration, Web
 UI changes, or an HTTP execute route. Manual live-Facebook
-validation is opt-in and was not performed by Sprint 065C3.
+validation was not performed by Sprint 065C3.
 
 ## Sprint 066: Source Publisher Discovery Review API And UI
 

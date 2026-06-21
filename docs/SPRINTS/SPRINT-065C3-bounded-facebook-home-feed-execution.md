@@ -413,3 +413,29 @@ Sprint 065C3 is **active and authorized** and is implemented in this
 working tree. It is not yet accepted.
 
 Sprint 065C3 makes **no live-Facebook execution claim**.
+
+## Acceptance
+
+Sprint 065C3 was accepted at
+`e60e5a8f0167cad84d7fac4545fdda2e29feea99`.
+
+Manual live-Facebook validation was **not performed** by this sprint.
+
+### Final verification
+
+Executed against the accepted working tree:
+
+- Focused Sprint 065C3 vitest set
+  (`checkout-use-cases.test.ts`,
+  `execute-profile-home-feed-collection-run.use-case.test.ts`,
+  `facebook-browser-payload-capture.test.ts`,
+  `facebook-home-feed-browser-payload-capture.test.ts`,
+  `cli.test.ts`, `runner.test.ts`):
+  **118 passed, 0 failed**.
+- `pnpm typecheck`: **passed**.
+- `pnpm test`: **1672 passed / 15 skipped / 0 failed**.
+- `pnpm web:typecheck`: **passed**.
+- `pnpm web:build`: **passed**.
+- `pnpm test:http:db`: **177 passed**.
+- `pnpm test:e2e:docker`: **18 passed**.
+- `git diff --check`: **clean**.

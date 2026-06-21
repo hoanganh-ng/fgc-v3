@@ -163,7 +163,7 @@ Owns:
   source-group promotion, Content Builder, or Content Publisher
   behavior. Sprint 065C1 makes no browser or live-Facebook execution
   claim.
-- Sprint 065C2 (the only active and authorized sprint) adds the
+- Sprint 065C2 (accepted) adds the
   explicit profile-bound checkout path for the exact profile
   referenced by a `ProfileHomeFeedCollectionRun`. It extends
   `ProfileLeasePurpose` with a fourth value, `HOME_FEED_COLLECTION`,
@@ -202,6 +202,14 @@ Owns:
   add Web UI behavior, or make any live-Facebook claim. The new
   `ProfileHomeFeedCheckoutPort` is not wired into a worker or
   executor in Sprint 065C2.
+- Sprint 065C3 (accepted at
+  `e60e5a8f0167cad84d7fac4545fdda2e29feea99`) wires the
+  `HOME_FEED_COLLECTION` checkout into the one-shot operator-invoked
+  executor `pnpm profile:home-feed:run-next` that drives bounded
+  home-feed capture, publisher observation, and home-feed content
+  submission through the existing Content Manager HTTP contracts.
+  Manual live-Facebook validation was **not performed** by
+  Sprint 065C3.
 - Safe read APIs.
 - Future handoff shape for Content Builder.
 
