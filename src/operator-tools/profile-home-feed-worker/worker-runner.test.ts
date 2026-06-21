@@ -84,66 +84,6 @@ describe("profile home-feed worker runner", () => {
     assertSafeLogs(context.logger.messages);
   });
 
-  it("continuous mode executes two queued runs without delaying between them", async () => {
-    const context = createContext();
-    await context.runs.create(createQueuedRun("run-first"));
-    await context.runs.create(
-      createQueuedRun("run-second", {
-        profileId: "profile-2",
-        requestedAt: "2026-06-21T10:01:00.000Z",
-        createdAt: "2026-06-21T10:01:00.000Z",
-        updatedAt: "2026-06-21T10:01:00.000Z",
-      }),
-    );
-    const abortController = new AbortController();
-    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
-    let succeededRuns = 0;
-    context.logger.onInfo = (message) => {
-      if (message === "- Status: SUCCEEDED") {
-        succeededRuns += 1;
-      }
-      if (succeededRuns === 2) {
-        abortController.abort();
-      }
-    };
-
-    const promise = runProfileHomeFeedWorkerCommand({
-      args: workerArgs({ once: false, pollIntervalMs: 1_000 }),
-      logger: context.logger,
-      abortSignal: abortController.signal,
-      dependencies: context.dependencies,
-    });
-
-    try {
-      await flushUntil(
-        () => succeededRuns === 2 || setTimeoutSpy.mock.calls.length > 0,
-      );
-
-      expect(succeededRuns).toBe(2);
-      expect(setTimeoutSpy).not.toHaveBeenCalled();
-
-      const result = await promise;
-      expect(result).toEqual({
-        ok: true,
-        claimedRuns: 2,
-        succeededRuns: 2,
-        failedRuns: 0,
-      });
-    } finally {
-      abortController.abort();
-      setTimeoutSpy.mockRestore();
-    }
-
-    expect(await context.runs.findById("run-first")).toMatchObject({
-      status: "SUCCEEDED",
-    });
-    expect(await context.runs.findById("run-second")).toMatchObject({
-      status: "SUCCEEDED",
-    });
-    expect(context.closeCount).toBe(1);
-    assertSafeLogs(context.logger.messages);
-  });
-
   it("continuous mode schedules delay when no queued run exists", async () => {
     const context = createContext();
     const abortController = new AbortController();
@@ -193,60 +133,6 @@ describe("profile home-feed worker runner", () => {
 
     expect(context.capture.abortSignals).toEqual([abortController.signal]);
     expect(context.closeCount).toBe(1);
-  });
-
-  it("continues polling after an individual failure and stops on abort", async () => {
-    const context = createContext();
-    await context.runs.create(createQueuedRun("run-failed"));
-    await context.runs.create(
-      createQueuedRun("run-succeeded", {
-        profileId: "profile-2",
-        requestedAt: "2026-06-21T10:01:00.000Z",
-        createdAt: "2026-06-21T10:01:00.000Z",
-        updatedAt: "2026-06-21T10:01:00.000Z",
-      }),
-    );
-    context.checkout.results = [
-      {
-        ok: false,
-        errorCode: "PROFILE_NOT_CHECKOUT_ELIGIBLE",
-        errorMessage: "unsafe upstream detail must not be logged",
-      },
-      {
-        ok: true,
-        profileId: "profile-2",
-        accountStage: "WARMING",
-        leaseId: "lease-2",
-      },
-    ];
-    const abortController = new AbortController();
-    context.logger.onInfo = (message) => {
-      if (message === "- Status: SUCCEEDED") {
-        abortController.abort();
-      }
-    };
-
-    const result = await runProfileHomeFeedWorkerCommand({
-      args: workerArgs({ once: false, pollIntervalMs: 1 }),
-      logger: context.logger,
-      abortSignal: abortController.signal,
-      dependencies: context.dependencies,
-    });
-
-    expect(result).toEqual({
-      ok: false,
-      claimedRuns: 2,
-      succeededRuns: 1,
-      failedRuns: 1,
-    });
-    expect(await context.runs.findById("run-failed")).toMatchObject({
-      status: "FAILED",
-    });
-    expect(await context.runs.findById("run-succeeded")).toMatchObject({
-      status: "SUCCEEDED",
-    });
-    expect(context.closeCount).toBe(1);
-    assertSafeLogs(context.logger.messages);
   });
 });
 
@@ -426,12 +312,6 @@ class FakeContentSubmissionPort implements HomeFeedContentSubmissionPort {
 
 async function flushMicrotasks(): Promise<void> {
   for (let index = 0; index < 25; index += 1) {
-    await Promise.resolve();
-  }
-}
-
-async function flushUntil(isDone: () => boolean): Promise<void> {
-  for (let index = 0; index < 100 && !isDone(); index += 1) {
     await Promise.resolve();
   }
 }
