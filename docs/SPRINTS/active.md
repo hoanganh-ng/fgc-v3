@@ -287,7 +287,7 @@ routes.
 - [Sprint 068B-D - Home-Feed Scheduled Dispatch Design](SPRINT-068B-D-home-feed-scheduled-dispatch-design.md)
 
 Sprint 068B1 — Home-Feed Scheduled Dispatch Persistence + Use Case is
-**active**. It implements the internal Collector Runtime dispatch path
+**accepted**. It implemented the internal Collector Runtime dispatch path
 that converts one due `ProfileHomeFeedCollectionSchedule` into either
 one queued `ProfileHomeFeedCollectionRun` with
 `triggerType = "SCHEDULED"` or a safe skip/defer outcome. It does not
@@ -305,6 +305,18 @@ and an inline comment annotating the existing active-run skip test as
 candidate-vs-dispatch race coverage.
 
 - [Sprint 068B1 - Home-Feed Scheduled Dispatch Persistence + Use Case](SPRINT-068B1-home-feed-scheduled-dispatch-persistence-use-case.md)
+
+Sprint 068B2 — Home-Feed Scheduler and Worker Containerization is
+**active**. It adds opt-in dev and preview Docker Compose services for
+the profile home-feed scheduler and profile home-feed worker so
+scheduled dispatch and queued execution can run as separate services in
+the stack. This is runtime wiring only: it does not change domain
+behavior, persistence behavior, dispatch rules, worker execution logic,
+browser capture behavior, HTTP routes, Web UI, Content Manager
+behavior, Profile Manager checkout rules, or Content Builder /
+Publisher behavior.
+
+- [Sprint 068B2 - Home-Feed Scheduler and Worker Containerization](SPRINT-068B2-home-feed-scheduler-worker-containerization.md)
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

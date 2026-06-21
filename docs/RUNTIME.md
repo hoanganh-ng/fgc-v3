@@ -1,6 +1,6 @@
 # Full-Stack Runtime
 
-Sprint 027 provides two Docker Compose runtimes for the current Content Collector management surface. Sprint 037B adds an opt-in containerized worker service for consuming queued collection runs from those stacks. Sprint 047A adds a separate opt-in containerized worker service for queued Account Exercise runs. Sprint 060 adds an opt-in containerized collection scheduler service that drives scheduled dispatch from those stacks.
+Sprint 027 provides two Docker Compose runtimes for the current Content Collector management surface. Sprint 037B adds an opt-in containerized worker service for consuming queued collection runs from those stacks. Sprint 047A adds a separate opt-in containerized worker service for queued Account Exercise runs. Sprint 060 adds an opt-in containerized collection scheduler service that drives scheduled dispatch from those stacks. Sprint 068B2 adds separate opt-in profile home-feed scheduler and worker services for scheduled home-feed dispatch and queued home-feed execution.
 
 ## Command Groups
 
@@ -51,6 +51,8 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | `pnpm operator:collector:facebook` | Run one manual Facebook collection for a source group. | `pnpm collector:facebook:run` |
 | `pnpm operator:collector:worker` | Claim and execute queued collection runs. | `pnpm collector:worker:run` |
 | `pnpm operator:collector:scheduler` | Poll `DispatchNextDueCollectionScheduleUseCase` and dispatch due schedules. | `pnpm collector:scheduler:run` |
+| `pnpm operator:profile-home-feed:scheduler` | Poll `DispatchNextDueProfileHomeFeedCollectionScheduleUseCase` and dispatch due profile home-feed schedules. | `pnpm profile-home-feed:scheduler:run` |
+| `pnpm operator:profile-home-feed-worker` | Claim and execute queued profile home-feed collection runs. | `pnpm profile-home-feed-worker:run` |
 | `pnpm operator:browser:probe` | Probe a browser provider without backend or Facebook login. | `pnpm collector:browser:probe` |
 
 ### Docker Stacks
@@ -67,6 +69,12 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | `pnpm stack:dev:scheduler:start` | Start the development stack collection scheduler service in polling mode. |
 | `pnpm stack:dev:scheduler:once` | Run one development stack collection scheduler iteration in a disposable container. |
 | `pnpm stack:dev:scheduler:logs` | Follow development stack collection scheduler logs. |
+| `pnpm stack:dev:profile-home-feed-scheduler:start` | Start the development stack profile home-feed scheduler service in polling mode. |
+| `pnpm stack:dev:profile-home-feed-scheduler:once` | Run one development stack profile home-feed scheduler iteration in a disposable container. |
+| `pnpm stack:dev:profile-home-feed-scheduler:logs` | Follow development stack profile home-feed scheduler logs. |
+| `pnpm stack:dev:profile-home-feed-worker:start` | Start the development stack profile home-feed worker service in polling mode. |
+| `pnpm stack:dev:profile-home-feed-worker:once` | Run one development stack profile home-feed worker iteration in a disposable container. |
+| `pnpm stack:dev:profile-home-feed-worker:logs` | Follow development stack profile home-feed worker logs. |
 | `pnpm stack:dev:workers:start` | Start all development stack opt-in worker services. |
 | `pnpm stack:dev:workers:logs` | Follow logs for all development stack opt-in worker services. |
 | `pnpm stack:dev:stop` | Stop the development Compose stack. |
@@ -81,6 +89,12 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | `pnpm stack:preview:scheduler:start` | Start the preview stack collection scheduler service in polling mode. |
 | `pnpm stack:preview:scheduler:once` | Run one preview stack collection scheduler iteration in a disposable container. |
 | `pnpm stack:preview:scheduler:logs` | Follow preview stack collection scheduler logs. |
+| `pnpm stack:preview:profile-home-feed-scheduler:start` | Start the preview stack profile home-feed scheduler service in polling mode. |
+| `pnpm stack:preview:profile-home-feed-scheduler:once` | Run one preview stack profile home-feed scheduler iteration in a disposable container. |
+| `pnpm stack:preview:profile-home-feed-scheduler:logs` | Follow preview stack profile home-feed scheduler logs. |
+| `pnpm stack:preview:profile-home-feed-worker:start` | Start the preview stack profile home-feed worker service in polling mode. |
+| `pnpm stack:preview:profile-home-feed-worker:once` | Run one preview stack profile home-feed worker iteration in a disposable container. |
+| `pnpm stack:preview:profile-home-feed-worker:logs` | Follow preview stack profile home-feed worker logs. |
 | `pnpm stack:preview:workers:start` | Start all preview stack opt-in worker services. |
 | `pnpm stack:preview:workers:logs` | Follow logs for all preview stack opt-in worker services. |
 | `pnpm stack:preview:stop` | Stop the preview Compose stack. |
@@ -174,7 +188,7 @@ In preview, `apps/web` is built into static files and served by Nginx. The brows
 
 ## Containerized Worker Services
 
-Sprint 037B adds an opt-in Docker Compose service named `collector-worker`. Sprint 047A adds a separate opt-in Docker Compose service named `account-exercise-worker`. Sprint 060 adds a third opt-in Docker Compose service named `collection-scheduler` that drives the scheduled dispatch poller described in Sprint 059. All three services are behind the Compose `worker` profile, expose no ports, and are not started by normal stack boot commands.
+Sprint 037B adds an opt-in Docker Compose service named `collector-worker`. Sprint 047A adds a separate opt-in Docker Compose service named `account-exercise-worker`. Sprint 060 adds a third opt-in Docker Compose service named `collection-scheduler` that drives the scheduled dispatch poller described in Sprint 059. Sprint 068B2 adds `profile-home-feed-scheduler` and `profile-home-feed-worker` as separate opt-in services for profile home-feed scheduled dispatch and queued run execution. All five services are behind the Compose `worker` profile, expose no ports, and are not started by normal stack boot commands.
 
 Start the development stack and collection worker:
 
@@ -192,7 +206,7 @@ pnpm stack:dev:exercise-worker:start
 pnpm stack:dev:exercise-worker:logs
 ```
 
-Start both development workers:
+Start every development worker-profile service:
 
 ```bash
 pnpm stack:dev:start
@@ -216,7 +230,7 @@ pnpm stack:preview:exercise-worker:start
 pnpm stack:preview:exercise-worker:logs
 ```
 
-Start both preview workers:
+Start every preview worker-profile service:
 
 ```bash
 pnpm stack:preview:start
@@ -238,6 +252,15 @@ pnpm stack:dev:exercise-worker:once
 pnpm stack:preview:exercise-worker:once
 ```
 
+Run one disposable profile-home-feed scheduler or worker iteration through Docker:
+
+```bash
+pnpm stack:dev:profile-home-feed-scheduler:once
+pnpm stack:dev:profile-home-feed-worker:once
+pnpm stack:preview:profile-home-feed-scheduler:once
+pnpm stack:preview:profile-home-feed-worker:once
+```
+
 Stop polling workers without stopping the whole stack:
 
 ```bash
@@ -247,11 +270,15 @@ docker compose -f docker-compose.dev.yml stop account-exercise-worker
 docker compose -f docker-compose.preview.yml stop account-exercise-worker
 docker compose -f docker-compose.dev.yml stop collection-scheduler
 docker compose -f docker-compose.preview.yml stop collection-scheduler
+docker compose -f docker-compose.dev.yml stop profile-home-feed-scheduler
+docker compose -f docker-compose.preview.yml stop profile-home-feed-scheduler
+docker compose -f docker-compose.dev.yml stop profile-home-feed-worker
+docker compose -f docker-compose.preview.yml stop profile-home-feed-worker
 ```
 
-Inside Docker, both workers use `http://api:3000` as their API base URL and `postgres:5432` through `DATABASE_URL`. Do not use `http://localhost:8081` or `http://localhost:3000` from inside worker containers; those are host entrypoints for browser/operator commands running on the host. The preview gateway remains the host browser entrypoint, while service-to-service Compose traffic goes directly to the `api` service.
+Inside Docker, browser-backed worker containers use `http://api:3000` as their API base URL and `postgres:5432` through `DATABASE_URL`. Do not use `http://localhost:8081` or `http://localhost:3000` from inside worker containers; those are host entrypoints for browser/operator commands running on the host. The preview gateway remains the host browser entrypoint, while service-to-service Compose traffic goes directly to the `api` service.
 
-The worker image uses the Playwright runtime base image aligned to the locked Playwright package version. Each worker container entrypoint starts Xvfb and forwards `SIGINT`/`SIGTERM` to the existing worker CLI so the current headed Playwright path can launch Chromium in the container and still stop cleanly. `BROWSER_PROVIDER=playwright` is the default. CloakBrowser remains experimental and is not required for worker containers to start; if an operator overrides `BROWSER_PROVIDER=cloakbrowser` without a working CloakBrowser installation, the existing provider boundary should fail with sanitized setup guidance.
+The worker image uses the Playwright runtime base image aligned to the locked Playwright package version. Each browser-backed worker container entrypoint starts Xvfb and forwards `SIGINT`/`SIGTERM` to the existing worker CLI so the current headed Playwright path can launch Chromium in the container and still stop cleanly. Existing stack defaults are preserved: dev browser-backed workers use `BROWSER_PROVIDER=cloakbrowser`, and preview browser-backed workers use `BROWSER_PROVIDER=playwright`. CloakBrowser remains experimental; if an operator overrides `BROWSER_PROVIDER=cloakbrowser` without a working CloakBrowser installation, the existing provider boundary should fail with sanitized setup guidance.
 
 When no jobs exist, the polling worker logs safe operational lines such as `Collector worker started.` and `No queued collection run found.`. The one-shot worker exits after a single no-job check. When a queued run exists, the worker claims the oldest `QUEUED` run, marks it `RUNNING`, executes the existing Facebook collector orchestration, and records either `SUCCEEDED` with safe summary counts or `FAILED` with a sanitized failure reason. Profile leases should be released by the existing collector flow when a profile was checked out.
 
@@ -303,6 +330,83 @@ pnpm stack:preview:scheduler:once
 The container entrypoint is `scripts/run-collection-scheduler-container.sh`. It polls the configured `COLLECTION_SCHEDULER_READINESS_URL` (default `http://api:3000/collector/collection-runs?limit=1`) until the API returns an HTTP status below 500, then `exec`s the scheduler CLI. Default scheduler mode is `--poll-interval-ms 5000`; override `COLLECTION_SCHEDULER_MODE_ARGS` to run `--once` or a different poll interval. The scheduler talks to PostgreSQL through the existing Collector Runtime composition root, so it needs `DATABASE_URL` and no other module base URL. It never logs `DATABASE_URL`, credentials, base URLs, or any other environment variable.
 
 The scheduler container does not start Xvfb and does not manage a browser process. Compose `init: true` makes the small init process PID 1 of the container. The entrypoint script's final operation is `exec node --import tsx … cli.ts`, which replaces the shell with the Node process so there is no shell intermediary between init and Node; init forwards `SIGINT`/`SIGTERM` (e.g. from `docker compose stop collection-scheduler`) to the Node process, and the existing Sprint 059 CLI signal handlers perform the clean shutdown.
+
+## Containerized Profile Home-Feed Scheduler And Worker
+
+Sprint 068B2 adds two separate opt-in Docker Compose services:
+
+- `profile-home-feed-scheduler` runs the existing profile home-feed
+  scheduler CLI from the lightweight `scheduler-runtime` image.
+- `profile-home-feed-worker` runs the existing profile home-feed
+  worker CLI from the browser-capable `worker-runtime` image.
+
+Start the development stack and profile home-feed scheduler:
+
+```bash
+pnpm stack:dev:start
+pnpm stack:dev:profile-home-feed-scheduler:start
+pnpm stack:dev:profile-home-feed-scheduler:logs
+```
+
+Start the development stack and profile home-feed worker:
+
+```bash
+pnpm stack:dev:start
+pnpm stack:dev:profile-home-feed-worker:start
+pnpm stack:dev:profile-home-feed-worker:logs
+```
+
+Start the preview stack and profile home-feed scheduler:
+
+```bash
+pnpm stack:preview:start
+pnpm stack:preview:profile-home-feed-scheduler:start
+pnpm stack:preview:profile-home-feed-scheduler:logs
+```
+
+Start the preview stack and profile home-feed worker:
+
+```bash
+pnpm stack:preview:start
+pnpm stack:preview:profile-home-feed-worker:start
+pnpm stack:preview:profile-home-feed-worker:logs
+```
+
+Run one disposable profile home-feed scheduler or worker iteration:
+
+```bash
+pnpm stack:dev:profile-home-feed-scheduler:once
+pnpm stack:dev:profile-home-feed-worker:once
+pnpm stack:preview:profile-home-feed-scheduler:once
+pnpm stack:preview:profile-home-feed-worker:once
+```
+
+`profile-home-feed-scheduler` sets `DATABASE_URL`,
+`PROFILE_HOME_FEED_SCHEDULER_MODE_ARGS`, and
+`PROFILE_HOME_FEED_SCHEDULER_READINESS_URL`. Its entrypoint polls
+the readiness URL, defaulting to
+`http://api:3000/collector/profile-home-feed-collection-schedules?limit=1`,
+until the API returns an HTTP status below 500, then `exec`s
+`src/operator-tools/profile-home-feed-scheduler/cli.ts`. It does not
+set `BROWSER_PROVIDER`, `DISPLAY`, Xvfb variables, or browser runtime
+environment.
+
+`profile-home-feed-worker` sets `DATABASE_URL`,
+`PROFILE_HOME_FEED_WORKER_BASE_URL=http://api:3000`,
+`PROFILE_HOME_FEED_WORKER_MODE_ARGS`, Xvfb display configuration, and
+`BROWSER_PROVIDER`. Its entrypoint waits for
+`/collector/profile-home-feed-collection-runs?limit=1` to answer
+below 500, starts Xvfb, exports `DISPLAY`, starts the existing worker
+CLI with `--base-url http://api:3000`, forwards `SIGINT` and
+`SIGTERM`, cleans up Xvfb, and exits with the worker status.
+
+The dev stack follows the existing dev browser-backed worker default
+of `BROWSER_PROVIDER=cloakbrowser`; the preview stack follows the
+existing preview default of `BROWSER_PROVIDER=playwright`. The
+entrypoints print only static readiness/display messages and do not
+log database URLs, API URLs, tokens, cookies, localStorage, proxy
+values, trusted runtime configuration, raw payloads, screenshots, or
+raw HTML.
 
 ## Profile Provisioning CLI
 

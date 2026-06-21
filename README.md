@@ -20,9 +20,12 @@ The current focus is the Content Collector: collecting normalized content from c
 - An account exercise worker exists for claiming and executing queued Account Exercise runs (Ambient and Category Browse).
 - A profile-source access check worker exists for claiming and executing queued browser-backed access checks.
 - A collection scheduler exists for polling `DispatchNextDueCollectionScheduleUseCase` and dispatching due schedules.
+- A profile home-feed scheduler exists for polling `DispatchNextDueProfileHomeFeedCollectionScheduleUseCase` and dispatching due profile home-feed schedules.
+- A profile home-feed worker exists for claiming and executing queued profile home-feed collection runs.
 - The collector worker is available as an opt-in Docker Compose service for dev and preview stacks.
 - The account exercise worker is available as a separate opt-in Docker Compose service for dev and preview stacks.
 - The collection scheduler is available as a separate opt-in Docker Compose service for dev and preview stacks.
+- The profile home-feed scheduler and worker are available as separate opt-in Docker Compose services for dev and preview stacks.
 - A Collector Runtime browser provider boundary exists.
 - CloakBrowser support is experimental and not yet production-proven; Playwright Chromium remains the default provider.
 
@@ -101,10 +104,12 @@ pnpm stack:dev:workers:logs
 - `pnpm operator:collector:facebook -- --source-group-id <source-group-id> --base-url http://localhost:8081`
 - `pnpm operator:collector:worker -- --base-url http://localhost:8081 --once`
 - `pnpm operator:collector:scheduler -- --once`
+- `pnpm operator:profile-home-feed:scheduler -- --once`
+- `pnpm operator:profile-home-feed-worker -- --base-url http://localhost:8081 --once`
 - `pnpm operator:profile:exercise-worker -- --base-url http://localhost:8081 --once`
 - `pnpm operator:profile-source-access-check-worker -- --base-url http://localhost:8081 --once`
 - `pnpm operator:browser:probe -- --browser-provider playwright`
-- Backward-compatible aliases: `pnpm profile:provision`, `pnpm profile:provision:cloakbrowser-probe`, `pnpm profile:assisted-access:run`, `pnpm collector:facebook:run`, `pnpm collector:worker:run`, `pnpm collector:scheduler:run`, `pnpm profile:exercise-worker:run`, `pnpm profile-source-access-check-worker:run`, `pnpm collector:browser:probe`.
+- Backward-compatible aliases: `pnpm profile:provision`, `pnpm profile:provision:cloakbrowser-probe`, `pnpm profile:assisted-access:run`, `pnpm collector:facebook:run`, `pnpm collector:worker:run`, `pnpm collector:scheduler:run`, `pnpm profile-home-feed:scheduler:run`, `pnpm profile-home-feed-worker:run`, `pnpm profile:exercise-worker:run`, `pnpm profile-source-access-check-worker:run`, `pnpm collector:browser:probe`.
 
 Operator browser-backed commands that accept `--browser-provider` use `BROWSER_PROVIDER`, then `playwright` when the option is omitted. Supported values are `playwright` and experimental `cloakbrowser`.
 
@@ -116,14 +121,18 @@ CloakBrowser provisioning uses the Node package `cloakbrowser` from `CloakHQ/Clo
 - `pnpm stack:dev:worker:start`, `pnpm stack:dev:worker:once`, `pnpm stack:dev:worker:logs`
 - `pnpm stack:dev:exercise-worker:start`, `pnpm stack:dev:exercise-worker:once`, `pnpm stack:dev:exercise-worker:logs`
 - `pnpm stack:dev:scheduler:start`, `pnpm stack:dev:scheduler:once`, `pnpm stack:dev:scheduler:logs`
+- `pnpm stack:dev:profile-home-feed-scheduler:start`, `pnpm stack:dev:profile-home-feed-scheduler:once`, `pnpm stack:dev:profile-home-feed-scheduler:logs`
+- `pnpm stack:dev:profile-home-feed-worker:start`, `pnpm stack:dev:profile-home-feed-worker:once`, `pnpm stack:dev:profile-home-feed-worker:logs`
 - `pnpm stack:dev:workers:start`, `pnpm stack:dev:workers:logs`
 - `pnpm stack:preview:start`, `pnpm stack:preview:stop`, `pnpm stack:preview:reset`
 - `pnpm stack:preview:worker:start`, `pnpm stack:preview:worker:once`, `pnpm stack:preview:worker:logs`
 - `pnpm stack:preview:exercise-worker:start`, `pnpm stack:preview:exercise-worker:once`, `pnpm stack:preview:exercise-worker:logs`
 - `pnpm stack:preview:scheduler:start`, `pnpm stack:preview:scheduler:once`, `pnpm stack:preview:scheduler:logs`
+- `pnpm stack:preview:profile-home-feed-scheduler:start`, `pnpm stack:preview:profile-home-feed-scheduler:once`, `pnpm stack:preview:profile-home-feed-scheduler:logs`
+- `pnpm stack:preview:profile-home-feed-worker:start`, `pnpm stack:preview:profile-home-feed-worker:once`, `pnpm stack:preview:profile-home-feed-worker:logs`
 - `pnpm stack:preview:workers:start`, `pnpm stack:preview:workers:logs`
 
-The `collector-worker`, `account-exercise-worker`, and `collection-scheduler` Compose services are behind the `worker` profile and expose no ports. Inside Docker they talk to the API at `http://api:3000`; host commands still use `http://localhost:8081` for preview gateway access or `http://localhost:3000` for direct API access. The `collection-scheduler` service does not open a browser and uses a lightweight `scheduler-runtime` image that installs no Playwright runtime or Xvfb.
+The `collector-worker`, `account-exercise-worker`, `collection-scheduler`, `profile-home-feed-scheduler`, and `profile-home-feed-worker` Compose services are behind the `worker` profile and expose no ports. Inside Docker, worker services talk to the API at `http://api:3000`; host commands still use `http://localhost:8081` for preview gateway access or `http://localhost:3000` for direct API access. The `collection-scheduler` and `profile-home-feed-scheduler` services do not open a browser and use the lightweight `scheduler-runtime` image that installs no Playwright runtime or Xvfb. Browser-backed workers use `worker-runtime`.
 
 ## Deeper Docs
 

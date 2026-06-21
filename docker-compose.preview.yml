@@ -101,5 +101,48 @@ services:
       api:
         condition: service_started
 
+  profile-home-feed-scheduler:
+    profiles:
+      - worker
+    build:
+      context: .
+      target: scheduler-runtime
+    init: true
+    command:
+      - sh
+      - scripts/run-profile-home-feed-scheduler-container.sh
+    environment:
+      DATABASE_URL: postgres://content_pipeline:content_pipeline@postgres:5432/content_pipeline
+      PROFILE_HOME_FEED_SCHEDULER_MODE_ARGS: "--poll-interval-ms 5000"
+      PROFILE_HOME_FEED_SCHEDULER_READINESS_URL: http://api:3000/collector/profile-home-feed-collection-schedules?limit=1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  profile-home-feed-worker:
+    profiles:
+      - worker
+    build:
+      context: .
+      target: worker-runtime
+    init: true
+    command:
+      - sh
+      - scripts/run-profile-home-feed-worker-container.sh
+    environment:
+      DATABASE_URL: postgres://content_pipeline:content_pipeline@postgres:5432/content_pipeline
+      PROFILE_HOME_FEED_WORKER_BASE_URL: http://api:3000
+      PROFILE_HOME_FEED_WORKER_MODE_ARGS: "--poll-interval-ms 5000"
+      PROFILE_HOME_FEED_WORKER_DISPLAY: ":99"
+      PROFILE_HOME_FEED_WORKER_XVFB_SCREEN: 1280x720x24
+      BROWSER_PROVIDER: playwright
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+
 volumes:
   fgc_preview_postgres_data:
