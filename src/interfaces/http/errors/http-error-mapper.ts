@@ -24,6 +24,7 @@ import {
   CollectionRunValidationError,
   AccountExerciseRunValidationError,
   ProfileHomeFeedCollectionRunValidationError,
+  ProfileHomeFeedCollectionScheduleValidationError,
   ProfileSourceAccessCheckRunValidationError,
   CollectionScheduleValidationError,
   CollectorRuntimeApplicationError,
@@ -165,6 +166,7 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
     error instanceof CollectionRunValidationError ||
     error instanceof AccountExerciseRunValidationError ||
     error instanceof ProfileHomeFeedCollectionRunValidationError ||
+    error instanceof ProfileHomeFeedCollectionScheduleValidationError ||
     error instanceof ProfileSourceAccessCheckRunValidationError
   ) {
     return {
@@ -374,6 +376,8 @@ const collectorRuntimeApplicationErrorStatus: Record<
   PROFILE_HOME_FEED_COLLECTION_RUN_VALIDATION_ERROR: 400,
   PROFILE_HOME_FEED_COLLECTION_RUN_CONFLICT: 409,
   PROFILE_HOME_FEED_COLLECTION_RUN_ALREADY_EXISTS: 409,
+  PROFILE_HOME_FEED_COLLECTION_SCHEDULE_VALIDATION_ERROR: 400,
+  PROFILE_HOME_FEED_COLLECTION_SCHEDULE_NOT_FOUND: 404,
   // Collection schedule errors are mapped here for the Sprint 061
   // /collector/collection-schedules routes. The validation error is also
   // handled explicitly above so the structured issues list reaches the

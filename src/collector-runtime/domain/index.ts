@@ -25,4 +25,6 @@ export * from "./profile-home-feed-collection-run-state-machine";
 export * from "./profile-home-feed-collection-run-status";
 export * from "./profile-home-feed-collection-run-trigger-type";
 export * from "./profile-home-feed-collection-run.schemas";
+export * from "./profile-home-feed-collection-schedule";
+export * from "./profile-home-feed-collection-schedule.schemas";
 export * from "./validation";

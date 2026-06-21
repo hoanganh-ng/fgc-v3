@@ -3,6 +3,7 @@ import type {
   CollectionRun,
   CollectionSchedule,
   ProfileHomeFeedCollectionRun,
+  ProfileHomeFeedCollectionSchedule,
   ProfileSourceAccessCheckRun,
 } from "../../../collector-runtime/domain";
 import type {
@@ -132,12 +133,33 @@ export interface FakeCollectorRuntimeHttpService
       };
     }
   >;
+  readonly createOrUpdateProfileHomeFeedCollectionSchedule: StubUseCase<
+    unknown,
+    ProfileHomeFeedCollectionSchedule
+  >;
+  readonly getProfileHomeFeedCollectionSchedule: StubUseCase<
+    unknown,
+    ProfileHomeFeedCollectionSchedule
+  >;
+  readonly listProfileHomeFeedCollectionSchedules: StubUseCase<
+    unknown,
+    {
+      readonly items: readonly ProfileHomeFeedCollectionSchedule[];
+      readonly page: {
+        readonly limit: number;
+        readonly offset: number;
+        readonly total: number;
+      };
+    }
+  >;
 }
 
 export function createFakeCollectorRuntimeHttpService(): FakeCollectorRuntimeHttpService {
   const collectionRun = createCollectionRun();
   const accountExerciseRun = createAccountExerciseRun();
   const profileHomeFeedCollectionRun = createProfileHomeFeedCollectionRun();
+  const profileHomeFeedCollectionSchedule =
+    createProfileHomeFeedCollectionSchedule();
 
   return {
     requestAccountExerciseRun: new StubUseCase(accountExerciseRun),
@@ -258,6 +280,20 @@ export function createFakeCollectorRuntimeHttpService(): FakeCollectorRuntimeHtt
         total: 1,
       },
     }),
+    createOrUpdateProfileHomeFeedCollectionSchedule: new StubUseCase(
+      profileHomeFeedCollectionSchedule,
+    ),
+    getProfileHomeFeedCollectionSchedule: new StubUseCase(
+      profileHomeFeedCollectionSchedule,
+    ),
+    listProfileHomeFeedCollectionSchedules: new StubUseCase({
+      items: [profileHomeFeedCollectionSchedule],
+      page: {
+        limit: 50,
+        offset: 0,
+        total: 1,
+      },
+    }),
   } as unknown as FakeCollectorRuntimeHttpService;
 }
 
@@ -292,6 +328,9 @@ export function createUnusedCollectorRuntimeHttpService(): CollectorRuntimeHttpS
     upsertCollectionSchedule: useCase,
     getCollectionSchedule: useCase,
     listCollectionSchedules: useCase,
+    createOrUpdateProfileHomeFeedCollectionSchedule: useCase,
+    getProfileHomeFeedCollectionSchedule: useCase,
+    listProfileHomeFeedCollectionSchedules: useCase,
   } as unknown as CollectorRuntimeHttpService;
 }
 
@@ -428,6 +467,20 @@ export function createCollectionSchedule(
 ): CollectionSchedule {
   return {
     sourceGroupId: options.sourceGroupId ?? "source-group-1",
+    enabled: options.enabled ?? true,
+    intervalMinutes: options.intervalMinutes ?? 60,
+    nextRunAt: options.nextRunAt ?? collectorRuntimeHttpTestNow,
+    parameters: options.parameters ?? {},
+    createdAt: options.createdAt ?? collectorRuntimeHttpTestNow,
+    updatedAt: options.updatedAt ?? collectorRuntimeHttpTestNow,
+  };
+}
+
+export function createProfileHomeFeedCollectionSchedule(
+  options: Partial<ProfileHomeFeedCollectionSchedule> = {},
+): ProfileHomeFeedCollectionSchedule {
+  return {
+    profileId: options.profileId ?? "profile-1",
     enabled: options.enabled ?? true,
     intervalMinutes: options.intervalMinutes ?? 60,
     nextRunAt: options.nextRunAt ?? collectorRuntimeHttpTestNow,

@@ -34,6 +34,7 @@ import type {
   ProfileHomeFeedCollectionRunParameters,
   ProfileHomeFeedCollectionRunSummary,
   ProfileHomeFeedCollectionRunTarget,
+  ProfileHomeFeedCollectionSchedule,
   ProfileSourceAccessCheckRunTarget,
   ProfileSourceAccessCheckRunFailureReason,
   ProfileSourceAccessCheckRunOutcome,
@@ -246,6 +247,35 @@ export const collectorCollectionSchedules = pgTable(
       table.enabled,
       table.nextRunAt,
       table.sourceGroupId,
+    ),
+  ],
+);
+
+export const profileHomeFeedCollectionSchedules = pgTable(
+  "collector_profile_home_feed_collection_schedules",
+  {
+    profileId: text("profile_id").primaryKey(),
+    enabled: boolean("enabled").notNull(),
+    intervalMinutes: integer("interval_minutes").notNull(),
+    nextRunAt: timestampWithTimezone("next_run_at").notNull(),
+    parameters:
+      jsonb("parameters").$type<ProfileHomeFeedCollectionSchedule["parameters"]>().notNull(),
+    createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
+    updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "collector_phf_schedules_interval_minutes_check",
+      sql`${table.intervalMinutes} BETWEEN 1 AND 10080`,
+    ),
+    index("collector_phf_schedules_due_idx").on(
+      table.enabled,
+      table.nextRunAt,
+      table.profileId,
+    ),
+    index("collector_phf_schedules_next_idx").on(
+      table.nextRunAt,
+      table.profileId,
     ),
   ],
 );

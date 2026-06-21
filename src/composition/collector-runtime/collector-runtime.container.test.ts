@@ -27,6 +27,9 @@ import {
   RequestAccountExerciseRunUseCase,
   RequestProfileHomeFeedCollectionRunUseCase,
   CancelProfileHomeFeedCollectionRunUseCase,
+  CreateOrUpdateProfileHomeFeedCollectionScheduleUseCase,
+  GetProfileHomeFeedCollectionScheduleUseCase,
+  ListProfileHomeFeedCollectionSchedulesUseCase,
   UpsertCollectionScheduleUseCase,
 } from "../../collector-runtime/application";
 import type {
@@ -42,6 +45,7 @@ import { InMemoryAccountExerciseRunRepository } from "../../collector-runtime/ap
 import { InMemoryCollectionScheduleRepository } from "../../collector-runtime/application/test-support/in-memory-collection-schedule-repository";
 import { InMemoryDispatchNextDueCollectionScheduleRepository } from "../../collector-runtime/application/test-support/in-memory-dispatch-next-due-collection-schedule.repository";
 import { InMemoryProfileHomeFeedCollectionRunRepository } from "../../collector-runtime/application/test-support/in-memory-profile-home-feed-collection-run-repository";
+import { InMemoryProfileHomeFeedCollectionScheduleRepository } from "../../collector-runtime/application/test-support/in-memory-profile-home-feed-collection-schedule-repository";
 import { InMemoryProfileSourceAccessCheckRunRepository } from "../../collector-runtime/application/test-support/in-memory-profile-source-access-check-run-repository";
 import { createCollectorRuntime } from "./collector-runtime.container";
 
@@ -52,6 +56,8 @@ describe("collector runtime composition container", () => {
       accountExerciseRuns: new InMemoryAccountExerciseRunRepository(),
       collectionRuns: new InMemoryCollectionRunRepository(),
       collectionSchedules: new InMemoryCollectionScheduleRepository(),
+      homeFeedSchedules:
+        new InMemoryProfileHomeFeedCollectionScheduleRepository(),
       dispatchNextDueCollectionSchedules:
         new InMemoryDispatchNextDueCollectionScheduleRepository(),
       homeFeedRuns: new InMemoryProfileHomeFeedCollectionRunRepository(),
@@ -122,6 +128,15 @@ describe("collector runtime composition container", () => {
     );
     expect(services.listCollectionSchedules).toBeInstanceOf(
       ListCollectionSchedulesUseCase,
+    );
+    expect(
+      services.createOrUpdateProfileHomeFeedCollectionSchedule,
+    ).toBeInstanceOf(CreateOrUpdateProfileHomeFeedCollectionScheduleUseCase);
+    expect(services.getProfileHomeFeedCollectionSchedule).toBeInstanceOf(
+      GetProfileHomeFeedCollectionScheduleUseCase,
+    );
+    expect(services.listProfileHomeFeedCollectionSchedules).toBeInstanceOf(
+      ListProfileHomeFeedCollectionSchedulesUseCase,
     );
     expect(services.dispatchNextDueCollectionSchedule).toBeInstanceOf(
       DispatchNextDueCollectionScheduleUseCase,

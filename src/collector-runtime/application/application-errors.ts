@@ -37,6 +37,8 @@ export type CollectorRuntimeApplicationErrorCode =
   | "PROFILE_HOME_FEED_COLLECTION_RUN_VALIDATION_ERROR"
   | "PROFILE_HOME_FEED_COLLECTION_RUN_CONFLICT"
   | "PROFILE_HOME_FEED_COLLECTION_RUN_ALREADY_EXISTS"
+  | "PROFILE_HOME_FEED_COLLECTION_SCHEDULE_VALIDATION_ERROR"
+  | "PROFILE_HOME_FEED_COLLECTION_SCHEDULE_NOT_FOUND"
   | "COLLECTION_SCHEDULE_VALIDATION_ERROR"
   | "COLLECTION_SCHEDULE_NOT_FOUND"
   | "COLLECTION_SCHEDULE_SOURCE_GROUP_NOT_FOUND"
@@ -463,6 +465,30 @@ export class ProfileHomeFeedCollectionRunAlreadyExistsError extends CollectorRun
       `Profile home-feed collection run already exists: ${runId}.`,
     );
     this.runId = runId;
+  }
+}
+
+export class ProfileHomeFeedCollectionScheduleValidationError extends CollectorRuntimeApplicationError {
+  public readonly issues: readonly ValidationIssue[];
+
+  public constructor(issues: readonly ValidationIssue[]) {
+    super(
+      "PROFILE_HOME_FEED_COLLECTION_SCHEDULE_VALIDATION_ERROR",
+      "Profile home-feed collection schedule input is invalid.",
+    );
+    this.issues = issues;
+  }
+}
+
+export class ProfileHomeFeedCollectionScheduleNotFoundError extends CollectorRuntimeApplicationError {
+  public readonly profileId: string;
+
+  public constructor(profileId: string) {
+    super(
+      "PROFILE_HOME_FEED_COLLECTION_SCHEDULE_NOT_FOUND",
+      `Profile home-feed collection schedule not found: ${profileId}.`,
+    );
+    this.profileId = profileId;
   }
 }
 

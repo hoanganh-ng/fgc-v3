@@ -16,6 +16,10 @@ import {
   CollectionScheduleSourceGroupNotFoundError,
   CollectionScheduleSourceGroupPlatformUnsupportedError,
   CollectionScheduleValidationError,
+  ProfileHomeFeedCollectionScheduleNotFoundError,
+  ProfileHomeFeedCollectionScheduleValidationError,
+  ProfileNotFoundError,
+  ProfileReferenceLookupFailedError,
 } from "../../collector-runtime/application";
 import { createHttpServer } from "./server";
 import {
@@ -26,6 +30,7 @@ import {
   createCollectionRun,
   createCollectionSchedule,
   createFakeCollectorRuntimeHttpService,
+  createProfileHomeFeedCollectionSchedule,
 } from "./test-support/collector-runtime-http-service";
 import {
   createFakeContentManagerHttpService,
@@ -1053,6 +1058,287 @@ describe("Collector Runtime HTTP routes", () => {
     }
   });
 
+  it("creates, updates, gets, and lists profile home-feed collection schedules with safe DTOs", async () => {
+    const { server, service } = createTestServer();
+
+    service.createOrUpdateProfileHomeFeedCollectionSchedule.setOutput(
+      createProfileHomeFeedCollectionSchedule({
+        profileId: "profile-1",
+        enabled: true,
+        intervalMinutes: 120,
+        nextRunAt: "2026-04-01T14:00:00.000Z",
+        parameters: {
+          maxScrolls: 3,
+          maxDurationMs: 30_000,
+          maxPosts: 20,
+        },
+        createdAt: "2026-03-31T12:00:00.000Z",
+        updatedAt: "2026-04-01T08:00:00.000Z",
+      }),
+    );
+    service.getProfileHomeFeedCollectionSchedule.setOutput(
+      createProfileHomeFeedCollectionSchedule({
+        profileId: "profile-1",
+        enabled: false,
+        intervalMinutes: 60,
+        nextRunAt: "2026-04-01T15:00:00.000Z",
+        parameters: {
+          maxPosts: 10,
+        },
+      }),
+    );
+    service.listProfileHomeFeedCollectionSchedules.setOutput({
+      items: [
+        createProfileHomeFeedCollectionSchedule({
+          profileId: "profile-2",
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T16:00:00.000Z",
+          parameters: {},
+        }),
+      ],
+      page: { limit: 10, offset: 5, total: 1 },
+    });
+
+    try {
+      const putResponse = await server.inject({
+        method: "PUT",
+        url: "/collector/profile-home-feed-collection-schedules/profile-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 120,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+          maxScrolls: 3,
+          maxDurationMs: 30_000,
+          maxPosts: 20,
+        },
+      });
+      const getResponse = await server.inject({
+        method: "GET",
+        url: "/collector/profile-home-feed-collection-schedules/profile-1",
+      });
+      const listResponse = await server.inject({
+        method: "GET",
+        url: "/collector/profile-home-feed-collection-schedules?enabled=true&limit=10&offset=5",
+      });
+
+      expect(putResponse.statusCode).toBe(200);
+      expect(getResponse.statusCode).toBe(200);
+      expect(listResponse.statusCode).toBe(200);
+      expect(
+        service.createOrUpdateProfileHomeFeedCollectionSchedule.calls,
+      ).toEqual([
+        {
+          profileId: "profile-1",
+          enabled: true,
+          intervalMinutes: 120,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+          maxScrolls: 3,
+          maxDurationMs: 30_000,
+          maxPosts: 20,
+        },
+      ]);
+      expect(service.getProfileHomeFeedCollectionSchedule.calls).toEqual([
+        { profileId: "profile-1" },
+      ]);
+      expect(service.listProfileHomeFeedCollectionSchedules.calls).toEqual([
+        { enabled: true, limit: 10, offset: 5 },
+      ]);
+      expect(putResponse.json()).toEqual({
+        schedule: {
+          profileId: "profile-1",
+          enabled: true,
+          intervalMinutes: 120,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+          parameters: {
+            maxScrolls: 3,
+            maxDurationMs: 30_000,
+            maxPosts: 20,
+          },
+          createdAt: "2026-03-31T12:00:00.000Z",
+          updatedAt: "2026-04-01T08:00:00.000Z",
+        },
+      });
+      expect(getResponse.json()).toMatchObject({
+        schedule: {
+          profileId: "profile-1",
+          enabled: false,
+          parameters: {
+            maxPosts: 10,
+          },
+        },
+      });
+      expect(listResponse.json()).toMatchObject({
+        items: [
+          {
+            profileId: "profile-2",
+            enabled: true,
+            parameters: {},
+          },
+        ],
+        page: { limit: 10, offset: 5, total: 1 },
+      });
+      expectProfileHomeFeedCollectionSchedulePayloadIsSafe(putResponse.json());
+      expectProfileHomeFeedCollectionSchedulePayloadIsSafe(getResponse.json());
+      expectProfileHomeFeedCollectionSchedulePayloadIsSafe(listResponse.json());
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns 400 for invalid profile home-feed collection schedule requests before invoking service", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const invalidBodyResponse = await server.inject({
+        method: "PUT",
+        url: "/collector/profile-home-feed-collection-schedules/profile-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 0,
+          nextRunAt: "2026-04-01T14:00:00.000",
+          maxScrolls: -1,
+          maxDurationMs: 0,
+          maxPosts: null,
+          parameters: {},
+          unknown: "not allowed",
+        },
+      });
+      const invalidListResponse = await server.inject({
+        method: "GET",
+        url: "/collector/profile-home-feed-collection-schedules?enabled=yes",
+      });
+
+      expect(invalidBodyResponse.statusCode).toBe(400);
+      expect(invalidBodyResponse.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(invalidListResponse.statusCode).toBe(400);
+      expect(invalidListResponse.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(
+        service.createOrUpdateProfileHomeFeedCollectionSchedule.calls,
+      ).toEqual([]);
+      expect(service.listProfileHomeFeedCollectionSchedules.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps profile home-feed collection schedule application errors to safe HTTP responses", async () => {
+    const { server, service } = createTestServer();
+
+    service.getProfileHomeFeedCollectionSchedule.setError(
+      new ProfileHomeFeedCollectionScheduleNotFoundError("profile-1"),
+    );
+    service.createOrUpdateProfileHomeFeedCollectionSchedule.setError(
+      new ProfileHomeFeedCollectionScheduleValidationError([
+        {
+          path: "intervalMinutes",
+          message: "intervalMinutes must be an integer between 1 and 10080.",
+        },
+      ]),
+    );
+
+    try {
+      const missingResponse = await server.inject({
+        method: "GET",
+        url: "/collector/profile-home-feed-collection-schedules/profile-1",
+      });
+      const validationResponse = await server.inject({
+        method: "PUT",
+        url: "/collector/profile-home-feed-collection-schedules/profile-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+        },
+      });
+      service.createOrUpdateProfileHomeFeedCollectionSchedule.setError(
+        new ProfileNotFoundError("profile-1"),
+      );
+      const profileMissingResponse = await server.inject({
+        method: "PUT",
+        url: "/collector/profile-home-feed-collection-schedules/profile-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+        },
+      });
+
+      expect(missingResponse.statusCode).toBe(404);
+      expect(missingResponse.json()).toMatchObject({
+        error: { code: "PROFILE_HOME_FEED_COLLECTION_SCHEDULE_NOT_FOUND" },
+      });
+      expect(validationResponse.statusCode).toBe(400);
+      expect(validationResponse.json()).toMatchObject({
+        error: {
+          code: "PROFILE_HOME_FEED_COLLECTION_SCHEDULE_VALIDATION_ERROR",
+          issues: [
+            {
+              path: "intervalMinutes",
+              message:
+                "intervalMinutes must be an integer between 1 and 10080.",
+            },
+          ],
+        },
+      });
+      expect(profileMissingResponse.statusCode).toBe(404);
+      expect(profileMissingResponse.json()).toMatchObject({
+        error: { code: "PROFILE_NOT_FOUND" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps profile lookup failure on profile home-feed schedule upsert to sanitized 502", async () => {
+    const { server, service } = createTestServer();
+
+    service.createOrUpdateProfileHomeFeedCollectionSchedule.setError(
+      new ProfileReferenceLookupFailedError(
+        "profile-1",
+        "internal http://credentials:secret@profile-manager/raw",
+        {
+          causeCode: "PROFILE_MANAGER_TIMEOUT",
+          statusCode: 504,
+        },
+      ),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PUT",
+        url: "/collector/profile-home-feed-collection-schedules/profile-1",
+        payload: {
+          enabled: true,
+          intervalMinutes: 30,
+          nextRunAt: "2026-04-01T14:00:00.000Z",
+        },
+      });
+
+      expect(response.statusCode).toBe(502);
+      expect(response.json()).toMatchObject({
+        error: {
+          code: "PROFILE_REFERENCE_LOOKUP_FAILED",
+          message: "Profile Manager profile lookup failed.",
+          reasons: [
+            { causeCode: "PROFILE_MANAGER_TIMEOUT" },
+            { statusCode: 504 },
+          ],
+        },
+      });
+      const serialized = JSON.stringify(response.json());
+      expect(serialized).not.toContain("credentials");
+      expect(serialized).not.toContain("secret");
+      expect(serialized).not.toContain("profile-1");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("lists collection schedules with default paging", async () => {
     const { server, service } = createTestServer();
 
@@ -1576,4 +1862,23 @@ function expectAccountExerciseRunPayloadIsSafe(payload: unknown): void {
   expect(serialized).not.toContain("provisioning");
   expect(serialized).not.toContain("session");
   expect(serialized).not.toContain("authenticationState");
+}
+
+function expectProfileHomeFeedCollectionSchedulePayloadIsSafe(
+  payload: unknown,
+): void {
+  const serialized = JSON.stringify(payload);
+
+  expect(serialized).not.toContain("sourceGroupId");
+  expect(serialized).not.toContain("runId");
+  expect(serialized).not.toContain("triggerType");
+  expect(serialized).not.toContain("status");
+  expect(serialized).not.toContain("cookie");
+  expect(serialized).not.toContain("localStorage");
+  expect(serialized).not.toContain("authorization");
+  expect(serialized).not.toContain("proxy");
+  expect(serialized).not.toContain("fingerprint");
+  expect(serialized).not.toContain("rawGraphQL");
+  expect(serialized).not.toContain("rawHtml");
+  expect(serialized).not.toContain("trustedRuntimeConfiguration");
 }

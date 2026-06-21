@@ -237,7 +237,7 @@ introduced by Sprint 066.
 - [Sprint 066 - Source Publisher Status Mutation HTTP Contract](SPRINT-066-source-publisher-status-mutation-http-contract.md)
 
 Sprint 067 — Approved Source Publisher Group Promotion is
-**active**. It exposes a safe Content Manager application use case
+**accepted**. It exposes a safe Content Manager application use case
 and HTTP route that promotes an already `APPROVED` Facebook
 `GROUP` `SourcePublisher` into a managed `PAUSED` `SourceGroup`.
 The route is
@@ -264,9 +264,16 @@ behavior.
 
 - [Sprint 067 - Approved Source Publisher Group Promotion](SPRINT-067-approved-source-publisher-group-promotion.md)
 
-The remaining 068 feed-discovery item is a documented placeholder
-and is **not active** until the Product Owner explicitly approves
-the next sprint.
+Sprint 068A — Profile Home-Feed Schedule Foundation is **active**.
+It adds a durable Collector Runtime-owned
+`ProfileHomeFeedCollectionSchedule` model and safe operator HTTP API
+for profile-bound Facebook home-feed collection schedules. This sprint
+configures schedules only: it does not dispatch runs, execute browser
+collection, wire the Sprint 059 scheduler poller, add Docker services,
+change the one-shot home-feed executor, add a `SCHEDULED` home-feed run
+trigger, or start Sprint 068B.
+
+- [Sprint 068A - Profile Home-Feed Schedule Foundation](SPRINT-068A-profile-home-feed-schedule-foundation.md)
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

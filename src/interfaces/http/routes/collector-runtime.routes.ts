@@ -7,7 +7,9 @@ import type {
   GetAccountExerciseRunInput,
   GetCollectionRunInput,
   GetCollectionScheduleInput,
+  CreateOrUpdateProfileHomeFeedCollectionScheduleInput,
   GetProfileHomeFeedCollectionRunInput,
+  GetProfileHomeFeedCollectionScheduleInput,
   ListAccountExerciseRunsInput,
   ListAccountExerciseRunsOutput,
   ListCollectionRunsInput,
@@ -16,6 +18,8 @@ import type {
   ListCollectionSchedulesOutput,
   ListProfileHomeFeedCollectionRunsInput,
   ListProfileHomeFeedCollectionRunsOutput,
+  ListProfileHomeFeedCollectionSchedulesInput,
+  ListProfileHomeFeedCollectionSchedulesOutput,
   MarkAccountExerciseRunFailedInput,
   MarkAccountExerciseRunRunningInput,
   MarkAccountExerciseRunSucceededInput,
@@ -60,6 +64,8 @@ import type {
   ProfileHomeFeedCollectionRunSummary,
   ProfileHomeFeedCollectionRunTarget,
   ProfileHomeFeedCollectionRunTriggerType,
+  ProfileHomeFeedCollectionSchedule,
+  ProfileHomeFeedCollectionScheduleIsoDateTime,
   ProfileSourceAccessCheckRun,
   ProfileSourceAccessCheckRunFailureReason,
   ProfileSourceAccessCheckRunId,
@@ -107,11 +113,17 @@ import {
   ListProfileSourceAccessCheckRunsHttpQuerySchema,
   ListProfileHomeFeedCollectionRunsHttpQuerySchema,
   CollectionScheduleSourceGroupIdHttpParamsSchema,
+  ProfileHomeFeedCollectionScheduleProfileIdHttpParamsSchema,
   UpsertCollectionScheduleHttpBodySchema,
+  CreateOrUpdateProfileHomeFeedCollectionScheduleHttpBodySchema,
   ListCollectionSchedulesHttpQuerySchema,
+  ListProfileHomeFeedCollectionSchedulesHttpQuerySchema,
   listCollectionSchedulesHttpRouteSchema,
   getCollectionScheduleHttpRouteSchema,
   upsertCollectionScheduleHttpRouteSchema,
+  listProfileHomeFeedCollectionSchedulesHttpRouteSchema,
+  getProfileHomeFeedCollectionScheduleHttpRouteSchema,
+  createOrUpdateProfileHomeFeedCollectionScheduleHttpRouteSchema,
 } from "../schemas/collector-runtime.http-schemas";
 
 interface ExecutableUseCase<Input, Output> {
@@ -211,6 +223,18 @@ export interface CollectorRuntimeHttpService {
     ListCollectionSchedulesInput,
     ListCollectionSchedulesOutput
   >;
+  readonly createOrUpdateProfileHomeFeedCollectionSchedule: ExecutableUseCase<
+    CreateOrUpdateProfileHomeFeedCollectionScheduleInput,
+    ProfileHomeFeedCollectionSchedule
+  >;
+  readonly getProfileHomeFeedCollectionSchedule: ExecutableUseCase<
+    GetProfileHomeFeedCollectionScheduleInput,
+    ProfileHomeFeedCollectionSchedule
+  >;
+  readonly listProfileHomeFeedCollectionSchedules: ExecutableUseCase<
+    ListProfileHomeFeedCollectionSchedulesInput,
+    ListProfileHomeFeedCollectionSchedulesOutput
+  >;
 }
 
 export interface RegisterCollectorRuntimeRoutesOptions {
@@ -295,6 +319,16 @@ export interface CollectionScheduleDto {
   };
   readonly createdAt: CollectionScheduleIsoDateTime;
   readonly updatedAt: CollectionScheduleIsoDateTime;
+}
+
+export interface ProfileHomeFeedCollectionScheduleDto {
+  readonly profileId: string;
+  readonly enabled: boolean;
+  readonly intervalMinutes: number;
+  readonly nextRunAt: ProfileHomeFeedCollectionScheduleIsoDateTime;
+  readonly parameters: ProfileHomeFeedCollectionRunParameters;
+  readonly createdAt: ProfileHomeFeedCollectionScheduleIsoDateTime;
+  readonly updatedAt: ProfileHomeFeedCollectionScheduleIsoDateTime;
 }
 
 export function registerCollectorRuntimeRoutes(
@@ -769,6 +803,86 @@ export function registerCollectorRuntimeRoutes(
   );
 
   server.get(
+    "/collector/profile-home-feed-collection-schedules",
+    { schema: listProfileHomeFeedCollectionSchedulesHttpRouteSchema },
+    async (request) => {
+      const query = parseHttpInput(
+        ListProfileHomeFeedCollectionSchedulesHttpQuerySchema,
+        request.query,
+      );
+      const input = {
+        ...(query.enabled !== undefined ? { enabled: query.enabled } : {}),
+        limit: query.limit,
+        offset: query.offset,
+      } satisfies ListProfileHomeFeedCollectionSchedulesInput;
+      const output =
+        await collectorRuntime.listProfileHomeFeedCollectionSchedules.execute(
+          input,
+        );
+
+      return {
+        items: output.items.map(toProfileHomeFeedCollectionScheduleDto),
+        page: output.page,
+      };
+    },
+  );
+
+  server.get(
+    "/collector/profile-home-feed-collection-schedules/:profileId",
+    { schema: getProfileHomeFeedCollectionScheduleHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileHomeFeedCollectionScheduleProfileIdHttpParamsSchema,
+        request.params,
+      );
+      const schedule =
+        await collectorRuntime.getProfileHomeFeedCollectionSchedule.execute({
+          profileId: params.profileId,
+        });
+
+      return {
+        schedule: toProfileHomeFeedCollectionScheduleDto(schedule),
+      };
+    },
+  );
+
+  server.put(
+    "/collector/profile-home-feed-collection-schedules/:profileId",
+    { schema: createOrUpdateProfileHomeFeedCollectionScheduleHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        ProfileHomeFeedCollectionScheduleProfileIdHttpParamsSchema,
+        request.params,
+      );
+      const body = parseHttpInput(
+        CreateOrUpdateProfileHomeFeedCollectionScheduleHttpBodySchema,
+        request.body,
+      );
+      const input = {
+        profileId: params.profileId,
+        enabled: body.enabled,
+        intervalMinutes: body.intervalMinutes,
+        nextRunAt: body.nextRunAt,
+        ...(body.maxScrolls !== undefined
+          ? { maxScrolls: body.maxScrolls }
+          : {}),
+        ...(body.maxDurationMs !== undefined
+          ? { maxDurationMs: body.maxDurationMs }
+          : {}),
+        ...(body.maxPosts !== undefined ? { maxPosts: body.maxPosts } : {}),
+      } satisfies CreateOrUpdateProfileHomeFeedCollectionScheduleInput;
+      const schedule =
+        await collectorRuntime.createOrUpdateProfileHomeFeedCollectionSchedule.execute(
+          input,
+        );
+
+      return {
+        schedule: toProfileHomeFeedCollectionScheduleDto(schedule),
+      };
+    },
+  );
+
+  server.get(
     "/collector/collection-schedules",
     { schema: listCollectionSchedulesHttpRouteSchema },
     async (request) => {
@@ -970,5 +1084,29 @@ export function toCollectionScheduleDto(
     },
     createdAt: collectionSchedule.createdAt,
     updatedAt: collectionSchedule.updatedAt,
+  };
+}
+
+export function toProfileHomeFeedCollectionScheduleDto(
+  schedule: ProfileHomeFeedCollectionSchedule,
+): ProfileHomeFeedCollectionScheduleDto {
+  return {
+    profileId: schedule.profileId,
+    enabled: schedule.enabled,
+    intervalMinutes: schedule.intervalMinutes,
+    nextRunAt: schedule.nextRunAt,
+    parameters: {
+      ...(schedule.parameters.maxScrolls !== undefined
+        ? { maxScrolls: schedule.parameters.maxScrolls }
+        : {}),
+      ...(schedule.parameters.maxDurationMs !== undefined
+        ? { maxDurationMs: schedule.parameters.maxDurationMs }
+        : {}),
+      ...(schedule.parameters.maxPosts !== undefined
+        ? { maxPosts: schedule.parameters.maxPosts }
+        : {}),
+    },
+    createdAt: schedule.createdAt,
+    updatedAt: schedule.updatedAt,
   };
 }

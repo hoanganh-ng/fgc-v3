@@ -8,6 +8,7 @@ import {
   collectorAccountExerciseRuns,
   collectorCollectionRuns,
   profileHomeFeedCollectionRuns,
+  profileHomeFeedCollectionSchedules,
   profileHomeFeedCollectionRunStatusEnum,
   profileHomeFeedCollectionRunTriggerTypeEnum,
   collectorProfileSourceAccessCheckRuns,
@@ -76,6 +77,35 @@ describe("collector runtime database schema", () => {
         "profile_home_feed_collection_runs_claim_idx",
         "profile_home_feed_collection_runs_profile_history_idx",
       ]),
+    );
+  });
+
+  it("exports profile home-feed collection schedule table metadata for migration generation", () => {
+    expect(profileHomeFeedCollectionSchedules.profileId.name).toBe(
+      "profile_id",
+    );
+    expect(profileHomeFeedCollectionSchedules.enabled.name).toBe("enabled");
+    expect(profileHomeFeedCollectionSchedules.intervalMinutes.name).toBe(
+      "interval_minutes",
+    );
+    expect(profileHomeFeedCollectionSchedules.nextRunAt.name).toBe(
+      "next_run_at",
+    );
+    expect(profileHomeFeedCollectionSchedules.parameters.name).toBe(
+      "parameters",
+    );
+    expect(
+      getTableConfig(profileHomeFeedCollectionSchedules).indexes.map(
+        (index) => index.config.name,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "collector_phf_schedules_due_idx",
+        "collector_phf_schedules_next_idx",
+      ]),
+    );
+    expect(getTableConfig(profileHomeFeedCollectionSchedules).foreignKeys).toEqual(
+      [],
     );
   });
 

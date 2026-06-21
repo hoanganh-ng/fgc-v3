@@ -198,9 +198,20 @@ the Web UI review page remains future work.
 
 Promote an approved discovered Facebook group into a paused managed `SourceGroup`. Require category selection and existing-source matching. Do not automatically join, activate, or schedule the promoted group.
 
-## Sprint 068: Home-Feed Scheduling
+## Sprint 068A: Profile Home-Feed Schedule Foundation
 
-Generalize scheduling for profile-bound home-feed collection only after Sprint 065C's manual feed execution is validated. Wire the Sprint 059 scheduled dispatch poller to feed discovery so a home-feed run can be scheduled against a profile with bounded retries and a deterministic next-run timestamp.
+Add the Collector Runtime-owned durable schedule model and safe operator HTTP
+API for profile-bound home-feed collection schedules. This foundation stores
+cadence and bounded run parameters only; it does not dispatch runs, wire the
+scheduler poller, execute browser collection, add Docker services, or change
+the one-shot home-feed executor.
+
+## Sprint 068B: Home-Feed Scheduled Dispatch
+
+After manual feed execution validation and the Sprint 068A foundation, wire
+scheduled profile home-feed dispatch so a due schedule can create a
+profile-bound home-feed run with bounded retries and a deterministic next-run
+timestamp. Poller and worker integration remain out of Sprint 068A.
 
 ## Future: Content Builder
 

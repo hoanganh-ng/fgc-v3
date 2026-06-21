@@ -6,15 +6,18 @@ import {
   ClaimNextCollectionRunUseCase,
   ClaimNextProfileHomeFeedCollectionRunUseCase,
   ClaimNextProfileSourceAccessCheckRunUseCase,
+  CreateOrUpdateProfileHomeFeedCollectionScheduleUseCase,
   DispatchNextDueCollectionScheduleUseCase,
   GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
   GetCollectionScheduleUseCase,
   GetProfileHomeFeedCollectionRunUseCase,
+  GetProfileHomeFeedCollectionScheduleUseCase,
   ListAccountExerciseRunsUseCase,
   ListCollectionRunsUseCase,
   ListCollectionSchedulesUseCase,
   ListProfileHomeFeedCollectionRunsUseCase,
+  ListProfileHomeFeedCollectionSchedulesUseCase,
   MarkAccountExerciseRunFailedUseCase,
   MarkAccountExerciseRunRunningUseCase,
   MarkAccountExerciseRunSucceededUseCase,
@@ -43,6 +46,7 @@ import type {
   CollectionScheduleRepository,
   DispatchNextDueCollectionScheduleRepositoryPort,
   IdGenerator,
+  ProfileHomeFeedCollectionScheduleRepository,
   SourceGroupLookupPort,
   ProfileHomeFeedCollectionRunRepository,
   ProfileSourceAccessCheckRunRepository,
@@ -53,6 +57,7 @@ export interface CollectorRuntimeDependencies {
   readonly accountExerciseRuns: AccountExerciseRunRepository;
   readonly collectionRuns: CollectionRunRepository;
   readonly collectionSchedules: CollectionScheduleRepository;
+  readonly homeFeedSchedules: ProfileHomeFeedCollectionScheduleRepository;
   readonly dispatchNextDueCollectionSchedules: DispatchNextDueCollectionScheduleRepositoryPort;
   readonly homeFeedRuns: ProfileHomeFeedCollectionRunRepository;
   readonly checkRuns: ProfileSourceAccessCheckRunRepository;
@@ -82,6 +87,9 @@ export interface CollectorRuntimeContainer {
   readonly upsertCollectionSchedule: UpsertCollectionScheduleUseCase;
   readonly getCollectionSchedule: GetCollectionScheduleUseCase;
   readonly listCollectionSchedules: ListCollectionSchedulesUseCase;
+  readonly createOrUpdateProfileHomeFeedCollectionSchedule: CreateOrUpdateProfileHomeFeedCollectionScheduleUseCase;
+  readonly getProfileHomeFeedCollectionSchedule: GetProfileHomeFeedCollectionScheduleUseCase;
+  readonly listProfileHomeFeedCollectionSchedules: ListProfileHomeFeedCollectionSchedulesUseCase;
   readonly dispatchNextDueCollectionSchedule: DispatchNextDueCollectionScheduleUseCase;
   readonly requestProfileHomeFeedCollectionRun: RequestProfileHomeFeedCollectionRunUseCase;
   readonly getProfileHomeFeedCollectionRun: GetProfileHomeFeedCollectionRunUseCase;
@@ -110,6 +118,7 @@ export function createCollectorRuntime(
     accountExerciseRuns,
     collectionRuns,
     collectionSchedules,
+    homeFeedSchedules,
     dispatchNextDueCollectionSchedules,
     homeFeedRuns,
     checkRuns,
@@ -187,6 +196,16 @@ export function createCollectorRuntime(
     listCollectionSchedules: new ListCollectionSchedulesUseCase(
       collectionSchedules,
     ),
+    createOrUpdateProfileHomeFeedCollectionSchedule:
+      new CreateOrUpdateProfileHomeFeedCollectionScheduleUseCase(
+        homeFeedSchedules,
+        profiles,
+        clock,
+      ),
+    getProfileHomeFeedCollectionSchedule:
+      new GetProfileHomeFeedCollectionScheduleUseCase(homeFeedSchedules),
+    listProfileHomeFeedCollectionSchedules:
+      new ListProfileHomeFeedCollectionSchedulesUseCase(homeFeedSchedules),
     dispatchNextDueCollectionSchedule: new DispatchNextDueCollectionScheduleUseCase(
       dispatchNextDueCollectionSchedules,
       clock,

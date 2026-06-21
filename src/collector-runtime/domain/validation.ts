@@ -22,6 +22,7 @@ import type {
   ProfileHomeFeedCollectionRunParameters,
   ProfileHomeFeedCollectionRunSummary,
 } from "./profile-home-feed-collection-run";
+import type { ProfileHomeFeedCollectionSchedule } from "./profile-home-feed-collection-schedule";
 import {
   AccountExerciseRunActionBudgetSchema,
   AccountExerciseRunFailureReasonSchema,
@@ -43,6 +44,7 @@ import {
   ProfileHomeFeedCollectionRunSchema,
   ProfileHomeFeedCollectionRunSummarySchema,
 } from "./profile-home-feed-collection-run.schemas";
+import { ProfileHomeFeedCollectionScheduleSchema } from "./profile-home-feed-collection-schedule.schemas";
 
 export interface ValidationIssue {
   readonly path: string;
@@ -284,6 +286,21 @@ export function validateProfileHomeFeedCollectionRunFailureReason(
 ): ValidationResult<ProfileHomeFeedCollectionRunFailureReason> {
   const result =
     ProfileHomeFeedCollectionRunFailureReasonSchema.safeParse(value);
+
+  if (!result.success) {
+    return invalid(formatZodIssues(result.error.issues));
+  }
+
+  return {
+    valid: true,
+    value: result.data,
+  };
+}
+
+export function validateProfileHomeFeedCollectionSchedule(
+  value: unknown,
+): ValidationResult<ProfileHomeFeedCollectionSchedule> {
+  const result = ProfileHomeFeedCollectionScheduleSchema.safeParse(value);
 
   if (!result.success) {
     return invalid(formatZodIssues(result.error.issues));

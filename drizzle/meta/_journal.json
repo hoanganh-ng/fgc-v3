@@ -176,6 +176,13 @@
       "when": 1781884676878,
       "tag": "0024_collector_profile_lease_purpose_home_feed",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1781884676879,
+      "tag": "0025_profile_home_feed_collection_schedules",
+      "breakpoints": true
     }
   ]
 }
