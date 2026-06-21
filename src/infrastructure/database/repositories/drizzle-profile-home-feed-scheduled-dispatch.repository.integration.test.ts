@@ -12,14 +12,29 @@ import {
 import { DrizzleDispatchNextDueProfileHomeFeedCollectionScheduleRepository } from "./drizzle-dispatch-next-due-profile-home-feed-collection-schedule.repository";
 import { DrizzleProfileHomeFeedCollectionRunRepository } from "./drizzle-profile-home-feed-collection-run.repository";
 import { DrizzleProfileHomeFeedCollectionScheduleRepository } from "./drizzle-profile-home-feed-collection-schedule.repository";
+import {
+  resolveIsolatedSprint068B1DatabaseUrl,
+  Sprint068B1IsolatedDatabaseGuardError,
+} from "./sprint-068b1-isolated-database.guard";
 
 const shouldRunDbTests = process.env.RUN_DB_TESTS === "true";
+
+let isolatedDatabaseUrl: string | undefined;
 
 if (!shouldRunDbTests) {
   describe.skip("Collector Runtime PostgreSQL profile home-feed scheduled dispatch repository integration", () => {
     it("runs only when RUN_DB_TESTS=true", () => {});
   });
 } else {
+  try {
+    isolatedDatabaseUrl = resolveIsolatedSprint068B1DatabaseUrl();
+  } catch (error) {
+    if (error instanceof Sprint068B1IsolatedDatabaseGuardError) {
+      throw error;
+    }
+    throw error;
+  }
+
   describe("Collector Runtime PostgreSQL profile home-feed scheduled dispatch repository integration", () => {
     let client: DatabaseClient | undefined;
     let dispatcher: DrizzleDispatchNextDueProfileHomeFeedCollectionScheduleRepository;
@@ -30,7 +45,13 @@ if (!shouldRunDbTests) {
     const trackedRunIds = new Set<string>();
 
     beforeAll(async () => {
+      if (isolatedDatabaseUrl === undefined) {
+        throw new Error(
+          "Sprint 068B1 dispatch test reached beforeAll without a resolved isolated database URL.",
+        );
+      }
       const databaseClient = createDatabaseClient({
+        databaseUrl: isolatedDatabaseUrl,
         poolConfig: {
           max: 8,
         },
