@@ -70,7 +70,7 @@ does not redesign those layers.
     conflict probe against the existing schedule resource and short-circuits
     on edit
 - New page `apps/web/src/pages/profile-home-feed-collection-schedules-page.tsx`:
-  - route `/profile-home-feed-collection-schedules`
+  - route `/profile-home-feed-schedules`
   - paginated list of schedules with profile display name, status,
     account stage, and authentication health when available, falling back to
     `profileId` when the profile is not in the loaded summary page
@@ -80,7 +80,7 @@ does not redesign those layers.
   - edit-detail loading and error branches with a Retry control
   - editor locks the `profileId` field while editing
 - Navigation entry `Home Feed Schedules` under
-  `/profile-home-feed-collection-schedules`, reusing the existing
+  `/profile-home-feed-schedules`, reusing the existing
   `CalendarClock` icon.
 
 ## Architecture
@@ -121,7 +121,7 @@ Web UI (apps/web/src/)
       that calls the conflict probe for create and short-circuits for edit)
     CREATE_PROFILE_HOME_FEED_SCHEDULE_CONFLICT_EXISTS_MESSAGE
   pages/profile-home-feed-collection-schedules-page.tsx (new)
-  app/router.tsx (adds the /profile-home-feed-collection-schedules route)
+  app/router.tsx (adds the /profile-home-feed-schedules route)
   app/navigation.ts (adds the "Home Feed Schedules" entry)
   features/collector-runtime/profile-home-feed-collection-schedule-view-model.test.ts
   features/collector-runtime/profile-home-feed-collection-schedule-page.test.tsx
@@ -213,7 +213,7 @@ reused unchanged.
 - `apps/web/src/lib/api/collector-runtime-client.ts` — add schedule schemas,
   request/response types, and client methods.
 - `apps/web/src/app/router.tsx` — add the
-  `/profile-home-feed-collection-schedules` route.
+  `/profile-home-feed-schedules` route.
 - `apps/web/src/app/navigation.ts` — add the `Home Feed Schedules` entry.
 - `docs/SPRINTS/active.md` — mark Sprint 068B2 accepted and Sprint 068C
   active.
@@ -281,7 +281,7 @@ pnpm stack:dev:start
 
 Manual UI checks (matching the verification list in the sprint brief):
 
-- `/profile-home-feed-collection-schedules` loads.
+- `/profile-home-feed-schedules` loads.
 - Empty schedule list renders the empty state.
 - Create schedule submits and persists; row appears in the list.
 - Edit schedule locks the `profileId` field.

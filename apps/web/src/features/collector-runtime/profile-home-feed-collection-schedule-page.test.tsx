@@ -76,6 +76,7 @@ import {
   ScheduleEditor,
   PROFILES_QUERY,
 } from "@/pages/profile-home-feed-collection-schedules-page";
+import { primaryNavigation } from "@/app/navigation";
 import { resolveProfileHomeFeedScheduleSubmit } from "@/features/collector-runtime/profile-home-feed-collection-schedule-view-model";
 import { collectorRuntimeClient } from "@/lib/api/collector-runtime-client";
 import type { ProfileHomeFeedCollectionSchedule } from "@/lib/api/collector-runtime-client";
@@ -186,6 +187,13 @@ function wrapWithProviders(node: ReactNode, initial: PageInitialData): JSX.Eleme
 }
 
 describe("ProfileHomeFeedCollectionSchedulesPage", () => {
+  it("registers the Home Feed Schedules navigation path", () => {
+    expect(
+      primaryNavigation.find((item) => item.label === "Home Feed Schedules")
+        ?.path,
+    ).toBe("/profile-home-feed-schedules");
+  });
+
   it("renders a paginated list of schedules with profile metadata", () => {
     const markup = renderToStaticMarkup(
       wrapWithProviders(<ProfileHomeFeedCollectionSchedulesPage />, {
@@ -343,7 +351,7 @@ describe("ScheduleEditor", () => {
     mocks.getProfileHomeFeedCollectionSchedule.mockResolvedValue({
       ok: true,
       data: {
-        profileHomeFeedCollectionSchedule: createSchedule({
+        schedule: createSchedule({
           profileId: "profile-1",
         }),
       },
@@ -384,7 +392,7 @@ describe("ScheduleEditor", () => {
         Object.defineProperty(result, "isPending", { value: false });
         Object.defineProperty(result, "isError", { value: false });
         result.data = {
-          profileHomeFeedCollectionSchedule: createSchedule({
+          schedule: createSchedule({
             profileId: "profile-1",
           }),
         };

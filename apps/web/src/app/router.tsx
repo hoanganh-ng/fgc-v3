@@ -63,7 +63,7 @@ export const router = createBrowserRouter([
         element: <CollectionSchedulesPage />,
       },
       {
-        path: "profile-home-feed-collection-schedules",
+        path: "profile-home-feed-schedules",
         element: <ProfileHomeFeedCollectionSchedulesPage />,
       },
       {

@@ -349,7 +349,14 @@ function ScheduleRow({
         {formatLimits(schedule)}
       </td>
       <td className="py-3 pr-3 text-xs text-muted-foreground">
-        {formatDispatchStatus(schedule.lastDispatchStatus)}
+        {schedule.lastDispatchStatus === undefined ? (
+          "—"
+        ) : (
+          <StatusBadge
+            label={schedule.lastDispatchStatus}
+            tone={dispatchStatusTone(schedule.lastDispatchStatus)}
+          />
+        )}
       </td>
       <td className="py-3 pr-3 text-xs text-muted-foreground">
         {formatLocalDateTimeSeconds(schedule.updatedAt)}
@@ -382,17 +389,6 @@ function formatLimits(schedule: ProfileHomeFeedCollectionSchedule): string {
     parts.push(`max posts: ${schedule.parameters.maxPosts}`);
   }
   return parts.length === 0 ? "—" : parts.join(" · ");
-}
-
-function formatDispatchStatus(
-  status: ProfileHomeFeedCollectionScheduleDispatchStatus | undefined,
-): string {
-  if (status === undefined) {
-    return "—";
-  }
-
-  const tone = dispatchStatusTone(status);
-  return status;
 }
 
 function dispatchStatusTone(
@@ -446,7 +442,7 @@ export function ScheduleEditor({
       if (detailQuery.data) {
         form.reset(
           profileHomeFeedScheduleToFormValues(
-            detailQuery.data.profileHomeFeedCollectionSchedule,
+            detailQuery.data.schedule,
           ),
         );
       }

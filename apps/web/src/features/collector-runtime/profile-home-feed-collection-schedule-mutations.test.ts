@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
       _request: UpsertProfileHomeFeedCollectionScheduleRequest,
     ) => {
       const response: ProfileHomeFeedCollectionScheduleResponse = {
-        profileHomeFeedCollectionSchedule: {
+        schedule: {
           profileId: "profile-1",
           enabled: true,
           intervalMinutes: 30,
@@ -78,9 +78,7 @@ describe("profile-home-feed-schedule mutation helpers", () => {
       intervalMinutes: 30,
       nextRunAt: "2026-06-15T12:30:00.000Z",
     });
-    expect(result.profileHomeFeedCollectionSchedule.profileId).toBe(
-      "profile-1",
-    );
+    expect(result.schedule.profileId).toBe("profile-1");
   });
 
   it("invalidateProfileHomeFeedCollectionScheduleQueries invalidates schedule query keys", async () => {

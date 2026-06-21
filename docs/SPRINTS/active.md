@@ -322,7 +322,7 @@ Sprint 068C — Profile Home-Feed Schedule Operator UI is **active**.
 It closes the operator feedback loop for the Sprint 068A
 `ProfileHomeFeedCollectionSchedule` model by exposing the existing safe
 operator HTTP routes (`PUT`/`GET list`/`GET detail`) through a
-dedicated Web UI page (`/profile-home-feed-collection-schedules`).
+dedicated Web UI page (`/profile-home-feed-schedules`).
 Operators can list, create, edit, enable, and disable existing
 profile-bound Facebook home-feed collection schedules. The page reads
 safe Profile Manager profile summaries for presentation and partial-

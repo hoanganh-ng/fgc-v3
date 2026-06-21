@@ -54,7 +54,7 @@ describe("profile-home-feed-schedule view-model", () => {
     );
     const responseWithExtra =
       ProfileHomeFeedCollectionScheduleResponseSchema.safeParse({
-        profileHomeFeedCollectionSchedule: {
+        schedule: {
           ...createSchedule(),
           unexpected: true,
         },
@@ -360,6 +360,14 @@ describe("profile-home-feed-schedule view-model", () => {
     };
     const parsed =
       ProfileHomeFeedCollectionScheduleListResponseSchema.safeParse(sample);
+    expect(parsed.success).toBe(true);
+  });
+
+  it("accepts the backend single schedule response wrapper", () => {
+    const parsed = ProfileHomeFeedCollectionScheduleResponseSchema.safeParse({
+      schedule: createSchedule(),
+    });
+
     expect(parsed.success).toBe(true);
   });
 });

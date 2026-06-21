@@ -49,7 +49,7 @@ export const primaryNavigation: readonly NavigationItem[] = [
   },
   {
     label: "Home Feed Schedules",
-    path: "/profile-home-feed-collection-schedules",
+    path: "/profile-home-feed-schedules",
     icon: CalendarClock,
   },
   {

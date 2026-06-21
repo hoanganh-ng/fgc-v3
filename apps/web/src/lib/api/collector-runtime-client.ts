@@ -614,7 +614,7 @@ export const ProfileHomeFeedCollectionScheduleListResponseSchema = z
 
 export const ProfileHomeFeedCollectionScheduleResponseSchema = z
   .object({
-    profileHomeFeedCollectionSchedule: ProfileHomeFeedCollectionScheduleSchema,
+    schedule: ProfileHomeFeedCollectionScheduleSchema,
   })
   .strict();
 
