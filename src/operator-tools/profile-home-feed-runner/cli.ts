@@ -9,6 +9,7 @@ import {
   runProfileHomeFeedRunNextCommand,
   type ProfileHomeFeedRunNextCommandResult,
 } from "./runner";
+import { reportUnexpectedCliFailure } from "./cli-error-reporter";
 
 async function main(): Promise<void> {
   let parsedArgs;
@@ -74,14 +75,6 @@ function applyProcessExitCode(
   }
 
   process.exitCode = interrupted ? 130 : 1;
-}
-
-export const UNEXPECTED_CLI_FAILURE_MESSAGE =
-  "Profile home-feed runner failed unexpectedly.";
-
-export function reportUnexpectedCliFailure(_error: unknown): void {
-  process.exitCode = 1;
-  console.error(UNEXPECTED_CLI_FAILURE_MESSAGE);
 }
 
 void main().catch(reportUnexpectedCliFailure);

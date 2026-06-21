@@ -81,6 +81,10 @@ const FAILURE_INTERRUPTED = {
   code: "HOME_FEED_EXECUTION_INTERRUPTED",
   message: "Home-feed execution was interrupted before completion.",
 } as const;
+const FAILURE_EXECUTION_FAILED = {
+  code: "HOME_FEED_EXECUTION_FAILED",
+  message: "Home-feed execution failed unexpectedly.",
+} as const;
 
 const LOGIN_REQUIRED_CODE = "LOGIN_REQUIRED";
 const CHECKPOINT_REQUIRED_CODE = "CHECKPOINT_REQUIRED";
@@ -103,6 +107,34 @@ interface MutableSummary {
   failedPublisherObservations: number;
   failedContentSubmissions: number;
   leaseReleased: boolean;
+}
+
+type LeaseFinalization =
+  | { readonly kind: "released" }
+  | { readonly kind: "release_failed" };
+
+type TerminalDecision =
+  | { readonly kind: "succeed" }
+  | { readonly kind: "fail"; readonly reason: ProfileHomeFeedCollectionRunFailureReason };
+
+/**
+ * The finalization result for an acquired lease. Either:
+ * - `released` with the operationally decided terminal, OR
+ * - `release_failed` (precedence: profile may remain BUSY).
+ */
+type FinalOutcomeReleased = {
+  readonly finalization: { readonly kind: "released" };
+  readonly terminal: TerminalDecision;
+};
+type FinalOutcomeReleaseFailed = {
+  readonly finalization: { readonly kind: "release_failed" };
+};
+type FinalOutcome = FinalOutcomeReleased | FinalOutcomeReleaseFailed;
+
+function isFinalOutcomeReleased(
+  outcome: FinalOutcome,
+): outcome is FinalOutcomeReleased {
+  return outcome.finalization.kind === "released";
 }
 
 export class ExecuteProfileHomeFeedCollectionRunUseCase {
@@ -157,29 +189,11 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     };
     const summary: MutableSummary = createEmptySummary();
     const readAbortSignal = (): AbortSignal | undefined => abortSignal;
+    let outcome: FinalOutcome;
+    let unexpectedError: unknown;
 
     try {
-      if (acquiredLease.profileId !== run.profileId) {
-        const release = await safeRelease(
-          this.leasePort,
-          acquiredLease.profileId,
-          acquiredLease.leaseId,
-          undefined,
-        );
-        summary.leaseReleased = release.ok;
-
-        if (!release.ok) {
-          return this.failRun(
-            run.id,
-            FAILURE_LEASE_RELEASE_FAILED,
-            summary,
-          );
-        }
-
-        return this.failRun(run.id, FAILURE_PROFILE_MISMATCH, summary);
-      }
-
-      return await this.executeAfterCheckout(
+      outcome = await this.decideOutcome(
         run,
         acquiredLease,
         bounds,
@@ -187,25 +201,103 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
         summary,
       );
     } catch (error) {
-      const interrupted = isAbortInterruption(abortSignal, error);
-      const release = await safeRelease(
-        this.leasePort,
-        acquiredLease.profileId,
-        acquiredLease.leaseId,
+      unexpectedError = error;
+      const finalization = await this.finalizeAcquiredLease(
+        acquiredLease,
         undefined,
       );
-      summary.leaseReleased = release.ok;
-
-      if (!release.ok) {
-        return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
-      }
-
-      if (interrupted) {
-        return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
-      }
-
-      throw error;
+      summary.leaseReleased = finalization.kind === "released";
+      outcome =
+        finalization.kind === "release_failed"
+          ? { finalization }
+          : {
+              finalization,
+              terminal: {
+                kind: "fail",
+                reason: FAILURE_EXECUTION_FAILED,
+              },
+            };
     }
+
+    return this.persistOutcome(run.id, outcome, summary, unexpectedError);
+  }
+
+  private async persistOutcome(
+    runId: ProfileHomeFeedCollectionRunId,
+    outcome: FinalOutcome,
+    summary: MutableSummary,
+    unexpectedError: unknown,
+  ): Promise<ProfileHomeFeedCollectionRun> {
+    if (!isFinalOutcomeReleased(outcome)) {
+      try {
+        // Release failure always takes precedence because the profile may
+        // remain BUSY. We persist HOME_FEED_LEASE_RELEASE_FAILED exactly once
+        // on the FAILED terminal; the operationally-decided reason is
+        // discarded and not persisted a second time.
+        summary.leaseReleased = false;
+        return await this.failRun(runId, FAILURE_LEASE_RELEASE_FAILED, summary);
+      } catch (terminalError) {
+        if (unexpectedError !== undefined) {
+          throw unexpectedError;
+        }
+        throw terminalError;
+      }
+    }
+
+    summary.leaseReleased = true;
+    try {
+      return await this.persistTerminal(runId, outcome.terminal, summary);
+    } catch (terminalError) {
+      if (unexpectedError !== undefined) {
+        throw unexpectedError;
+      }
+      throw terminalError;
+    }
+  }
+
+  private async persistTerminal(
+    runId: ProfileHomeFeedCollectionRunId,
+    terminal: TerminalDecision,
+    summary: MutableSummary,
+  ): Promise<ProfileHomeFeedCollectionRun> {
+    if (terminal.kind === "succeed") {
+      return await this.markSucceeded.execute({
+        runId,
+        summary: toImmutableSummary(summary),
+      });
+    }
+    return await this.failRun(runId, terminal.reason, summary);
+  }
+
+  private async decideOutcome(
+    run: ProfileHomeFeedCollectionRun,
+    acquiredLease: AcquiredLease,
+    bounds: EffectiveBounds,
+    readAbortSignal: () => AbortSignal | undefined,
+    summary: MutableSummary,
+  ): Promise<FinalOutcome> {
+    if (acquiredLease.profileId !== run.profileId) {
+      const finalization = await this.finalizeAcquiredLease(
+        acquiredLease,
+        undefined,
+      );
+      summary.leaseReleased = finalization.kind === "released";
+      if (finalization.kind === "release_failed") {
+        return { finalization };
+      }
+      return {
+        finalization,
+        terminal: { kind: "fail", reason: FAILURE_PROFILE_MISMATCH },
+      };
+    }
+
+    return this.executeAfterCheckout(
+      run,
+      acquiredLease,
+      bounds,
+      readAbortSignal,
+      summary,
+    );
   }
 
   private async executeAfterCheckout(
@@ -214,7 +306,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     bounds: EffectiveBounds,
     readAbortSignal: () => AbortSignal | undefined,
     summary: MutableSummary,
-  ): Promise<ProfileHomeFeedCollectionRun> {
+  ): Promise<FinalOutcome> {
     const captureSignal = readAbortSignal();
     const captureResult = await safeCapture(this.capturePort, {
       profileId: acquiredLease.profileId,
@@ -229,39 +321,44 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       const authObs = interrupted
         ? undefined
         : toAuthenticationObservation(captureResult.errorCode);
-      const release = await safeRelease(
-        this.leasePort,
-        acquiredLease.profileId,
-        acquiredLease.leaseId,
+      const finalization = await this.finalizeAcquiredLease(
+        acquiredLease,
         authObs,
       );
-      summary.leaseReleased = release.ok;
+      summary.leaseReleased = finalization.kind === "released";
 
-      if (!release.ok) {
-        return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+      if (finalization.kind === "release_failed") {
+        return { finalization };
       }
 
       if (interrupted) {
-        return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
+        return {
+          finalization,
+          terminal: { kind: "fail", reason: FAILURE_INTERRUPTED },
+        };
       }
 
-      return this.failRun(run.id, FAILURE_CAPTURE_FAILED, summary);
+      return {
+        finalization,
+        terminal: { kind: "fail", reason: FAILURE_CAPTURE_FAILED },
+      };
     }
 
     summary.capturedPayloads = captureResult.capturedPayloads.length;
 
     if (readAbortSignal()?.aborted === true) {
-      const release = await safeRelease(
-        this.leasePort,
-        acquiredLease.profileId,
-        acquiredLease.leaseId,
+      const finalization = await this.finalizeAcquiredLease(
+        acquiredLease,
         undefined,
       );
-      summary.leaseReleased = release.ok;
-      if (!release.ok) {
-        return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+      summary.leaseReleased = finalization.kind === "released";
+      if (finalization.kind === "release_failed") {
+        return { finalization };
       }
-      return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
+      return {
+        finalization,
+        terminal: { kind: "fail", reason: FAILURE_INTERRUPTED },
+      };
     }
 
     const candidates = collectCandidates(
@@ -276,17 +373,18 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
 
     for (const candidate of candidates) {
       if (readAbortSignal()?.aborted === true) {
-        const release = await safeRelease(
-          this.leasePort,
-          acquiredLease.profileId,
-          acquiredLease.leaseId,
+        const finalization = await this.finalizeAcquiredLease(
+          acquiredLease,
           undefined,
         );
-        summary.leaseReleased = release.ok;
-        if (!release.ok) {
-          return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+        summary.leaseReleased = finalization.kind === "released";
+        if (finalization.kind === "release_failed") {
+          return { finalization };
         }
-        return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
+        return {
+          finalization,
+          terminal: { kind: "fail", reason: FAILURE_INTERRUPTED },
+        };
       }
 
       const publisherKey = buildPublisherKey(candidate);
@@ -295,17 +393,18 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
 
       if (cached === undefined) {
         if (readAbortSignal()?.aborted === true) {
-          const release = await safeRelease(
-            this.leasePort,
-            acquiredLease.profileId,
-            acquiredLease.leaseId,
+          const finalization = await this.finalizeAcquiredLease(
+            acquiredLease,
             undefined,
           );
-          summary.leaseReleased = release.ok;
-          if (!release.ok) {
-            return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+          summary.leaseReleased = finalization.kind === "released";
+          if (finalization.kind === "release_failed") {
+            return { finalization };
           }
-          return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
+          return {
+            finalization,
+            terminal: { kind: "fail", reason: FAILURE_INTERRUPTED },
+          };
         }
 
         const observation = await safeObservePublisher(
@@ -335,17 +434,18 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       }
 
       if (readAbortSignal()?.aborted === true) {
-        const release = await safeRelease(
-          this.leasePort,
-          acquiredLease.profileId,
-          acquiredLease.leaseId,
+        const finalization = await this.finalizeAcquiredLease(
+          acquiredLease,
           undefined,
         );
-        summary.leaseReleased = release.ok;
-        if (!release.ok) {
-          return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+        summary.leaseReleased = finalization.kind === "released";
+        if (finalization.kind === "release_failed") {
+          return { finalization };
         }
-        return this.failRun(run.id, FAILURE_INTERRUPTED, summary);
+        return {
+          finalization,
+          terminal: { kind: "fail", reason: FAILURE_INTERRUPTED },
+        };
       }
 
       const submission = await safeSubmitContent(
@@ -362,29 +462,47 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       summary.contentItemsSubmitted += 1;
     }
 
-    const release = await safeRelease(
-      this.leasePort,
-      acquiredLease.profileId,
-      acquiredLease.leaseId,
+    const finalization = await this.finalizeAcquiredLease(
+      acquiredLease,
       undefined,
     );
-    summary.leaseReleased = release.ok;
+    summary.leaseReleased = finalization.kind === "released";
 
-    if (!release.ok) {
-      return this.failRun(run.id, FAILURE_LEASE_RELEASE_FAILED, summary);
+    if (finalization.kind === "release_failed") {
+      return { finalization };
     }
 
     if (
       summary.failedPublisherObservations === 0 &&
       summary.failedContentSubmissions === 0
     ) {
-      return this.markSucceeded.execute({
-        runId: run.id,
-        summary: toImmutableSummary(summary),
-      });
+      return { finalization, terminal: { kind: "succeed" } };
     }
 
-    return this.failRun(run.id, FAILURE_PARTIAL, summary);
+    return {
+      finalization,
+      terminal: { kind: "fail", reason: FAILURE_PARTIAL },
+    };
+  }
+
+  /**
+   * Releases an acquired lease exactly once. Subsequent calls would silently
+   * skip the underlying port call, so callers must route every acquired-lease
+   * terminal branch through this helper.
+   */
+  private async finalizeAcquiredLease(
+    acquiredLease: AcquiredLease,
+    authenticationObservation: ProfileAuthenticationObservation | undefined,
+  ): Promise<LeaseFinalization> {
+    const release = await safeRelease(
+      this.leasePort,
+      acquiredLease.profileId,
+      acquiredLease.leaseId,
+      authenticationObservation,
+    );
+    return release.ok
+      ? { kind: "released" }
+      : { kind: "release_failed" };
   }
 
   private async failRun(
@@ -523,17 +641,6 @@ async function safeCapture(
   } catch {
     return { ok: false, errorCode: "HOME_FEED_CAPTURE_PORT_ERROR" };
   }
-}
-
-function isAbortInterruption(
-  abortSignal: AbortSignal | undefined,
-  error: unknown,
-): boolean {
-  if (abortSignal?.aborted === true) {
-    return true;
-  }
-
-  return error instanceof Error && error.name === "AbortError";
 }
 
 function toAuthenticationObservation(

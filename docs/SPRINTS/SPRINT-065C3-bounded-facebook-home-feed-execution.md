@@ -67,12 +67,18 @@ performed** by this sprint.
      effective per-call bounds (including the per-call `abortSignal`
      which is honored in addition to the constructor-level signal).
      `maxDurationMs` is a real capture deadline that bounds the
-     pending network-response drainage. On failure, derive the
-     `authenticationObservation` (`LOGIN_REQUIRED` /
-     `CHECKPOINT_REQUIRED`) from the capture errorCode, release the
-     lease, record a partial summary, and terminal
-     `HOME_FEED_CAPTURE_FAILED`. A release failure on this path
-     takes precedence and is classified as
+     pending network-response drainage. `settlePendingCaptures` waits
+     for all pending captures to settle OR for the remaining deadline
+     to elapse OR for the abort signal to fire — whichever comes
+     first (single `Promise.race` of `Promise.allSettled(pending)`,
+     the deadline timer, and the abort listener). Timers and abort
+     listeners are cleaned up after the race; unresolved network
+     reads detach in the background without holding listeners. On
+     failure, derive the `authenticationObservation`
+     (`LOGIN_REQUIRED` / `CHECKPOINT_REQUIRED`) from the capture
+     errorCode, release the lease, record a partial summary, and
+     terminal `HOME_FEED_CAPTURE_FAILED`. A release failure on this
+     path takes precedence and is classified as
      `HOME_FEED_LEASE_RELEASE_FAILED`.
   5. Run each captured payload through the existing Sprint 065A
      `extractFacebookHomeFeedGraphQLPayload`. Deduplicate across the
@@ -94,25 +100,42 @@ performed** by this sprint.
      does not return a `contentItemId` is counted in
      `failedContentSubmissions`; `contentItemsSubmitted` only
      increments after a validated non-empty ID.
-  8. Always release the lease through `ProfileLeasePort` exactly
-     once on every acquired-lease path (mismatch, capture failure,
-     mid-capture interruption, mid-delivery interruption, or terminal
-     success). A failed release marks the run FAILED with
+  8. Lease finalization is centralized in a single
+     `finalizeAcquiredLease` seam. Every acquired-lease terminal
+     branch (mismatch, capture failure, post-capture interruption,
+     per-candidate interruption, partial failure, success, and
+     unexpected operational error) routes through this seam exactly
+     once. The use case never calls `ProfileLeasePort.releaseProfileLease`
+     directly; the seam maps to `released` or `release_failed`, and
+     `persistOutcome` runs the terminal transition at most once per
+     run. A failed release marks the run FAILED with
      `HOME_FEED_LEASE_RELEASE_FAILED` and takes precedence over
      every other terminal reason because the profile may remain
-     BUSY.
+     BUSY. A terminal CAS conflict that fires *after* the seam
+     already finalized the lease propagates the CAS error without
+     attempting a second release.
   9. The use case checks `abortSignal.aborted` between capture,
      between publisher observations, and between content
      submissions. A mid-capture or mid-delivery abort is classified
      as `HOME_FEED_EXECUTION_INTERRUPTED` after the lease is
      released; a release failure on that path is classified as
-     `HOME_FEED_LEASE_RELEASE_FAILED`. An unexpected post-checkout
-     exception cannot bypass lease release.
-  10. Success requires successful checkout, capture, all publisher
+     `HOME_FEED_LEASE_RELEASE_FAILED`.
+  10. An unexpected non-abort operational error after successful
+      checkout is mapped to `HOME_FEED_EXECUTION_FAILED` with the
+      fixed sanitized message `Home-feed execution failed
+      unexpectedly.`. The raw exception is never persisted, logged,
+      or included in the failure reason. The lease is released
+      through the central seam exactly once; a release failure on
+      that path takes precedence and is classified as
+      `HOME_FEED_LEASE_RELEASE_FAILED`. A terminal CAS conflict
+      that fires after the seam already finalized the lease
+      propagates the CAS error to the caller without attempting a
+      second release.
+  11. Success requires successful checkout, capture, all publisher
       observations, all content submissions with validated IDs, and
       lease release. Zero captured or accepted candidates is a valid
       success when capture and release succeeded.
-  11. Failed runs retain a safe partial summary where available. A
+  12. Failed runs retain a safe partial summary where available. A
       partial failure terminal uses
       `HOME_FEED_EXECUTION_PARTIAL_FAILURE`.
 

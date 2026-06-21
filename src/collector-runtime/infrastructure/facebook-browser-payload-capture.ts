@@ -999,49 +999,47 @@ async function settlePendingCaptures(
     return;
   }
 
-  let resolveSettle: (() => void) | undefined;
-  const settled = new Promise<void>((resolve) => {
-    resolveSettle = resolve;
+  // Wait for ALL pending captures to settle, OR for the deadline to elapse,
+  // OR for the abort signal to fire — whichever comes first. We deliberately
+  // resolve on the first capture so that a slow response body does not block
+  // the bounded drain window. Unresolved network reads are left to detach in
+  // the background; the `Promise.allSettled` body retains no listeners.
+  const allSettled = Promise.allSettled(pendingCaptures);
+
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  const deadlinePromise = new Promise<void>((resolve) => {
+    deadlineTimer = setTimeout(resolve, remainingMs);
   });
 
-  const tracked = pendingCaptures.map((promise) =>
-    promise.finally(() => {
-      if (resolveSettle !== undefined) {
-        resolveSettle();
-      }
-    }),
-  );
-
-  const timer = setTimeout(() => {
-    if (resolveSettle !== undefined) {
-      resolveSettle();
+  let abortListener: (() => void) | undefined;
+  const abortPromise = new Promise<void>((resolve) => {
+    if (abortSignal === undefined) {
+      return;
     }
-  }, remainingMs);
-
-  const onAbort = (): void => {
-    if (resolveSettle !== undefined) {
-      resolveSettle();
+    if (abortSignal.aborted) {
+      resolve();
+      return;
     }
-  };
-
-  if (abortSignal !== undefined) {
-    abortSignal.addEventListener("abort", onAbort, { once: true });
-  }
+    abortListener = (): void => {
+      resolve();
+    };
+    abortSignal.addEventListener("abort", abortListener, { once: true });
+  });
 
   try {
-    await settled;
+    await Promise.race([allSettled, deadlinePromise, abortPromise]);
   } finally {
-    clearTimeout(timer);
-    if (abortSignal !== undefined) {
-      abortSignal.removeEventListener("abort", onAbort);
+    if (deadlineTimer !== undefined) {
+      clearTimeout(deadlineTimer);
+    }
+    if (abortSignal !== undefined && abortListener !== undefined) {
+      abortSignal.removeEventListener("abort", abortListener);
     }
   }
 
-  // Detach tracking handlers so unresolved network reads do not retain
-  // references after the bounded drain window has elapsed.
-  for (const trackedPromise of tracked) {
-    void trackedPromise.catch(() => undefined);
-  }
+  // Suppress unhandled rejection on any pending capture that did not resolve
+  // before the deadline / abort fired.
+  void allSettled.catch(() => undefined);
 }
 
 function createAbortCloseListener(

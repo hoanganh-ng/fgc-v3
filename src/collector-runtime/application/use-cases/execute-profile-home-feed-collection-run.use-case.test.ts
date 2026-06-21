@@ -162,21 +162,65 @@ describe("ExecuteProfileHomeFeedCollectionRunUseCase", () => {
     expect(ctx.capture.calls).toEqual([]);
   });
 
-  it("releases the acquired lease when an unexpected post-checkout exception is thrown", async () => {
+  it("uses HOME_FEED_EXECUTION_FAILED when an unexpected operational error occurs after successful checkout", async () => {
     const ctx = await createContext({
       capturedPayloads: [{ payload: {}, capturedAt: new Date(createdAt) }],
       extractions: [
         {
           valid: true,
-          candidates: [
-            createCandidate({ externalPostId: "post-1" }),
-          ],
+          candidates: [createCandidate({ externalPostId: "post-1" })],
           warnings: [],
         },
       ],
     });
-    ctx.publisher.handler = () => {
-      throw new Error("publisher boom");
+    let clockCalls = 0;
+    ctx.clock.handler = () => {
+      clockCalls += 1;
+      if (clockCalls === 1) {
+        throw new Error(
+          "cookie=c_user; authorization=Bearer xyz; proxy=user:pass",
+        );
+      }
+      return new Date(observedAtIso);
+    };
+
+    const result = await ctx.useCase.execute({ runId: ctx.runId });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.failureReason).toEqual({
+      code: "HOME_FEED_EXECUTION_FAILED",
+      message: "Home-feed execution failed unexpectedly.",
+    });
+    expect(result.summary).toMatchObject({
+      capturedPayloads: 1,
+      extractorCandidates: 1,
+      leaseReleased: true,
+    });
+    expect(ctx.lease.releases).toHaveLength(1);
+    const serialized = JSON.stringify(result);
+    for (const needle of SENSITIVE_SUBSTRINGS) {
+      expect(serialized.toLowerCase()).not.toContain(needle.toLowerCase());
+    }
+  });
+
+  it("classifies unexpected-error + release-failure as HOME_FEED_LEASE_RELEASE_FAILED", async () => {
+    const ctx = await createContext({
+      capturedPayloads: [{ payload: {}, capturedAt: new Date(createdAt) }],
+      extractions: [
+        {
+          valid: true,
+          candidates: [createCandidate({ externalPostId: "post-1" })],
+          warnings: [],
+        },
+      ],
+    });
+    let clockCalls = 0;
+    ctx.clock.handler = () => {
+      clockCalls += 1;
+      if (clockCalls === 1) {
+        throw new Error("boom");
+      }
+      return new Date(observedAtIso);
     };
     ctx.lease.releaseResult = {
       ok: false,
@@ -191,11 +235,61 @@ describe("ExecuteProfileHomeFeedCollectionRunUseCase", () => {
     expect(result.failureReason?.code).toBe(
       "HOME_FEED_LEASE_RELEASE_FAILED",
     );
-    expect(result.summary).toMatchObject({
-      capturedPayloads: 1,
-      extractorCandidates: 1,
-      leaseReleased: false,
+    expect(result.summary).toMatchObject({ leaseReleased: false });
+    expect(ctx.lease.releases).toHaveLength(1);
+  });
+
+  it("propagates a terminal CAS conflict from markSucceeded and does not release the lease a second time", async () => {
+    const ctx = await createContext({
+      capturedPayloads: [{ payload: {}, capturedAt: new Date(createdAt) }],
+      extractions: [
+        {
+          valid: true,
+          candidates: [createCandidate({ externalPostId: "post-1" })],
+          warnings: [],
+        },
+      ],
     });
+    const repository = ctx.runs as ConflictingTerminalRepository;
+    repository.failNextTransition = true;
+
+    await expect(ctx.useCase.execute({ runId: ctx.runId })).rejects.toThrow(
+      InvalidProfileHomeFeedCollectionRunStatusTransitionError,
+    );
+    expect(ctx.lease.releases).toHaveLength(1);
+  });
+
+  it("propagates a terminal CAS conflict from markFailed (mismatch path) and does not release again", async () => {
+    const ctx = await createContext();
+    ctx.checkout.next = {
+      ok: true,
+      profileId: "different-profile",
+      accountStage: "WARMING",
+      leaseId: "lease-1",
+    };
+    const repository = ctx.runs as ConflictingTerminalRepository;
+    repository.failNextTransition = true;
+
+    await expect(ctx.useCase.execute({ runId: ctx.runId })).rejects.toThrow(
+      InvalidProfileHomeFeedCollectionRunStatusTransitionError,
+    );
+    expect(ctx.lease.releases).toHaveLength(1);
+  });
+
+  it("propagates a terminal CAS conflict from markFailed (capture path) and does not release again", async () => {
+    const ctx = await createContext();
+    ctx.capture.next = {
+      ok: false,
+      errorCode: "LOGIN_REQUIRED",
+      errorMessage: "session expired",
+      warnings: [],
+    };
+    const repository = ctx.runs as ConflictingTerminalRepository;
+    repository.failNextTransition = true;
+
+    await expect(ctx.useCase.execute({ runId: ctx.runId })).rejects.toThrow(
+      InvalidProfileHomeFeedCollectionRunStatusTransitionError,
+    );
     expect(ctx.lease.releases).toHaveLength(1);
   });
 
@@ -746,9 +840,14 @@ async function createContext(
 }
 
 class FixedClock implements Clock {
-  public constructor(private nowResult: string) {}
+  public handler: (() => Date) | undefined;
+
+  public constructor(private readonly nowResult: string) {}
 
   public now(): Date {
+    if (this.handler !== undefined) {
+      return this.handler();
+    }
     return new Date(this.nowResult);
   }
 }

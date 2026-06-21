@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   UNEXPECTED_CLI_FAILURE_MESSAGE,
   reportUnexpectedCliFailure,
-} from "./cli";
+} from "./cli-error-reporter";
 
 interface CapturedError {
   readonly messages: string[];
@@ -64,5 +64,32 @@ describe("profile home-feed run-next CLI unexpected error handler", () => {
     const serialized = captured.messages.join("\n");
     expect(serialized).not.toContain("proxy");
     expect(serialized).not.toContain("secret");
+  });
+});
+
+describe("profile home-feed run-next CLI unexpected error handler module", () => {
+  it("does not install signal handlers on import", async () => {
+    const originalSigintListeners = process.listeners("SIGINT").slice();
+    const originalSigtermListeners = process.listeners("SIGTERM").slice();
+    const originalExitCodeBefore = process.exitCode;
+
+    await import("./cli-error-reporter");
+
+    expect(process.listeners("SIGINT")).toEqual(originalSigintListeners);
+    expect(process.listeners("SIGTERM")).toEqual(originalSigtermListeners);
+    expect(process.exitCode).toBe(originalExitCodeBefore);
+  });
+
+  it("exposes only the safe message and reporter", async () => {
+    const module = await import("./cli-error-reporter");
+    const exportedNames = Object.keys(module).sort();
+
+    expect(exportedNames).toEqual([
+      "UNEXPECTED_CLI_FAILURE_MESSAGE",
+      "reportUnexpectedCliFailure",
+    ]);
+    expect(module.UNEXPECTED_CLI_FAILURE_MESSAGE).toBe(
+      "Profile home-feed runner failed unexpectedly.",
+    );
   });
 });

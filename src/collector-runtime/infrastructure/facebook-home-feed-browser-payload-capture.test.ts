@@ -157,6 +157,48 @@ describe("FacebookHomeFeedBrowserPayloadCaptureAdapter", () => {
     expect(browserProvider.session.closeCalls).toBe(1);
   });
 
+  it("preserves the first response and includes a second response that resolves before the deadline", async () => {
+    const browserProvider = new FakeBrowserProvider({
+      pageLoaded: true,
+      blockingState: "NONE_DETECTED",
+    });
+    const secondResponseBody = new Promise<string>((resolve) => {
+      setTimeout(
+        () => resolve('{"data":{"post":"post-2"}}'),
+        50,
+      );
+    });
+    browserProvider.page.scheduleResponses([
+      '{"data":{"post":"post-1"}}',
+      secondResponseBody,
+    ]);
+
+    const maxDurationMs = 1_000;
+    const capture = new FacebookHomeFeedBrowserPayloadCaptureAdapter({
+      runtimeProfileConfigurationPort: new FakeRuntimeProfileConfigurationPort(),
+      browserProvider,
+    });
+
+    const result = await capture.captureHomeFeedPayloads({
+      ...captureInput(),
+      maxScrolls: 0,
+      maxDurationMs,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const postIds = result.capturedPayloads
+        .map((payload) => {
+          const data = (payload.payload as { data?: { post?: string } })?.data;
+          return data?.post;
+        })
+        .filter((id): id is string => typeof id === "string")
+        .sort();
+      expect(postIds).toEqual(["post-1", "post-2"]);
+    }
+    expect(browserProvider.session.closeCalls).toBe(1);
+  });
+
   it("honors a per-call abortSignal in addition to the constructor signal", async () => {
     const browserProvider = new FakeBrowserProvider({
       pageLoaded: true,
@@ -251,7 +293,7 @@ class FakeBrowserPage implements BrowserProviderPage {
   public blockAfterScrollCount: number | undefined;
   public blockingStateAfterScroll: FacebookPageState["blockingState"] =
     "NONE_DETECTED";
-  private pendingResponseBody: Promise<string> | undefined;
+  private pendingResponseBodies: Array<Promise<string> | string> = [];
   private responseListener:
     | ((response: BrowserProviderResponse) => void)
     | undefined;
@@ -268,13 +310,18 @@ class FakeBrowserPage implements BrowserProviderPage {
   }): Promise<{ readonly status: number }> {
     this.currentUrl = options.url;
     this.gotoUrls.push(options.url);
-    if (this.responseListener !== undefined && this.pendingResponseBody !== undefined) {
-      this.responsesEmitted += 1;
-      this.responseListener({
-        url: () => "https://www.facebook.com/api/graphql/",
-        headers: () => ({ "content-type": "application/json" }),
-        text: () => this.pendingResponseBody as Promise<string>,
-      });
+    if (
+      this.responseListener !== undefined &&
+      this.pendingResponseBodies.length > 0
+    ) {
+      for (const body of this.pendingResponseBodies) {
+        this.responsesEmitted += 1;
+        this.responseListener({
+          url: () => "https://www.facebook.com/api/graphql/",
+          headers: () => ({ "content-type": "application/json" }),
+          text: () => Promise.resolve(body) as Promise<string>,
+        });
+      }
     }
     return { status: 200 };
   }
@@ -308,7 +355,13 @@ class FakeBrowserPage implements BrowserProviderPage {
   }
 
   public scheduleResponseBody(body: Promise<string>): void {
-    this.pendingResponseBody = body;
+    this.pendingResponseBodies = [body];
+  }
+
+  public scheduleResponses(
+    bodies: ReadonlyArray<Promise<string> | string>,
+  ): void {
+    this.pendingResponseBodies = [...bodies];
   }
 
   public oncePageError(_listener: (error: Error) => void): void {}
