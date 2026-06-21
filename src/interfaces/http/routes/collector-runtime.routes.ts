@@ -66,6 +66,8 @@ import type {
   ProfileHomeFeedCollectionRunTriggerType,
   ProfileHomeFeedCollectionSchedule,
   ProfileHomeFeedCollectionScheduleIsoDateTime,
+  ProfileHomeFeedCollectionScheduleDispatchStatus,
+  ProfileHomeFeedCollectionScheduleFailureReason,
   ProfileSourceAccessCheckRun,
   ProfileSourceAccessCheckRunFailureReason,
   ProfileSourceAccessCheckRunId,
@@ -327,6 +329,10 @@ export interface ProfileHomeFeedCollectionScheduleDto {
   readonly intervalMinutes: number;
   readonly nextRunAt: ProfileHomeFeedCollectionScheduleIsoDateTime;
   readonly parameters: ProfileHomeFeedCollectionRunParameters;
+  readonly lastAttemptedAt?: ProfileHomeFeedCollectionScheduleIsoDateTime;
+  readonly lastDispatchStatus?: ProfileHomeFeedCollectionScheduleDispatchStatus;
+  readonly lastFailureReason?: ProfileHomeFeedCollectionScheduleFailureReason;
+  readonly consecutiveFailures: number;
   readonly createdAt: ProfileHomeFeedCollectionScheduleIsoDateTime;
   readonly updatedAt: ProfileHomeFeedCollectionScheduleIsoDateTime;
 }
@@ -1106,6 +1112,16 @@ export function toProfileHomeFeedCollectionScheduleDto(
         ? { maxPosts: schedule.parameters.maxPosts }
         : {}),
     },
+    ...(schedule.lastAttemptedAt !== undefined
+      ? { lastAttemptedAt: schedule.lastAttemptedAt }
+      : {}),
+    ...(schedule.lastDispatchStatus !== undefined
+      ? { lastDispatchStatus: schedule.lastDispatchStatus }
+      : {}),
+    ...(schedule.lastFailureReason !== undefined
+      ? { lastFailureReason: { ...schedule.lastFailureReason } }
+      : {}),
+    consecutiveFailures: schedule.consecutiveFailures,
     createdAt: schedule.createdAt,
     updatedAt: schedule.updatedAt,
   };

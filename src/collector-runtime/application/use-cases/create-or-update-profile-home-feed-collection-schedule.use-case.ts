@@ -67,6 +67,16 @@ export class CreateOrUpdateProfileHomeFeedCollectionScheduleUseCase {
       intervalMinutes,
       nextRunAt,
       parameters,
+      ...(existing?.lastAttemptedAt !== undefined
+        ? { lastAttemptedAt: existing.lastAttemptedAt }
+        : {}),
+      ...(existing?.lastDispatchStatus !== undefined
+        ? { lastDispatchStatus: existing.lastDispatchStatus }
+        : {}),
+      ...(existing?.lastFailureReason !== undefined
+        ? { lastFailureReason: existing.lastFailureReason }
+        : {}),
+      consecutiveFailures: existing?.consecutiveFailures ?? 0,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     });

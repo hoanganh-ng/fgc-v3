@@ -36,6 +36,10 @@ export function toDomainProfileHomeFeedCollectionSchedule(
     intervalMinutes: record.intervalMinutes,
     nextRunAt: normalizeIsoDateTime(record.nextRunAt),
     parameters: record.parameters,
+    ...optionalIsoDateTime("lastAttemptedAt", record.lastAttemptedAt),
+    ...optional("lastDispatchStatus", record.lastDispatchStatus),
+    ...optional("lastFailureReason", record.lastFailureReason),
+    consecutiveFailures: record.consecutiveFailures,
     createdAt: normalizeIsoDateTime(record.createdAt),
     updatedAt: normalizeIsoDateTime(record.updatedAt),
   };
@@ -71,9 +75,35 @@ export function toProfileHomeFeedCollectionScheduleRecord(
     intervalMinutes: validSchedule.intervalMinutes,
     nextRunAt: validSchedule.nextRunAt,
     parameters: validSchedule.parameters,
+    lastAttemptedAt: validSchedule.lastAttemptedAt ?? null,
+    lastDispatchStatus: validSchedule.lastDispatchStatus ?? null,
+    lastFailureReason: validSchedule.lastFailureReason ?? null,
+    consecutiveFailures: validSchedule.consecutiveFailures,
     createdAt: validSchedule.createdAt,
     updatedAt: validSchedule.updatedAt,
   };
+}
+
+function optional<T>(
+  key: string,
+  value: T | null,
+): Record<string, T> | Record<string, never> {
+  if (value === null) {
+    return {};
+  }
+
+  return { [key]: value };
+}
+
+function optionalIsoDateTime(
+  key: string,
+  value: string | Date | null,
+): Record<string, ProfileHomeFeedCollectionScheduleIsoDateTime> | Record<string, never> {
+  if (value === null) {
+    return {};
+  }
+
+  return { [key]: normalizeIsoDateTime(value) };
 }
 
 function normalizeIsoDateTime(

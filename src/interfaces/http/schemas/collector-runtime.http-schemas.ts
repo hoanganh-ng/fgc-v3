@@ -1228,6 +1228,16 @@ const profileHomeFeedCollectionRunFailureReasonJsonSchema = {
   },
 } as const;
 
+const profileHomeFeedCollectionScheduleFailureReasonJsonSchema = {
+  type: "object",
+  required: ["code", "message"],
+  additionalProperties: false,
+  properties: {
+    code: nonEmptyStringJsonSchema,
+    message: nonEmptyStringJsonSchema,
+  },
+} as const;
+
 const profileHomeFeedCollectionRunJsonSchema = {
   type: "object",
   required: [
@@ -1439,6 +1449,7 @@ const profileHomeFeedCollectionScheduleJsonSchema = {
     "intervalMinutes",
     "nextRunAt",
     "parameters",
+    "consecutiveFailures",
     "createdAt",
     "updatedAt",
   ],
@@ -1455,6 +1466,21 @@ const profileHomeFeedCollectionScheduleJsonSchema = {
     },
     nextRunAt: isoDateTimeJsonSchema,
     parameters: profileHomeFeedCollectionScheduleParametersJsonSchema,
+    lastAttemptedAt: isoDateTimeJsonSchema,
+    lastDispatchStatus: {
+      type: "string",
+      enum: [
+        "DISPATCHED",
+        "SKIPPED_ACTIVE_RUN",
+        "PROFILE_NOT_FOUND",
+        "PROFILE_LOOKUP_FAILED",
+      ],
+    },
+    lastFailureReason: profileHomeFeedCollectionScheduleFailureReasonJsonSchema,
+    consecutiveFailures: {
+      type: "integer",
+      minimum: 0,
+    },
     createdAt: isoDateTimeJsonSchema,
     updatedAt: isoDateTimeJsonSchema,
   },

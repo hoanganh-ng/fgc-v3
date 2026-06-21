@@ -28,6 +28,7 @@ import {
   RequestProfileHomeFeedCollectionRunUseCase,
   CancelProfileHomeFeedCollectionRunUseCase,
   CreateOrUpdateProfileHomeFeedCollectionScheduleUseCase,
+  DispatchNextDueProfileHomeFeedCollectionScheduleUseCase,
   GetProfileHomeFeedCollectionScheduleUseCase,
   ListProfileHomeFeedCollectionSchedulesUseCase,
   UpsertCollectionScheduleUseCase,
@@ -60,6 +61,8 @@ describe("collector runtime composition container", () => {
         new InMemoryProfileHomeFeedCollectionScheduleRepository(),
       dispatchNextDueCollectionSchedules:
         new InMemoryDispatchNextDueCollectionScheduleRepository(),
+      dispatchNextDueProfileHomeFeedCollectionSchedules:
+        new InMemoryProfileHomeFeedCollectionScheduleRepository(),
       homeFeedRuns: new InMemoryProfileHomeFeedCollectionRunRepository(),
       checkRuns: new InMemoryProfileSourceAccessCheckRunRepository(),
       sourceGroups: new FakeSourceGroupLookupPort(),
@@ -141,6 +144,9 @@ describe("collector runtime composition container", () => {
     expect(services.dispatchNextDueCollectionSchedule).toBeInstanceOf(
       DispatchNextDueCollectionScheduleUseCase,
     );
+    expect(
+      services.dispatchNextDueProfileHomeFeedCollectionSchedule,
+    ).toBeInstanceOf(DispatchNextDueProfileHomeFeedCollectionScheduleUseCase);
     expect(services.requestProfileHomeFeedCollectionRun).toBeInstanceOf(
       RequestProfileHomeFeedCollectionRunUseCase,
     );

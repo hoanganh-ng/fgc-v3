@@ -36,6 +36,10 @@ export class DrizzleProfileHomeFeedCollectionScheduleRepository
           intervalMinutes: record.intervalMinutes,
           nextRunAt: record.nextRunAt,
           parameters: record.parameters,
+          lastAttemptedAt: record.lastAttemptedAt,
+          lastDispatchStatus: record.lastDispatchStatus,
+          lastFailureReason: record.lastFailureReason,
+          consecutiveFailures: record.consecutiveFailures,
           updatedAt: record.updatedAt,
         },
       });

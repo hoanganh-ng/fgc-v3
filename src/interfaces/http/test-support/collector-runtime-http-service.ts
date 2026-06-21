@@ -485,6 +485,16 @@ export function createProfileHomeFeedCollectionSchedule(
     intervalMinutes: options.intervalMinutes ?? 60,
     nextRunAt: options.nextRunAt ?? collectorRuntimeHttpTestNow,
     parameters: options.parameters ?? {},
+    ...(options.lastAttemptedAt !== undefined
+      ? { lastAttemptedAt: options.lastAttemptedAt }
+      : {}),
+    ...(options.lastDispatchStatus !== undefined
+      ? { lastDispatchStatus: options.lastDispatchStatus }
+      : {}),
+    ...(options.lastFailureReason !== undefined
+      ? { lastFailureReason: options.lastFailureReason }
+      : {}),
+    consecutiveFailures: options.consecutiveFailures ?? 0,
     createdAt: options.createdAt ?? collectorRuntimeHttpTestNow,
     updatedAt: options.updatedAt ?? collectorRuntimeHttpTestNow,
   };

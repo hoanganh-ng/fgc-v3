@@ -3,6 +3,7 @@ import type { ProfileHomeFeedCollectionRunTriggerTypeSchema } from "./profile-ho
 
 export const PROFILE_HOME_FEED_COLLECTION_RUN_TRIGGER_TYPES = [
   "MANUAL_API",
+  "SCHEDULED",
 ] as const;
 
 export type ProfileHomeFeedCollectionRunTriggerType = zInfer<

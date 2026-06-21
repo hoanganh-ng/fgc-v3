@@ -92,6 +92,7 @@ function createSchedule(
     intervalMinutes: options.intervalMinutes ?? 60,
     nextRunAt: options.nextRunAt ?? "2026-06-21T11:00:00.000Z",
     parameters: options.parameters ?? {},
+    consecutiveFailures: options.consecutiveFailures ?? 0,
     createdAt: options.createdAt ?? now,
     updatedAt: options.updatedAt ?? now,
   };

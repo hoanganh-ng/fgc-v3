@@ -1155,6 +1155,7 @@ describe("Collector Runtime HTTP routes", () => {
             maxDurationMs: 30_000,
             maxPosts: 20,
           },
+          consecutiveFailures: 0,
           createdAt: "2026-03-31T12:00:00.000Z",
           updatedAt: "2026-04-01T08:00:00.000Z",
         },

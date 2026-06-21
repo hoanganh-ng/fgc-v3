@@ -17,6 +17,13 @@ describe("profile home-feed collection schedule database mapper", () => {
         maxDurationMs: 30_000,
         maxPosts: 20,
       },
+      lastAttemptedAt: "2026-06-21T10:30:00.000Z",
+      lastDispatchStatus: "PROFILE_LOOKUP_FAILED",
+      lastFailureReason: {
+        code: "PROFILE_REFERENCE_LOOKUP_FAILED",
+        message: "Profile Manager returned an error.",
+      },
+      consecutiveFailures: 2,
     });
 
     const record = toProfileHomeFeedCollectionScheduleRecord(schedule);
@@ -31,6 +38,13 @@ describe("profile home-feed collection schedule database mapper", () => {
         maxDurationMs: 30_000,
         maxPosts: 20,
       },
+      lastAttemptedAt: "2026-06-21T10:30:00.000Z",
+      lastDispatchStatus: "PROFILE_LOOKUP_FAILED",
+      lastFailureReason: {
+        code: "PROFILE_REFERENCE_LOOKUP_FAILED",
+        message: "Profile Manager returned an error.",
+      },
+      consecutiveFailures: 2,
       createdAt: now,
       updatedAt: now,
     });
@@ -70,6 +84,10 @@ function toSelectRow(
     intervalMinutes: record.intervalMinutes,
     nextRunAt: record.nextRunAt,
     parameters: record.parameters,
+    lastAttemptedAt: record.lastAttemptedAt ?? null,
+    lastDispatchStatus: record.lastDispatchStatus ?? null,
+    lastFailureReason: record.lastFailureReason ?? null,
+    consecutiveFailures: record.consecutiveFailures ?? 0,
     createdAt: record.createdAt ?? now,
     updatedAt: record.updatedAt ?? now,
   };
@@ -84,6 +102,16 @@ function createSchedule(
     intervalMinutes: options.intervalMinutes ?? 60,
     nextRunAt: options.nextRunAt ?? "2026-06-21T11:00:00.000Z",
     parameters: options.parameters ?? {},
+    ...(options.lastAttemptedAt !== undefined
+      ? { lastAttemptedAt: options.lastAttemptedAt }
+      : {}),
+    ...(options.lastDispatchStatus !== undefined
+      ? { lastDispatchStatus: options.lastDispatchStatus }
+      : {}),
+    ...(options.lastFailureReason !== undefined
+      ? { lastFailureReason: options.lastFailureReason }
+      : {}),
+    consecutiveFailures: options.consecutiveFailures ?? 0,
     createdAt: options.createdAt ?? now,
     updatedAt: options.updatedAt ?? now,
   };

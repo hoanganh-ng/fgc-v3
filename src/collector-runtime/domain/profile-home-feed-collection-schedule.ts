@@ -2,6 +2,8 @@ import type { infer as zInfer } from "zod";
 import type {
   ProfileHomeFeedCollectionScheduleIntervalMinutesSchema,
   ProfileHomeFeedCollectionScheduleIsoDateTimeSchema,
+  ProfileHomeFeedCollectionScheduleDispatchStatusSchema,
+  ProfileHomeFeedCollectionScheduleFailureReasonSchema,
   ProfileHomeFeedCollectionScheduleProfileIdSchema,
   ProfileHomeFeedCollectionScheduleSchema,
 } from "./profile-home-feed-collection-schedule.schemas";
@@ -14,6 +16,12 @@ export type ProfileHomeFeedCollectionScheduleProfileId = zInfer<
 >;
 export type ProfileHomeFeedCollectionScheduleIntervalMinutes = zInfer<
   typeof ProfileHomeFeedCollectionScheduleIntervalMinutesSchema
+>;
+export type ProfileHomeFeedCollectionScheduleDispatchStatus = zInfer<
+  typeof ProfileHomeFeedCollectionScheduleDispatchStatusSchema
+>;
+export type ProfileHomeFeedCollectionScheduleFailureReason = zInfer<
+  typeof ProfileHomeFeedCollectionScheduleFailureReasonSchema
 >;
 export type ProfileHomeFeedCollectionSchedule = zInfer<
   typeof ProfileHomeFeedCollectionScheduleSchema

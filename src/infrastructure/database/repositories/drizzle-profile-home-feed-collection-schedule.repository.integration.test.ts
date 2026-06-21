@@ -166,6 +166,16 @@ function createSchedule(
     intervalMinutes: options.intervalMinutes ?? 30,
     nextRunAt: options.nextRunAt ?? "2026-06-21T10:30:00.000Z",
     parameters: options.parameters ?? {},
+    ...(options.lastAttemptedAt !== undefined
+      ? { lastAttemptedAt: options.lastAttemptedAt }
+      : {}),
+    ...(options.lastDispatchStatus !== undefined
+      ? { lastDispatchStatus: options.lastDispatchStatus }
+      : {}),
+    ...(options.lastFailureReason !== undefined
+      ? { lastFailureReason: options.lastFailureReason }
+      : {}),
+    consecutiveFailures: options.consecutiveFailures ?? 0,
     createdAt: options.createdAt ?? "2026-06-21T10:00:00.000Z",
     updatedAt: options.updatedAt ?? "2026-06-21T10:00:00.000Z",
   };

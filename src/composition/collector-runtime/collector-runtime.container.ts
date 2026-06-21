@@ -8,6 +8,7 @@ import {
   ClaimNextProfileSourceAccessCheckRunUseCase,
   CreateOrUpdateProfileHomeFeedCollectionScheduleUseCase,
   DispatchNextDueCollectionScheduleUseCase,
+  DispatchNextDueProfileHomeFeedCollectionScheduleUseCase,
   GetAccountExerciseRunUseCase,
   GetCollectionRunUseCase,
   GetCollectionScheduleUseCase,
@@ -45,6 +46,7 @@ import type {
   CollectionRunRepository,
   CollectionScheduleRepository,
   DispatchNextDueCollectionScheduleRepositoryPort,
+  DispatchNextDueProfileHomeFeedCollectionScheduleRepositoryPort,
   IdGenerator,
   ProfileHomeFeedCollectionScheduleRepository,
   SourceGroupLookupPort,
@@ -59,6 +61,7 @@ export interface CollectorRuntimeDependencies {
   readonly collectionSchedules: CollectionScheduleRepository;
   readonly homeFeedSchedules: ProfileHomeFeedCollectionScheduleRepository;
   readonly dispatchNextDueCollectionSchedules: DispatchNextDueCollectionScheduleRepositoryPort;
+  readonly dispatchNextDueProfileHomeFeedCollectionSchedules: DispatchNextDueProfileHomeFeedCollectionScheduleRepositoryPort;
   readonly homeFeedRuns: ProfileHomeFeedCollectionRunRepository;
   readonly checkRuns: ProfileSourceAccessCheckRunRepository;
   readonly profiles: ProfileReferencePort;
@@ -91,6 +94,7 @@ export interface CollectorRuntimeContainer {
   readonly getProfileHomeFeedCollectionSchedule: GetProfileHomeFeedCollectionScheduleUseCase;
   readonly listProfileHomeFeedCollectionSchedules: ListProfileHomeFeedCollectionSchedulesUseCase;
   readonly dispatchNextDueCollectionSchedule: DispatchNextDueCollectionScheduleUseCase;
+  readonly dispatchNextDueProfileHomeFeedCollectionSchedule: DispatchNextDueProfileHomeFeedCollectionScheduleUseCase;
   readonly requestProfileHomeFeedCollectionRun: RequestProfileHomeFeedCollectionRunUseCase;
   readonly getProfileHomeFeedCollectionRun: GetProfileHomeFeedCollectionRunUseCase;
   readonly listProfileHomeFeedCollectionRuns: ListProfileHomeFeedCollectionRunsUseCase;
@@ -120,6 +124,7 @@ export function createCollectorRuntime(
     collectionSchedules,
     homeFeedSchedules,
     dispatchNextDueCollectionSchedules,
+    dispatchNextDueProfileHomeFeedCollectionSchedules,
     homeFeedRuns,
     checkRuns,
     profiles,
@@ -211,6 +216,13 @@ export function createCollectorRuntime(
       clock,
       idGenerator,
     ),
+    dispatchNextDueProfileHomeFeedCollectionSchedule:
+      new DispatchNextDueProfileHomeFeedCollectionScheduleUseCase(
+        dispatchNextDueProfileHomeFeedCollectionSchedules,
+        profiles,
+        clock,
+        idGenerator,
+      ),
     requestProfileHomeFeedCollectionRun: new RequestProfileHomeFeedCollectionRunUseCase(
       homeFeedRuns,
       profiles,

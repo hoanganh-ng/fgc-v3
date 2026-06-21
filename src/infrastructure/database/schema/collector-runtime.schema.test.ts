@@ -94,6 +94,18 @@ describe("collector runtime database schema", () => {
     expect(profileHomeFeedCollectionSchedules.parameters.name).toBe(
       "parameters",
     );
+    expect(profileHomeFeedCollectionSchedules.lastAttemptedAt.name).toBe(
+      "last_attempted_at",
+    );
+    expect(profileHomeFeedCollectionSchedules.lastDispatchStatus.name).toBe(
+      "last_dispatch_status",
+    );
+    expect(profileHomeFeedCollectionSchedules.lastFailureReason.name).toBe(
+      "last_failure_reason",
+    );
+    expect(profileHomeFeedCollectionSchedules.consecutiveFailures.name).toBe(
+      "consecutive_failures",
+    );
     expect(
       getTableConfig(profileHomeFeedCollectionSchedules).indexes.map(
         (index) => index.config.name,
@@ -148,6 +160,7 @@ describe("collector runtime database schema", () => {
     ]);
     expect(profileHomeFeedCollectionRunTriggerTypeEnum.enumValues).toEqual([
       "MANUAL_API",
+      "SCHEDULED",
     ]);
   });
 });

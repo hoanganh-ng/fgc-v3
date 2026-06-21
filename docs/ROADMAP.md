@@ -211,19 +211,17 @@ the one-shot home-feed executor.
 Design scheduled profile home-feed dispatch from
 `ProfileHomeFeedCollectionSchedule` configuration into queued,
 profile-bound `ProfileHomeFeedCollectionRun` records. This sprint is
-documentation-only: no runtime behavior, migrations, trigger enum
-changes, dispatch repositories, scheduler process changes, workers,
-Docker services, browser execution, Web UI, or execution routes.
+accepted and was documentation-only: no runtime behavior, migrations,
+trigger enum changes, dispatch repositories, scheduler process changes,
+workers, Docker services, browser execution, Web UI, or execution routes.
 Manual live-Facebook validation remains separate.
 
-## Sprint 068B: Home-Feed Scheduled Dispatch Implementation
+## Sprint 068B1: Home-Feed Scheduled Dispatch Persistence + Use Case
 
-After Sprint 068B-D is accepted, implement the separate home-feed
-scheduled dispatch path so a due schedule can create a profile-bound
-home-feed run with a `SCHEDULED` trigger, deterministic cadence
-advancement, active-run skip behavior, and safe retry/backoff tracking.
-Poller integration should remain a separate authorized slice unless
-the implementation sprint explicitly includes it.
+Implement the separate home-feed scheduled dispatch path so a due schedule can
+create a profile-bound home-feed run with a `SCHEDULED` trigger, deterministic
+cadence advancement, active-run skip behavior, and safe retry/backoff tracking.
+Poller integration remains a separate authorized slice.
 
 ## Future: Content Builder
 

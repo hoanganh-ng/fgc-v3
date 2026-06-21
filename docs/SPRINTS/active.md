@@ -275,16 +275,27 @@ add Docker services, change the one-shot home-feed executor, add a
 
 - [Sprint 068A - Profile Home-Feed Schedule Foundation](SPRINT-068A-profile-home-feed-schedule-foundation.md)
 
-Sprint 068B-D — Home-Feed Scheduled Dispatch Design is **active**.
-It produces the design for dispatching due
+Sprint 068B-D — Home-Feed Scheduled Dispatch Design is **accepted**.
+It produced the design for dispatching due
 `ProfileHomeFeedCollectionSchedule` rows into queued, profile-bound
 `ProfileHomeFeedCollectionRun` records. This sprint is design-only:
-it does not implement runtime behavior, add migrations, change trigger
+it did not implement runtime behavior, add migrations, change trigger
 enums, add dispatch repositories, wire pollers or workers, add Docker
 services, add browser code, add Web UI behavior, or expose execution
-routes. The design is not accepted.
+routes.
 
 - [Sprint 068B-D - Home-Feed Scheduled Dispatch Design](SPRINT-068B-D-home-feed-scheduled-dispatch-design.md)
+
+Sprint 068B1 — Home-Feed Scheduled Dispatch Persistence + Use Case is
+**active**. It implements the internal Collector Runtime dispatch path
+that converts one due `ProfileHomeFeedCollectionSchedule` into either
+one queued `ProfileHomeFeedCollectionRun` with
+`triggerType = "SCHEDULED"` or a safe skip/defer outcome. It does not
+wire a scheduler poller, worker, browser execution, Docker service,
+HTTP execution route, Web UI, Content Manager behavior, Content
+Builder behavior, or Content Publisher behavior.
+
+- [Sprint 068B1 - Home-Feed Scheduled Dispatch Persistence + Use Case](SPRINT-068B1-home-feed-scheduled-dispatch-persistence-use-case.md)
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

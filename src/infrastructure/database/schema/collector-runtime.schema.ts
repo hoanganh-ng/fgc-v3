@@ -35,6 +35,7 @@ import type {
   ProfileHomeFeedCollectionRunSummary,
   ProfileHomeFeedCollectionRunTarget,
   ProfileHomeFeedCollectionSchedule,
+  ProfileHomeFeedCollectionScheduleFailureReason,
   ProfileSourceAccessCheckRunTarget,
   ProfileSourceAccessCheckRunFailureReason,
   ProfileSourceAccessCheckRunOutcome,
@@ -260,6 +261,13 @@ export const profileHomeFeedCollectionSchedules = pgTable(
     nextRunAt: timestampWithTimezone("next_run_at").notNull(),
     parameters:
       jsonb("parameters").$type<ProfileHomeFeedCollectionSchedule["parameters"]>().notNull(),
+    lastAttemptedAt: timestampWithTimezone("last_attempted_at"),
+    lastDispatchStatus: text("last_dispatch_status").$type<
+      ProfileHomeFeedCollectionSchedule["lastDispatchStatus"]
+    >(),
+    lastFailureReason:
+      jsonb("last_failure_reason").$type<ProfileHomeFeedCollectionScheduleFailureReason>(),
+    consecutiveFailures: integer("consecutive_failures").notNull().default(0),
     createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
     updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow(),
   },
@@ -267,6 +275,14 @@ export const profileHomeFeedCollectionSchedules = pgTable(
     check(
       "collector_phf_schedules_interval_minutes_check",
       sql`${table.intervalMinutes} BETWEEN 1 AND 10080`,
+    ),
+    check(
+      "collector_phf_schedules_last_dispatch_status_check",
+      sql`${table.lastDispatchStatus} IS NULL OR ${table.lastDispatchStatus} IN ('DISPATCHED', 'SKIPPED_ACTIVE_RUN', 'PROFILE_NOT_FOUND', 'PROFILE_LOOKUP_FAILED')`,
+    ),
+    check(
+      "collector_phf_schedules_consecutive_failures_check",
+      sql`${table.consecutiveFailures} >= 0`,
     ),
     index("collector_phf_schedules_due_idx").on(
       table.enabled,
