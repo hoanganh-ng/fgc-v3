@@ -120,13 +120,19 @@
   mutation, source-group promotion, Content Builder, or Content
   Publisher behavior.
 - Safe read APIs for content and sources.
-- Safe `SourcePublisher` HTTP observation, list, and get contracts
-  served through Nginx → Fastify → Content Manager application →
-  PostgreSQL. The safe `SourcePublisherDto` allowlist explicitly
-  enumerates every response field; optional `displayName` and
-  `canonicalUrl` are omitted when absent and never serialized as
-  `null`. Status mutation (approve / ignore / block) is intentionally
-  deferred to Sprint 066.
+- Safe `SourcePublisher` HTTP observation, list, get, and status
+  mutation contracts served through Nginx → Fastify → Content
+  Manager application → PostgreSQL. The safe `SourcePublisherDto`
+  allowlist explicitly enumerates every response field; optional
+  `displayName` and `canonicalUrl` are omitted when absent and
+  never serialized as `null`. The status mutation contract is
+  `PATCH /collector/source-publishers/:sourcePublisherId/status`
+  with a strict body schema that accepts exactly `{ status }`
+  where `status` is one of `DISCOVERED`, `APPROVED`, `IGNORED`,
+  `BLOCKED`; unknown fields, missing fields, and `null` are
+  rejected with HTTP 400 `VALIDATION_ERROR`, and a missing
+  publisher maps to the existing HTTP 404
+  `SOURCE_PUBLISHER_NOT_FOUND`.
 - Future handoff shape for Content Builder.
 
 ## Does Not Own

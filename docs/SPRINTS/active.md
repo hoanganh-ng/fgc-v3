@@ -219,7 +219,7 @@ was **not performed** by Sprint 065C3.
 - [Sprint 065C3 - Bounded Facebook Home-Feed Execution](SPRINT-065C3-bounded-facebook-home-feed-execution.md)
 
 Sprint 066 — Source Publisher Status Mutation HTTP Contract is
-**active**. It exposes
+**accepted** at `3a27b8be109a5b015f9ece4f443d5ea5c6957cab`. It exposes
 `PATCH /collector/source-publishers/:sourcePublisherId/status` as a
 safe Content Manager HTTP contract that delegates to the existing
 `UpdateSourcePublisherStatusUseCase`. The body is strict and
@@ -236,7 +236,7 @@ introduced by Sprint 066.
 
 - [Sprint 066 - Source Publisher Status Mutation HTTP Contract](SPRINT-066-source-publisher-status-mutation-http-contract.md)
 
-No sprint is currently active beyond Sprint 066. The remaining
+No sprint is currently active. The remaining
 067–068 feed-discovery items are documented placeholders and are
 **not active** until the Product Owner explicitly approves the next
 sprint.
