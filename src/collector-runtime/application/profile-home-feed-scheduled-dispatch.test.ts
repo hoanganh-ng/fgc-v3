@@ -140,6 +140,52 @@ describe("DispatchNextDueProfileHomeFeedCollectionScheduleUseCase", () => {
     expect(retry).toEqual({ outcome: "NO_DUE_SCHEDULE" });
     expect(context.profiles.calls).toEqual(["profile-1"]);
   });
+
+  it("looks up the profile before mutating any schedule or run state", async () => {
+    const order: string[] = [];
+    const repository = new InMemoryProfileHomeFeedCollectionScheduleRepository();
+    const profiles: ProfileReferencePort = {
+      async getProfileAccountStage(profileId) {
+        order.push(`profile-lookup:${profileId}`);
+
+        return { ok: true, profileId, accountStage: "WARMING" };
+      },
+    };
+
+    const originalDispatch = repository.dispatchOrSkipActiveRun.bind(repository);
+    const originalSave = repository.save.bind(repository);
+    repository.dispatchOrSkipActiveRun = async (input) => {
+      order.push(`dispatch-or-skip:${input.profileId}`);
+
+      return originalDispatch(input);
+    };
+    repository.save = async (schedule) => {
+      order.push(`save:${schedule.profileId}`);
+
+      return originalSave(schedule);
+    };
+
+    await repository.save(createSchedule());
+
+    const useCase = new DispatchNextDueProfileHomeFeedCollectionScheduleUseCase(
+      repository,
+      profiles,
+      new FixedClock(dispatchAt),
+      new FixedIdGenerator("scheduled-run-lookup-order"),
+    );
+
+    const result = await useCase.execute();
+
+    expect(result.outcome).toBe("DISPATCHED");
+    expect(order).toEqual([
+      "save:profile-1",
+      "profile-lookup:profile-1",
+      "dispatch-or-skip:profile-1",
+    ]);
+    expect(order.indexOf("profile-lookup:profile-1")).toBeLessThan(
+      order.indexOf("dispatch-or-skip:profile-1"),
+    );
+  });
 });
 
 function createContext(): {

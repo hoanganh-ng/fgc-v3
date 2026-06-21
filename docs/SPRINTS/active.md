@@ -293,7 +293,16 @@ one queued `ProfileHomeFeedCollectionRun` with
 `triggerType = "SCHEDULED"` or a safe skip/defer outcome. It does not
 wire a scheduler poller, worker, browser execution, Docker service,
 HTTP execution route, Web UI, Content Manager behavior, Content
-Builder behavior, or Content Publisher behavior.
+Builder behavior, or Content Publisher behavior. Sprint 068B1-H adds
+test/hardening coverage: DB integration tests proving concurrent
+dispatchers against one schedule create at most one queued run and
+advance the schedule exactly once; DB integration tests proving
+concurrent dispatchers against two schedules dispatch both without
+cross-profile blocking; DB integration tests proving the schedule
+advance rolls back when the post-insert UPDATE fails; an application
+test proving the Profile Manager lookup happens before any DB mutation;
+and an inline comment annotating the existing active-run skip test as
+candidate-vs-dispatch race coverage.
 
 - [Sprint 068B1 - Home-Feed Scheduled Dispatch Persistence + Use Case](SPRINT-068B1-home-feed-scheduled-dispatch-persistence-use-case.md)
 
