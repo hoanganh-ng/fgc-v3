@@ -53,6 +53,23 @@ export interface ProfileHomeFeedRunNextDependencies {
   readonly close?: () => Promise<void>;
 }
 
+export interface ProfileHomeFeedClaimAndExecuteDependencies {
+  readonly runs: ProfileHomeFeedCollectionRunRepository;
+  readonly checkoutPort: ProfileHomeFeedCheckoutPort;
+  readonly leasePort: ProfileLeasePort;
+  readonly capturePort: FacebookHomeFeedPayloadCapturePort;
+  readonly publisherObservationPort: SourcePublisherObservationPort;
+  readonly contentSubmissionPort: HomeFeedContentSubmissionPort;
+  readonly extractor: HomeFeedExtractorLike;
+  readonly clock: Clock;
+}
+
+export interface ClaimAndExecuteNextProfileHomeFeedRunInput {
+  readonly dependencies: ProfileHomeFeedClaimAndExecuteDependencies;
+  readonly logger?: ProfileHomeFeedRunNextLogger;
+  readonly abortSignal?: AbortSignal;
+}
+
 export interface RunProfileHomeFeedRunNextCommandInput {
   readonly args: ProfileHomeFeedRunNextCliArgs;
   readonly logger?: ProfileHomeFeedRunNextLogger;
@@ -67,15 +84,7 @@ export interface ProfileHomeFeedRunNextCommandResult {
   readonly failedRuns: number;
 }
 
-interface BuiltDependencies {
-  readonly runs: ProfileHomeFeedCollectionRunRepository;
-  readonly checkoutPort: ProfileHomeFeedCheckoutPort;
-  readonly leasePort: ProfileLeasePort;
-  readonly capturePort: FacebookHomeFeedPayloadCapturePort;
-  readonly publisherObservationPort: SourcePublisherObservationPort;
-  readonly contentSubmissionPort: HomeFeedContentSubmissionPort;
-  readonly extractor: HomeFeedExtractorLike;
-  readonly clock: Clock;
+interface BuiltDependencies extends ProfileHomeFeedClaimAndExecuteDependencies {
   readonly close: () => Promise<void>;
 }
 
@@ -92,62 +101,77 @@ export async function runProfileHomeFeedRunNextCommand(
   logger.info("Profile home-feed runner started.");
 
   try {
-    if (input.abortSignal?.aborted === true) {
-      logger.info("Profile home-feed runner aborted before claim.");
-      return { ok: false, claimedRuns: 0, succeededRuns: 0, failedRuns: 0 };
-    }
-
-    const claimed = await new ClaimNextProfileHomeFeedCollectionRunUseCase(
-      dependencies.runs,
-      dependencies.clock,
-    ).execute();
-
-    if (claimed === null) {
-      logger.info("No queued profile home-feed collection run found.");
-      return { ok: true, claimedRuns: 0, succeededRuns: 0, failedRuns: 0 };
-    }
-
-    logger.info(
-      `Claimed profile home-feed collection run ${claimed.id} for profile ${claimed.profileId}.`,
-    );
-
-    const executeUseCase = new ExecuteProfileHomeFeedCollectionRunUseCase(
-      dependencies.runs,
-      new MarkProfileHomeFeedCollectionRunSucceededUseCase(
-        dependencies.runs,
-        dependencies.clock,
-      ),
-      new MarkProfileHomeFeedCollectionRunFailedUseCase(
-        dependencies.runs,
-        dependencies.clock,
-      ),
-      dependencies.checkoutPort,
-      dependencies.leasePort,
-      dependencies.capturePort,
-      dependencies.publisherObservationPort,
-      dependencies.contentSubmissionPort,
-      dependencies.extractor,
-      dependencies.clock,
-    );
-
-    const finishedRun = await executeUseCase.execute({
-      runId: claimed.id,
+    return await claimAndExecuteNextProfileHomeFeedRun({
+      dependencies,
+      logger,
       ...(input.abortSignal === undefined
         ? {}
         : { abortSignal: input.abortSignal }),
     });
-
-    logSafeSummary(logger, finishedRun);
-
-    if (finishedRun.status === "SUCCEEDED") {
-      return { ok: true, claimedRuns: 1, succeededRuns: 1, failedRuns: 0 };
-    }
-
-    return { ok: false, claimedRuns: 1, succeededRuns: 0, failedRuns: 1 };
   } finally {
     await dependencies.close();
     logger.info("Profile home-feed runner stopped.");
   }
+}
+
+export async function claimAndExecuteNextProfileHomeFeedRun(
+  input: ClaimAndExecuteNextProfileHomeFeedRunInput,
+): Promise<ProfileHomeFeedRunNextCommandResult> {
+  const logger = input.logger ?? NOOP_LOGGER;
+  const dependencies = input.dependencies;
+
+  if (input.abortSignal?.aborted === true) {
+    logger.info("Profile home-feed runner aborted before claim.");
+    return { ok: false, claimedRuns: 0, succeededRuns: 0, failedRuns: 0 };
+  }
+
+  const claimed = await new ClaimNextProfileHomeFeedCollectionRunUseCase(
+    dependencies.runs,
+    dependencies.clock,
+  ).execute();
+
+  if (claimed === null) {
+    logger.info("No queued profile home-feed collection run found.");
+    return { ok: true, claimedRuns: 0, succeededRuns: 0, failedRuns: 0 };
+  }
+
+  logger.info(
+    `Claimed profile home-feed collection run ${claimed.id} for profile ${claimed.profileId}.`,
+  );
+
+  const executeUseCase = new ExecuteProfileHomeFeedCollectionRunUseCase(
+    dependencies.runs,
+    new MarkProfileHomeFeedCollectionRunSucceededUseCase(
+      dependencies.runs,
+      dependencies.clock,
+    ),
+    new MarkProfileHomeFeedCollectionRunFailedUseCase(
+      dependencies.runs,
+      dependencies.clock,
+    ),
+    dependencies.checkoutPort,
+    dependencies.leasePort,
+    dependencies.capturePort,
+    dependencies.publisherObservationPort,
+    dependencies.contentSubmissionPort,
+    dependencies.extractor,
+    dependencies.clock,
+  );
+
+  const finishedRun = await executeUseCase.execute({
+    runId: claimed.id,
+    ...(input.abortSignal === undefined
+      ? {}
+      : { abortSignal: input.abortSignal }),
+  });
+
+  logSafeSummary(logger, finishedRun);
+
+  if (finishedRun.status === "SUCCEEDED") {
+    return { ok: true, claimedRuns: 1, succeededRuns: 1, failedRuns: 0 };
+  }
+
+  return { ok: false, claimedRuns: 1, succeededRuns: 0, failedRuns: 1 };
 }
 
 function buildDependencies(
