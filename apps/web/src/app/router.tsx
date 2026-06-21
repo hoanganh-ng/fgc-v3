@@ -4,6 +4,7 @@ import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { AccountExerciseRunsPage } from "@/pages/account-exercise-runs-page";
 import { CollectionRunsPage } from "@/pages/collection-runs-page";
 import { CollectionSchedulesPage } from "@/pages/collection-schedules-page";
+import { ProfileHomeFeedCollectionSchedulesPage } from "@/pages/profile-home-feed-collection-schedules-page";
 import { ContentItemDetailPage } from "@/pages/content-item-detail-page";
 import { ContentItemsPage } from "@/pages/content-items-page";
 import { NotFoundPage } from "@/pages/not-found-page";
@@ -60,6 +61,10 @@ export const router = createBrowserRouter([
       {
         path: "collection-schedules",
         element: <CollectionSchedulesPage />,
+      },
+      {
+        path: "profile-home-feed-collection-schedules",
+        element: <ProfileHomeFeedCollectionSchedulesPage />,
       },
       {
         path: "account-exercise-runs",

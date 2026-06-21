@@ -307,7 +307,7 @@ candidate-vs-dispatch race coverage.
 - [Sprint 068B1 - Home-Feed Scheduled Dispatch Persistence + Use Case](SPRINT-068B1-home-feed-scheduled-dispatch-persistence-use-case.md)
 
 Sprint 068B2 — Home-Feed Scheduler and Worker Containerization is
-**active**. It adds opt-in dev and preview Docker Compose services for
+**accepted**. It adds opt-in dev and preview Docker Compose services for
 the profile home-feed scheduler and profile home-feed worker so
 scheduled dispatch and queued execution can run as separate services in
 the stack. This is runtime wiring only: it does not change domain
@@ -317,6 +317,28 @@ behavior, Profile Manager checkout rules, or Content Builder /
 Publisher behavior.
 
 - [Sprint 068B2 - Home-Feed Scheduler and Worker Containerization](SPRINT-068B2-home-feed-scheduler-worker-containerization.md)
+
+Sprint 068C — Profile Home-Feed Schedule Operator UI is **active**.
+It closes the operator feedback loop for the Sprint 068A
+`ProfileHomeFeedCollectionSchedule` model by exposing the existing safe
+operator HTTP routes (`PUT`/`GET list`/`GET detail`) through a
+dedicated Web UI page (`/profile-home-feed-collection-schedules`).
+Operators can list, create, edit, enable, and disable existing
+profile-bound Facebook home-feed collection schedules. The page reads
+safe Profile Manager profile summaries for presentation and partial-
+inventory warnings. `profileId` is path-only on the PUT body; empty
+optional numerics are omitted; `intervalMinutes` is required; `nextRunAt`
+is sent as an ISO datetime with offset and rendered in the operator's
+local timezone. This sprint does not change domain behavior,
+persistence behavior, dispatch rules, worker execution logic, browser
+capture behavior, the HTTP routes themselves, backend composition,
+scheduler / worker services, Docker, Content Manager behavior, Profile
+Manager behavior, or Content Builder / Publisher behavior. Deletion,
+bulk scheduling, run-now, scheduler health / logs, cron / timezone
+cadence redesign, and live Facebook validation remain out of scope and
+were not part of Sprint 068C.
+
+- [Sprint 068C - Profile Home-Feed Schedule Operator UI](SPRINT-068C-profile-home-feed-schedule-operator-ui.md)
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)
