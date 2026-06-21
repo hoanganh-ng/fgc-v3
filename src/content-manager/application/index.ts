@@ -19,6 +19,7 @@ export * from "./use-cases/list-content-items.use-case";
 export * from "./use-cases/list-source-groups.use-case";
 export * from "./use-cases/list-source-publishers.use-case";
 export * from "./use-cases/observe-source-publisher.use-case";
+export * from "./use-cases/promote-source-publisher-to-source-group.use-case";
 export * from "./use-cases/remove-source-group-entry-route.use-case";
 export * from "./use-cases/update-content-status.use-case";
 export * from "./use-cases/update-source-group-entry-route.use-case";

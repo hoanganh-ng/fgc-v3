@@ -669,6 +669,179 @@ if (!shouldRunHttpDbTests) {
     });
 
     // --------------------------------------------------------------
+    // Sprint 067 — promote an APPROVED Facebook GROUP
+    // SourcePublisher into a managed PAUSED SourceGroup through
+    // composition → repositories → PostgreSQL.
+    // --------------------------------------------------------------
+    it("promotes an APPROVED FACEBOOK GROUP publisher into a PAUSED SourceGroup through composition, repositories, and PostgreSQL", async () => {
+      const externalPublisherId = nextTestId(
+        "external-publisher-promote-create",
+      );
+      const categorySlug = nextTestSlug("promote-create-category");
+
+      // 1. Seed a category through the existing HTTP boundary.
+      const categoryResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/content-categories",
+        payload: {
+          name: "Promote Create Category",
+          slug: categorySlug,
+        },
+      });
+      const categoryId = trackCategoryId(
+        (
+          categoryResponse.json() as {
+            readonly category: { readonly id: string };
+          }
+        ).category.id,
+      );
+
+      expect(categoryResponse.statusCode).toBe(201);
+
+      // 2. Observe a fresh APPROVED Facebook GROUP publisher through
+      // the existing route. The promote flow requires an APPROVED
+      // publisher, so seed the publisher and patch its status to
+      // APPROVED before promoting.
+      const observeResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/source-publishers/observations",
+        payload: {
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId,
+          observedAt: "2026-06-18T12:00:00.000Z",
+          displayName: "HTTP DB Promote Group",
+          canonicalUrl: `https://example.invalid/groups/${externalPublisherId}`,
+        },
+      });
+      const observeBody = observeResponse.json() as {
+        readonly sourcePublisher: { readonly id: string };
+      };
+      const sourcePublisherId = trackSourcePublisherId(
+        observeBody.sourcePublisher.id,
+      );
+
+      expect(observeResponse.statusCode).toBe(200);
+
+      const patchResponse = await getServer().inject({
+        method: "PATCH",
+        url: `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}/status`,
+        payload: { status: "APPROVED" },
+      });
+      const patchBody = patchResponse.json() as {
+        readonly sourcePublisher: { readonly status: string };
+      };
+
+      expect(patchResponse.statusCode).toBe(200);
+      expect(patchBody.sourcePublisher.status).toBe("APPROVED");
+
+      // 3. POST the new promote endpoint. The first call should
+      // return CREATED and a PAUSED SourceGroup.
+      const promoteResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}/promote-to-source-group`,
+        payload: {
+          categoryId,
+          collectionPriority: 75,
+          notes: "Promoted via Sprint 067 integration test.",
+        },
+      });
+      const promoteBody = promoteResponse.json() as {
+        readonly sourceGroup: {
+          readonly id: string;
+          readonly platform: string;
+          readonly externalGroupId: string;
+          readonly status: string;
+          readonly collectionPriority: number;
+          readonly categoryId: string;
+          readonly entryRoutes: readonly { readonly isDefault: boolean }[];
+        };
+        readonly promotion: { readonly outcome: "CREATED" | "ALREADY_EXISTS" };
+      };
+      const promotedSourceGroupId = trackSourceGroupId(
+        promoteBody.sourceGroup.id,
+      );
+
+      expect(promoteResponse.statusCode).toBe(200);
+      expect(promoteBody.promotion).toEqual({ outcome: "CREATED" });
+      expect(promoteBody.sourceGroup).toMatchObject({
+        id: promotedSourceGroupId,
+        platform: "FACEBOOK",
+        externalGroupId: externalPublisherId,
+        status: "PAUSED",
+        collectionPriority: 75,
+        categoryId,
+      });
+      expect(
+        promoteBody.sourceGroup.entryRoutes.some((route) => route.isDefault),
+      ).toBe(true);
+      expectReadPayloadIsSafe(promoteBody);
+
+      // 4. Re-promote the same publisher. Outcome must be
+      // ALREADY_EXISTS and the same SourceGroup id must come back.
+      const rePromoteResponse = await getServer().inject({
+        method: "POST",
+        url: `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}/promote-to-source-group`,
+        payload: {
+          categoryId,
+          collectionPriority: 90,
+        },
+      });
+      const rePromoteBody = rePromoteResponse.json() as {
+        readonly sourceGroup: { readonly id: string };
+        readonly promotion: { readonly outcome: "CREATED" | "ALREADY_EXISTS" };
+      };
+
+      expect(rePromoteResponse.statusCode).toBe(200);
+      expect(rePromoteBody.promotion).toEqual({ outcome: "ALREADY_EXISTS" });
+      expect(rePromoteBody.sourceGroup.id).toBe(promotedSourceGroupId);
+      expectReadPayloadIsSafe(rePromoteBody);
+
+      // 5. Inspect the persisted SourceGroup row and confirm the
+      // PAUSED status, the category id, and the entry-route JSONB.
+      const [persistedRow] = await client!.db
+        .select({
+          id: sourceGroups.id,
+          platform: sourceGroups.platform,
+          externalGroupId: sourceGroups.externalGroupId,
+          status: sourceGroups.status,
+          categoryId: sourceGroups.categoryId,
+          collectionPriority: sourceGroups.collectionPriority,
+          entryRoutes: sourceGroups.entryRoutes,
+        })
+        .from(sourceGroups)
+        .where(sql`${sourceGroups.id} = ${promotedSourceGroupId}`);
+      expect(persistedRow).toMatchObject({
+        id: promotedSourceGroupId,
+        platform: "FACEBOOK",
+        externalGroupId: externalPublisherId,
+        status: "PAUSED",
+        categoryId,
+        collectionPriority: 75,
+      });
+      expect(persistedRow?.entryRoutes).toEqual([
+        expect.objectContaining({
+          id: "direct-group-url",
+          type: "DIRECT_GROUP_URL",
+          isDefault: true,
+        }),
+      ]);
+
+      // 6. The SourcePublisher status must remain APPROVED. Promotion
+      // never mutates the publisher review status.
+      const publisherAfterResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}`,
+      });
+      const publisherAfterBody = publisherAfterResponse.json() as {
+        readonly sourcePublisher: { readonly status: string };
+      };
+
+      expect(publisherAfterResponse.statusCode).toBe(200);
+      expect(publisherAfterBody.sourcePublisher.status).toBe("APPROVED");
+    });
+
+    // --------------------------------------------------------------
     // Sprint 065C1 — bare home-feed HTTP integration through
     // composition → repositories → PostgreSQL with end-to-end
     // safe DTO assertions and a final source-group follow-up that

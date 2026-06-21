@@ -12,6 +12,7 @@ import type {
   ListSourcePublishersInput,
   ListSourcePublishersOutput,
   ObserveSourcePublisherApplicationInput,
+  PromoteSourcePublisherToSourceGroupInput,
   RemoveSourceGroupEntryRouteInput,
   UpdateContentStatusInput,
   UpdateSourceGroupEntryRouteInput,
@@ -151,6 +152,13 @@ export interface FakeContentManagerHttpService
     UpdateSourcePublisherStatusInput,
     SourcePublisher
   >;
+  readonly promoteSourcePublisherToSourceGroup: StubUseCase<
+    PromoteSourcePublisherToSourceGroupInput,
+    {
+      readonly sourceGroup: SourceGroup;
+      readonly outcome: "CREATED" | "ALREADY_EXISTS";
+    }
+  >;
 }
 
 export function createFakeContentManagerHttpService(): FakeContentManagerHttpService {
@@ -223,6 +231,10 @@ export function createFakeContentManagerHttpService(): FakeContentManagerHttpSer
     updateSourcePublisherStatus: new StubUseCase(
       createSourcePublisher({ status: "APPROVED" }),
     ),
+    promoteSourcePublisherToSourceGroup: new StubUseCase({
+      sourceGroup: createSourceGroup({ status: "PAUSED" }),
+      outcome: "CREATED",
+    }),
   };
 }
 

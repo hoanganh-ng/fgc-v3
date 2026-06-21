@@ -13,6 +13,7 @@ import type {
   ListSourcePublishersInput,
   ListSourcePublishersOutput,
   ObserveSourcePublisherApplicationInput,
+  PromoteSourcePublisherToSourceGroupInput,
   RemoveSourceGroupEntryRouteInput,
   UpdateContentStatusInput,
   UpdateSourceGroupEntryRouteInput,
@@ -50,6 +51,8 @@ import {
   ListSourceGroupsHttpQuerySchema,
   ListSourcePublishersHttpQuerySchema,
   ObserveSourcePublisherHttpBodySchema,
+  PromoteSourcePublisherToSourceGroupHttpBodySchema,
+  promoteSourcePublisherToSourceGroupHttpRouteSchema,
   SourceGroupEntryRouteIdHttpParamsSchema,
   SourceGroupIdHttpParamsSchema,
   SourcePublisherIdHttpParamsSchema,
@@ -151,6 +154,13 @@ export interface ContentManagerHttpService {
   readonly updateSourcePublisherStatus: ExecutableUseCase<
     UpdateSourcePublisherStatusInput,
     SourcePublisher
+  >;
+  readonly promoteSourcePublisherToSourceGroup: ExecutableUseCase<
+    PromoteSourcePublisherToSourceGroupInput,
+    {
+      readonly sourceGroup: SourceGroup;
+      readonly outcome: "CREATED" | "ALREADY_EXISTS";
+    }
   >;
 }
 
@@ -654,6 +664,36 @@ export function registerContentManagerRoutes(
 
       return {
         sourcePublisher: toSourcePublisherDto(sourcePublisher),
+      };
+    },
+  );
+
+  server.post(
+    "/collector/source-publishers/:sourcePublisherId/promote-to-source-group",
+    { schema: promoteSourcePublisherToSourceGroupHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        SourcePublisherIdHttpParamsSchema,
+        request.params,
+      );
+      const body = parseHttpInput(
+        PromoteSourcePublisherToSourceGroupHttpBodySchema,
+        request.body,
+      );
+      const input = {
+        sourcePublisherId: params.sourcePublisherId,
+        categoryId: body.categoryId,
+        collectionPriority: body.collectionPriority,
+        ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.url !== undefined ? { url: body.url } : {}),
+        ...(body.notes !== undefined ? { notes: body.notes } : {}),
+      } satisfies PromoteSourcePublisherToSourceGroupInput;
+      const result =
+        await contentManager.promoteSourcePublisherToSourceGroup.execute(input);
+
+      return {
+        sourceGroup: toSourceGroupDto(result.sourceGroup),
+        promotion: { outcome: result.outcome },
       };
     },
   );

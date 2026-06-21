@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  ContentCategoryNotFoundError,
   ContentValidationError,
+  CreateSourceGroupUseCase,
   GetSourcePublisherUseCase,
   ListSourcePublishersUseCase,
   MAX_SOURCE_PUBLISHER_LIST_LIMIT,
   ObserveSourcePublisherUseCase,
+  PromoteSourcePublisherToSourceGroupUseCase,
   SourcePublisherNotFoundError,
+  SourcePublisherNotPromotableError,
   UpdateSourcePublisherStatusUseCase,
 } from "./index";
 import type {
@@ -17,8 +21,12 @@ import type {
   SourcePublisherRepository,
   SourcePublisherStatusPersistenceInput,
 } from "./index";
-import { InMemorySourcePublisherRepository } from "./test-support/in-memory-repositories";
-import type { SourcePublisher } from "../domain";
+import {
+  InMemoryContentCategoryRepository,
+  InMemorySourceGroupRepository,
+  InMemorySourcePublisherRepository,
+} from "./test-support/in-memory-repositories";
+import type { ContentCategory, SourcePublisher } from "../domain";
 
 const baseObservedAt = "2026-03-01T08:00:00.000Z";
 const laterObservedAt = "2026-03-01T09:00:00.000Z";
@@ -835,6 +843,406 @@ describe("source publisher application use cases", () => {
     });
   });
 });
+
+describe("PromoteSourcePublisherToSourceGroupUseCase", () => {
+  const seededBaseUpdatedAt = "2026-03-01T08:05:00.000Z";
+
+  function createPromoteContext(
+    ids: readonly string[] = [],
+  ): PromoteTestContext {
+    return {
+      sourcePublishers: new InMemorySourcePublisherRepository(),
+      sourceGroups: new InMemorySourceGroupRepository(),
+      categories: new InMemoryContentCategoryRepository(),
+      ids: new FakeIdGenerator(ids),
+      clock: new FixedClock(seededBaseUpdatedAt),
+    };
+  }
+
+  async function seedCategory(
+    categories: InMemoryContentCategoryRepository,
+  ): Promise<ContentCategory> {
+    const category: ContentCategory = {
+      id: "category-1",
+      name: "Knowledge",
+      slug: "knowledge",
+      createdAt: seededBaseUpdatedAt,
+      updatedAt: seededBaseUpdatedAt,
+    };
+
+    await categories.save(category);
+
+    return category;
+  }
+
+  async function seedApprovedGroupPublisher(
+    context: PromoteTestContext,
+    overrides: Partial<SourcePublisher> = {},
+  ): Promise<SourcePublisher> {
+    const hasDisplayNameOverride = Object.prototype.hasOwnProperty.call(
+      overrides,
+      "displayName",
+    );
+    const hasCanonicalUrlOverride = Object.prototype.hasOwnProperty.call(
+      overrides,
+      "canonicalUrl",
+    );
+    const publisher: SourcePublisher = {
+      id: overrides.id ?? "publisher-1",
+      platform: overrides.platform ?? "FACEBOOK",
+      kind: overrides.kind ?? "GROUP",
+      externalPublisherId:
+        overrides.externalPublisherId ?? "synthetic-group-123",
+      ...(hasDisplayNameOverride
+        ? { displayName: overrides.displayName as string | undefined }
+        : { displayName: "Synthetic Knowledge Group" }),
+      ...(hasCanonicalUrlOverride
+        ? { canonicalUrl: overrides.canonicalUrl as string | undefined }
+        : {
+            canonicalUrl:
+              "https://www.facebook.com/groups/synthetic-group-123",
+          }),
+      status: overrides.status ?? "APPROVED",
+      firstObservedAt: overrides.firstObservedAt ?? "2026-03-01T08:00:00.000Z",
+      lastObservedAt: overrides.lastObservedAt ?? "2026-03-01T08:00:00.000Z",
+      observationCount: overrides.observationCount ?? 1,
+      createdAt: overrides.createdAt ?? seededBaseUpdatedAt,
+      updatedAt: overrides.updatedAt ?? seededBaseUpdatedAt,
+    };
+    context.sourcePublishers.seedForTest(publisher);
+
+    return publisher;
+  }
+
+  function createUseCase(
+    context: PromoteTestContext,
+  ): PromoteSourcePublisherToSourceGroupUseCase {
+    return new PromoteSourcePublisherToSourceGroupUseCase(
+      context.sourcePublishers,
+      context.sourceGroups,
+      context.categories,
+      context.ids,
+      context.clock,
+    );
+  }
+
+  it("promotes an approved FACEBOOK GROUP publisher and saves a PAUSED SourceGroup", async () => {
+    const context = createPromoteContext(["source-group-promoted-1"]);
+    await seedCategory(context.categories);
+    await seedApprovedGroupPublisher(context);
+
+    const result = await createUseCase(context).execute({
+      sourcePublisherId: "publisher-1",
+      categoryId: "category-1",
+      collectionPriority: 80,
+    });
+
+    expect(result.outcome).toBe("CREATED");
+    expect(result.sourceGroup).toMatchObject({
+      id: "source-group-promoted-1",
+      platform: "FACEBOOK",
+      externalGroupId: "synthetic-group-123",
+      name: "Synthetic Knowledge Group",
+      url: "https://www.facebook.com/groups/synthetic-group-123",
+      categoryId: "category-1",
+      status: "PAUSED",
+      collectionPriority: 80,
+    });
+    expect(result.sourceGroup.entryRoutes).toHaveLength(1);
+    expect(result.sourceGroup.entryRoutes[0]).toMatchObject({
+      id: "direct-group-url",
+      type: "DIRECT_GROUP_URL",
+      isDefault: true,
+    });
+
+    const stored = await context.sourceGroups.findById("source-group-promoted-1");
+    expect(stored).toEqual(result.sourceGroup);
+  });
+
+  it("uses the input url when provided and falls back to externalPublisherId when no displayName exists", async () => {
+    const context = createPromoteContext(["source-group-promoted-2"]);
+    await seedCategory(context.categories);
+    await seedApprovedGroupPublisher(context, {
+      id: "publisher-2",
+      externalPublisherId: "synthetic-group-456",
+      displayName: undefined,
+      canonicalUrl: undefined,
+    });
+
+    const result = await createUseCase(context).execute({
+      sourcePublisherId: "publisher-2",
+      categoryId: "category-1",
+      collectionPriority: 25,
+      url: "https://facebook.test/groups/synthetic-group-456",
+      notes: "Promoted after manual approval.",
+    });
+
+    expect(result.outcome).toBe("CREATED");
+    expect(result.sourceGroup).toMatchObject({
+      platform: "FACEBOOK",
+      externalGroupId: "synthetic-group-456",
+      name: "synthetic-group-456",
+      url: "https://facebook.test/groups/synthetic-group-456",
+      categoryId: "category-1",
+      status: "PAUSED",
+      collectionPriority: 25,
+      notes: "Promoted after manual approval.",
+    });
+  });
+
+  it("returns ALREADY_EXISTS when a SourceGroup already exists for the identity", async () => {
+    const context = createPromoteContext(["source-group-1"]);
+    await seedCategory(context.categories);
+    await seedApprovedGroupPublisher(context);
+
+    const seeded = await new CreateSourceGroupUseCase(
+      context.sourceGroups,
+      context.categories,
+      context.ids,
+      context.clock,
+    ).execute({
+      platform: "FACEBOOK",
+      externalGroupId: "synthetic-group-123",
+      name: "Existing Source Group",
+      url: "https://facebook.test/groups/synthetic-group-123",
+      categoryId: "category-1",
+      status: "ACTIVE",
+      collectionPriority: 10,
+    });
+
+    const result = await createUseCase(context).execute({
+      sourcePublisherId: "publisher-1",
+      categoryId: "category-1",
+      collectionPriority: 90,
+    });
+
+    expect(result.outcome).toBe("ALREADY_EXISTS");
+    expect(result.sourceGroup).toEqual(seeded);
+  });
+
+  it("rejects PAGE publishers with NOT_GROUP", async () => {
+    const context = createPromoteContext();
+    await seedCategory(context.categories);
+    await seedApprovedGroupPublisher(context, {
+      id: "publisher-page",
+      kind: "PAGE",
+      externalPublisherId: "synthetic-page-1",
+      canonicalUrl: "https://facebook.test/synthetic-page-1",
+    });
+
+    await expect(
+      createUseCase(context).execute({
+        sourcePublisherId: "publisher-page",
+        categoryId: "category-1",
+        collectionPriority: 50,
+        url: "https://facebook.test/synthetic-page-1",
+      }),
+    ).rejects.toMatchObject({
+      code: "SOURCE_PUBLISHER_NOT_PROMOTABLE",
+      reason: "NOT_GROUP",
+    });
+  });
+
+  it("rejects unapproved publishers with NOT_APPROVED", async () => {
+    const context = createPromoteContext();
+    await seedCategory(context.categories);
+    await seedApprovedGroupPublisher(context, {
+      id: "publisher-discovered",
+      status: "DISCOVERED",
+    });
+
+    await expect(
+      createUseCase(context).execute({
+        sourcePublisherId: "publisher-discovered",
+        categoryId: "category-1",
+        collectionPriority: 50,
+      }),
+    ).rejects.toBeInstanceOf(SourcePublisherNotPromotableError);
+
+    await expect(
+      createUseCase(context).execute({
+        sourcePublisherId: "publisher-discovered",
+        categoryId: "category-1",
+        collectionPriority: 50,
+      }),
+    ).rejects.toMatchObject({
+      code: "SOURCE_PUBLISHER_NOT_PROMOTABLE",
+      reason: "NOT_APPROVED",
+    });
+  });
+
+  it("rejects BLOCKED and IGNORED publishers with NOT_APPROVED", async () => {
+    const context = createPromoteContext();
+    await seedCategory(context.categories);
+
+    await seedApprovedGroupPublisher(context, {
+      id: "publisher-blocked",
+      status: "BLOCKED",
+    });
+    await expect(
+      createUseCase(context).execute({
+        sourcePublisherId: "publisher-blocked",
+        categoryId: "category-1",
+        collectionPriority: 50,
+      }),
+    ).rejects.toMatchObject({
+      code: "SOURCE_PUBLISHER_NOT_PROMOTABLE",
+      reason: "NOT_APPROVED",
+    });
+
+    await seedApprovedGroupPublisher(context, {
+      id: "publisher-ignored",
+      status: "IGNORED",
+    });
+    await expect(
+      createUseCase(context).execute({
+        sourcePublisherId: "publisher-ignored",
+        categoryId: "category-1",
+        collectionPriority: 50,
+      }),
+    ).rejects.toMatchObject({
+      code: "SOURCE_PUBLISHER_NOT_PROMOTABLE",
+      reason: "NOT_APPROVED",
+    });
+  });
+
+  it("rejects a missing source publisher", async () => {
+    const context = createPromoteContext();
+    await seedCategory(context.categories);
+
+    await expect(
+      createUseCase(context).execute({
+        sourcePublisherId: "missing",
+        categoryId: "category-1",
+        collectionPriority: 50,
+      }),
+    ).rejects.toBeInstanceOf(SourcePublisherNotFoundError);
+  });
+
+  it("rejects a missing category with CONTENT_CATEGORY_NOT_FOUND", async () => {
+    const context = createPromoteContext();
+    await seedApprovedGroupPublisher(context);
+
+    await expect(
+      createUseCase(context).execute({
+        sourcePublisherId: "publisher-1",
+        categoryId: "category-missing",
+        collectionPriority: 50,
+      }),
+    ).rejects.toBeInstanceOf(ContentCategoryNotFoundError);
+  });
+
+  it("rejects promotion when no URL is available from input or publisher", async () => {
+    const context = createPromoteContext();
+    await seedCategory(context.categories);
+    await seedApprovedGroupPublisher(context, {
+      id: "publisher-no-url",
+      canonicalUrl: undefined,
+    });
+
+    await expect(
+      createUseCase(context).execute({
+        sourcePublisherId: "publisher-no-url",
+        categoryId: "category-1",
+        collectionPriority: 50,
+      }),
+    ).rejects.toBeInstanceOf(SourcePublisherNotFoundError);
+
+    const storedAfter = await context.sourceGroups.list({
+      limit: 50,
+      offset: 0,
+    });
+    expect(storedAfter.items).toEqual([]);
+  });
+
+  it("does not mutate SourcePublisher status or observation counts on promotion", async () => {
+    const context = createPromoteContext(["source-group-promoted-3"]);
+    await seedCategory(context.categories);
+    const seeded = await seedApprovedGroupPublisher(context);
+
+    await createUseCase(context).execute({
+      sourcePublisherId: "publisher-1",
+      categoryId: "category-1",
+      collectionPriority: 70,
+    });
+
+    const after = await context.sourcePublishers.findById("publisher-1");
+    expect(after).toEqual(seeded);
+  });
+
+  it("returns ALREADY_EXISTS on a race when a SourceGroup appears between check and save", async () => {
+    const context = createPromoteContext(["source-group-1"]);
+    await seedCategory(context.categories);
+    await seedApprovedGroupPublisher(context);
+
+    const racySourceGroups = new (class {
+      private readonly inner = context.sourceGroups;
+      private insertedAfterCheck = false;
+
+      public async findByPlatformAndExternalGroupId(
+        platform: ContentCategory["id"] & string,
+        externalGroupId: string,
+      ): Promise<Awaited<
+        ReturnType<typeof context.sourceGroups.findByPlatformAndExternalGroupId>
+      >> {
+        const result = await this.inner.findByPlatformAndExternalGroupId(
+          platform as never,
+          externalGroupId,
+        );
+
+        if (!this.insertedAfterCheck) {
+          this.insertedAfterCheck = true;
+          await this.inner.save({
+            id: "source-group-1",
+            platform: "FACEBOOK",
+            externalGroupId: "synthetic-group-123",
+            name: "Existing Source Group",
+            url: "https://facebook.test/groups/synthetic-group-123",
+            categoryId: "category-1",
+            status: "ACTIVE",
+            collectionPriority: 10,
+            entryRoutes: [],
+            createdAt: seededBaseUpdatedAt,
+            updatedAt: seededBaseUpdatedAt,
+          });
+        }
+
+        return result;
+      }
+
+      public async save(): Promise<void> {
+        throw new Error(
+          "save should not be called when a race SourceGroup exists",
+        );
+      }
+    })();
+
+    const racyUseCase = new PromoteSourcePublisherToSourceGroupUseCase(
+      context.sourcePublishers,
+      racySourceGroups as unknown as typeof context.sourceGroups,
+      context.categories,
+      context.ids,
+      context.clock,
+    );
+
+    const result = await racyUseCase.execute({
+      sourcePublisherId: "publisher-1",
+      categoryId: "category-1",
+      collectionPriority: 50,
+    });
+
+    expect(result.outcome).toBe("ALREADY_EXISTS");
+    expect(result.sourceGroup.id).toBe("source-group-1");
+  });
+});
+
+interface PromoteTestContext {
+  readonly sourcePublishers: InMemorySourcePublisherRepository;
+  readonly sourceGroups: InMemorySourceGroupRepository;
+  readonly categories: InMemoryContentCategoryRepository;
+  readonly ids: FakeIdGenerator;
+  readonly clock: FixedClock;
+}
 
 interface TestContext {
   readonly sourcePublishers: InMemorySourcePublisherRepository;

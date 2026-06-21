@@ -6,6 +6,7 @@ import {
   InvalidContentStatusTransitionError,
   SourceGroupNotFoundError,
   SourcePublisherNotFoundError,
+  SourcePublisherNotPromotableError,
 } from "../../content-manager/application";
 import { toSourcePublisherDto } from "./routes/content-manager.routes";
 import { createHttpServer } from "./server";
@@ -1719,6 +1720,299 @@ describe("Content Manager HTTP routes — home-feed ingestion", () => {
 
       expect(response.statusCode).toBe(400);
       expect(service.ingestHomeFeedCollectedContent.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+describe("Content Manager HTTP routes — promote source publisher to source group", () => {
+  it("promotes an approved Facebook GROUP publisher and returns CREATED", async () => {
+    const { server, service } = createTestServer();
+
+    service.promoteSourcePublisherToSourceGroup.setOutput({
+      sourceGroup: createSourceGroup({
+        id: "source-group-promoted-1",
+        status: "PAUSED",
+        externalGroupId: "synthetic-group-123",
+      }),
+      outcome: "CREATED",
+    });
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-1/promote-to-source-group",
+        payload: {
+          categoryId: "category-1",
+          collectionPriority: 80,
+        },
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(service.promoteSourcePublisherToSourceGroup.calls).toEqual([
+        {
+          sourcePublisherId: "source-publisher-1",
+          categoryId: "category-1",
+          collectionPriority: 80,
+        },
+      ]);
+      expect(body).toEqual({
+        sourceGroup: expect.objectContaining({
+          id: "source-group-promoted-1",
+          status: "PAUSED",
+          externalGroupId: "synthetic-group-123",
+        }),
+        promotion: { outcome: "CREATED" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns ALREADY_EXISTS when the use case signals an existing source group", async () => {
+    const { server, service } = createTestServer();
+
+    service.promoteSourcePublisherToSourceGroup.setOutput({
+      sourceGroup: createSourceGroup({ id: "source-group-existing" }),
+      outcome: "ALREADY_EXISTS",
+    });
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-1/promote-to-source-group",
+        payload: {
+          categoryId: "category-1",
+          collectionPriority: 50,
+          name: "Custom Name",
+          url: "https://facebook.test/groups/synthetic-group-123",
+          notes: "Re-promote safe.",
+        },
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body.promotion).toEqual({ outcome: "ALREADY_EXISTS" });
+      expect(service.promoteSourcePublisherToSourceGroup.calls).toEqual([
+        {
+          sourcePublisherId: "source-publisher-1",
+          categoryId: "category-1",
+          collectionPriority: 50,
+          name: "Custom Name",
+          url: "https://facebook.test/groups/synthetic-group-123",
+          notes: "Re-promote safe.",
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects unknown fields on the promote body", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-1/promote-to-source-group",
+        payload: {
+          categoryId: "category-1",
+          collectionPriority: 50,
+          status: "ACTIVE",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(service.promoteSourcePublisherToSourceGroup.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects a missing required collectionPriority", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-1/promote-to-source-group",
+        payload: { categoryId: "category-1" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(service.promoteSourcePublisherToSourceGroup.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects an out-of-range collectionPriority", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-1/promote-to-source-group",
+        payload: {
+          categoryId: "category-1",
+          collectionPriority: 150,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(service.promoteSourcePublisherToSourceGroup.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects null values on optional fields", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-1/promote-to-source-group",
+        payload: {
+          categoryId: "category-1",
+          collectionPriority: 50,
+          name: null,
+          url: null,
+          notes: null,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(service.promoteSourcePublisherToSourceGroup.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects a blank categoryId", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-1/promote-to-source-group",
+        payload: {
+          categoryId: "   ",
+          collectionPriority: 50,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(service.promoteSourcePublisherToSourceGroup.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps a missing source publisher to 404 SOURCE_PUBLISHER_NOT_FOUND", async () => {
+    const { server, service } = createTestServer();
+
+    service.promoteSourcePublisherToSourceGroup.setError(
+      new SourcePublisherNotFoundError("source-publisher-missing"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-missing/promote-to-source-group",
+        payload: {
+          categoryId: "category-1",
+          collectionPriority: 50,
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: { code: "SOURCE_PUBLISHER_NOT_FOUND" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps a not-promotable publisher to 409 SOURCE_PUBLISHER_NOT_PROMOTABLE", async () => {
+    const { server, service } = createTestServer();
+
+    service.promoteSourcePublisherToSourceGroup.setError(
+      new SourcePublisherNotPromotableError(
+        "source-publisher-1",
+        "NOT_APPROVED",
+      ),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-1/promote-to-source-group",
+        payload: {
+          categoryId: "category-1",
+          collectionPriority: 50,
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: { code: "SOURCE_PUBLISHER_NOT_PROMOTABLE" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps a missing category to 404 CONTENT_CATEGORY_NOT_FOUND", async () => {
+    const { server, service } = createTestServer();
+
+    service.promoteSourcePublisherToSourceGroup.setError(
+      new ContentCategoryNotFoundError("category-missing"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-1/promote-to-source-group",
+        payload: {
+          categoryId: "category-missing",
+          collectionPriority: 50,
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: { code: "CONTENT_CATEGORY_NOT_FOUND" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("omits sensitive keys from the promote response", async () => {
+    const { server, service } = createTestServer();
+
+    service.promoteSourcePublisherToSourceGroup.setOutput({
+      sourceGroup: createSourceGroup({ status: "PAUSED" }),
+      outcome: "CREATED",
+    });
+
+    try {
+      const response = await server.inject({
+        method: "POST",
+        url: "/collector/source-publishers/source-publisher-1/promote-to-source-group",
+        payload: {
+          categoryId: "category-1",
+          collectionPriority: 50,
+        },
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expectReadPayloadIsSafe(body);
     } finally {
       await server.close();
     }

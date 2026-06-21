@@ -236,10 +236,35 @@ introduced by Sprint 066.
 
 - [Sprint 066 - Source Publisher Status Mutation HTTP Contract](SPRINT-066-source-publisher-status-mutation-http-contract.md)
 
-No sprint is currently active. The remaining
-067–068 feed-discovery items are documented placeholders and are
-**not active** until the Product Owner explicitly approves the next
-sprint.
+Sprint 067 — Approved Source Publisher Group Promotion is
+**active**. It exposes a safe Content Manager application use case
+and HTTP route that promotes an already `APPROVED` Facebook
+`GROUP` `SourcePublisher` into a managed `PAUSED` `SourceGroup`.
+The route is
+`POST /collector/source-publishers/:sourcePublisherId/promote-to-source-group`,
+delegates to the new
+`PromoteSourcePublisherToSourceGroupUseCase`, reuses the existing
+safe `SourceGroupDto` allowlist, never mutates the durable
+`SourcePublisher` review status or observation counts, and never
+invents a Facebook URL. The strict body carries only `categoryId`,
+`collectionPriority` (integer `0..100`), and the optional `name`,
+`url`, and `notes`; unknown fields, missing required fields,
+blank strings, `null` values, and an out-of-range priority map to
+HTTP 400 `VALIDATION_ERROR`. A missing publisher, a missing
+category, a `PAGE` publisher, an unapproved status, and a missing
+URL each map to a typed application error. Promotion is
+review-status neutral; a `CREATED` outcome persists a new `PAUSED`
+`SourceGroup`, an `ALREADY_EXISTS` outcome returns the existing
+matching `SourceGroup`. Sprint 067 does not add Web UI, browser
+behavior, scheduling, joining, activation, workers, Collector
+Runtime behavior, or Content Builder / Content Publisher
+behavior.
+
+- [Sprint 067 - Approved Source Publisher Group Promotion](SPRINT-067-approved-source-publisher-group-promotion.md)
+
+The remaining 068 feed-discovery item is a documented placeholder
+and is **not active** until the Product Owner explicitly approves
+the next sprint.
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

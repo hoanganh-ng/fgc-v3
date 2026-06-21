@@ -133,6 +133,35 @@
   rejected with HTTP 400 `VALIDATION_ERROR`, and a missing
   publisher maps to the existing HTTP 404
   `SOURCE_PUBLISHER_NOT_FOUND`.
+- Safe `SourcePublisher` → `SourceGroup` promotion contract
+  served through the same Nginx → Fastify → Content Manager
+  application → PostgreSQL path. The promotion route
+  `POST /collector/source-publishers/:sourcePublisherId/promote-to-source-group`
+  delegates to the new
+  `PromoteSourcePublisherToSourceGroupUseCase`. The strict body
+  carries only `categoryId`, `collectionPriority` (integer
+  `0..100`), and the optional `name`, `url`, and `notes`;
+  unknown fields, missing required fields, blank strings, `null`
+  values, and an out-of-range priority map to HTTP 400
+  `VALIDATION_ERROR`. The use case enforces the
+  `platform === "FACEBOOK"`, `kind === "GROUP"`,
+  `status === "APPROVED"` preconditions on the durable
+  `SourcePublisher`; `PAGE` publishers, unapproved statuses, a
+  missing publisher, a missing category, and a missing URL each
+  raise a typed application error (`SOURCE_PUBLISHER_NOT_PROMOTABLE`,
+  `SOURCE_PUBLISHER_NOT_FOUND`, `CONTENT_CATEGORY_NOT_FOUND`).
+  Promotion resolves the new `SourceGroup` fields from the
+  publisher plus the body without inventing a Facebook URL,
+  short-circuits on
+  `SourceGroupRepository.findByPlatformAndExternalGroupId` with
+  `outcome = "ALREADY_EXISTS"`, and otherwise persists a new
+  `PAUSED` `SourceGroup` with the default `DIRECT_GROUP_URL`
+  entry route and returns `outcome = "CREATED"`. The 200
+  response reuses the existing safe `SourceGroupDto` allowlist
+  plus a typed
+  `promotion: { outcome: "CREATED" | "ALREADY_EXISTS" }` block.
+  Promotion never mutates the durable `SourcePublisher` review
+  status or observation counts.
 - Future handoff shape for Content Builder.
 
 ## Does Not Own
@@ -142,7 +171,14 @@
 - Raw Facebook GraphQL parsing or scraping strategy.
 - Platform-specific extraction rules.
 - Promotion of a `SourcePublisher` into a managed `SourceGroup`,
-  `SourceGroup` configuration, scheduling, or any social action.
+  `SourceGroup` configuration, scheduling, or any social action,
+  with the single narrow exception of the
+  `POST /collector/source-publishers/:sourcePublisherId/promote-to-source-group`
+  HTTP route introduced by Sprint 067. Sprint 067 only promotes
+  already `APPROVED` Facebook `GROUP` `SourcePublisher` records
+  into `PAUSED` managed `SourceGroup` records. It does not
+  activate, schedule, join, or perform any other social action,
+  and it does not promote `PAGE` publishers.
 - `Content Publisher` pipeline behavior. `SourcePublisher` is the
   Content Manager-owned durable publishing-source identity, not the
   future Content Publisher pipeline module, and it does not model
@@ -161,6 +197,8 @@
   - `use-cases/get-source-publisher.use-case.ts`
   - `use-cases/list-source-publishers.use-case.ts`
   - `use-cases/update-source-publisher-status.use-case.ts`
+  - `use-cases/promote-source-publisher-to-source-group.use-case.ts`
+    (Sprint 067)
   - `use-cases/ingest-collected-content.use-case.ts` (Sprint 064B
     integrates provenance creation and merge)
   - `test-support/in-memory-repositories.ts`
@@ -209,8 +247,11 @@
 - `Fastify API`: `src/content-manager/interface/http/` (e.g. `/content/items`, `/content/source-groups`)
 - `HTTP Adapter (SourcePublisher)`: `src/interfaces/http/routes/content-manager.routes.ts`
   registers `POST /collector/source-publishers/observations`,
-  `GET /collector/source-publishers`, and
-  `GET /collector/source-publishers/:sourcePublisherId`.
+  `GET /collector/source-publishers`,
+  `GET /collector/source-publishers/:sourcePublisherId`,
+  `PATCH /collector/source-publishers/:sourcePublisherId/status`,
+  and (Sprint 067)
+  `POST /collector/source-publishers/:sourcePublisherId/promote-to-source-group`.
 - `Composition Root`: `src/content-manager/composition/root.ts`
 
 ## Critical Invariants

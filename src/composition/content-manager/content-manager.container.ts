@@ -12,6 +12,7 @@ import {
   ListSourceGroupsUseCase,
   ListSourcePublishersUseCase,
   ObserveSourcePublisherUseCase,
+  PromoteSourcePublisherToSourceGroupUseCase,
   RemoveSourceGroupEntryRouteUseCase,
   UpdateContentStatusUseCase,
   UpdateSourceGroupEntryRouteUseCase,
@@ -56,6 +57,7 @@ export interface ContentManagerContainer {
   readonly getSourcePublisher: GetSourcePublisherUseCase;
   readonly listSourcePublishers: ListSourcePublishersUseCase;
   readonly updateSourcePublisherStatus: UpdateSourcePublisherStatusUseCase;
+  readonly promoteSourcePublisherToSourceGroup: PromoteSourcePublisherToSourceGroupUseCase;
   close(): Promise<void>;
 }
 
@@ -129,6 +131,14 @@ export function createContentManager(
       sourcePublishers,
       clock,
     ),
+    promoteSourcePublisherToSourceGroup:
+      new PromoteSourcePublisherToSourceGroupUseCase(
+        sourcePublishers,
+        sourceGroups,
+        categories,
+        idGenerator,
+        clock,
+      ),
     close: dependencies.close ?? noopClose,
   };
 }

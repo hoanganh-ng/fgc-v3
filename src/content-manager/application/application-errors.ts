@@ -14,6 +14,7 @@ export type ContentManagerApplicationErrorCode =
   | "INVALID_CONTENT_STATUS_TRANSITION"
   | "CONTENT_VALIDATION_ERROR"
   | "SOURCE_PUBLISHER_NOT_FOUND"
+  | "SOURCE_PUBLISHER_NOT_PROMOTABLE"
   | "HOME_FEED_CONTENT_PLATFORM_MISMATCH";
 
 export abstract class ContentManagerApplicationError extends Error {
@@ -134,6 +135,27 @@ export class SourcePublisherNotFoundError extends ContentManagerApplicationError
       `Source publisher not found: ${sourcePublisherId}.`,
     );
     this.sourcePublisherId = sourcePublisherId;
+  }
+}
+
+export class SourcePublisherNotPromotableError extends ContentManagerApplicationError {
+  public readonly sourcePublisherId: string;
+  public readonly reason:
+    | "NOT_FACEBOOK"
+    | "NOT_GROUP"
+    | "NOT_APPROVED"
+    | "MISSING_URL";
+
+  public constructor(
+    sourcePublisherId: string,
+    reason: "NOT_FACEBOOK" | "NOT_GROUP" | "NOT_APPROVED" | "MISSING_URL",
+  ) {
+    super(
+      "SOURCE_PUBLISHER_NOT_PROMOTABLE",
+      `Source publisher not promotable (${reason}): ${sourcePublisherId}.`,
+    );
+    this.sourcePublisherId = sourcePublisherId;
+    this.reason = reason;
   }
 }
 

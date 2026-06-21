@@ -188,6 +188,16 @@ export const UpdateSourcePublisherStatusHttpBodySchema = z
   })
   .strict();
 
+export const PromoteSourcePublisherToSourceGroupHttpBodySchema = z
+  .object({
+    categoryId: ContentCategoryIdSchema,
+    collectionPriority: z.number().int().min(0).max(100),
+    name: NonEmptyStringHttpSchema.optional(),
+    url: NonEmptyStringHttpSchema.optional(),
+    notes: NonEmptyStringHttpSchema.optional(),
+  })
+  .strict();
+
 export type CreateContentCategoryHttpBody = z.infer<
   typeof CreateContentCategoryHttpBodySchema
 >;
@@ -238,6 +248,9 @@ export type ListSourcePublishersHttpQuery = z.infer<
 >;
 export type UpdateSourcePublisherStatusHttpBody = z.infer<
   typeof UpdateSourcePublisherStatusHttpBodySchema
+>;
+export type PromoteSourcePublisherToSourceGroupHttpBody = z.infer<
+  typeof PromoteSourcePublisherToSourceGroupHttpBodySchema
 >;
 
 const nonEmptyStringJsonSchema = { type: "string", minLength: 1 } as const;
@@ -853,6 +866,45 @@ const sourcePublisherStatusBodyJsonSchema = {
   },
 } as const;
 
+const promoteSourcePublisherToSourceGroupBodyJsonSchema = {
+  type: "object",
+  required: ["categoryId", "collectionPriority"],
+  additionalProperties: false,
+  properties: {
+    categoryId: nonEmptyStringJsonSchema,
+    collectionPriority: {
+      type: "integer",
+      minimum: 0,
+      maximum: 100,
+    },
+    name: nonEmptyStringJsonSchema,
+    url: nonEmptyStringJsonSchema,
+    notes: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+const promoteSourcePublisherToSourceGroupResultJsonSchema = {
+  type: "object",
+  required: ["outcome"],
+  additionalProperties: false,
+  properties: {
+    outcome: {
+      type: "string",
+      enum: ["CREATED", "ALREADY_EXISTS"],
+    },
+  },
+} as const;
+
+const promoteSourcePublisherToSourceGroupResponseJsonSchema = {
+  type: "object",
+  required: ["sourceGroup", "promotion"],
+  additionalProperties: false,
+  properties: {
+    sourceGroup: sourceGroupJsonSchema,
+    promotion: promoteSourcePublisherToSourceGroupResultJsonSchema,
+  },
+} as const;
+
 const listSourcePublishersQueryJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -1185,6 +1237,16 @@ export const updateSourcePublisherStatusHttpRouteSchema = {
         sourcePublisher: sourcePublisherJsonSchema,
       },
     },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const promoteSourcePublisherToSourceGroupHttpRouteSchema = {
+  params: sourcePublisherIdParamsJsonSchema,
+  body: promoteSourcePublisherToSourceGroupBodyJsonSchema,
+  response: {
+    200: promoteSourcePublisherToSourceGroupResponseJsonSchema,
     "4xx": errorResponseJsonSchema,
     "5xx": errorResponseJsonSchema,
   },
