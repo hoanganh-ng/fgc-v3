@@ -264,16 +264,27 @@ behavior.
 
 - [Sprint 067 - Approved Source Publisher Group Promotion](SPRINT-067-approved-source-publisher-group-promotion.md)
 
-Sprint 068A — Profile Home-Feed Schedule Foundation is **active**.
-It adds a durable Collector Runtime-owned
-`ProfileHomeFeedCollectionSchedule` model and safe operator HTTP API
-for profile-bound Facebook home-feed collection schedules. This sprint
-configures schedules only: it does not dispatch runs, execute browser
-collection, wire the Sprint 059 scheduler poller, add Docker services,
-change the one-shot home-feed executor, add a `SCHEDULED` home-feed run
-trigger, or start Sprint 068B.
+Sprint 068A — Profile Home-Feed Schedule Foundation is **accepted** at
+`fe14d016e364724df354c2816c5d3f75abda8703`. It added a durable
+Collector Runtime-owned `ProfileHomeFeedCollectionSchedule` model and
+safe operator HTTP API for profile-bound Facebook home-feed collection
+schedules. This sprint configured schedules only: it did not dispatch
+runs, execute browser collection, wire the Sprint 059 scheduler poller,
+add Docker services, change the one-shot home-feed executor, add a
+`SCHEDULED` home-feed run trigger, or start Sprint 068B.
 
 - [Sprint 068A - Profile Home-Feed Schedule Foundation](SPRINT-068A-profile-home-feed-schedule-foundation.md)
+
+Sprint 068B-D — Home-Feed Scheduled Dispatch Design is **active**.
+It produces the design for dispatching due
+`ProfileHomeFeedCollectionSchedule` rows into queued, profile-bound
+`ProfileHomeFeedCollectionRun` records. This sprint is design-only:
+it does not implement runtime behavior, add migrations, change trigger
+enums, add dispatch repositories, wire pollers or workers, add Docker
+services, add browser code, add Web UI behavior, or expose execution
+routes. The design is not accepted.
+
+- [Sprint 068B-D - Home-Feed Scheduled Dispatch Design](SPRINT-068B-D-home-feed-scheduled-dispatch-design.md)
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

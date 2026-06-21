@@ -177,7 +177,12 @@ account private payloads, browser diagnostics, or other private runtime data.
 
 ## Status
 
-Sprint 068A is **active and authorized**. It is not accepted.
+Sprint 068A is **accepted** at
+`fe14d016e364724df354c2816c5d3f75abda8703`.
 
-Sprint 068B or any later dispatch/poller wiring remains future work and is not
-started by this sprint.
+Sprint 068B-D is the active design-only scheduled-dispatch sprint. It
+does not implement dispatch, add migrations, wire pollers or workers,
+or execute browser collection.
+
+Sprint 068B or any later dispatch/poller wiring remains future work and
+is not started by this sprint.

@@ -206,12 +206,24 @@ cadence and bounded run parameters only; it does not dispatch runs, wire the
 scheduler poller, execute browser collection, add Docker services, or change
 the one-shot home-feed executor.
 
-## Sprint 068B: Home-Feed Scheduled Dispatch
+## Sprint 068B-D: Home-Feed Scheduled Dispatch Design
 
-After manual feed execution validation and the Sprint 068A foundation, wire
-scheduled profile home-feed dispatch so a due schedule can create a
-profile-bound home-feed run with bounded retries and a deterministic next-run
-timestamp. Poller and worker integration remain out of Sprint 068A.
+Design scheduled profile home-feed dispatch from
+`ProfileHomeFeedCollectionSchedule` configuration into queued,
+profile-bound `ProfileHomeFeedCollectionRun` records. This sprint is
+documentation-only: no runtime behavior, migrations, trigger enum
+changes, dispatch repositories, scheduler process changes, workers,
+Docker services, browser execution, Web UI, or execution routes.
+Manual live-Facebook validation remains separate.
+
+## Sprint 068B: Home-Feed Scheduled Dispatch Implementation
+
+After Sprint 068B-D is accepted, implement the separate home-feed
+scheduled dispatch path so a due schedule can create a profile-bound
+home-feed run with a `SCHEDULED` trigger, deterministic cadence
+advancement, active-run skip behavior, and safe retry/backoff tracking.
+Poller integration should remain a separate authorized slice unless
+the implementation sprint explicitly includes it.
 
 ## Future: Content Builder
 
