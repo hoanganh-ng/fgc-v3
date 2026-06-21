@@ -16,6 +16,7 @@ import type {
   UpdateContentStatusInput,
   UpdateSourceGroupEntryRouteInput,
   UpdateSourceGroupStatusInput,
+  UpdateSourcePublisherStatusInput,
 } from "../../../content-manager/application";
 import type {
   CollectedContentInput,
@@ -146,6 +147,10 @@ export interface FakeContentManagerHttpService
     ListSourcePublishersInput,
     ListSourcePublishersOutput
   >;
+  readonly updateSourcePublisherStatus: StubUseCase<
+    UpdateSourcePublisherStatusInput,
+    SourcePublisher
+  >;
 }
 
 export function createFakeContentManagerHttpService(): FakeContentManagerHttpService {
@@ -215,6 +220,9 @@ export function createFakeContentManagerHttpService(): FakeContentManagerHttpSer
         total: 1,
       },
     }),
+    updateSourcePublisherStatus: new StubUseCase(
+      createSourcePublisher({ status: "APPROVED" }),
+    ),
   };
 }
 

@@ -1299,6 +1299,217 @@ describe("Content Manager HTTP routes", () => {
     }
   });
 
+  it("updates source publisher status to APPROVED", async () => {
+    const { server, service } = createTestServer();
+
+    service.updateSourcePublisherStatus.setOutput(
+      createSourcePublisher({ status: "APPROVED" }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PATCH",
+        url: "/collector/source-publishers/source-publisher-1/status",
+        payload: { status: "APPROVED" },
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(service.updateSourcePublisherStatus.calls).toEqual([
+        {
+          sourcePublisherId: "source-publisher-1",
+          status: "APPROVED",
+        },
+      ]);
+      expect(body).toMatchObject({
+        sourcePublisher: {
+          id: "source-publisher-1",
+          status: "APPROVED",
+        },
+      });
+      expectSourcePublisherIsSafe(body);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("updates source publisher status to BLOCKED, IGNORED, and DISCOVERED", async () => {
+    const { server, service } = createTestServer();
+
+    const cases = [
+      { status: "BLOCKED", id: "source-publisher-blocked" },
+      { status: "IGNORED", id: "source-publisher-ignored" },
+      { status: "DISCOVERED", id: "source-publisher-discovered" },
+    ] as const;
+
+    for (const { status, id } of cases) {
+      const local = createTestServer();
+      local.service.updateSourcePublisherStatus.setOutput(
+        createSourcePublisher({ id, status }),
+      );
+
+      try {
+        const response = await local.server.inject({
+          method: "PATCH",
+          url: `/collector/source-publishers/${id}/status`,
+          payload: { status },
+        });
+        const body = response.json();
+
+        expect(response.statusCode).toBe(200);
+        expect(local.service.updateSourcePublisherStatus.calls).toEqual([
+          { sourcePublisherId: id, status },
+        ]);
+        expect(body).toMatchObject({
+          sourcePublisher: { id, status },
+        });
+        expectSourcePublisherIsSafe(body);
+      } finally {
+        await local.server.close();
+      }
+    }
+
+    expect(service.updateSourcePublisherStatus.calls).toEqual([]);
+  });
+
+  it("rejects invalid source publisher status values", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "PATCH",
+        url: "/collector/source-publishers/source-publisher-1/status",
+        payload: { status: "REJECTED" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(service.updateSourcePublisherStatus.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects unknown fields on source publisher status PATCH", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "PATCH",
+        url: "/collector/source-publishers/source-publisher-1/status",
+        payload: {
+          status: "APPROVED",
+          displayName: "Should not be accepted",
+          canonicalUrl: "https://example.invalid/should-not",
+          id: "source-publisher-x",
+          observationCount: 99,
+          updatedAt: "2026-06-18T13:00:00.000Z",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(service.updateSourcePublisherStatus.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects empty body on source publisher status PATCH", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "PATCH",
+        url: "/collector/source-publishers/source-publisher-1/status",
+        payload: {},
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(service.updateSourcePublisherStatus.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects null status on source publisher status PATCH", async () => {
+    const { server, service } = createTestServer();
+
+    try {
+      const response = await server.inject({
+        method: "PATCH",
+        url: "/collector/source-publishers/source-publisher-1/status",
+        payload: { status: null },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(service.updateSourcePublisherStatus.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps missing source publisher status PATCH to 404", async () => {
+    const { server, service } = createTestServer();
+
+    service.updateSourcePublisherStatus.setError(
+      new SourcePublisherNotFoundError("source-publisher-missing"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PATCH",
+        url: "/collector/source-publishers/source-publisher-missing/status",
+        payload: { status: "APPROVED" },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: { code: "SOURCE_PUBLISHER_NOT_FOUND" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("omits displayName and canonicalUrl on status PATCH when absent", async () => {
+    const { server, service } = createTestServer();
+
+    service.updateSourcePublisherStatus.setOutput(
+      createSourcePublisher({
+        status: "APPROVED",
+        displayName: undefined,
+        canonicalUrl: undefined,
+      }),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PATCH",
+        url: "/collector/source-publishers/source-publisher-1/status",
+        payload: { status: "APPROVED" },
+      });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body.sourcePublisher).not.toHaveProperty("displayName");
+      expect(body.sourcePublisher).not.toHaveProperty("canonicalUrl");
+      expectSourcePublisherIsSafe(body);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("toSourcePublisherDto omits displayName and canonicalUrl when absent", async () => {
     const dto = toSourcePublisherDto(
       createSourcePublisher({

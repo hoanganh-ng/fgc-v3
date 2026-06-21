@@ -190,7 +190,9 @@ validation was not performed by Sprint 065C3.
 
 ## Sprint 066: Source Publisher Discovery Review API And UI
 
-Add the discovered `SourcePublisher` review queue with approve, ignore, and block behavior, exposed through HTTP routes and a Web UI review page.
+Add the discovered `SourcePublisher` review queue with approve, ignore, and block behavior, exposed through HTTP routes and a Web UI review page. Sprint 066 ships only the HTTP contract
+(`PATCH /collector/source-publishers/:sourcePublisherId/status`);
+the Web UI review page remains future work.
 
 ## Sprint 067: Approved Group Promotion
 

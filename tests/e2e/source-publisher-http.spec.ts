@@ -116,6 +116,55 @@ test.describe("Sprint 063C — Source Publisher HTTP E2E", () => {
     expect(matched, "list contains the observed source publisher").toBeDefined();
     expectSourcePublisherIsSafe(listBody);
   });
+
+  test("patches a SourcePublisher status through web-gateway", async ({
+    request,
+  }) => {
+    const observation = buildSourcePublisherObservationFixture(runStamp, {
+      kind: "GROUP",
+    });
+
+    // 1. Observe a fresh SourcePublisher through the existing route.
+    const observeResponse = await request.post(
+      "/collector/source-publishers/observations",
+      { data: observation },
+    );
+    expect(
+      observeResponse.status(),
+      "POST /collector/source-publishers/observations",
+    ).toBe(200);
+    const observeBody = await observeResponse.json();
+    const sourcePublisherId: string = observeBody.sourcePublisher.id;
+    expect(observeBody.sourcePublisher.status).toBe("DISCOVERED");
+    expectSourcePublisherIsSafe(observeBody);
+
+    // 2. PATCH the status to APPROVED.
+    const patchResponse = await request.patch(
+      `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}/status`,
+      { data: { status: "APPROVED" } },
+    );
+    expect(
+      patchResponse.status(),
+      "PATCH /collector/source-publishers/:id/status",
+    ).toBe(200);
+    const patchBody = await patchResponse.json();
+    expect(patchBody.sourcePublisher.id).toBe(sourcePublisherId);
+    expect(patchBody.sourcePublisher.status).toBe("APPROVED");
+    expectSourcePublisherIsSafe(patchBody);
+
+    // 3. GET back to confirm durable status persistence through web-gateway.
+    const getResponse = await request.get(
+      `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}`,
+    );
+    expect(
+      getResponse.status(),
+      "GET /collector/source-publishers/:id",
+    ).toBe(200);
+    const getBody = await getResponse.json();
+    expect(getBody.sourcePublisher.id).toBe(sourcePublisherId);
+    expect(getBody.sourcePublisher.status).toBe("APPROVED");
+    expectSourcePublisherIsSafe(getBody);
+  });
 });
 
 const SENSITIVE_KEYS = [

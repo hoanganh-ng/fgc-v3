@@ -604,6 +604,71 @@ if (!shouldRunHttpDbTests) {
     });
 
     // --------------------------------------------------------------
+    // Sprint 066 — Source Publisher status mutation HTTP integration
+    // through composition → repositories → PostgreSQL with safe DTO
+    // assertions and a final GET round-trip confirming durable
+    // persistence.
+    // --------------------------------------------------------------
+    it("persists a Source Publisher status mutation through composition, repositories, and PostgreSQL", async () => {
+      const externalPublisherId = nextTestId("external-publisher-status");
+
+      // 1. Observe a fresh SourcePublisher through the existing route.
+      const observeResponse = await getServer().inject({
+        method: "POST",
+        url: "/collector/source-publishers/observations",
+        payload: {
+          platform: "FACEBOOK",
+          kind: "GROUP",
+          externalPublisherId,
+          observedAt: "2026-06-18T12:00:00.000Z",
+          displayName: "HTTP DB Status Group",
+          canonicalUrl: `https://example.invalid/groups/${externalPublisherId}`,
+        },
+      });
+      const observeBody = observeResponse.json() as {
+        readonly sourcePublisher: { readonly id: string; readonly status: string };
+      };
+      const sourcePublisherId = trackSourcePublisherId(
+        observeBody.sourcePublisher.id,
+      );
+
+      expect(observeResponse.statusCode).toBe(200);
+      expect(observeBody.sourcePublisher.status).toBe("DISCOVERED");
+
+      // 2. PATCH the status to APPROVED.
+      const patchResponse = await getServer().inject({
+        method: "PATCH",
+        url: `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}/status`,
+        payload: { status: "APPROVED" },
+      });
+      const patchBody = patchResponse.json() as {
+        readonly sourcePublisher: {
+          readonly id: string;
+          readonly status: string;
+          readonly updatedAt: string;
+        };
+      };
+
+      expect(patchResponse.statusCode).toBe(200);
+      expect(patchBody.sourcePublisher.id).toBe(sourcePublisherId);
+      expect(patchBody.sourcePublisher.status).toBe("APPROVED");
+      expectSourcePublisherIsSafe(patchBody);
+
+      // 3. GET back to confirm the status was durably persisted.
+      const getResponse = await getServer().inject({
+        method: "GET",
+        url: `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}`,
+      });
+      const getBody = getResponse.json() as {
+        readonly sourcePublisher: { readonly status: string };
+      };
+
+      expect(getResponse.statusCode).toBe(200);
+      expect(getBody.sourcePublisher.status).toBe("APPROVED");
+      expectSourcePublisherIsSafe(getBody);
+    });
+
+    // --------------------------------------------------------------
     // Sprint 065C1 — bare home-feed HTTP integration through
     // composition → repositories → PostgreSQL with end-to-end
     // safe DTO assertions and a final source-group follow-up that

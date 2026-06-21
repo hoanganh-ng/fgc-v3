@@ -17,6 +17,7 @@ import type {
   UpdateContentStatusInput,
   UpdateSourceGroupEntryRouteInput,
   UpdateSourceGroupStatusInput,
+  UpdateSourcePublisherStatusInput,
 } from "../../../content-manager/application";
 import type {
   CollectedContentInput,
@@ -55,6 +56,7 @@ import {
   UpdateContentStatusHttpBodySchema,
   UpdateSourceGroupEntryRouteHttpBodySchema,
   UpdateSourceGroupStatusHttpBodySchema,
+  UpdateSourcePublisherStatusHttpBodySchema,
   createContentCategoryHttpRouteSchema,
   createSourceGroupEntryRouteHttpRouteSchema,
   createSourceGroupHttpRouteSchema,
@@ -73,6 +75,7 @@ import {
   updateContentStatusHttpRouteSchema,
   updateSourceGroupEntryRouteHttpRouteSchema,
   updateSourceGroupStatusHttpRouteSchema,
+  updateSourcePublisherStatusHttpRouteSchema,
 } from "../schemas/content-manager.http-schemas";
 
 interface ExecutableUseCase<Input, Output> {
@@ -144,6 +147,10 @@ export interface ContentManagerHttpService {
   readonly listSourcePublishers: ExecutableUseCase<
     ListSourcePublishersInput,
     ListSourcePublishersOutput
+  >;
+  readonly updateSourcePublisherStatus: ExecutableUseCase<
+    UpdateSourcePublisherStatusInput,
+    SourcePublisher
   >;
 }
 
@@ -620,6 +627,30 @@ export function registerContentManagerRoutes(
         await contentManager.getSourcePublisher.execute({
           sourcePublisherId: params.sourcePublisherId,
         } satisfies GetSourcePublisherInput);
+
+      return {
+        sourcePublisher: toSourcePublisherDto(sourcePublisher),
+      };
+    },
+  );
+
+  server.patch(
+    "/collector/source-publishers/:sourcePublisherId/status",
+    { schema: updateSourcePublisherStatusHttpRouteSchema },
+    async (request) => {
+      const params = parseHttpInput(
+        SourcePublisherIdHttpParamsSchema,
+        request.params,
+      );
+      const body = parseHttpInput(
+        UpdateSourcePublisherStatusHttpBodySchema,
+        request.body,
+      );
+      const sourcePublisher =
+        await contentManager.updateSourcePublisherStatus.execute({
+          sourcePublisherId: params.sourcePublisherId,
+          status: body.status,
+        } satisfies UpdateSourcePublisherStatusInput);
 
       return {
         sourcePublisher: toSourcePublisherDto(sourcePublisher),

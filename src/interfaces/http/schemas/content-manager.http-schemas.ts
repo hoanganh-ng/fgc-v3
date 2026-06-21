@@ -182,6 +182,12 @@ export const ListSourcePublishersHttpQuerySchema = z
   })
   .strict();
 
+export const UpdateSourcePublisherStatusHttpBodySchema = z
+  .object({
+    status: SourcePublisherStatusSchema,
+  })
+  .strict();
+
 export type CreateContentCategoryHttpBody = z.infer<
   typeof CreateContentCategoryHttpBodySchema
 >;
@@ -229,6 +235,9 @@ export type SourcePublisherIdHttpParams = z.infer<
 >;
 export type ListSourcePublishersHttpQuery = z.infer<
   typeof ListSourcePublishersHttpQuerySchema
+>;
+export type UpdateSourcePublisherStatusHttpBody = z.infer<
+  typeof UpdateSourcePublisherStatusHttpBodySchema
 >;
 
 const nonEmptyStringJsonSchema = { type: "string", minLength: 1 } as const;
@@ -832,6 +841,18 @@ const sourcePublisherIdParamsJsonSchema = {
   },
 } as const;
 
+const sourcePublisherStatusBodyJsonSchema = {
+  type: "object",
+  required: ["status"],
+  additionalProperties: false,
+  properties: {
+    status: {
+      type: "string",
+      enum: SOURCE_PUBLISHER_STATUSES,
+    },
+  },
+} as const;
+
 const listSourcePublishersQueryJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -1138,6 +1159,23 @@ export const listSourcePublishersHttpRouteSchema = {
 
 export const getSourcePublisherHttpRouteSchema = {
   params: sourcePublisherIdParamsJsonSchema,
+  response: {
+    200: {
+      type: "object",
+      required: ["sourcePublisher"],
+      additionalProperties: false,
+      properties: {
+        sourcePublisher: sourcePublisherJsonSchema,
+      },
+    },
+    "4xx": errorResponseJsonSchema,
+    "5xx": errorResponseJsonSchema,
+  },
+} as const;
+
+export const updateSourcePublisherStatusHttpRouteSchema = {
+  params: sourcePublisherIdParamsJsonSchema,
+  body: sourcePublisherStatusBodyJsonSchema,
   response: {
     200: {
       type: "object",

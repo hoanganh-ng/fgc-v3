@@ -218,9 +218,28 @@ was **not performed** by Sprint 065C3.
 
 - [Sprint 065C3 - Bounded Facebook Home-Feed Execution](SPRINT-065C3-bounded-facebook-home-feed-execution.md)
 
-No sprint is currently active. Sprint 066 and the remaining 067–068
-feed-discovery items are documented placeholders and are **not
-active** until the Product Owner explicitly approves the next sprint.
+Sprint 066 — Source Publisher Status Mutation HTTP Contract is
+**active**. It exposes
+`PATCH /collector/source-publishers/:sourcePublisherId/status` as a
+safe Content Manager HTTP contract that delegates to the existing
+`UpdateSourcePublisherStatusUseCase`. The body is strict and
+accepts exactly `{ status }` where `status` is one of `DISCOVERED`,
+`APPROVED`, `IGNORED`, `BLOCKED`; unknown fields, missing fields,
+and `null` are rejected with HTTP 400 `VALIDATION_ERROR`. The 200
+response reuses the existing safe `SourcePublisherDto` allowlist
+(`displayName` and `canonicalUrl` omitted when absent, never
+emitted as `null`) and a missing publisher maps to the existing
+HTTP 404 `SOURCE_PUBLISHER_NOT_FOUND`. No new container wiring,
+repository change, status transition rule, migration, Web UI,
+browser behavior, scheduler, worker, or Docker service is
+introduced by Sprint 066.
+
+- [Sprint 066 - Source Publisher Status Mutation HTTP Contract](SPRINT-066-source-publisher-status-mutation-http-contract.md)
+
+No sprint is currently active beyond Sprint 066. The remaining
+067–068 feed-discovery items are documented placeholders and are
+**not active** until the Product Owner explicitly approves the next
+sprint.
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

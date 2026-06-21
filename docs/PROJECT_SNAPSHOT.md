@@ -190,8 +190,20 @@ and E2E is accepted: it ships the safe observation, list, and get
 HTTP contracts, the safe `SourcePublisherDto` allowlist, the
 stub-backed HTTP unit tests, the opt-in PostgreSQL-backed HTTP
 integration test, the Docker E2E spec through web-gateway, and
-the corresponding documentation. Status mutation (approve / ignore /
-block) is intentionally deferred to Sprint 066. Sprint 064A —
+the corresponding documentation. Sprint 066 — Source Publisher
+Status Mutation HTTP Contract is accepted: it exposes
+`PATCH /collector/source-publishers/:sourcePublisherId/status` as
+a safe Content Manager HTTP contract that delegates to the existing
+`UpdateSourcePublisherStatusUseCase`, with a strict body schema
+(`{ status }` only, enum-validated, unknown fields and `null`
+rejected with HTTP 400 `VALIDATION_ERROR`), the existing safe
+`SourcePublisherDto` allowlist (`displayName` and `canonicalUrl`
+omitted when absent), the existing 404 `SOURCE_PUBLISHER_NOT_FOUND`
+mapping, and matching stub-backed unit tests, opt-in PostgreSQL-backed
+HTTP integration test, Playwright E2E spec, and sprint
+documentation. Sprint 066 adds no new container wiring, repository
+change, status transition rule, migration, Web UI, browser,
+scheduler, worker, or Docker service. Sprint 064A —
 Content Collection Provenance Model is accepted, and Sprint 064B —
 Provenance Persistence And Compatibility is accepted. Sprint 065A —
 Facebook Home-Feed Extractor Fixtures is accepted at
