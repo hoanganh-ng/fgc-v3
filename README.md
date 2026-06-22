@@ -2,14 +2,15 @@
 
 `fgc-v3` is a Content Video Pipeline. The product is being built in stages: Content Collector, Content Builder, and Content Publisher.
 
-The current focus is the Content Collector: collecting normalized content from configured sources while keeping profile/session management, collector runtime orchestration, and content management behind clear module boundaries.
+The current focus is expanding from Content Collector foundations into the first Content Builder catalog surface while keeping profile/session management, collector runtime orchestration, content management, and content building behind clear module boundaries.
 
 ## Current Modules
 
 - Collector Profile Manager: profile lifecycle, provisioning, session ingestion, checkout eligibility, and trusted runtime profile configuration.
 - Content Manager: content categories, source groups, normalized content ingestion, deduplication, safe reads, and review lifecycle status.
 - Collector Runtime: profile checkout/release orchestration, Facebook collection, browser provider adapters, extraction, submission, and worker execution.
-- Web UI: local management surface for profiles, source groups, content categories, content items, and provisioning actions.
+- Content Builder: reusable Transform Type catalog entries for future content-building workflows. Transform Types store prompts only; they do not execute LLM calls.
+- Web UI: local management surface for profiles, source groups, content categories, content items, Transform Types, and provisioning actions.
 - Operator tools: profile provisioning, manual Facebook collection, worker execution, and browser provider probing.
 
 ## Current Status
@@ -27,6 +28,7 @@ The current focus is the Content Collector: collecting normalized content from c
 - The collection scheduler is available as a separate opt-in Docker Compose service for dev and preview stacks.
 - The profile home-feed scheduler and worker are available as separate opt-in Docker Compose services for dev and preview stacks.
 - A Collector Runtime browser provider boundary exists.
+- The first Content Builder-owned catalog model, Transform Type, is available through safe HTTP routes and the Web UI at `/transform-types`.
 - CloakBrowser support is experimental and not yet production-proven; Playwright Chromium remains the default provider.
 
 ## Architecture

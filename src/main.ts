@@ -3,6 +3,7 @@ import {
   createCollectorProfileManagerFromEnv,
 } from "./composition/collector-profile-manager";
 import { createCollectorRuntimeFromEnv } from "./composition/collector-runtime";
+import { createContentBuilderFromEnv } from "./composition/content-builder";
 import { createContentManagerFromEnv } from "./composition/content-manager";
 import { createHttpServer } from "./interfaces/http";
 
@@ -38,11 +39,13 @@ async function main(): Promise<void> {
     sourceGroupReference: sourceGroupReferences,
   });
   const collectorRuntime = createCollectorRuntimeFromEnv();
+  const contentBuilder = createContentBuilderFromEnv();
   const server = createHttpServer({
     collectorProfileManager,
     sourceGroupReferences,
     collectorRuntime,
     contentManager,
+    contentBuilder,
   });
   let shutdownStarted = false;
 
@@ -56,6 +59,7 @@ async function main(): Promise<void> {
     await collectorProfileManager.close();
     await collectorRuntime.close();
     await contentManager.close();
+    await contentBuilder.close();
   }
 
   process.once("SIGINT", () => {

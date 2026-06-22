@@ -15,6 +15,7 @@ import {
 } from "./test-support/collector-runtime-http-service";
 import { createUnusedCollectorProfileManagerHttpService } from "./test-support/collector-profile-manager-http-service";
 import { createFakeContentManagerHttpService } from "./test-support/content-manager-http-service";
+import { createUnusedContentBuilderHttpService } from "./test-support/content-builder-http-service";
 import { FakeSourceGroupReferencePort } from "./test-support/source-group-reference-port";
 import type { FastifyInstance } from "fastify";
 import type { CollectorRuntimeHttpService } from "./routes/collector-runtime.routes";
@@ -292,6 +293,7 @@ function createTestServer(): {
     collectorRuntime: service,
     contentManager: createFakeContentManagerHttpService(),
     sourceGroupReferences: new FakeSourceGroupReferencePort(),
+    contentBuilder: createUnusedContentBuilderHttpService(),
   });
 
   return { server, service };

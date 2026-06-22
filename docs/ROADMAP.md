@@ -223,9 +223,21 @@ create a profile-bound home-feed run with a `SCHEDULED` trigger, deterministic
 cadence advancement, active-run skip behavior, and safe retry/backoff tracking.
 Poller integration remains a separate authorized slice.
 
+## Sprint 072: Content Builder Transform Type Catalog
+
+Introduce the first Content Builder-owned product model: `TransformType`.
+Operators can create, list, view, update, and archive reusable initial
+transform prompts from the Web UI. This sprint stores prompt catalog entries
+only and does not execute LLM calls, add Content Briefs, Producer graphs,
+artifacts, provider integrations, prompt versioning, Content Publisher,
+Collector Runtime behavior, Facebook browser behavior, profile checkout,
+schedulers, or workers.
+
 ## Future: Content Builder
 
-Retain the long-term Content Builder pipeline stage. The Content Builder stage is not redefined or removed by the feed discovery sequence.
+Retain the long-term Content Builder pipeline stage beyond the Transform Type
+catalog. Content Briefs, Producer workflows, prompt execution, artifacts, and
+provider integrations remain future work.
 
 ## Future: Content Publisher
 

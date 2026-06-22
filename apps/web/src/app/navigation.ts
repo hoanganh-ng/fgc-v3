@@ -8,6 +8,7 @@ import {
   RadioTower,
   ShieldCheck,
   Users,
+  WandSparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,6 +43,11 @@ export const primaryNavigation: readonly NavigationItem[] = [
     label: "Content Items",
     path: "/content-items",
     icon: FileText,
+  },
+  {
+    label: "Transform Types",
+    path: "/transform-types",
+    icon: WandSparkles,
   },
   {
     label: "Collection Runs",

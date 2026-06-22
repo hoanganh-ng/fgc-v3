@@ -17,6 +17,9 @@ import {
   createUnusedCollectorRuntimeHttpService,
 } from "./test-support/collector-runtime-http-service";
 import {
+  createUnusedContentBuilderHttpService,
+} from "./test-support/content-builder-http-service";
+import {
   createCollectedContentInput,
   createContentCategory,
   createContentItem,
@@ -1538,6 +1541,7 @@ function createTestServer(): {
       sourceGroupReferences: new FakeSourceGroupReferencePort(),
       collectorRuntime: createUnusedCollectorRuntimeHttpService(),
       contentManager: service,
+      contentBuilder: createUnusedContentBuilderHttpService(),
     }),
     service,
   };

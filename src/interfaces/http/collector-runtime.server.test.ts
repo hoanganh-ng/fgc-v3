@@ -35,6 +35,9 @@ import {
 import {
   createFakeContentManagerHttpService,
 } from "./test-support/content-manager-http-service";
+import {
+  createUnusedContentBuilderHttpService,
+} from "./test-support/content-builder-http-service";
 import { FakeSourceGroupReferencePort } from "./test-support/source-group-reference-port";
 
 describe("Collector Runtime HTTP routes", () => {
@@ -1835,6 +1838,7 @@ function createTestServer(): {
       sourceGroupReferences: new FakeSourceGroupReferencePort(),
       collectorRuntime: service,
       contentManager: createFakeContentManagerHttpService(),
+      contentBuilder: createUnusedContentBuilderHttpService(),
     }),
     service,
   };

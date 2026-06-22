@@ -17,6 +17,7 @@ import { RouteErrorPage } from "@/pages/route-error-page";
 import { SourceGroupsPage } from "@/pages/source-groups-page";
 import { SourcePublishersPage } from "@/pages/source-publishers-page";
 import { ProfileSourceAccessCheckRunsPage } from "@/pages/profile-source-access-check-runs-page";
+import { TransformTypesPage } from "@/pages/transform-types-page";
 
 export const router = createBrowserRouter([
   {
@@ -59,6 +60,10 @@ export const router = createBrowserRouter([
       {
         path: "content-items/:contentItemId",
         element: <ContentItemDetailPage />,
+      },
+      {
+        path: "transform-types",
+        element: <TransformTypesPage />,
       },
       {
         path: "collection-runs",

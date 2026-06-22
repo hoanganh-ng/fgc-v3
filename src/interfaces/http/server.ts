@@ -11,6 +11,10 @@ import {
   type CollectorRuntimeHttpService,
 } from "./routes/collector-runtime.routes";
 import {
+  registerContentBuilderRoutes,
+  type ContentBuilderHttpService,
+} from "./routes/content-builder.routes";
+import {
   registerContentManagerRoutes,
   type ContentManagerHttpService,
 } from "./routes/content-manager.routes";
@@ -21,6 +25,7 @@ export interface CreateHttpServerOptions {
   readonly sourceGroupReferences: SourceGroupReferencePort;
   readonly collectorRuntime: CollectorRuntimeHttpService;
   readonly contentManager: ContentManagerHttpService;
+  readonly contentBuilder: ContentBuilderHttpService;
   readonly logger?: FastifyServerOptions["logger"];
 }
 
@@ -52,6 +57,9 @@ export function createHttpServer(
   });
   registerContentManagerRoutes(server, {
     contentManager: options.contentManager,
+  });
+  registerContentBuilderRoutes(server, {
+    contentBuilder: options.contentBuilder,
   });
 
   return server;

@@ -27,6 +27,9 @@ import { createHttpServer } from "./server";
 import {
   createUnusedCollectorRuntimeHttpService,
 } from "./test-support/collector-runtime-http-service";
+import {
+  createUnusedContentBuilderHttpService,
+} from "./test-support/content-builder-http-service";
 
 const shouldRunHttpDbTests = process.env.RUN_HTTP_DB_TESTS === "true";
 const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -76,6 +79,7 @@ if (!shouldRunHttpDbTests) {
         sourceGroupReferences,
         collectorRuntime: createUnusedCollectorRuntimeHttpService(),
         contentManager,
+        contentBuilder: createUnusedContentBuilderHttpService(),
       });
     });
 

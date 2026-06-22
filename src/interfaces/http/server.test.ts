@@ -67,6 +67,9 @@ import {
   createFakeContentManagerHttpService,
 } from "./test-support/content-manager-http-service";
 import {
+  createUnusedContentBuilderHttpService,
+} from "./test-support/content-builder-http-service";
+import {
   createUnusedCollectorRuntimeHttpService,
 } from "./test-support/collector-runtime-http-service";
 import { FakeSourceGroupReferencePort } from "./test-support/source-group-reference-port";
@@ -2263,6 +2266,7 @@ function createTestServer(): {
       sourceGroupReferences,
       collectorRuntime: createUnusedCollectorRuntimeHttpService(),
       contentManager: createFakeContentManagerHttpService(),
+      contentBuilder: createUnusedContentBuilderHttpService(),
     }),
     service,
     sourceGroupReferences,

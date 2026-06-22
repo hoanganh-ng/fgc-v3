@@ -22,6 +22,9 @@ import {
 import {
   createUnusedCollectorRuntimeHttpService,
 } from "./test-support/collector-runtime-http-service";
+import {
+  createUnusedContentBuilderHttpService,
+} from "./test-support/content-builder-http-service";
 import { FakeSourceGroupReferencePort } from "./test-support/source-group-reference-port";
 
 const shouldRunHttpDbTests = process.env.RUN_HTTP_DB_TESTS === "true";
@@ -64,6 +67,7 @@ if (!shouldRunHttpDbTests) {
         sourceGroupReferences: new FakeSourceGroupReferencePort(),
         collectorRuntime: createUnusedCollectorRuntimeHttpService(),
         contentManager: service,
+        contentBuilder: createUnusedContentBuilderHttpService(),
       });
     });
 

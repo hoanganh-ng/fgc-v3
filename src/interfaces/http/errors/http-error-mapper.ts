@@ -17,6 +17,11 @@ import {
   type ContentManagerApplicationErrorCode,
 } from "../../../content-manager/application";
 import {
+  ContentBuilderApplicationError,
+  TransformTypeValidationError,
+  type ContentBuilderApplicationErrorCode,
+} from "../../../content-builder/application";
+import {
   ContentManagerDomainError,
   type ContentManagerDomainErrorCode,
 } from "../../../content-manager/domain";
@@ -162,6 +167,19 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
     };
   }
 
+  if (error instanceof TransformTypeValidationError) {
+    return {
+      statusCode: 400,
+      body: {
+        error: {
+          code: error.code,
+          message: error.message,
+          issues: error.issues,
+        },
+      },
+    };
+  }
+
   if (
     error instanceof CollectionRunValidationError ||
     error instanceof AccountExerciseRunValidationError ||
@@ -206,6 +224,14 @@ export function mapErrorToHttpResponse(error: unknown): HttpErrorMapping {
     return mapKnownError(
       error.code,
       contentApplicationErrorStatus[error.code],
+      error.message,
+    );
+  }
+
+  if (error instanceof ContentBuilderApplicationError) {
+    return mapKnownError(
+      error.code,
+      contentBuilderApplicationErrorStatus[error.code],
       error.message,
     );
   }
@@ -340,6 +366,15 @@ const contentApplicationErrorStatus: Record<
   SOURCE_PUBLISHER_NOT_FOUND: 404,
   SOURCE_PUBLISHER_NOT_PROMOTABLE: 409,
   HOME_FEED_CONTENT_PLATFORM_MISMATCH: 400,
+};
+
+const contentBuilderApplicationErrorStatus: Record<
+  ContentBuilderApplicationErrorCode,
+  number
+> = {
+  TRANSFORM_TYPE_NOT_FOUND: 404,
+  TRANSFORM_TYPE_VALIDATION_ERROR: 400,
+  TRANSFORM_TYPE_NAME_ALREADY_EXISTS: 409,
 };
 
 const collectorRuntimeApplicationErrorStatus: Record<

@@ -6,6 +6,7 @@ export * from "./repositories/drizzle-dispatch-next-due-collection-schedule.repo
 export * from "./repositories/drizzle-dispatch-next-due-profile-home-feed-collection-schedule.repository";
 export * from "./repositories/drizzle-content-category.repository";
 export * from "./repositories/drizzle-content-item.repository";
+export * from "./repositories/drizzle-transform-type.repository";
 export * from "./repositories/drizzle-profile-lease.repository";
 export * from "./repositories/drizzle-profile.repository";
 export * from "./repositories/drizzle-profile-home-feed-collection-run.repository";
@@ -16,5 +17,6 @@ export * from "./repositories/drizzle-source-group.repository";
 export * from "./repositories/drizzle-source-publisher.repository";
 export * from "./schema/collector-profile-manager.schema";
 export * from "./schema/collector-runtime.schema";
+export * from "./schema/content-builder.schema";
 export * from "./schema/content-manager.schema";
 export * from "./transaction/drizzle-transaction-manager";
