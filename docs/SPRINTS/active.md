@@ -340,7 +340,7 @@ were not part of Sprint 068C.
 
 - [Sprint 068C - Profile Home-Feed Schedule Operator UI](SPRINT-068C-profile-home-feed-schedule-operator-ui.md)
 
-Sprint 069 — Source Publisher Review and Promotion UI is **active**.
+Sprint 069 — Source Publisher Review and Promotion UI is **accepted**.
 It adds a narrow Content Manager Web UI/client surface for reviewing
 safe `SourcePublisher` DTOs from the existing HTTP contracts,
 mutating review status through
@@ -358,6 +358,25 @@ PAGE promotion, bulk review, Content Builder, or future Content
 Publisher behavior.
 
 - [Sprint 069 - Source Publisher Review and Promotion UI](SPRINT-069-source-publisher-review-promotion-ui.md)
+
+Sprint 070 — Typecheck Cleanup for Home-Feed Runner CLI Test is
+**active**. It restores full repository `pnpm typecheck` by fixing the
+narrow TypeScript mismatch in
+`src/operator-tools/profile-home-feed-runner/cli.test.ts` around
+capturing and restoring `process.exitCode`. The fix is test-only and
+uses `typeof process.exitCode` so the captured value matches the
+runtime type (which can be `string | number | null | undefined`). It
+preserves the existing test assertions and intent: unexpected errors
+print only the fixed safe message, sensitive values are not leaked,
+importing `cli-error-reporter` does not install signal handlers, and the
+exported module surface stays limited to `UNEXPECTED_CLI_FAILURE_MESSAGE`
+and `reportUnexpectedCliFailure`. Sprint 070 does not change the runtime
+implementation, product behavior, backend domain, application,
+persistence, HTTP routes, Web UI, Docker, worker, scheduler, browser,
+migration, Content Builder, or Content Publisher behavior. No commits,
+pushes, or new sprint activations occur as part of this sprint.
+
+- [Sprint 070 - Typecheck Cleanup For Home-Feed Runner CLI Test](SPRINT-070-typecheck-cleanup-home-feed-runner-cli.md)
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

@@ -10,7 +10,7 @@ interface CapturedError {
 
 describe("profile home-feed run-next CLI unexpected error handler", () => {
   let originalConsoleError: typeof console.error;
-  let originalExitCode: string | number | undefined;
+  let originalExitCode: typeof process.exitCode;
   let captured: CapturedError;
 
   beforeEach(() => {
