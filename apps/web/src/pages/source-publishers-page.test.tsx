@@ -140,6 +140,21 @@ describe("SourcePublishersPage", () => {
     expect(markup).toContain("Publisher Group");
   });
 
+  it("marks the promotion URL as required when an approved group has no canonical URL", () => {
+    const { canonicalUrl: _canonicalUrl, ...publisher } = createSourcePublisher({
+      status: "APPROVED",
+    });
+    const markup = renderPage({
+      sourcePublishers: [publisher],
+      categories: [createCategory()],
+    });
+
+    expect(markup).toContain("Promote to Source Group");
+    expect(markup).toContain(
+      'id="source-publisher-1-promotion-url" autoComplete="off" required=""',
+    );
+  });
+
   it("disables promotion when no content categories exist", () => {
     const markup = renderPage({
       sourcePublishers: [createSourcePublisher({ status: "APPROVED" })],
@@ -149,6 +164,20 @@ describe("SourcePublishersPage", () => {
     expect(markup).toContain(
       "Create a content category before promoting a source publisher.",
     );
+  });
+
+  it("renders a disabled promotion panel for unapproved Facebook groups", () => {
+    const markup = renderPage({
+      sourcePublishers: [createSourcePublisher({ status: "DISCOVERED" })],
+      categories: [createCategory()],
+    });
+
+    expect(markup).toContain("Promote to Source Group");
+    expect(markup).toContain("Approve this group publisher before promotion.");
+    expect(markup).toContain(
+      'id="source-publisher-1-promotion-category" disabled=""',
+    );
+    expect(markup).toContain('type="submit" disabled=""');
   });
 
   it("does not render PAGE promotion", () => {

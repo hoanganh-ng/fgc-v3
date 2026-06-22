@@ -37,12 +37,12 @@ import {
 } from "@/features/content-manager/content-manager-queries";
 import {
   getSourcePublisherDisplayName,
+  getSourcePublisherPromotionFormSchema,
   getSourcePublisherPromotionGate,
   SOURCE_PUBLISHER_KIND_FILTER_OPTIONS,
   SOURCE_PUBLISHER_PLATFORM_FILTER_OPTIONS,
   SOURCE_PUBLISHER_STATUS_FILTER_OPTIONS,
   SourcePublisherFilterSchema,
-  SourcePublisherPromotionFormSchema,
   toPromoteSourcePublisherRequest,
   toSourcePublisherPromotionDefaultValues,
   type SourcePublisherFilterValues,
@@ -448,7 +448,8 @@ function SourcePublisherPromotionPanel({
     setPromotionOutcome(undefined);
     promoteSourcePublisher.reset();
 
-    const parsed = SourcePublisherPromotionFormSchema.safeParse(values);
+    const parsed =
+      getSourcePublisherPromotionFormSchema(sourcePublisher).safeParse(values);
 
     if (!parsed.success) {
       setValidationSummary(
@@ -574,6 +575,7 @@ function SourcePublisherPromotionPanel({
             id={`${sourcePublisher.id}-promotion-url`}
             autoComplete="off"
             disabled={!gate.allowed}
+            required={sourcePublisher.canonicalUrl === undefined}
             {...form.register("url")}
           />
         </FormField>

@@ -173,9 +173,14 @@
   `Approve`, `Ignore`, `Block`, and `Reset to discovered` actions,
   and gates promotion to `platform === "FACEBOOK"`,
   `kind === "GROUP"`, `status === "APPROVED"` with an existing
-  content category. Promotion bodies include `categoryId` and
-  integer `collectionPriority` (`0..100`) and omit empty optional
-  `name`, `url`, and `notes` fields. The UI shows only the typed
+  content category. The promotion panel is hidden for non-group
+  publishers; unapproved Facebook groups render a disabled panel with
+  an approval explanation. Promotion bodies include `categoryId` and
+  integer `collectionPriority` (`0..100`). The URL field defaults from
+  `SourcePublisher.canonicalUrl` when present; when `canonicalUrl` is
+  absent, the UI requires an operator-entered URL before submit. Empty
+  optional `name`, `url`, and `notes` fields are omitted only when
+  allowed, and populated optional fields are trimmed. The UI shows only the typed
   `CREATED` / `ALREADY_EXISTS` outcome and does not expose raw
   payloads, cookies, sessions, tokens, proxies, viewer IDs, account
   IDs, screenshots, diagnostics, stack traces, or backend internals.

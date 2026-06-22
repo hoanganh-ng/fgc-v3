@@ -35,7 +35,14 @@ export const SourcePublisherPromotionFormSchema = z
       .min(0, "Collection priority must be at least 0.")
       .max(100, "Collection priority must be at most 100."),
     name: z.string(),
-    url: z.string(),
+    url: z.string().refine(
+      (value) => {
+        const url = value.trim();
+
+        return url.length === 0 || isHttpUrl(url);
+      },
+      { message: "URL must be a valid http or https URL." },
+    ),
     notes: z.string(),
   })
   .strict();
@@ -100,6 +107,23 @@ export function toSourcePublisherPromotionDefaultValues(
   };
 }
 
+export function getSourcePublisherPromotionFormSchema(
+  sourcePublisher: SourcePublisher,
+) {
+  return SourcePublisherPromotionFormSchema.superRefine((values, context) => {
+    if (
+      sourcePublisher.canonicalUrl === undefined &&
+      values.url.trim().length === 0
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "URL is required when the publisher has no canonical URL.",
+        path: ["url"],
+      });
+    }
+  });
+}
+
 export function toPromoteSourcePublisherRequest(
   values: SourcePublisherPromotionFormValues,
 ): PromoteSourcePublisherToSourceGroupRequest {
@@ -114,4 +138,14 @@ export function toPromoteSourcePublisherRequest(
     ...(url.length > 0 ? { url } : {}),
     ...(notes.length > 0 ? { notes } : {}),
   };
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }

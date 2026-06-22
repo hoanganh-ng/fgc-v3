@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getSourcePublisherDisplayName,
+  getSourcePublisherPromotionFormSchema,
   getSourcePublisherPromotionGate,
   SourcePublisherFilterSchema,
   SourcePublisherPromotionFormSchema,
@@ -122,6 +123,60 @@ describe("source publisher review view model", () => {
     ).toBe(false);
   });
 
+  it("validates populated promotion URLs as http or https URLs", () => {
+    expect(
+      SourcePublisherPromotionFormSchema.safeParse({
+        categoryId: "category-1",
+        collectionPriority: 50,
+        name: "",
+        url: "not-a-url",
+        notes: "",
+      }).success,
+    ).toBe(false);
+    expect(
+      SourcePublisherPromotionFormSchema.safeParse({
+        categoryId: "category-1",
+        collectionPriority: 50,
+        name: "",
+        url: "ftp://facebook.test/groups/fb-group-1",
+        notes: "",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("allows canonical-url publishers to promote with the default URL included", () => {
+    const defaults = toSourcePublisherPromotionDefaultValues(
+      createSourcePublisher(),
+      "category-1",
+    );
+
+    expect(
+      getSourcePublisherPromotionFormSchema(
+        createSourcePublisher(),
+      ).safeParse(defaults).success,
+    ).toBe(true);
+    expect(toPromoteSourcePublisherRequest(defaults)).toEqual({
+      categoryId: "category-1",
+      collectionPriority: 50,
+      name: "Publisher Group",
+      url: "https://facebook.test/groups/fb-group-1",
+    });
+  });
+
+  it("requires an operator URL when the publisher has no canonical URL", () => {
+    const { canonicalUrl: _canonicalUrl, ...publisher } = createSourcePublisher();
+
+    expect(
+      getSourcePublisherPromotionFormSchema(publisher).safeParse({
+        categoryId: "category-1",
+        collectionPriority: 50,
+        name: "",
+        url: "",
+        notes: "",
+      }).success,
+    ).toBe(false);
+  });
+
   it("omits empty optional promotion fields and never sends null", () => {
     expect(
       toPromoteSourcePublisherRequest({
@@ -134,6 +189,22 @@ describe("source publisher review view model", () => {
     ).toEqual({
       categoryId: "category-1",
       collectionPriority: 50,
+    });
+  });
+
+  it("includes a trimmed operator URL while omitting empty name and notes", () => {
+    expect(
+      toPromoteSourcePublisherRequest({
+        categoryId: "category-1",
+        collectionPriority: 50,
+        name: "  ",
+        url: "  https://facebook.test/groups/manual-group  ",
+        notes: " ",
+      }),
+    ).toEqual({
+      categoryId: "category-1",
+      collectionPriority: 50,
+      url: "https://facebook.test/groups/manual-group",
     });
   });
 

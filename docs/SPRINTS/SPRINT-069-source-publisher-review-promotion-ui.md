@@ -58,7 +58,10 @@ pipeline stage.
   - display-name fallback to `externalPublisherId`
   - promotion gating for Facebook group + approved status + category presence
   - promotion default values from publisher display name / canonical URL
-  - promotion request mapping that omits empty optional fields and never sends
+  - promotion validation that requires an operator-entered URL when the safe
+    `SourcePublisher` DTO has no `canonicalUrl`
+  - promotion request mapping that trims populated optional fields, validates
+    populated URLs, omits empty optional fields when allowed, and never sends
     `null`
 - New page `apps/web/src/pages/source-publishers-page.tsx`:
   - route `/source-publishers`
@@ -67,10 +70,11 @@ pipeline stage.
   - status, kind, and platform filters
   - safe identity, timestamp, count, and canonical URL rendering
   - `Approve`, `Ignore`, `Block`, and `Reset to discovered` actions
-  - promotion form only for `platform === "FACEBOOK"`,
-    `kind === "GROUP"`, and `status === "APPROVED"`
+  - promotion panel only for `platform === "FACEBOOK"` and `kind === "GROUP"`;
+    unapproved groups render disabled with an approval explanation
   - content-category loading for promotion
   - no-category promotion disabled state with operator explanation
+  - URL input required before submit when the publisher has no canonical URL
   - `CREATED` / `ALREADY_EXISTS` promotion outcome display
 
 ## Safe DTO Contract
@@ -113,9 +117,9 @@ traces are rejected or never rendered.
 | Strict SourcePublisher DTO schema accepts only safe fields and rejects `null` optionals / unknown fields | `apps/web/src/lib/api/content-manager-client.test.ts` |
 | Source-publisher list query params omit undefined filters | `apps/web/src/lib/api/content-manager-client.test.ts` |
 | Promotion request schema validates priority and rejects `null` optionals | `apps/web/src/lib/api/content-manager-client.test.ts` |
-| Display-name fallback, filters, promotion gates, defaults, and optional-field omission | `apps/web/src/features/content-manager/source-publisher-review-view-model.test.ts` |
+| Display-name fallback, filters, promotion gates, defaults, URL validation / required manual URL, and optional-field omission | `apps/web/src/features/content-manager/source-publisher-review-view-model.test.ts` |
 | Status and promotion mutation helpers call the production client and invalidate Content Manager queries | `apps/web/src/features/content-manager/source-publisher-review-mutations.test.ts` |
-| Navigation entry, page rendering, filters, status actions, promotion gating, and no-category message | `apps/web/src/pages/source-publishers-page.test.tsx` |
+| Navigation entry, page rendering, filters, status actions, promotion gating, missing-canonical URL required indicator, disabled unapproved-group promotion, and no-category message | `apps/web/src/pages/source-publishers-page.test.tsx` |
 
 ## Verification
 
