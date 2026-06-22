@@ -3,6 +3,11 @@ import {
   ContentItemResponseSchema,
   ContentItemSchema,
   ContentItemsListResponseSchema,
+  PromoteSourcePublisherToSourceGroupRequestSchema,
+  SourcePublisherResponseSchema,
+  SourcePublisherSchema,
+  SourcePublishersListResponseSchema,
+  toListSourcePublishersQueryParams,
 } from "@/lib/api/content-manager-client";
 
 const now = "2026-06-18T10:00:00.000Z";
@@ -105,5 +110,128 @@ describe("ContentItem API schema (Sprint 065C1)", () => {
       expect(result.data.items[0]?.sourceGroupId).toBe("source-group-1");
       expect(result.data.items[1]?.sourceGroupId).toBeUndefined();
     }
+  });
+});
+
+function makeSourcePublisher(): Record<string, unknown> {
+  return {
+    id: "source-publisher-1",
+    platform: "FACEBOOK",
+    kind: "GROUP",
+    externalPublisherId: "fb-group-1",
+    displayName: "Publisher Group",
+    canonicalUrl: "https://facebook.test/groups/fb-group-1",
+    status: "DISCOVERED",
+    firstObservedAt: now,
+    lastObservedAt: now,
+    observationCount: 2,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+describe("SourcePublisher API schema (Sprint 069)", () => {
+  it("parses the safe SourcePublisher DTO allowlist", () => {
+    const result = SourcePublisherSchema.safeParse(makeSourcePublisher());
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts omitted optional displayName and canonicalUrl", () => {
+    const result = SourcePublisherSchema.safeParse({
+      ...makeSourcePublisher(),
+      displayName: undefined,
+      canonicalUrl: undefined,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.displayName).toBeUndefined();
+      expect(result.data.canonicalUrl).toBeUndefined();
+    }
+  });
+
+  it("rejects null optional SourcePublisher fields", () => {
+    const result = SourcePublisherSchema.safeParse({
+      ...makeSourcePublisher(),
+      displayName: null,
+      canonicalUrl: null,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unsafe extra SourcePublisher fields", () => {
+    const result = SourcePublisherSchema.safeParse({
+      ...makeSourcePublisher(),
+      accountId: "account-1",
+      rawPayload: { value: true },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("parses list and detail envelopes", () => {
+    expect(
+      SourcePublisherResponseSchema.safeParse({
+        sourcePublisher: makeSourcePublisher(),
+      }).success,
+    ).toBe(true);
+    expect(
+      SourcePublishersListResponseSchema.safeParse({
+        items: [makeSourcePublisher()],
+        page: { limit: 100, offset: 0, total: 1 },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("validates the strict promotion request body", () => {
+    const result = PromoteSourcePublisherToSourceGroupRequestSchema.safeParse({
+      categoryId: "category-1",
+      collectionPriority: 50,
+      name: "Publisher Group",
+      url: "https://facebook.test/groups/fb-group-1",
+      notes: "Reviewed by operator.",
+    });
+
+    expect(result.success).toBe(true);
+    expect(
+      PromoteSourcePublisherToSourceGroupRequestSchema.safeParse({
+        categoryId: "category-1",
+        collectionPriority: 101,
+      }).success,
+    ).toBe(false);
+    expect(
+      PromoteSourcePublisherToSourceGroupRequestSchema.safeParse({
+        categoryId: "category-1",
+        collectionPriority: 50,
+        notes: null,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("builds source publisher list query params without undefined filters", () => {
+    expect(
+      toListSourcePublishersQueryParams({
+        status: "DISCOVERED",
+        kind: "GROUP",
+        platform: "FACEBOOK",
+        limit: 100,
+        offset: 0,
+      }),
+    ).toEqual({
+      status: "DISCOVERED",
+      kind: "GROUP",
+      platform: "FACEBOOK",
+      limit: 100,
+      offset: 0,
+    });
+
+    expect(toListSourcePublishersQueryParams({ limit: 100, offset: 0 })).toEqual(
+      {
+        limit: 100,
+        offset: 0,
+      },
+    );
   });
 });

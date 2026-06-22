@@ -14,6 +14,7 @@ import { ProfileDetailPage } from "@/pages/profile-detail-page";
 import { ProfilesPage } from "@/pages/profiles-page";
 import { RouteErrorPage } from "@/pages/route-error-page";
 import { SourceGroupsPage } from "@/pages/source-groups-page";
+import { SourcePublishersPage } from "@/pages/source-publishers-page";
 import { ProfileSourceAccessCheckRunsPage } from "@/pages/profile-source-access-check-runs-page";
 
 export const router = createBrowserRouter([
@@ -45,6 +46,10 @@ export const router = createBrowserRouter([
       {
         path: "source-groups",
         element: <SourceGroupsPage />,
+      },
+      {
+        path: "source-publishers",
+        element: <SourcePublishersPage />,
       },
       {
         path: "content-items",

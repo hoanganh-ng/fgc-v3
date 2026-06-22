@@ -5,6 +5,7 @@ import {
   FileText,
   FolderKanban,
   Gauge,
+  RadioTower,
   ShieldCheck,
   Users,
   type LucideIcon,
@@ -31,6 +32,11 @@ export const primaryNavigation: readonly NavigationItem[] = [
     label: "Source Groups",
     path: "/source-groups",
     icon: FolderKanban,
+  },
+  {
+    label: "Source Publishers",
+    path: "/source-publishers",
+    icon: RadioTower,
   },
   {
     label: "Content Items",

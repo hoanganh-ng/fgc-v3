@@ -12,8 +12,12 @@ import {
   type CreateContentCategoryResponse,
   type CreateSourceGroupRequest,
   type CreateSourceGroupResponse,
+  type PromoteSourcePublisherToSourceGroupRequest,
+  type PromoteSourcePublisherToSourceGroupResponse,
   type SourceGroupStatus,
+  type SourcePublisherStatus,
   type UpdateContentItemStatusResponse,
+  type UpdateSourcePublisherStatusResponse,
   type UpdateSourceGroupEntryRouteRequest,
   type UpdateSourceGroupEntryRouteResponse,
   type UpdateSourceGroupStatusResponse,
@@ -28,6 +32,16 @@ import { contentManagerQueryKeys } from "@/features/content-manager/content-mana
 export interface UpdateSourceGroupStatusVariables {
   readonly sourceGroupId: string;
   readonly status: SourceGroupStatus;
+}
+
+export interface UpdateSourcePublisherStatusVariables {
+  readonly sourcePublisherId: string;
+  readonly status: SourcePublisherStatus;
+}
+
+export interface PromoteSourcePublisherVariables {
+  readonly sourcePublisherId: string;
+  readonly request: PromoteSourcePublisherToSourceGroupRequest;
 }
 
 export interface CreateSourceGroupEntryRouteVariables {
@@ -123,6 +137,76 @@ export function useUpdateSourceGroupStatusMutation(): UseMutationResult<
       await queryClient.invalidateQueries({
         queryKey: contentManagerQueryKeys.all,
       });
+    },
+  });
+}
+
+export async function updateSourcePublisherStatus(
+  variables: UpdateSourcePublisherStatusVariables,
+): Promise<UpdateSourcePublisherStatusResponse> {
+  return unwrapApiResult(
+    await contentManagerClient.updateSourcePublisherStatus(
+      variables.sourcePublisherId,
+      variables.status,
+    ),
+  );
+}
+
+export async function promoteSourcePublisherToSourceGroup(
+  variables: PromoteSourcePublisherVariables,
+): Promise<PromoteSourcePublisherToSourceGroupResponse> {
+  return unwrapApiResult(
+    await contentManagerClient.promoteSourcePublisherToSourceGroup(
+      variables.sourcePublisherId,
+      variables.request,
+    ),
+  );
+}
+
+export async function invalidateContentManagerQueries(queryClient: {
+  invalidateQueries: (filters: {
+    readonly queryKey: readonly unknown[];
+  }) => Promise<unknown>;
+}): Promise<void> {
+  await queryClient.invalidateQueries({
+    queryKey: contentManagerQueryKeys.all,
+  });
+}
+
+export function useUpdateSourcePublisherStatusMutation(): UseMutationResult<
+  UpdateSourcePublisherStatusResponse,
+  ApiResultError,
+  UpdateSourcePublisherStatusVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    UpdateSourcePublisherStatusResponse,
+    ApiResultError,
+    UpdateSourcePublisherStatusVariables
+  >({
+    mutationFn: updateSourcePublisherStatus,
+    onSuccess: async () => {
+      await invalidateContentManagerQueries(queryClient);
+    },
+  });
+}
+
+export function usePromoteSourcePublisherToSourceGroupMutation(): UseMutationResult<
+  PromoteSourcePublisherToSourceGroupResponse,
+  ApiResultError,
+  PromoteSourcePublisherVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    PromoteSourcePublisherToSourceGroupResponse,
+    ApiResultError,
+    PromoteSourcePublisherVariables
+  >({
+    mutationFn: promoteSourcePublisherToSourceGroup,
+    onSuccess: async () => {
+      await invalidateContentManagerQueries(queryClient);
     },
   });
 }

@@ -318,7 +318,7 @@ Publisher behavior.
 
 - [Sprint 068B2 - Home-Feed Scheduler and Worker Containerization](SPRINT-068B2-home-feed-scheduler-worker-containerization.md)
 
-Sprint 068C — Profile Home-Feed Schedule Operator UI is **active**.
+Sprint 068C — Profile Home-Feed Schedule Operator UI is **accepted**.
 It closes the operator feedback loop for the Sprint 068A
 `ProfileHomeFeedCollectionSchedule` model by exposing the existing safe
 operator HTTP routes (`PUT`/`GET list`/`GET detail`) through a
@@ -339,6 +339,25 @@ cadence redesign, and live Facebook validation remain out of scope and
 were not part of Sprint 068C.
 
 - [Sprint 068C - Profile Home-Feed Schedule Operator UI](SPRINT-068C-profile-home-feed-schedule-operator-ui.md)
+
+Sprint 069 — Source Publisher Review and Promotion UI is **active**.
+It adds a narrow Content Manager Web UI/client surface for reviewing
+safe `SourcePublisher` DTOs from the existing HTTP contracts,
+mutating review status through
+`PATCH /collector/source-publishers/:sourcePublisherId/status`, and
+promoting already `APPROVED` Facebook `GROUP` publishers through
+`POST /collector/source-publishers/:sourcePublisherId/promote-to-source-group`.
+The page lives at `/source-publishers`, defaults the list filter to
+`DISCOVERED`, supports status/kind/platform filters, loads content
+categories for promotion, omits empty optional promotion fields, and
+shows the typed `CREATED` / `ALREADY_EXISTS` promotion outcome. This
+is a Web UI/client-only sprint. It does not change backend domain,
+application, persistence, HTTP routes, migrations, Collector Runtime,
+browser execution, scheduler, worker, Docker, SourceGroup activation,
+PAGE promotion, bulk review, Content Builder, or future Content
+Publisher behavior.
+
+- [Sprint 069 - Source Publisher Review and Promotion UI](SPRINT-069-source-publisher-review-promotion-ui.md)
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

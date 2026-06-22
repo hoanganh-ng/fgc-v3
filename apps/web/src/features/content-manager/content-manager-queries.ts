@@ -5,7 +5,10 @@ import {
   type ContentItemResponse,
   type ContentItemsListResponse,
   type ListContentItemsQuery,
+  type ListSourcePublishersQuery,
   type ListSourceGroupsQuery,
+  type SourcePublisherResponse,
+  type SourcePublishersListResponse,
   type SourceGroupsListResponse,
 } from "@/lib/api/content-manager-client";
 import {
@@ -23,11 +26,27 @@ const defaultContentItemsQuery = {
   offset: 0,
 } satisfies ListContentItemsQuery;
 
+const defaultSourcePublishersQuery = {
+  status: "DISCOVERED",
+  limit: 100,
+  offset: 0,
+} satisfies ListSourcePublishersQuery;
+
 export const contentManagerQueryKeys = {
   all: ["content-manager"] as const,
   categories: () => [...contentManagerQueryKeys.all, "categories"] as const,
   sourceGroups: (query: ListSourceGroupsQuery) =>
     [...contentManagerQueryKeys.all, "source-groups", query] as const,
+  sourcePublishers: () =>
+    [...contentManagerQueryKeys.all, "source-publishers"] as const,
+  sourcePublishersList: (query: ListSourcePublishersQuery) =>
+    [...contentManagerQueryKeys.sourcePublishers(), "list", query] as const,
+  sourcePublisher: (sourcePublisherId: string) =>
+    [
+      ...contentManagerQueryKeys.sourcePublishers(),
+      "detail",
+      sourcePublisherId,
+    ] as const,
   contentItems: () => [...contentManagerQueryKeys.all, "content-items"] as const,
   contentItemsList: (query: ListContentItemsQuery) =>
     [...contentManagerQueryKeys.contentItems(), "list", query] as const,
@@ -53,6 +72,31 @@ export function useSourceGroupsQuery(
     queryKey: contentManagerQueryKeys.sourceGroups(query),
     queryFn: async () =>
       unwrapApiResult(await contentManagerClient.listSourceGroups(query)),
+  });
+}
+
+export function useSourcePublishersQuery(
+  query: ListSourcePublishersQuery = defaultSourcePublishersQuery,
+): UseQueryResult<SourcePublishersListResponse, ApiResultError> {
+  return useQuery<SourcePublishersListResponse, ApiResultError>({
+    queryKey: contentManagerQueryKeys.sourcePublishersList(query),
+    queryFn: async () =>
+      unwrapApiResult(await contentManagerClient.listSourcePublishers(query)),
+  });
+}
+
+export function useSourcePublisherQuery(
+  sourcePublisherId: string,
+): UseQueryResult<SourcePublisherResponse, ApiResultError> {
+  const enabled = sourcePublisherId.trim().length > 0;
+
+  return useQuery<SourcePublisherResponse, ApiResultError>({
+    queryKey: contentManagerQueryKeys.sourcePublisher(sourcePublisherId),
+    queryFn: async () =>
+      unwrapApiResult(
+        await contentManagerClient.getSourcePublisher(sourcePublisherId),
+      ),
+    enabled,
   });
 }
 

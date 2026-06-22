@@ -26,6 +26,13 @@ export const ContentStatusSchema = z.enum([
   "USED",
 ]);
 export const ContentPlatformSchema = z.enum(["FACEBOOK"]);
+export const SourcePublisherKindSchema = z.enum(["GROUP", "PAGE"]);
+export const SourcePublisherStatusSchema = z.enum([
+  "DISCOVERED",
+  "APPROVED",
+  "IGNORED",
+  "BLOCKED",
+]);
 
 export type SourceGroupStatus = z.infer<typeof SourceGroupStatusSchema>;
 export type SourceGroupEntryRouteType = z.infer<
@@ -36,6 +43,10 @@ export type SourceGroupEntryRouteRiskLevel = z.infer<
 >;
 export type ContentStatus = z.infer<typeof ContentStatusSchema>;
 export type ContentPlatform = z.infer<typeof ContentPlatformSchema>;
+export type SourcePublisherKind = z.infer<typeof SourcePublisherKindSchema>;
+export type SourcePublisherStatus = z.infer<
+  typeof SourcePublisherStatusSchema
+>;
 
 const NonEmptyStringSchema = z.string().min(1);
 
@@ -84,6 +95,23 @@ export const SourceGroupSchema = z
     collectionPriority: z.number().int().min(0).max(100),
     notes: NonEmptyStringSchema.optional(),
     entryRoutes: z.array(SourceGroupEntryRouteSchema),
+    createdAt: NonEmptyStringSchema,
+    updatedAt: NonEmptyStringSchema,
+  })
+  .strict();
+
+export const SourcePublisherSchema = z
+  .object({
+    id: NonEmptyStringSchema,
+    platform: ContentPlatformSchema,
+    kind: SourcePublisherKindSchema,
+    externalPublisherId: NonEmptyStringSchema,
+    displayName: NonEmptyStringSchema.optional(),
+    canonicalUrl: z.string().url().optional(),
+    status: SourcePublisherStatusSchema,
+    firstObservedAt: NonEmptyStringSchema,
+    lastObservedAt: NonEmptyStringSchema,
+    observationCount: z.number().int().min(1),
     createdAt: NonEmptyStringSchema,
     updatedAt: NonEmptyStringSchema,
   })
@@ -212,6 +240,46 @@ export const SourceGroupsListResponseSchema = z
   })
   .strict();
 
+export const SourcePublisherResponseSchema = z
+  .object({
+    sourcePublisher: SourcePublisherSchema,
+  })
+  .strict();
+
+export const SourcePublishersListResponseSchema = z
+  .object({
+    items: z.array(SourcePublisherSchema),
+    page: PageSchema,
+  })
+  .strict();
+
+export const UpdateSourcePublisherStatusRequestSchema = z
+  .object({
+    status: SourcePublisherStatusSchema,
+  })
+  .strict();
+
+export const PromoteSourcePublisherToSourceGroupRequestSchema = z
+  .object({
+    categoryId: NonEmptyStringSchema,
+    collectionPriority: z.number().int().min(0).max(100),
+    name: NonEmptyStringSchema.optional(),
+    url: NonEmptyStringSchema.optional(),
+    notes: NonEmptyStringSchema.optional(),
+  })
+  .strict();
+
+export const PromoteSourcePublisherToSourceGroupResponseSchema = z
+  .object({
+    sourceGroup: SourceGroupSchema,
+    promotion: z
+      .object({
+        outcome: z.enum(["CREATED", "ALREADY_EXISTS"]),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const ContentItemsListResponseSchema = z
   .object({
     items: z.array(ContentItemSchema),
@@ -255,6 +323,7 @@ export type SourceGroupEntryRoute = z.infer<
   typeof SourceGroupEntryRouteSchema
 >;
 export type SourceGroup = z.infer<typeof SourceGroupSchema>;
+export type SourcePublisher = z.infer<typeof SourcePublisherSchema>;
 export type ContentItem = z.infer<typeof ContentItemSchema>;
 export type ContentCategoriesListResponse = z.infer<
   typeof ContentCategoriesListResponseSchema
@@ -290,6 +359,22 @@ export type RemoveSourceGroupEntryRouteResponse = SourceGroupResponse;
 export type SourceGroupsListResponse = z.infer<
   typeof SourceGroupsListResponseSchema
 >;
+export type SourcePublisherResponse = z.infer<
+  typeof SourcePublisherResponseSchema
+>;
+export type SourcePublishersListResponse = z.infer<
+  typeof SourcePublishersListResponseSchema
+>;
+export type UpdateSourcePublisherStatusRequest = z.infer<
+  typeof UpdateSourcePublisherStatusRequestSchema
+>;
+export type UpdateSourcePublisherStatusResponse = SourcePublisherResponse;
+export type PromoteSourcePublisherToSourceGroupRequest = z.infer<
+  typeof PromoteSourcePublisherToSourceGroupRequestSchema
+>;
+export type PromoteSourcePublisherToSourceGroupResponse = z.infer<
+  typeof PromoteSourcePublisherToSourceGroupResponseSchema
+>;
 export type ContentItemsListResponse = z.infer<
   typeof ContentItemsListResponseSchema
 >;
@@ -306,6 +391,14 @@ export type IngestHomeFeedCollectedContentResponse = ContentItemResponse;
 export interface ListSourceGroupsQuery {
   readonly status?: SourceGroupStatus;
   readonly categoryId?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListSourcePublishersQuery {
+  readonly status?: SourcePublisherStatus;
+  readonly kind?: SourcePublisherKind;
+  readonly platform?: ContentPlatform;
   readonly limit?: number;
   readonly offset?: number;
 }
@@ -327,6 +420,20 @@ export interface ContentManagerClient {
   readonly listSourceGroups: (
     query?: ListSourceGroupsQuery,
   ) => Promise<ApiResult<SourceGroupsListResponse>>;
+  readonly listSourcePublishers: (
+    query?: ListSourcePublishersQuery,
+  ) => Promise<ApiResult<SourcePublishersListResponse>>;
+  readonly getSourcePublisher: (
+    sourcePublisherId: string,
+  ) => Promise<ApiResult<SourcePublisherResponse>>;
+  readonly updateSourcePublisherStatus: (
+    sourcePublisherId: string,
+    status: SourcePublisherStatus,
+  ) => Promise<ApiResult<UpdateSourcePublisherStatusResponse>>;
+  readonly promoteSourcePublisherToSourceGroup: (
+    sourcePublisherId: string,
+    request: PromoteSourcePublisherToSourceGroupRequest,
+  ) => Promise<ApiResult<PromoteSourcePublisherToSourceGroupResponse>>;
   readonly createSourceGroup: (
     request: CreateSourceGroupRequest,
   ) => Promise<ApiResult<CreateSourceGroupResponse>>;
@@ -385,6 +492,35 @@ export function createContentManagerClient(
         path: "/collector/source-groups",
         query: toListSourceGroupsQueryParams(query),
         responseSchema: SourceGroupsListResponseSchema,
+      });
+    },
+    listSourcePublishers(query) {
+      return httpClient.request({
+        path: "/collector/source-publishers",
+        query: toListSourcePublishersQueryParams(query),
+        responseSchema: SourcePublishersListResponseSchema,
+      });
+    },
+    getSourcePublisher(sourcePublisherId) {
+      return httpClient.request({
+        path: `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}`,
+        responseSchema: SourcePublisherResponseSchema,
+      });
+    },
+    updateSourcePublisherStatus(sourcePublisherId, status) {
+      return httpClient.request({
+        path: `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}/status`,
+        method: "PATCH",
+        body: { status } satisfies UpdateSourcePublisherStatusRequest,
+        responseSchema: SourcePublisherResponseSchema,
+      });
+    },
+    promoteSourcePublisherToSourceGroup(sourcePublisherId, request) {
+      return httpClient.request({
+        path: `/collector/source-publishers/${encodeURIComponent(sourcePublisherId)}/promote-to-source-group`,
+        method: "POST",
+        body: request,
+        responseSchema: PromoteSourcePublisherToSourceGroupResponseSchema,
       });
     },
     createSourceGroup(request) {
@@ -470,6 +606,22 @@ function toListSourceGroupsQueryParams(
   return {
     ...(query.status !== undefined ? { status: query.status } : {}),
     ...(query.categoryId !== undefined ? { categoryId: query.categoryId } : {}),
+    ...(query.limit !== undefined ? { limit: query.limit } : {}),
+    ...(query.offset !== undefined ? { offset: query.offset } : {}),
+  };
+}
+
+export function toListSourcePublishersQueryParams(
+  query: ListSourcePublishersQuery | undefined,
+): Readonly<Record<string, string | number>> | undefined {
+  if (query === undefined) {
+    return undefined;
+  }
+
+  return {
+    ...(query.status !== undefined ? { status: query.status } : {}),
+    ...(query.kind !== undefined ? { kind: query.kind } : {}),
+    ...(query.platform !== undefined ? { platform: query.platform } : {}),
     ...(query.limit !== undefined ? { limit: query.limit } : {}),
     ...(query.offset !== undefined ? { offset: query.offset } : {}),
   };

@@ -164,6 +164,21 @@
   `promotion: { outcome: "CREATED" | "ALREADY_EXISTS" }` block.
   Promotion never mutates the durable `SourcePublisher` review
   status or observation counts.
+- Source Publisher operator Web UI surface at `/source-publishers`
+  (Sprint 069). The Web UI consumes only the existing safe Content
+  Manager HTTP contracts for list/get, status mutation, and approved
+  Facebook group promotion. It defaults the review list to
+  `DISCOVERED`, supports status/kind/platform filters, renders
+  canonical URLs as external links when present, exposes explicit
+  `Approve`, `Ignore`, `Block`, and `Reset to discovered` actions,
+  and gates promotion to `platform === "FACEBOOK"`,
+  `kind === "GROUP"`, `status === "APPROVED"` with an existing
+  content category. Promotion bodies include `categoryId` and
+  integer `collectionPriority` (`0..100`) and omit empty optional
+  `name`, `url`, and `notes` fields. The UI shows only the typed
+  `CREATED` / `ALREADY_EXISTS` outcome and does not expose raw
+  payloads, cookies, sessions, tokens, proxies, viewer IDs, account
+  IDs, screenshots, diagnostics, stack traces, or backend internals.
 - Future handoff shape for Content Builder.
 
 ## Does Not Own
@@ -244,6 +259,12 @@
     `buildSourcePublisherSecondObservationFixture` builders)
   - `source-publisher-http.spec.ts` (Docker E2E flow through
     `web-gateway`)
+- `apps/web/src/pages/source-publishers-page.tsx` (Sprint 069
+  operator review and promotion UI)
+- `apps/web/src/features/content-manager/source-publisher-review-view-model.ts`
+  (Sprint 069 filter, display, gating, and promotion request mapping)
+- `apps/web/src/lib/api/content-manager-client.ts` (Web UI client
+  schemas and methods for SourcePublisher list/get/status/promotion)
 
 ## Important Entrypoints
 - `Fastify API`: `src/content-manager/interface/http/` (e.g. `/content/items`, `/content/source-groups`)
