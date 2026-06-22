@@ -90,12 +90,18 @@ export async function runProfileHomeFeedWorkerCommand(
     }
 
     while (input.abortSignal?.aborted !== true) {
+      const claimedRunsBeforeIteration = totals.claimedRuns;
       await runOneWorkerIteration(
         dependencies,
         logger,
         totals,
         input.abortSignal,
       );
+
+      if (totals.claimedRuns > claimedRunsBeforeIteration) {
+        continue;
+      }
+
       await delay(input.args.pollIntervalMs, input.abortSignal);
     }
 
