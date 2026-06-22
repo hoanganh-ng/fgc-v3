@@ -59,6 +59,11 @@ export const primaryNavigation: readonly NavigationItem[] = [
     icon: CalendarClock,
   },
   {
+    label: "Home Feed Runs",
+    path: "/profile-home-feed-collection-runs",
+    icon: ClipboardList,
+  },
+  {
     label: "Exercise Runs",
     path: "/account-exercise-runs",
     icon: Activity,

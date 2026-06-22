@@ -19,6 +19,19 @@ export const CollectionRunTriggerTypeSchema = z.enum([
   "SCHEDULED",
 ]);
 
+export const ProfileHomeFeedCollectionRunStatusSchema = z.enum([
+  "QUEUED",
+  "RUNNING",
+  "SUCCEEDED",
+  "FAILED",
+  "CANCELED",
+]);
+
+export const ProfileHomeFeedCollectionRunTriggerTypeSchema = z.enum([
+  "MANUAL_API",
+  "SCHEDULED",
+]);
+
 export const AccountExerciseRunStatusSchema = z.enum([
   "QUEUED",
   "RUNNING",
@@ -35,6 +48,12 @@ export const AccountExerciseTypeSchema = z.enum([
 export type CollectionRunStatus = z.infer<typeof CollectionRunStatusSchema>;
 export type CollectionRunTriggerType = z.infer<
   typeof CollectionRunTriggerTypeSchema
+>;
+export type ProfileHomeFeedCollectionRunStatus = z.infer<
+  typeof ProfileHomeFeedCollectionRunStatusSchema
+>;
+export type ProfileHomeFeedCollectionRunTriggerType = z.infer<
+  typeof ProfileHomeFeedCollectionRunTriggerTypeSchema
 >;
 export type AccountExerciseRunStatus = z.infer<
   typeof AccountExerciseRunStatusSchema
@@ -232,6 +251,90 @@ export const RequestCollectionRunRequestSchema = z
   })
   .strict();
 
+export const ProfileHomeFeedCollectionRunAccountStageSchema = z.enum([
+  "NEW_ACCOUNT",
+  "WARMING",
+  "COLLECTION_READY",
+  "LIMITED",
+  "NEEDS_REVIEW",
+  "RETIRED",
+]);
+
+export const ProfileHomeFeedCollectionRunTargetSchema = z
+  .object({
+    platform: z.literal("FACEBOOK"),
+    surface: z.literal("PROFILE_HOME_FEED"),
+  })
+  .strict();
+
+export const ProfileHomeFeedCollectionRunParametersSchema = z
+  .object({
+    maxScrolls: z.number().int().min(0).optional(),
+    maxDurationMs: z.number().int().min(1).optional(),
+    maxPosts: z.number().int().min(1).optional(),
+  })
+  .strict();
+
+export const ProfileHomeFeedCollectionRunSummarySchema = z
+  .object({
+    capturedPayloads: z.number().int().min(0).optional(),
+    extractorCandidates: z.number().int().min(0).optional(),
+    sourcePublishersObserved: z.number().int().min(0).optional(),
+    contentItemsSubmitted: z.number().int().min(0).optional(),
+    failedPublisherObservations: z.number().int().min(0).optional(),
+    failedContentSubmissions: z.number().int().min(0).optional(),
+    leaseReleased: z.boolean().optional(),
+  })
+  .strict();
+
+export const ProfileHomeFeedCollectionRunFailureReasonSchema = z
+  .object({
+    code: NonEmptyStringSchema,
+    message: NonEmptyStringSchema,
+  })
+  .strict();
+
+export const ProfileHomeFeedCollectionRunSchema = z
+  .object({
+    id: NonEmptyStringSchema,
+    profileId: NonEmptyStringSchema,
+    triggerType: ProfileHomeFeedCollectionRunTriggerTypeSchema,
+    status: ProfileHomeFeedCollectionRunStatusSchema,
+    accountStageAtRequest: ProfileHomeFeedCollectionRunAccountStageSchema,
+    target: ProfileHomeFeedCollectionRunTargetSchema,
+    parameters: ProfileHomeFeedCollectionRunParametersSchema,
+    summary: ProfileHomeFeedCollectionRunSummarySchema.optional(),
+    failureReason: ProfileHomeFeedCollectionRunFailureReasonSchema.optional(),
+    requestedAt: z.string().datetime({ offset: true }),
+    startedAt: z.string().datetime({ offset: true }).optional(),
+    finishedAt: z.string().datetime({ offset: true }).optional(),
+    createdAt: z.string().datetime({ offset: true }),
+    updatedAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+
+export const ProfileHomeFeedCollectionRunsListResponseSchema = z
+  .object({
+    items: z.array(ProfileHomeFeedCollectionRunSchema),
+    page: PageSchema,
+  })
+  .strict();
+
+export const ProfileHomeFeedCollectionRunResponseSchema = z
+  .object({
+    profileHomeFeedCollectionRun: ProfileHomeFeedCollectionRunSchema,
+  })
+  .strict();
+
+export const RequestProfileHomeFeedCollectionRunRequestSchema = z
+  .object({
+    profileId: NonEmptyStringSchema,
+    maxScrolls: z.number().int().min(0).optional(),
+    maxDurationMs: z.number().int().min(1).optional(),
+    maxPosts: z.number().int().min(1).optional(),
+  })
+  .strict();
+
 const BaseRequestSchema = z.object({
   profileId: NonEmptyStringSchema,
   stageAtStart: NonEmptyStringSchema,
@@ -269,6 +372,33 @@ export type CollectionRunsListResponse = z.infer<
 export type CollectionRunResponse = z.infer<typeof CollectionRunResponseSchema>;
 export type RequestCollectionRunRequest = z.infer<
   typeof RequestCollectionRunRequestSchema
+>;
+export type ProfileHomeFeedCollectionRunAccountStage = z.infer<
+  typeof ProfileHomeFeedCollectionRunAccountStageSchema
+>;
+export type ProfileHomeFeedCollectionRunTarget = z.infer<
+  typeof ProfileHomeFeedCollectionRunTargetSchema
+>;
+export type ProfileHomeFeedCollectionRunParameters = z.infer<
+  typeof ProfileHomeFeedCollectionRunParametersSchema
+>;
+export type ProfileHomeFeedCollectionRunSummary = z.infer<
+  typeof ProfileHomeFeedCollectionRunSummarySchema
+>;
+export type ProfileHomeFeedCollectionRunFailureReason = z.infer<
+  typeof ProfileHomeFeedCollectionRunFailureReasonSchema
+>;
+export type ProfileHomeFeedCollectionRun = z.infer<
+  typeof ProfileHomeFeedCollectionRunSchema
+>;
+export type ProfileHomeFeedCollectionRunsListResponse = z.infer<
+  typeof ProfileHomeFeedCollectionRunsListResponseSchema
+>;
+export type ProfileHomeFeedCollectionRunResponse = z.infer<
+  typeof ProfileHomeFeedCollectionRunResponseSchema
+>;
+export type RequestProfileHomeFeedCollectionRunRequest = z.infer<
+  typeof RequestProfileHomeFeedCollectionRunRequestSchema
 >;
 export type AccountExerciseRun = z.infer<typeof AccountExerciseRunSchema>;
 export type AccountExerciseRunActionBudget = z.infer<
@@ -501,6 +631,8 @@ export const DEFAULT_ACCOUNT_EXERCISE_RUN_LIST_LIMIT = 50;
 export const MAX_ACCOUNT_EXERCISE_RUN_LIST_LIMIT = 100;
 export const DEFAULT_PROFILE_SOURCE_ACCESS_CHECK_RUN_LIST_LIMIT = 50;
 export const MAX_PROFILE_SOURCE_ACCESS_CHECK_RUN_LIST_LIMIT = 100;
+export const DEFAULT_PROFILE_HOME_FEED_COLLECTION_RUN_LIST_LIMIT = 50;
+export const MAX_PROFILE_HOME_FEED_COLLECTION_RUN_LIST_LIMIT = 100;
 export const DEFAULT_COLLECTION_SCHEDULE_LIST_LIMIT = 50;
 export const MAX_COLLECTION_SCHEDULE_LIST_LIMIT = 100;
 export const DEFAULT_PROFILE_HOME_FEED_COLLECTION_SCHEDULE_LIST_LIMIT = 50;
@@ -673,6 +805,13 @@ export interface ListProfileSourceAccessCheckRunsQuery {
   readonly offset?: number;
 }
 
+export interface ListProfileHomeFeedCollectionRunsQuery {
+  readonly status?: ProfileHomeFeedCollectionRunStatus;
+  readonly profileId?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
 export interface ListCollectionSchedulesQuery {
   readonly limit?: number;
   readonly offset?: number;
@@ -718,6 +857,18 @@ export interface CollectorRuntimeClient {
   readonly cancelProfileSourceAccessCheckRun: (
     checkRunId: string,
   ) => Promise<ApiResult<ProfileSourceAccessCheckRunResponse>>;
+  readonly listProfileHomeFeedCollectionRuns: (
+    query?: ListProfileHomeFeedCollectionRunsQuery,
+  ) => Promise<ApiResult<ProfileHomeFeedCollectionRunsListResponse>>;
+  readonly getProfileHomeFeedCollectionRun: (
+    profileHomeFeedCollectionRunId: string,
+  ) => Promise<ApiResult<ProfileHomeFeedCollectionRunResponse>>;
+  readonly requestProfileHomeFeedCollectionRun: (
+    request: RequestProfileHomeFeedCollectionRunRequest,
+  ) => Promise<ApiResult<ProfileHomeFeedCollectionRunResponse>>;
+  readonly cancelProfileHomeFeedCollectionRun: (
+    profileHomeFeedCollectionRunId: string,
+  ) => Promise<ApiResult<ProfileHomeFeedCollectionRunResponse>>;
   readonly listCollectionSchedules: (
     query?: ListCollectionSchedulesQuery,
   ) => Promise<ApiResult<CollectionScheduleListResponse>>;
@@ -824,6 +975,34 @@ export function createCollectorRuntimeClient(
         responseSchema: ProfileSourceAccessCheckRunResponseSchema,
       });
     },
+    listProfileHomeFeedCollectionRuns(query) {
+      return httpClient.request({
+        path: "/collector/profile-home-feed-collection-runs",
+        query: toListProfileHomeFeedCollectionRunsQueryParams(query),
+        responseSchema: ProfileHomeFeedCollectionRunsListResponseSchema,
+      });
+    },
+    getProfileHomeFeedCollectionRun(profileHomeFeedCollectionRunId) {
+      return httpClient.request({
+        path: `/collector/profile-home-feed-collection-runs/${encodeURIComponent(profileHomeFeedCollectionRunId)}`,
+        responseSchema: ProfileHomeFeedCollectionRunResponseSchema,
+      });
+    },
+    requestProfileHomeFeedCollectionRun(request) {
+      return httpClient.request({
+        path: "/collector/profile-home-feed-collection-runs",
+        method: "POST",
+        body: request,
+        responseSchema: ProfileHomeFeedCollectionRunResponseSchema,
+      });
+    },
+    cancelProfileHomeFeedCollectionRun(profileHomeFeedCollectionRunId) {
+      return httpClient.request({
+        path: `/collector/profile-home-feed-collection-runs/${encodeURIComponent(profileHomeFeedCollectionRunId)}/cancel`,
+        method: "POST",
+        responseSchema: ProfileHomeFeedCollectionRunResponseSchema,
+      });
+    },
     listCollectionSchedules(query) {
       return httpClient.request({
         path: "/collector/collection-schedules",
@@ -917,6 +1096,21 @@ export function toListProfileSourceAccessCheckRunsQueryParams(
     ...(query.sourceGroupId !== undefined
       ? { sourceGroupId: query.sourceGroupId }
       : {}),
+    ...(query.limit !== undefined ? { limit: query.limit } : {}),
+    ...(query.offset !== undefined ? { offset: query.offset } : {}),
+  };
+}
+
+export function toListProfileHomeFeedCollectionRunsQueryParams(
+  query: ListProfileHomeFeedCollectionRunsQuery | undefined,
+): Readonly<Record<string, string | number>> | undefined {
+  if (query === undefined) {
+    return undefined;
+  }
+
+  return {
+    ...(query.status !== undefined ? { status: query.status } : {}),
+    ...(query.profileId !== undefined ? { profileId: query.profileId } : {}),
     ...(query.limit !== undefined ? { limit: query.limit } : {}),
     ...(query.offset !== undefined ? { offset: query.offset } : {}),
   };

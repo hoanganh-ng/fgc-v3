@@ -360,7 +360,7 @@ Publisher behavior.
 - [Sprint 069 - Source Publisher Review and Promotion UI](SPRINT-069-source-publisher-review-promotion-ui.md)
 
 Sprint 070 — Typecheck Cleanup for Home-Feed Runner CLI Test is
-**active**. It restores full repository `pnpm typecheck` by fixing the
+**accepted**. It restored full repository `pnpm typecheck` by fixing the
 narrow TypeScript mismatch in
 `src/operator-tools/profile-home-feed-runner/cli.test.ts` around
 capturing and restoring `process.exitCode`. The fix is test-only and
@@ -373,10 +373,26 @@ exported module surface stays limited to `UNEXPECTED_CLI_FAILURE_MESSAGE`
 and `reportUnexpectedCliFailure`. Sprint 070 does not change the runtime
 implementation, product behavior, backend domain, application,
 persistence, HTTP routes, Web UI, Docker, worker, scheduler, browser,
-migration, Content Builder, or Content Publisher behavior. No commits,
-pushes, or new sprint activations occur as part of this sprint.
+migration, Content Builder, or Content Publisher behavior.
 
 - [Sprint 070 - Typecheck Cleanup For Home-Feed Runner CLI Test](SPRINT-070-typecheck-cleanup-home-feed-runner-cli.md)
+
+Sprint 071 — Profile Home-Feed Collection Runs Operator UI is **active**.
+It exposes the existing safe `ProfileHomeFeedCollectionRun` operator HTTP
+contracts through a narrow Web UI/client surface at
+`/profile-home-feed-collection-runs`, with a `Home Feed Runs` navigation item
+near Home Feed Schedules. Operators can queue manual profile-bound Facebook
+home-feed collection runs, monitor and filter runs by status/profile, refresh,
+paginate, poll active QUEUED/RUNNING rows, and cancel only QUEUED/RUNNING
+runs. The request form loads safe profile summaries, prefers profiles that are
+`READY`, `COLLECTION_READY`, and `HEALTHY`, requires `profileId`, and omits
+empty optional numeric fields. Sprint 071 does not change backend routes,
+schemas, domain, application, repositories, migrations, browser automation,
+scheduler/worker runtime, Docker, Content Manager, Content Builder, or Content
+Publisher behavior. No commits, pushes, or advancement beyond Sprint 071 occur
+as part of this sprint.
+
+- [Sprint 071 - Profile Home-Feed Collection Runs Operator UI](SPRINT-071-profile-home-feed-collection-runs-operator-ui.md)
 
 `SourcePublisher` is the Content Manager-owned publishing-source
 identity (a Facebook group or page observed while reading the feed)

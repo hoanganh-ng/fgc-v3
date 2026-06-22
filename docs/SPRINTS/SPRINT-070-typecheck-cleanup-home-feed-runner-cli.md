@@ -49,3 +49,7 @@ surface.
 - `git diff --check` reports no whitespace errors.
 - No commits, pushes, or new sprint activations occur as part of this
   sprint.
+
+## Status
+
+Sprint 070 is **accepted**. Sprint 071 is the active follow-up sprint.
