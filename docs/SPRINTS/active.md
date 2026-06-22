@@ -377,7 +377,7 @@ migration, Content Builder, or Content Publisher behavior.
 
 - [Sprint 070 - Typecheck Cleanup For Home-Feed Runner CLI Test](SPRINT-070-typecheck-cleanup-home-feed-runner-cli.md)
 
-Sprint 071 — Profile Home-Feed Collection Runs Operator UI is **active**.
+Sprint 071 — Profile Home-Feed Collection Runs Operator UI is **accepted**.
 It exposes the existing safe `ProfileHomeFeedCollectionRun` operator HTTP
 contracts through a narrow Web UI/client surface at
 `/profile-home-feed-collection-runs`, with a `Home Feed Runs` navigation item
