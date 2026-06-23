@@ -5,6 +5,7 @@ import type {
   TransformTypeListResult,
   TransformTypeRepository,
 } from "../../../content-builder/application";
+import { TransformTypeNameAlreadyExistsError } from "../../../content-builder/application";
 import type {
   TransformType,
   TransformTypeId,
@@ -24,20 +25,28 @@ export class DrizzleTransformTypeRepository
   public async save(transformType: TransformType): Promise<void> {
     const row = toTransformTypeRow(transformType);
 
-    await this.db
-      .insert(contentBuilderTransformTypes)
-      .values(row)
-      .onConflictDoUpdate({
-        target: contentBuilderTransformTypes.transformTypeId,
-        set: {
-          name: row.name,
-          normalizedName: row.normalizedName,
-          description: row.description,
-          initialPrompt: row.initialPrompt,
-          status: row.status,
-          updatedAt: row.updatedAt,
-        },
-      });
+    try {
+      await this.db
+        .insert(contentBuilderTransformTypes)
+        .values(row)
+        .onConflictDoUpdate({
+          target: contentBuilderTransformTypes.transformTypeId,
+          set: {
+            name: row.name,
+            normalizedName: row.normalizedName,
+            description: row.description,
+            initialPrompt: row.initialPrompt,
+            status: row.status,
+            updatedAt: row.updatedAt,
+          },
+        });
+    } catch (error: unknown) {
+      if (isActiveNameUniqueConflict(error)) {
+        throw new TransformTypeNameAlreadyExistsError(row.normalizedName);
+      }
+
+      throw error;
+    }
   }
 
   public async findById(
@@ -105,4 +114,31 @@ function getTransformTypeListWhere(
   }
 
   return eq(contentBuilderTransformTypes.status, query.status);
+}
+
+function isActiveNameUniqueConflict(error: unknown): boolean {
+  return (
+    hasPostgresConstraint(
+      error,
+      "content_builder_transform_types_active_name_uidx",
+    ) ||
+    (typeof error === "object" &&
+      error !== null &&
+      "cause" in error &&
+      hasPostgresConstraint(
+        error.cause,
+        "content_builder_transform_types_active_name_uidx",
+      ))
+  );
+}
+
+function hasPostgresConstraint(error: unknown, constraint: string): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "23505" &&
+    "constraint" in error &&
+    error.constraint === constraint
+  );
 }

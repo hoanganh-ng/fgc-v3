@@ -2,8 +2,7 @@
 
 ## Ownership
 
-- Reusable building blocks for transforming collected content into future
-  creative planning artifacts.
+- The current Sprint 072 implementation is the Transform Type catalog only.
 - `TransformType` catalog entries that define a reusable initial transform
   prompt.
 - Transform Type lifecycle: create, list, read, update, and archive.
@@ -18,7 +17,8 @@
   extractor orchestration, queues, schedulers, or workers.
 - Profile/session management or checkout behavior.
 - LLM provider configuration, prompt execution, prompt versioning, Content
-  Briefs, Producer graphs, artifacts, or Content Publisher behavior.
+  Briefs, Producers, Producer Sets, Producer graphs, artifacts, collected
+  content selection, or Content Publisher behavior.
 
 ## Important Source Paths
 
@@ -48,6 +48,12 @@
 - The Web UI consumes safe `/builder/*` HTTP contracts.
 - Content Builder does not import Content Manager repositories, Collector
   Runtime internals, Profile Manager internals, browser providers, or LLM SDKs.
+- Future Builder workflows must consume collected content through explicit safe
+  Content Manager contracts or Content Builder-owned application ports.
+- Builder must not import Content Manager repositories, database schema,
+  Collector Runtime internals, raw payloads, profile/session material, cookies,
+  localStorage, tokens, proxy details, browser data, or provenance internals
+  unless a later sprint explicitly approves a safe DTO.
 
 ## Sensitive Data Rules
 

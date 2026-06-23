@@ -104,22 +104,18 @@ Owns:
   items (matched by `platform + externalPostId`) use
   `mergeContentCollectionProvenance`. A merge that throws
   `ContentCollectionProvenanceConflictError` propagates the typed
-  domain error and never persists. The legacy `sourceGroupId`
-  field and the PostgreSQL `source_group_id` column remain
-  required and unchanged for backward compatibility. A
-  source-group consistency invariant guarantees that
-  `collectionProvenance.firstCollectionSurface.kind === 'SOURCE_GROUP'`
-  and that
-  `collectionProvenance.firstCollectionSurface.sourceGroupId === sourceGroupId`
-  on every persisted content item. The HTTP DTOs and JSON schemas
-  are unchanged; `collectionProvenance` is internal-only and is
-  not exposed through HTTP. Sprint 064B is accepted and does not introduce
-  home-feed ingestion or execution, does not make `sourceGroupId`
-  nullable, does not add `SourcePublisher` observation or
-  resolution, does not add a new HTTP DTO field, does not add a
-  provenance filter or index, and does not change the Collector
-  Runtime, extractor, browser, workers, scheduler, Docker, or
-  Web UI.
+  domain error and never persists. The source-group ingestion contract still
+  requires `sourceGroupId`, and source-group-first persisted content keeps the
+  invariant that
+  `collectionProvenance.firstCollectionSurface.kind === 'SOURCE_GROUP'` and
+  `collectionProvenance.firstCollectionSurface.sourceGroupId === sourceGroupId`.
+  Current durable content can omit `sourceGroupId` only for home-feed-first
+  content added by Sprint 065C1. The HTTP DTOs do not expose
+  `collectionProvenance`; `ContentItemDto.sourceGroupId` is optional and is
+  omitted when absent. Sprint 064B itself did not introduce home-feed ingestion
+  or execution, `SourcePublisher` observation or resolution, a provenance
+  filter or index, or Collector Runtime, extractor, browser, worker,
+  scheduler, Docker, or Web UI changes.
 - Sprint 065C1 (accepted at
   `40b3ce7023c126c03386994a719ae7acb7758f21`) makes
   `ContentItem.sourceGroupId` optional in the domain schema and DTOs
@@ -362,15 +358,33 @@ Does not own:
 
 Owns:
 
-- Future transformation of collected material into video-ready assets and assembled video outputs.
-- Future builder-specific validation, rendering, and quality workflows.
+- The current Sprint 072 Transform Type catalog: reusable initial transform
+  prompt records, create/list/read/update/archive lifecycle, active normalized
+  name uniqueness, safe `/builder/transform-types` HTTP contracts, PostgreSQL
+  persistence, and Web UI management.
+- Future Builder workflows may transform collected material into video-ready
+  assets only after a later sprint defines the safe contracts and DTOs.
 
 Does not own:
 
 - Profile lifecycle.
 - Profile provisioning.
+- Content Manager source groups, source publishers, content items, ingestion,
+  review lifecycle, repositories, or database schema.
 - Collector runtime execution.
+- Browser automation, raw Facebook payloads, profile/session material,
+  cookies, localStorage, tokens, proxy details, browser data, or provenance
+  internals.
+- Content Briefs, Producers, Producer Sets, artifacts, LLM execution, prompt
+  versioning, or collected-content selection.
 - Publishing workflows.
+
+Future Builder workflows must consume collected content through explicit safe
+Content Manager contracts or Content Builder-owned application ports. Builder
+must not import Content Manager repositories, database schema, Collector
+Runtime internals, raw payloads, profile/session material, cookies,
+localStorage, tokens, proxy details, browser data, or provenance internals
+unless a later sprint explicitly approves a safe DTO.
 
 ## Content Publisher
 

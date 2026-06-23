@@ -993,6 +993,10 @@ Worker logs and collection-run records never include raw Facebook payloads, cook
 Sprint 051 adds a separate operator command for consuming queued
 Profile-Source Access Check Runs. It does not add public lifecycle endpoints;
 the worker claims and updates runs through Collector Runtime application code.
+This is currently an operator command only. The development and preview
+Compose worker profiles do not include a `profile-source-access-check-worker`
+service or stack command; add Compose wiring only if a later sprint explicitly
+requires it.
 
 Run once against the preview gateway:
 

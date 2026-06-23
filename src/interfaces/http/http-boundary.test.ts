@@ -20,6 +20,12 @@ describe("HTTP adapter architecture boundary", () => {
         new URL("../../content-manager/application/", import.meta.url),
       ),
       ...collectTypeScriptFiles(
+        new URL("../../content-builder/domain/", import.meta.url),
+      ),
+      ...collectTypeScriptFiles(
+        new URL("../../content-builder/application/", import.meta.url),
+      ),
+      ...collectTypeScriptFiles(
         new URL("../../collector-runtime/domain/", import.meta.url),
       ),
       ...collectTypeScriptFiles(

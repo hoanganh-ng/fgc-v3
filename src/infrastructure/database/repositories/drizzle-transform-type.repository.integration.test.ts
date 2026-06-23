@@ -1,5 +1,6 @@
 import { inArray } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { TransformTypeNameAlreadyExistsError } from "../../../content-builder/application";
 import type { TransformType } from "../../../content-builder/domain";
 import {
   createTransformType as createTransformTypeDomain,
@@ -351,12 +352,9 @@ if (!shouldRunDbTests) {
 
         expect(duplicate.normalizedName).toBe(normalizedName);
 
-        await expect(repository.save(duplicate)).rejects.toMatchObject({
-          cause: {
-            code: "23505",
-            constraint: "content_builder_transform_types_active_name_uidx",
-          },
-        });
+        await expect(repository.save(duplicate)).rejects.toBeInstanceOf(
+          TransformTypeNameAlreadyExistsError,
+        );
 
         await expect(
           repository.findActiveByNormalizedName(normalizedName),
