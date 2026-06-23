@@ -174,6 +174,13 @@ if (!shouldRunDbTests) {
         await repository.save(activeA);
         await repository.save(activeB);
         await repository.save(archived);
+        await repository.save(
+          track({
+            ...archived,
+            status: "ARCHIVED" as const,
+            updatedAt: "2026-06-22T09:45:00.000Z",
+          }),
+        );
 
         const activeOnly = await repository.list({
           status: "ACTIVE",
@@ -345,8 +352,10 @@ if (!shouldRunDbTests) {
         expect(duplicate.normalizedName).toBe(normalizedName);
 
         await expect(repository.save(duplicate)).rejects.toMatchObject({
-          code: "23505",
-          constraint: "content_builder_transform_types_active_name_uidx",
+          cause: {
+            code: "23505",
+            constraint: "content_builder_transform_types_active_name_uidx",
+          },
         });
 
         await expect(

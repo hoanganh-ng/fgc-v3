@@ -56,17 +56,49 @@ higher layer can attribute the failure correctly.
 
 ## Layer 2 — Database Integration Tests
 
-- Runner: Vitest with `RUN_DB_TESTS=true` (`pnpm test:db`).
+- Canonical Builder runner: the Docker-backed harness
+  (`pnpm test:db:docker`). Host command: `bash scripts/test-db-docker.sh`.
+- In-container command: `sh scripts/run-db-test-container.sh`, which
+  runs `pnpm db:migrate` then
+  `pnpm exec vitest run ${DB_TEST_ARGS:-src/infrastructure}` with
+  `RUN_DB_TESTS=true` and `DATABASE_URL` set to the in-network
+  Postgres.
 - Scope: Drizzle repository adapters against a real PostgreSQL
   instance, exercised through the existing Sprint 057 / Sprint 058
   atomic dispatch fixtures and isolation helpers.
-- Database: a developer-managed test database reachable through
+- Database: an isolated PostgreSQL managed by Compose (no host port,
+  no host-managed database).
+- Stack isolation: the harness uses its own Compose project
+  (`fgc-v3-db-test`), its own named volume
+  (`fgc_db_test_postgres_data`), and its own network. It never
+  publishes a host port, never reuses dev, preview, or E2E volumes,
+  and never touches dev, preview, or E2E resources.
+- Readiness: `postgres` is gated by `pg_isready`. The runner starts
+  Vitest after `depends_on: service_healthy` and after
+  `pnpm db:migrate` succeeds inside the entrypoint.
+- Cleanup: the host driver traps `EXIT INT TERM` and always runs
+  `docker compose -p fgc-v3-db-test -f docker-compose.db-test.yml
+  down -v --remove-orphans`. Cleanup runs on success, failure, and
+  interruption.
+- Logs: on non-zero exit, the host driver prints
+  `docker compose logs --no-color db-test-runner postgres`. The
+  driver never prints `DATABASE_URL` or any environment value.
+- `DB_TEST_ARGS`: optional env var forwarded into the runner
+  container; word-split into positional args for Vitest. Default
+  `src/infrastructure`.
+- Host-managed fallback: `pnpm test:db` (Vitest with
+  `RUN_DB_TESTS=true` against a developer-managed `DATABASE_URL`)
+  remains available only when a developer has explicitly maintained
+  a reachable local test DB and explicitly opted in by setting
   `DATABASE_URL` (or `SPRINT_058_DATABASE_URL` for Sprint 058 atomic
-  dispatch tests). The repository layer applies migrations and resets
-  state per spec.
+  dispatch tests). The repository layer applies migrations and
+  resets state per spec.
 - No HTTP server, no browser, no real Facebook.
 - Owner: every sprint that adds or changes a repository adapter,
-  schema, migration, or atomic transition.
+  schema, migration, or atomic transition. For any sprint with
+  persistence, migration, or repository changes, Builder must run
+  Docker DB verification through `pnpm test:db:docker` unless
+  explicitly told otherwise.
 
 ## Layer 3 — HTTP Integration Tests
 
@@ -160,8 +192,11 @@ layer is a sprint-scope violation.
 - **Persistence, migration, or concurrency changes** (new Drizzle
   schema, new migration, repository adapter, mapper, unique
   constraint, atomic upsert, lease or run state transition): unit
-  tests plus Layer 2 (database integration). Concurrency changes
-  also require explicit contention coverage in the database
+  tests plus Layer 2 (database integration) through the canonical
+  Docker-backed runner `pnpm test:db:docker`. The host-managed
+  `pnpm test:db` is acceptable only when the developer has
+  explicitly opted in to a developer-managed test DB. Concurrency
+  changes also require explicit contention coverage in the database
   integration layer.
 - **HTTP contract changes** (new route, new DTO, request/response
   schema change, error mapping change): unit tests, Layer 3 (HTTP

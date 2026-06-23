@@ -80,5 +80,18 @@ function parseTransformTypeForPersistence(
 }
 
 function normalizeIsoDateTime(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : value;
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  // Drizzle returns `timestamp(..., { mode: "string", withTimezone: true })`
+  // columns as Postgres default timestamptz literals such as
+  // `2026-06-22 10:00:00.000+00`. Convert that shape to the strict ISO 8601
+  // representation the domain `IsoDateTimeSchema` (z.iso.datetime) accepts.
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString();
+  }
+
+  return value;
 }

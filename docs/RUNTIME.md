@@ -35,9 +35,20 @@ Root `package.json` scripts are grouped by operational purpose. New work should 
 | `pnpm typecheck` | Typecheck the backend/root TypeScript project. |
 | `pnpm test` | Run default Vitest tests. |
 | `pnpm test:db` | Run opt-in database integration tests. |
+| `pnpm test:db:docker` | Run the canonical Docker-backed Layer 2 database integration test runner (isolated Postgres + Vitest). |
 | `pnpm test:http:db` | Run opt-in DB-backed HTTP integration tests. |
 | `pnpm test:e2e:docker` | Run the isolated Docker E2E stack and Playwright runner. The only operator-facing host command for the E2E harness. |
 | `pnpm test:e2e:container` | Internal: the in-container Playwright invocation the `e2e-runner` entrypoint calls. Not directly host-runnable; `http://web-gateway` is Docker-only and no host port is published. |
+
+`pnpm test:db:docker` accepts an optional `DB_TEST_ARGS` env var forwarded
+into the runner container and split on whitespace into Vitest positional
+arguments. Default is `src/infrastructure` (matches the host `pnpm test:db`
+target). Example narrowing to one spec:
+
+```bash
+DB_TEST_ARGS="src/infrastructure/database/repositories/drizzle-transform-type.repository.integration.test.ts" \
+  pnpm test:db:docker
+```
 
 ### Operator Tools
 
@@ -1229,4 +1240,129 @@ up `postgres`, `api`, and `web-gateway` again.
 docker volume ls               # fgc_dev_postgres_data, fgc_preview_postgres_data unchanged
 docker ps -a                   # no leftover fgc-v3-e2e containers
 docker network ls              # no leftover fgc-v3-e2e_default network
+```
+
+## Docker Database Integration Testing
+
+Sprint 072B adds an isolated Docker-backed Layer 2 (database
+integration) test runner. The harness boots an isolated PostgreSQL,
+applies Drizzle migrations inside the runner container, and executes
+the existing Vitest DB specs through `RUN_DB_TESTS=true` against the
+in-network Postgres. The only operator-facing host command is:
+
+```bash
+pnpm test:db:docker
+```
+
+The host driver (`scripts/test-db-docker.sh`) runs inside its own
+Compose project (`fgc-v3-db-test`) and its own named volume
+(`fgc_db_test_postgres_data`). It performs, in order:
+
+1. Cleanup of any prior DB test resources:
+   `docker compose -p fgc-v3-db-test -f docker-compose.db-test.yml
+   down -v --remove-orphans`.
+2. Build: `docker compose -p fgc-v3-db-test -f docker-compose.db-test.yml build`.
+3. Start `postgres` in detached mode only:
+   `docker compose -p fgc-v3-db-test -f docker-compose.db-test.yml up
+   -d postgres`. The DB test runner is not started in this step.
+4. Start the `db-test-runner` exactly once, in attached mode, with
+   `--abort-on-container-exit --exit-code-from db-test-runner`:
+   `docker compose -p fgc-v3-db-test -f docker-compose.db-test.yml up
+   --abort-on-container-exit --exit-code-from db-test-runner
+   db-test-runner`.
+5. Capture the runner's exit code.
+6. On non-zero exit, print sanitized
+   `docker compose logs --no-color db-test-runner postgres`. The
+   driver never prints `DATABASE_URL` or any environment value.
+7. Return the runner's exit code as the host driver exit code.
+
+The driver installs a `trap` on `EXIT INT TERM` that always runs
+`docker compose -p fgc-v3-db-test -f docker-compose.db-test.yml down -v
+--remove-orphans`. Cleanup runs on success, failure, and interruption
+(including `Ctrl+C`).
+
+The container entrypoint (`scripts/run-db-test-container.sh`) runs
+`pnpm db:migrate` then `pnpm exec vitest run
+${DB_TEST_ARGS:-src/infrastructure}` with `RUN_DB_TESTS=true` and
+`DATABASE_URL` set to the in-network Postgres. The runner image is a
+dedicated `db-test-runtime` Dockerfile stage that copies the
+workspace deps, `tsconfig.json`, `drizzle.config.ts`, `drizzle/`,
+`scripts/`, and `src/`. The `e2e-runtime` stage is intentionally not
+reused because it omits `src/` and `drizzle/`.
+
+### What the DB test harness does not do
+
+The harness is intentionally narrow:
+
+- It does not publish a host port. The runner reaches the database
+  through Compose service DNS only.
+- It does not reuse `fgc_dev_postgres_data`, `fgc_preview_postgres_data`,
+  or `fgc_e2e_postgres_data`. The DB test volume is
+  `fgc_db_test_postgres_data` under the DB test project.
+- It does not start the API, web gateway, collection worker, account
+  exercise worker, or collection scheduler.
+- It does not start a browser, does not use Playwright, and does not
+  connect to Facebook.
+- It does not log `DATABASE_URL`, base URLs, raw payloads, cookies,
+  localStorage, proxy credentials, session headers, or environment
+  values from any container.
+- It does not use arbitrary sleeps as the readiness mechanism. The
+  only wait is the `pg_isready` healthcheck; the runner applies
+  migrations and starts Vitest only after `depends_on:
+  service_healthy`.
+- It does not start the DB test runner during the detached dependency
+  startup; the runner is started exactly once in attached mode.
+
+### DB test stack
+
+```text
+postgres         postgres:16-alpine     no host port; isolated named volume
+db-test-runner   db-test-runtime stage  pnpm db:migrate && pnpm exec vitest run ${DB_TEST_ARGS:-src/infrastructure}
+                                       with RUN_DB_TESTS=true
+                                       started exactly once, in attached mode
+```
+
+### Running the DB test harness
+
+```bash
+pnpm test:db:docker
+pnpm test:db:docker   # repeat for determinism
+DB_TEST_ARGS="src/infrastructure/database/repositories/drizzle-transform-type.repository.integration.test.ts" pnpm test:db:docker
+```
+
+The second run uses the same isolated volume and starts from a fresh
+database because the host driver always runs `down -v` before bringing
+up `postgres` and the runner again.
+
+### DB test troubleshooting
+
+- `no such service: db-test-runner` — the host driver is being run
+  from the wrong directory. `cd` to the repo root.
+- DB test runner exits non-zero — check
+  `docker compose -p fgc-v3-db-test -f docker-compose.db-test.yml
+  logs db-test-runner` for the sanitized Vitest output and
+  `pnpm db:migrate` result.
+- The DB test runner was started more than once — check
+  `docker ps -a --filter
+  "label=com.docker.compose.project=fgc-v3-db-test" --filter
+  "label=com.docker.compose.service=db-test-runner"`. There should
+  be at most one container per run; the host driver starts the runner
+  exactly once.
+- Leftover containers after a forced kill — the host driver `trap`
+  ran `down -v`. Verify with
+  `docker ps -a --filter
+  "label=com.docker.compose.project=fgc-v3-db-test"` (should be empty)
+  and `docker volume ls` (should not list
+  `fgc-v3-db-test_fgc_db_test_postgres_data`).
+- The driver prints `Cleanup failed: …` — the underlying `docker
+  compose down -v` failed. Run it manually:
+  `docker compose -p fgc-v3-db-test -f docker-compose.db-test.yml
+  down -v --remove-orphans`.
+
+### Verifying DB test isolation
+
+```bash
+docker volume ls               # fgc_dev_postgres_data, fgc_preview_postgres_data, fgc_e2e_postgres_data unchanged
+docker ps -a                   # no leftover fgc-v3-db-test containers
+docker network ls              # no leftover fgc-v3-db-test_default network
 ```

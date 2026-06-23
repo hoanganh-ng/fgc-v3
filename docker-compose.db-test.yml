@@ -1,0 +1,33 @@
+name: fgc-v3-db-test
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: content_pipeline
+      POSTGRES_PASSWORD: content_pipeline
+      POSTGRES_DB: content_pipeline
+    volumes:
+      - fgc_db_test_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  db-test-runner:
+    build:
+      context: .
+      target: db-test-runtime
+    init: true
+    command: ["sh", "scripts/run-db-test-container.sh"]
+    environment:
+      DATABASE_URL: postgres://content_pipeline:content_pipeline@postgres:5432/content_pipeline
+      DB_TEST_ARGS: ${DB_TEST_ARGS:-src/infrastructure}
+      RUN_DB_TESTS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  fgc_db_test_postgres_data:
