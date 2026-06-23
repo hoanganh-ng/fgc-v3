@@ -12,10 +12,12 @@ export { parseHttpInput } from "./http-validation";
 
 const NonEmptyStringHttpSchema = z.string().trim().min(1);
 
+const OptionalDescriptionHttpSchema = z.string().trim();
+
 export const CreateTransformTypeHttpBodySchema = z
   .object({
     name: NonEmptyStringHttpSchema,
-    description: NonEmptyStringHttpSchema.optional(),
+    description: OptionalDescriptionHttpSchema.optional(),
     initialPrompt: NonEmptyStringHttpSchema,
   })
   .strict();
@@ -23,7 +25,7 @@ export const CreateTransformTypeHttpBodySchema = z
 export const UpdateTransformTypeHttpBodySchema = z
   .object({
     name: NonEmptyStringHttpSchema.optional(),
-    description: NonEmptyStringHttpSchema.nullable().optional(),
+    description: OptionalDescriptionHttpSchema.nullable().optional(),
     initialPrompt: NonEmptyStringHttpSchema.optional(),
   })
   .strict()
@@ -117,7 +119,7 @@ const transformTypeJsonSchema = {
   properties: {
     transformTypeId: nonEmptyStringJsonSchema,
     name: nonEmptyStringJsonSchema,
-    description: nonEmptyStringJsonSchema,
+    description: { type: "string" },
     initialPrompt: nonEmptyStringJsonSchema,
     status: {
       type: "string",
@@ -165,7 +167,7 @@ const createTransformTypeBodyJsonSchema = {
   additionalProperties: false,
   properties: {
     name: nonEmptyStringJsonSchema,
-    description: nonEmptyStringJsonSchema,
+    description: { type: "string" },
     initialPrompt: nonEmptyStringJsonSchema,
   },
 } as const;
@@ -177,7 +179,7 @@ const updateTransformTypeBodyJsonSchema = {
   properties: {
     name: nonEmptyStringJsonSchema,
     description: {
-      anyOf: [nonEmptyStringJsonSchema, { type: "null" }],
+      anyOf: [{ type: "string" }, { type: "null" }],
     },
     initialPrompt: nonEmptyStringJsonSchema,
   },

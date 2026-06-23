@@ -83,7 +83,7 @@ export function registerContentBuilderRoutes(
       );
       const input = {
         name: body.name,
-        ...(body.description !== undefined
+        ...(body.description !== undefined && body.description.length > 0
           ? { description: body.description }
           : {}),
         initialPrompt: body.initialPrompt,
@@ -152,10 +152,14 @@ export function registerContentBuilderRoutes(
       const input = {
         transformTypeId: params.transformTypeId,
         ...(body.name !== undefined ? { name: body.name } : {}),
-        ...(body.description !== undefined && body.description !== null
+        ...(body.description !== undefined && body.description !== null &&
+        body.description.length > 0
           ? { description: body.description }
           : {}),
-        ...(body.description === null ? { clearDescription: true } : {}),
+        ...(body.description === null ||
+        (body.description !== undefined && body.description.length === 0)
+          ? { clearDescription: true }
+          : {}),
         ...(body.initialPrompt !== undefined
           ? { initialPrompt: body.initialPrompt }
           : {}),

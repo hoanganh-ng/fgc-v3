@@ -83,10 +83,68 @@ describe("Content Builder HTTP routes", () => {
           initialPrompt: "Prompt",
         },
       });
+      const blankPromptResponse = await server.inject({
+        method: "POST",
+        url: "/builder/transform-types",
+        payload: {
+          name: "Hook",
+          initialPrompt: "   ",
+        },
+      });
 
       expect(unknownResponse.statusCode).toBe(400);
       expect(blankResponse.statusCode).toBe(400);
+      expect(blankPromptResponse.statusCode).toBe(400);
       expect(service.createTransformType.calls).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("accepts blank optional descriptions on create and omits the field", async () => {
+    const { server, service } = createTestServer();
+    service.createTransformType.setOutput(
+      createTransformType({ description: undefined }),
+    );
+
+    try {
+      const emptyResponse = await server.inject({
+        method: "POST",
+        url: "/builder/transform-types",
+        payload: {
+          name: "Hook Rewrite",
+          description: "",
+          initialPrompt: "Rewrite this into a hook.",
+        },
+      });
+      const whitespaceResponse = await server.inject({
+        method: "POST",
+        url: "/builder/transform-types",
+        payload: {
+          name: "Hook Rewrite",
+          description: "   ",
+          initialPrompt: "Rewrite this into a hook.",
+        },
+      });
+
+      expect(emptyResponse.statusCode).toBe(201);
+      expect(whitespaceResponse.statusCode).toBe(201);
+      expect(service.createTransformType.calls).toEqual([
+        {
+          name: "Hook Rewrite",
+          initialPrompt: "Rewrite this into a hook.",
+        },
+        {
+          name: "Hook Rewrite",
+          initialPrompt: "Rewrite this into a hook.",
+        },
+      ]);
+      expect(emptyResponse.json().transformType).not.toHaveProperty(
+        "description",
+      );
+      expect(whitespaceResponse.json().transformType).not.toHaveProperty(
+        "description",
+      );
     } finally {
       await server.close();
     }
@@ -225,6 +283,66 @@ describe("Content Builder HTTP routes", () => {
       expect(response.json()).toMatchObject({
         error: { code: "TRANSFORM_TYPE_NOT_FOUND" },
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("treats blank optional descriptions on update as omitted and clears stored description", async () => {
+    const { server, service } = createTestServer();
+    service.updateTransformType.setOutput(
+      createTransformType({ description: undefined }),
+    );
+
+    try {
+      const emptyResponse = await server.inject({
+        method: "PATCH",
+        url: "/builder/transform-types/transform-type-1",
+        payload: {
+          description: "",
+        },
+      });
+      const whitespaceResponse = await server.inject({
+        method: "PATCH",
+        url: "/builder/transform-types/transform-type-1",
+        payload: {
+          description: "   ",
+        },
+      });
+      const nullResponse = await server.inject({
+        method: "PATCH",
+        url: "/builder/transform-types/transform-type-1",
+        payload: {
+          description: null,
+        },
+      });
+
+      expect(emptyResponse.statusCode).toBe(200);
+      expect(whitespaceResponse.statusCode).toBe(200);
+      expect(nullResponse.statusCode).toBe(200);
+      expect(service.updateTransformType.calls).toEqual([
+        {
+          transformTypeId: "transform-type-1",
+          clearDescription: true,
+        },
+        {
+          transformTypeId: "transform-type-1",
+          clearDescription: true,
+        },
+        {
+          transformTypeId: "transform-type-1",
+          clearDescription: true,
+        },
+      ]);
+      expect(emptyResponse.json().transformType).not.toHaveProperty(
+        "description",
+      );
+      expect(whitespaceResponse.json().transformType).not.toHaveProperty(
+        "description",
+      );
+      expect(nullResponse.json().transformType).not.toHaveProperty(
+        "description",
+      );
     } finally {
       await server.close();
     }
