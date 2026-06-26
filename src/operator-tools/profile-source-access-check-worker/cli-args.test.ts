@@ -48,7 +48,6 @@ describe("profile-source access check worker CLI args", () => {
     const usage = getProfileSourceAccessCheckWorkerCliUsage();
 
     expect(usage).toContain("pnpm operator:profile-source-access-check-worker");
-    expect(usage).toContain("pnpm profile-source-access-check-worker:run");
   });
 
   it("rejects invalid options", () => {

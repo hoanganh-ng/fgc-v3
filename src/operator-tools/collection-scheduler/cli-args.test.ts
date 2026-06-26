@@ -137,7 +137,7 @@ describe("collection scheduler CLI args", () => {
   it("documents usage", () => {
     const usage = getCollectionSchedulerCliUsage();
 
-    expect(usage).toContain("pnpm collector:scheduler:run");
+    expect(usage).toContain("pnpm operator:collector:scheduler");
     expect(usage).toContain("--once");
     expect(usage).toContain("--poll-interval-ms");
     expect(usage).toContain("--help");

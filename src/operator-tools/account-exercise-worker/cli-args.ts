@@ -147,7 +147,7 @@ export function getAccountExerciseWorkerCliUsage(): string {
   return [
     "Usage:",
     "  pnpm operator:profile:exercise-worker -- --base-url <url> --once",
-    "  pnpm profile:exercise-worker:run -- --base-url <url> [--poll-interval-ms 5000]",
+    "  pnpm operator:profile:exercise-worker -- --base-url <url> [--poll-interval-ms 5000]",
     "",
     "Options:",
     "  --base-url           API or gateway base URL for Collector HTTP routes.",

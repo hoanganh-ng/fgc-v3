@@ -56,7 +56,7 @@ describe("collector worker CLI args", () => {
   it("documents one-shot and polling usage", () => {
     const usage = getCollectorWorkerCliUsage();
 
-    expect(usage).toContain("pnpm collector:worker:run");
+    expect(usage).toContain("pnpm operator:collector:worker");
     expect(usage).toContain("--once");
     expect(usage).toContain("--poll-interval-ms");
     expect(usage).toContain("--browser-provider");

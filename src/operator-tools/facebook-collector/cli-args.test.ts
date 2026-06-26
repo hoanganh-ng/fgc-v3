@@ -200,7 +200,7 @@ describe("parseFacebookCollectorCliArgs", () => {
       FacebookCollectorCliHelpRequested,
     );
     expect(getFacebookCollectorCliUsage()).toContain(
-      "pnpm collector:facebook:run -- --source-group-id",
+      "pnpm operator:collector:facebook -- --source-group-id",
     );
     expect(getFacebookCollectorCliUsage()).toContain("--diagnose-checkout");
     expect(getFacebookCollectorCliUsage()).toContain("--browser-provider");

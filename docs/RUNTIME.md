@@ -67,6 +67,7 @@ DB_TEST_ARGS="src/infrastructure/database/repositories/drizzle-transform-type.re
 | `pnpm operator:collector:scheduler` | Poll `DispatchNextDueCollectionScheduleUseCase` and dispatch due schedules. |
 | `pnpm operator:profile-home-feed:scheduler` | Poll `DispatchNextDueProfileHomeFeedCollectionScheduleUseCase` and dispatch due profile home-feed schedules. |
 | `pnpm operator:profile-home-feed-worker` | Claim and execute queued profile home-feed collection runs. |
+| `pnpm operator:profile-home-feed:run-next` | Run one bounded profile home-feed collection (Sprint 065C3 one-shot executor). |
 | `pnpm operator:browser:probe` | Probe a browser provider without backend or Facebook login. |
 
 ### Removed legacy aliases (Sprint 073)
@@ -79,8 +80,8 @@ The following backward-compatible alias scripts were removed from the root
 - Profile: `pnpm profile:provision`,
   `pnpm profile:provision:cloakbrowser-probe`,
   `pnpm profile:exercise:run`, `pnpm profile:exercise-worker:run`,
-  `pnpm profile:assisted-access:run`,
-  `pnpm profile:home-feed:run-next`.
+  `pnpm profile:assisted-access:run`.
+  `pnpm profile:home-feed:run-next` -> `pnpm operator:profile-home-feed:run-next`.
 - Collector / source groups: `pnpm collector:facebook:run`,
   `pnpm collector:worker:run`, `pnpm collector:scheduler:run`,
   `pnpm collector:browser:probe`.
@@ -671,9 +672,7 @@ pnpm operator:profile:exercise-worker -- --base-url http://localhost:3000 --poll
 
 Alias:
 
-```bash
-pnpm profile:exercise-worker:run -- --base-url http://localhost:8081 --once
-```
+The backward-compatible alias `pnpm profile:exercise-worker:run` was removed in Sprint 073. Use the canonical `pnpm operator:profile:exercise-worker --` form above.
 
 If `--base-url` is omitted, the worker uses
 `ACCOUNT_EXERCISE_WORKER_BASE_URL`, then `PROFILE_EXERCISE_BASE_URL`, then
@@ -1028,9 +1027,7 @@ pnpm operator:profile-source-access-check-worker -- --base-url http://localhost:
 
 Alias:
 
-```bash
-pnpm profile-source-access-check-worker:run -- --base-url http://localhost:8081 --once
-```
+The backward-compatible alias `pnpm profile-source-access-check-worker:run` was removed in Sprint 073. Use the canonical `pnpm operator:profile-source-access-check-worker --` form above.
 
 Run in polling mode against the direct local API:
 

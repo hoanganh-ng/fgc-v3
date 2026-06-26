@@ -144,8 +144,8 @@ export function parseCollectorWorkerCliArgs(
 export function getCollectorWorkerCliUsage(): string {
   return [
     "Usage:",
-    "  pnpm collector:worker:run -- --base-url <url> --once",
-    "  pnpm collector:worker:run -- --base-url <url> [--poll-interval-ms 5000]",
+    "  pnpm operator:collector:worker -- --base-url <url> --once",
+    "  pnpm operator:collector:worker -- --base-url <url> [--poll-interval-ms 5000]",
     "",
     "Options:",
     "  --base-url           API or gateway base URL for Profile Manager and Content Manager.",

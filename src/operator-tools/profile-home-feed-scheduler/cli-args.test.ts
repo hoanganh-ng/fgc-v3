@@ -145,7 +145,7 @@ describe("profile home-feed scheduler CLI args", () => {
   it("documents usage", () => {
     const usage = getProfileHomeFeedSchedulerCliUsage();
 
-    expect(usage).toContain("pnpm profile-home-feed:scheduler:run");
+    expect(usage).toContain("pnpm operator:profile-home-feed:scheduler");
     expect(usage).toContain("--once");
     expect(usage).toContain("--poll-interval-ms");
     expect(usage).toContain("--help");

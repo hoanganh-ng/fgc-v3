@@ -185,7 +185,9 @@ describe("parseProfileProvisioningCliArgs", () => {
     expect(() => parseProfileProvisioningCliArgs(["--help"])).toThrow(
       ProfileProvisioningCliHelpRequested,
     );
-    expect(getProfileProvisioningCliUsage()).toContain("pnpm profile:provision");
+    expect(getProfileProvisioningCliUsage()).toContain(
+      "pnpm operator:profile:provision",
+    );
     expect(getProfileProvisioningCliUsage()).toContain("--browser-provider");
     expect(getProfileProvisioningCliUsage()).not.toContain("secret");
   });

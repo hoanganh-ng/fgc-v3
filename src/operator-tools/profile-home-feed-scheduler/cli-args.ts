@@ -90,8 +90,8 @@ export function parseProfileHomeFeedSchedulerCliArgs(
 export function getProfileHomeFeedSchedulerCliUsage(): string {
   return [
     "Usage:",
-    "  pnpm profile-home-feed:scheduler:run -- --once",
-    "  pnpm profile-home-feed:scheduler:run -- [--poll-interval-ms 5000]",
+    "  pnpm operator:profile-home-feed:scheduler -- --once",
+    "  pnpm operator:profile-home-feed:scheduler -- [--poll-interval-ms 5000]",
     "",
     "Options:",
     "  --once               Drain all due profile home-feed schedules once, then exit.",

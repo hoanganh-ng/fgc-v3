@@ -108,7 +108,7 @@ export function parseProfileHomeFeedRunNextCliArgs(
 export function getProfileHomeFeedRunNextCliUsage(): string {
   return [
     "Usage:",
-    "  pnpm profile:home-feed:run-next -- --base-url <url> [--browser-provider playwright]",
+    "  pnpm operator:profile-home-feed:run-next -- --base-url <url> [--browser-provider playwright]",
     "",
     "Options:",
     "  --base-url           API or gateway base URL for Profile Manager and Content Manager HTTP routes.",

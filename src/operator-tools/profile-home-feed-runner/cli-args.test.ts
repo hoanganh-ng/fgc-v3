@@ -105,7 +105,7 @@ describe("profile home-feed run-next CLI args", () => {
 
   it("prints the pnpm verb in usage", () => {
     expect(getProfileHomeFeedRunNextCliUsage()).toContain(
-      "pnpm profile:home-feed:run-next",
+      "pnpm operator:profile-home-feed:run-next",
     );
   });
 });

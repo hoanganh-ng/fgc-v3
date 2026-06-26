@@ -107,10 +107,9 @@ describe("profile home-feed worker CLI args", () => {
     ).toThrow(ProfileHomeFeedWorkerCliArgumentError);
   });
 
-  it("prints canonical and alias commands in usage", () => {
+  it("prints the canonical pnpm verb in usage", () => {
     const usage = getProfileHomeFeedWorkerCliUsage();
 
     expect(usage).toContain("pnpm operator:profile-home-feed-worker");
-    expect(usage).toContain("pnpm profile-home-feed-worker:run");
   });
 });

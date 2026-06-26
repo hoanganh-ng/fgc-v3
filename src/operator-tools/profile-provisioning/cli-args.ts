@@ -125,7 +125,7 @@ export function parseProfileProvisioningCliArgs(
 export function getProfileProvisioningCliUsage(): string {
   return [
     "Usage:",
-    "  pnpm profile:provision -- --token <provisioning-token> [--base-url <url>]",
+    "  pnpm operator:profile:provision -- --token <provisioning-token> [--base-url <url>]",
     "",
     "Options:",
     "  --token      Required one-time provisioning token from the Web UI success state.",

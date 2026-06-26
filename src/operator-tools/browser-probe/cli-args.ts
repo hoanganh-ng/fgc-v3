@@ -98,8 +98,8 @@ export function parseBrowserProbeCliArgs(
 export function getBrowserProbeCliUsage(): string {
   return [
     "Usage:",
-    "  pnpm collector:browser:probe -- --browser-provider playwright",
-    "  pnpm collector:browser:probe -- --browser-provider cloakbrowser",
+    "  pnpm operator:browser:probe -- --browser-provider playwright",
+    "  pnpm operator:browser:probe -- --browser-provider cloakbrowser",
     "",
     "Options:",
     "  --browser-provider   Browser provider: playwright or cloakbrowser. Default: playwright.",

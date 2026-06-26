@@ -48,7 +48,6 @@ describe("account exercise worker CLI args", () => {
     const usage = getAccountExerciseWorkerCliUsage();
 
     expect(usage).toContain("pnpm operator:profile:exercise-worker");
-    expect(usage).toContain("pnpm profile:exercise-worker:run");
   });
 
   it("rejects invalid base URLs and poll intervals", () => {

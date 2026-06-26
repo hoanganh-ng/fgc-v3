@@ -146,7 +146,7 @@ export function getProfileHomeFeedWorkerCliUsage(): string {
   return [
     "Usage:",
     "  pnpm operator:profile-home-feed-worker -- --once",
-    "  pnpm profile-home-feed-worker:run -- --base-url <url> [--poll-interval-ms 5000]",
+    "  pnpm operator:profile-home-feed-worker -- --base-url <url> [--poll-interval-ms 5000]",
     "",
     "Options:",
     "  --once               Claim and execute at most one queued profile home-feed collection run, then exit.",

@@ -145,7 +145,7 @@ export function getProfileSourceAccessCheckWorkerCliUsage(): string {
   return [
     "Usage:",
     "  pnpm operator:profile-source-access-check-worker -- --base-url <url> --once",
-    "  pnpm profile-source-access-check-worker:run -- --base-url <url> [--poll-interval-ms 5000]",
+    "  pnpm operator:profile-source-access-check-worker -- --base-url <url> [--poll-interval-ms 5000]",
     "",
     "Options:",
     "  --base-url           API or gateway base URL for Profile Manager HTTP routes.",

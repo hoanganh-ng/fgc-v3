@@ -86,8 +86,8 @@ export function parseCollectionSchedulerCliArgs(
 export function getCollectionSchedulerCliUsage(): string {
   return [
     "Usage:",
-    "  pnpm collector:scheduler:run -- --once",
-    "  pnpm collector:scheduler:run -- [--poll-interval-ms 5000]",
+    "  pnpm operator:collector:scheduler -- --once",
+    "  pnpm operator:collector:scheduler -- [--poll-interval-ms 5000]",
     "",
     "Options:",
     "  --once               Drain all due collection schedules once, then exit.",

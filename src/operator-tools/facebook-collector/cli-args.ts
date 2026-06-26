@@ -202,7 +202,7 @@ export function parseFacebookCollectorCliArgs(
 export function getFacebookCollectorCliUsage(): string {
   return [
     "Usage:",
-    "  pnpm collector:facebook:run -- --source-group-id <source-group-id> [--base-url <url>] [--max-scrolls 3] [--max-duration-ms 30000] [--browser-provider playwright] [--diagnose-checkout]",
+    "  pnpm operator:collector:facebook -- --source-group-id <source-group-id> [--base-url <url>] [--max-scrolls 3] [--max-duration-ms 30000] [--browser-provider playwright] [--diagnose-checkout]",
     "",
     "Options:",
     "  --source-group-id    Required Content Manager source group id. The command resolves the stored Facebook group URL before launch.",

@@ -21,6 +21,7 @@
     "operator:profile:exercise-worker": "tsx src/operator-tools/account-exercise-worker/cli.ts",
     "operator:profile-source-access-check-worker": "tsx src/operator-tools/profile-source-access-check-worker/cli.ts",
     "operator:profile:assisted-access": "tsx src/operator-tools/assisted-group-access/cli.ts",
+    "operator:profile-home-feed:run-next": "tsx src/operator-tools/profile-home-feed-runner/cli.ts",
     "operator:browser:probe": "tsx src/operator-tools/browser-probe/cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
