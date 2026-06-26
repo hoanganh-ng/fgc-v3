@@ -2,7 +2,11 @@
 
 ## Status
 
-Active, not accepted.
+Parked, not accepted.
+
+Sprint 072 was paused because the product direction has been refocused around the **Profile Feed Collector MVP**. The Transform Type catalog direction is not rejected forever, but it is no longer the active next step.
+
+Do not continue or expand this sprint unless the Product Owner explicitly reactivates Content Builder work.
 
 ## Goal
 
