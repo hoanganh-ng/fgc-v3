@@ -187,11 +187,10 @@ function wrapWithProviders(node: ReactNode, initial: PageInitialData): JSX.Eleme
 }
 
 describe("ProfileHomeFeedCollectionSchedulesPage", () => {
-  it("registers the Home Feed Schedules navigation path", () => {
+  it("keeps the Home Feed Schedules route registered but hides it from primary navigation (Sprint 073 MVP trim)", () => {
     expect(
-      primaryNavigation.find((item) => item.label === "Home Feed Schedules")
-        ?.path,
-    ).toBe("/profile-home-feed-schedules");
+      primaryNavigation.find((item) => item.path === "/profile-home-feed-schedules"),
+    ).toBeUndefined();
   });
 
   it("renders a paginated list of schedules with profile metadata", () => {

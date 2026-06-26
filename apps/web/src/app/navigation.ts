@@ -1,14 +1,10 @@
 import {
-  Activity,
-  CalendarClock,
   ClipboardList,
   FileText,
   FolderKanban,
   Gauge,
   RadioTower,
-  ShieldCheck,
   Users,
-  WandSparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,6 +14,10 @@ export interface NavigationItem {
   readonly icon: LucideIcon;
 }
 
+// Primary sidebar surfaces for the Profile Feed Collector MVP.
+// Parked/advanced pages (Transform Types, schedules, exercise/access-check
+// runs, generic Collection Runs) remain routed and compilable but are not
+// surfaced here. See `docs/SPRINTS/SPRINT-073-product-scope-lock-and-surface-trim.md`.
 export const primaryNavigation: readonly NavigationItem[] = [
   {
     label: "Dashboard",
@@ -30,14 +30,9 @@ export const primaryNavigation: readonly NavigationItem[] = [
     icon: Users,
   },
   {
-    label: "Source Groups",
-    path: "/source-groups",
-    icon: FolderKanban,
-  },
-  {
-    label: "Source Publishers",
-    path: "/source-publishers",
-    icon: RadioTower,
+    label: "Profile Feed Runs",
+    path: "/profile-home-feed-collection-runs",
+    icon: ClipboardList,
   },
   {
     label: "Content Items",
@@ -45,38 +40,13 @@ export const primaryNavigation: readonly NavigationItem[] = [
     icon: FileText,
   },
   {
-    label: "Transform Types",
-    path: "/transform-types",
-    icon: WandSparkles,
+    label: "Source Groups",
+    path: "/source-groups",
+    icon: FolderKanban,
   },
   {
-    label: "Collection Runs",
-    path: "/collection-runs",
-    icon: ClipboardList,
-  },
-  {
-    label: "Schedules",
-    path: "/collection-schedules",
-    icon: CalendarClock,
-  },
-  {
-    label: "Home Feed Schedules",
-    path: "/profile-home-feed-schedules",
-    icon: CalendarClock,
-  },
-  {
-    label: "Home Feed Runs",
-    path: "/profile-home-feed-collection-runs",
-    icon: ClipboardList,
-  },
-  {
-    label: "Exercise Runs",
-    path: "/account-exercise-runs",
-    icon: Activity,
-  },
-  {
-    label: "Access Checks",
-    path: "/profile-source-access-check-runs",
-    icon: ShieldCheck,
+    label: "Discovered Sources",
+    path: "/source-publishers",
+    icon: RadioTower,
   },
 ];

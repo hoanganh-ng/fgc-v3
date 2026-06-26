@@ -2,21 +2,22 @@
 
 `fgc-v3` is a Content Video Pipeline. The product is being built in stages: Content Collector, Content Builder, and Content Publisher.
 
-The current focus is expanding from Content Collector foundations into the first Content Builder catalog surface while keeping profile/session management, collector runtime orchestration, content management, and content building behind clear module boundaries.
+The current focus is the **Profile Feed Collector MVP** — proving one operator-usable loop end to end before resuming Content Builder or Content Publisher expansion. Sprint 073 narrows docs, navigation, and command surfaces to that loop. Sprint 072's Content Builder Transform Type catalog is parked, not deleted.
 
 ## Current Modules
 
 - Collector Profile Manager: profile lifecycle, provisioning, session ingestion, checkout eligibility, and trusted runtime profile configuration.
-- Content Manager: content categories, source groups, normalized content ingestion, deduplication, safe reads, and review lifecycle status.
+- Content Manager: content categories, source groups, normalized content ingestion, deduplication, safe reads, review lifecycle status, and discovered-source review/promotion.
 - Collector Runtime: profile checkout/release orchestration, Facebook collection, browser provider adapters, extraction, submission, and worker execution.
-- Content Builder: reusable Transform Type catalog entries for future content-building workflows. Transform Types store prompts only; they do not execute LLM calls.
-- Web UI: local management surface for profiles, source groups, content categories, content items, Transform Types, and provisioning actions.
-- Operator tools: profile provisioning, manual Facebook collection, worker execution, and browser provider probing.
+- Content Builder: parked. Reusable Transform Type catalog entries may exist from Sprint 072 but are not the current focus.
+- Web UI: local management surface for the Profile Feed Collector MVP — profiles, profile feed runs, content items, source groups/categories, and discovered sources.
+- Operator tools: profile provisioning, manual profile home-feed collection, worker execution, and browser provider probing.
 
 ## Current Status
 
 - Profile provisioning works through the Web UI plus operator browser CLI.
-- Manual Facebook collection works against configured source groups with provisioned `READY` profiles.
+- Manual profile home-feed collection works for `READY` profiles through bounded browser execution and operator command.
+- The manual collector command for source-group Facebook collection still works but is not the MVP operator loop.
 - A collector worker exists for claiming and executing queued collection runs.
 - An account exercise worker exists for claiming and executing queued Account Exercise runs (Ambient and Category Browse).
 - A profile-source access check worker exists for claiming and executing queued browser-backed access checks.
@@ -28,7 +29,7 @@ The current focus is expanding from Content Collector foundations into the first
 - The collection scheduler is available as a separate opt-in Docker Compose service for dev and preview stacks.
 - The profile home-feed scheduler and worker are available as separate opt-in Docker Compose services for dev and preview stacks.
 - A Collector Runtime browser provider boundary exists.
-- The first Content Builder-owned catalog model, Transform Type, is available through safe HTTP routes and the Web UI at `/transform-types`.
+- The parked Transform Type catalog model and its Web UI surface remain implemented but are hidden from primary navigation until Content Builder resumes.
 - CloakBrowser support is experimental and not yet production-proven; Playwright Chromium remains the default provider.
 
 ## Architecture
@@ -73,18 +74,18 @@ pnpm stack:dev:workers:logs
 
 ## Commands
 
+Daily-use commands only. Advanced/operator commands live in [`docs/RUNTIME.md`](docs/RUNTIME.md); legacy operator aliases (e.g. `pnpm dev`, `pnpm profile:provision`, `pnpm collector:facebook:run`) were removed in Sprint 073 and must be replaced with their canonical names listed there.
+
 ### App Runtime
 
 - `pnpm app:dev`: run the API app in watch mode.
 - `pnpm app:start`: run the API app once.
-- Backward-compatible aliases: `pnpm dev`, `pnpm start`.
 
 ### Web UI
 
 - `pnpm web:dev`: run the Vite Web UI.
 - `pnpm web:build`: build the Web UI.
 - `pnpm web:typecheck`: typecheck the Web UI.
-- Backward-compatible aliases: `pnpm dev:web`, `pnpm build:web`, `pnpm typecheck:web`.
 
 ### Database
 
@@ -98,20 +99,11 @@ pnpm stack:dev:workers:logs
 - `pnpm test:db`: run opt-in database integration tests.
 - `pnpm test:http:db`: run opt-in DB-backed HTTP integration tests.
 
-### Operator Tools
+### Profile Feed Collector MVP
 
 - `pnpm operator:profile:provision -- --token <token> --base-url http://localhost:8081 --browser-provider playwright`
-- `pnpm operator:profile:provision:cloakbrowser-probe -- --launch-headed`
-- `pnpm operator:profile:assisted-access -- --profile-id <profile-id> --source-group-id <source-group-id> --base-url http://localhost:8081`
-- `pnpm operator:collector:facebook -- --source-group-id <source-group-id> --base-url http://localhost:8081`
-- `pnpm operator:collector:worker -- --base-url http://localhost:8081 --once`
-- `pnpm operator:collector:scheduler -- --once`
-- `pnpm operator:profile-home-feed:scheduler -- --once`
 - `pnpm operator:profile-home-feed-worker -- --base-url http://localhost:8081 --once`
-- `pnpm operator:profile:exercise-worker -- --base-url http://localhost:8081 --once`
-- `pnpm operator:profile-source-access-check-worker -- --base-url http://localhost:8081 --once`
 - `pnpm operator:browser:probe -- --browser-provider playwright`
-- Backward-compatible aliases: `pnpm profile:provision`, `pnpm profile:provision:cloakbrowser-probe`, `pnpm profile:assisted-access:run`, `pnpm collector:facebook:run`, `pnpm collector:worker:run`, `pnpm collector:scheduler:run`, `pnpm profile-home-feed:scheduler:run`, `pnpm profile-home-feed-worker:run`, `pnpm profile:exercise-worker:run`, `pnpm profile-source-access-check-worker:run`, `pnpm collector:browser:probe`.
 
 Operator browser-backed commands that accept `--browser-provider` use `BROWSER_PROVIDER`, then `playwright` when the option is omitted. Supported values are `playwright` and experimental `cloakbrowser`.
 

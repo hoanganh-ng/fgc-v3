@@ -200,9 +200,10 @@ function wrapWithProviders(node: ReactNode, initial: PageInitialData): JSX.Eleme
 }
 
 describe("ProfileHomeFeedCollectionRunsPage", () => {
-  it("registers the Home Feed Runs navigation path and route", () => {
+  it("registers the Profile Feed Runs navigation path and route", () => {
     expect(
-      primaryNavigation.find((item) => item.label === "Home Feed Runs")?.path,
+      primaryNavigation.find((item) => item.label === "Profile Feed Runs")
+        ?.path,
     ).toBe("/profile-home-feed-collection-runs");
 
     const root = router.routes[0];

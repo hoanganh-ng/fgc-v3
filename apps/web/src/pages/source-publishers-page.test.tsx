@@ -104,9 +104,9 @@ function wrapWithProviders(node: ReactNode, client: QueryClient): JSX.Element {
 }
 
 describe("SourcePublishersPage", () => {
-  it("registers the Source Publishers navigation path", () => {
+  it("registers the Discovered Sources navigation path", () => {
     expect(
-      primaryNavigation.find((item) => item.label === "Source Publishers")
+      primaryNavigation.find((item) => item.label === "Discovered Sources")
         ?.path,
     ).toBe("/source-publishers");
   });

@@ -92,7 +92,7 @@ export function SourcePublishersPage(): JSX.Element {
   return (
     <PageShell
       eyebrow="Content Manager"
-      title="Source Publishers"
+      title="Discovered Sources"
       description="Review discovered publishing-source identities and promote approved Facebook groups into managed source groups."
       actions={
         <Button variant="secondary" onClick={refresh}>
@@ -237,7 +237,7 @@ function SourcePublishersList({
     <Card className="min-w-0">
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <CardTitle>Source Publishers</CardTitle>
+          <CardTitle>Discovered Sources</CardTitle>
           <CardDescription>
             {formatCount(page.total ?? sourcePublishers.length, "publisher")}
           </CardDescription>

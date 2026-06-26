@@ -4,22 +4,25 @@ Sprint 027 provides two Docker Compose runtimes for the current Content Collecto
 
 ## Command Groups
 
-Root `package.json` scripts are grouped by operational purpose. New work should prefer the canonical names below; older names remain available as backward-compatible aliases.
+Root `package.json` scripts are grouped by operational purpose. Sprint 073
+removed the backward-compatible aliases listed in the "Removed legacy
+aliases" section below; use the canonical names. README.md keeps the daily
+subset; this file is the full reference.
 
 ### App Runtime
 
-| Command | Purpose | Alias |
-| --- | --- | --- |
-| `pnpm app:dev` | Run the API app in watch mode. | `pnpm dev` |
-| `pnpm app:start` | Run the API app once. | `pnpm start` |
+| Command | Purpose |
+| --- | --- |
+| `pnpm app:dev` | Run the API app in watch mode. |
+| `pnpm app:start` | Run the API app once. |
 
 ### Web UI
 
-| Command | Purpose | Alias |
-| --- | --- | --- |
-| `pnpm web:dev` | Run the Vite Web UI. | `pnpm dev:web` |
-| `pnpm web:build` | Build the Web UI. | `pnpm build:web` |
-| `pnpm web:typecheck` | Typecheck the Web UI. | `pnpm typecheck:web` |
+| Command | Purpose |
+| --- | --- |
+| `pnpm web:dev` | Run the Vite Web UI. |
+| `pnpm web:build` | Build the Web UI. |
+| `pnpm web:typecheck` | Typecheck the Web UI. |
 
 ### Database
 
@@ -52,19 +55,38 @@ DB_TEST_ARGS="src/infrastructure/database/repositories/drizzle-transform-type.re
 
 ### Operator Tools
 
-| Command | Purpose | Alias |
-| --- | --- | --- |
-| `pnpm operator:profile:provision` | Complete manual profile provisioning in a headed browser. | `pnpm profile:provision` |
-| `pnpm operator:profile:exercise` | Run one read-only ambient account exercise attempt for a specified profile. | `pnpm profile:exercise:run` |
-| `pnpm operator:profile:exercise-worker` | Claim and execute queued Ambient Account and Category Browse exercise runs. | `pnpm profile:exercise-worker:run` |
-| `pnpm operator:profile-source-access-check-worker` | Claim and execute queued Profile-Source Access Check runs. | `pnpm profile-source-access-check-worker:run` |
-| `pnpm operator:profile:assisted-access` | Open one assisted group access browser session for manual operator inspection. | `pnpm profile:assisted-access:run` |
-| `pnpm operator:collector:facebook` | Run one manual Facebook collection for a source group. | `pnpm collector:facebook:run` |
-| `pnpm operator:collector:worker` | Claim and execute queued collection runs. | `pnpm collector:worker:run` |
-| `pnpm operator:collector:scheduler` | Poll `DispatchNextDueCollectionScheduleUseCase` and dispatch due schedules. | `pnpm collector:scheduler:run` |
-| `pnpm operator:profile-home-feed:scheduler` | Poll `DispatchNextDueProfileHomeFeedCollectionScheduleUseCase` and dispatch due profile home-feed schedules. | `pnpm profile-home-feed:scheduler:run` |
-| `pnpm operator:profile-home-feed-worker` | Claim and execute queued profile home-feed collection runs. | `pnpm profile-home-feed-worker:run` |
-| `pnpm operator:browser:probe` | Probe a browser provider without backend or Facebook login. | `pnpm collector:browser:probe` |
+| Command | Purpose |
+| --- | --- |
+| `pnpm operator:profile:provision` | Complete manual profile provisioning in a headed browser. |
+| `pnpm operator:profile:exercise` | Run one read-only ambient account exercise attempt for a specified profile. |
+| `pnpm operator:profile:exercise-worker` | Claim and execute queued Ambient Account and Category Browse exercise runs. |
+| `pnpm operator:profile-source-access-check-worker` | Claim and execute queued Profile-Source Access Check runs. |
+| `pnpm operator:profile:assisted-access` | Open one assisted group access browser session for manual operator inspection. |
+| `pnpm operator:collector:facebook` | Run one manual Facebook collection for a source group. |
+| `pnpm operator:collector:worker` | Claim and execute queued collection runs. |
+| `pnpm operator:collector:scheduler` | Poll `DispatchNextDueCollectionScheduleUseCase` and dispatch due schedules. |
+| `pnpm operator:profile-home-feed:scheduler` | Poll `DispatchNextDueProfileHomeFeedCollectionScheduleUseCase` and dispatch due profile home-feed schedules. |
+| `pnpm operator:profile-home-feed-worker` | Claim and execute queued profile home-feed collection runs. |
+| `pnpm operator:browser:probe` | Probe a browser provider without backend or Facebook login. |
+
+### Removed legacy aliases (Sprint 073)
+
+The following backward-compatible alias scripts were removed from the root
+`package.json`. Use the canonical names listed above instead:
+
+- App/Web: `pnpm dev`, `pnpm start`, `pnpm dev:web`, `pnpm build`,
+  `pnpm build:web`, `pnpm typecheck:web`.
+- Profile: `pnpm profile:provision`,
+  `pnpm profile:provision:cloakbrowser-probe`,
+  `pnpm profile:exercise:run`, `pnpm profile:exercise-worker:run`,
+  `pnpm profile:assisted-access:run`,
+  `pnpm profile:home-feed:run-next`.
+- Collector / source groups: `pnpm collector:facebook:run`,
+  `pnpm collector:worker:run`, `pnpm collector:scheduler:run`,
+  `pnpm collector:browser:probe`.
+- Profile home-feed: `pnpm profile-home-feed:scheduler:run`,
+  `pnpm profile-home-feed-worker:run`.
+- Access check: `pnpm profile-source-access-check-worker:run`.
 
 ### Docker Stacks
 
