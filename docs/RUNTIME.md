@@ -75,19 +75,27 @@ DB_TEST_ARGS="src/infrastructure/database/repositories/drizzle-transform-type.re
 The following backward-compatible alias scripts were removed from the root
 `package.json`. Use the canonical names listed above instead:
 
-- App/Web: `pnpm dev`, `pnpm start`, `pnpm dev:web`, `pnpm build`,
-  `pnpm build:web`, `pnpm typecheck:web`.
-- Profile: `pnpm profile:provision`,
-  `pnpm profile:provision:cloakbrowser-probe`,
-  `pnpm profile:exercise:run`, `pnpm profile:exercise-worker:run`,
-  `pnpm profile:assisted-access:run`.
-  `pnpm profile:home-feed:run-next` -> `pnpm operator:profile-home-feed:run-next`.
-- Collector / source groups: `pnpm collector:facebook:run`,
-  `pnpm collector:worker:run`, `pnpm collector:scheduler:run`,
-  `pnpm collector:browser:probe`.
-- Profile home-feed: `pnpm profile-home-feed:scheduler:run`,
-  `pnpm profile-home-feed-worker:run`.
-- Access check: `pnpm profile-source-access-check-worker:run`.
+| Old command | Canonical command |
+| --- | --- |
+| `pnpm dev` | `pnpm app:dev` |
+| `pnpm start` | `pnpm app:start` |
+| `pnpm dev:web` | `pnpm web:dev` |
+| `pnpm build` | `pnpm web:build` |
+| `pnpm build:web` | `pnpm web:build` |
+| `pnpm typecheck:web` | `pnpm web:typecheck` |
+| `pnpm profile:provision` | `pnpm operator:profile:provision` |
+| `pnpm profile:provision:cloakbrowser-probe` | `pnpm operator:profile:provision:cloakbrowser-probe` |
+| `pnpm profile:exercise:run` | `pnpm operator:profile:exercise` |
+| `pnpm profile:exercise-worker:run` | `pnpm operator:profile:exercise-worker` |
+| `pnpm profile:assisted-access:run` | `pnpm operator:profile:assisted-access` |
+| `pnpm profile:home-feed:run-next` | `pnpm operator:profile-home-feed:run-next` |
+| `pnpm collector:facebook:run` | `pnpm operator:collector:facebook` |
+| `pnpm collector:worker:run` | `pnpm operator:collector:worker` |
+| `pnpm collector:scheduler:run` | `pnpm operator:collector:scheduler` |
+| `pnpm collector:browser:probe` | `pnpm operator:browser:probe` |
+| `pnpm profile-home-feed:scheduler:run` | `pnpm operator:profile-home-feed:scheduler` |
+| `pnpm profile-home-feed-worker:run` | `pnpm operator:profile-home-feed-worker` |
+| `pnpm profile-source-access-check-worker:run` | `pnpm operator:profile-source-access-check-worker` |
 
 ### Docker Stacks
 

@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 /**
  * Sprint 065C3 — Bounded Facebook Home-Feed Execution E2E regression.
  *
- * Sprint 065C3 adds the operator-invoked `pnpm profile:home-feed:run-next`
+ * Sprint 065C3 adds the operator-invoked `pnpm operator:profile-home-feed:run-next`
  * one-shot runner, which executes a queued `ProfileHomeFeedCollectionRun`
  * against the live Facebook home feed under bounded scroll/duration/post
  * limits. Manual live-Facebook validation is opt-in and is NOT performed

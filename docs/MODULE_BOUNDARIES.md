@@ -201,7 +201,7 @@ Owns:
 - Sprint 065C3 (accepted at
   `e60e5a8f0167cad84d7fac4545fdda2e29feea99`) wires the
   `HOME_FEED_COLLECTION` checkout into the one-shot operator-invoked
-  executor `pnpm profile:home-feed:run-next` that drives bounded
+  executor `pnpm operator:profile-home-feed:run-next` that drives bounded
   home-feed capture, publisher observation, and home-feed content
   submission through the existing Content Manager HTTP contracts.
   Manual live-Facebook validation was **not performed** by
