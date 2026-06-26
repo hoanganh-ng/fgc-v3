@@ -1,244 +1,180 @@
 # Roadmap
 
-## Sprint 000: Project Brain Bootstrap
+## Current Product Direction
+
+The near-term product direction is the **Profile Feed Collector MVP**.
+
+The project should focus on a small, operator-usable loop:
+
+1. Persist collector profiles and authenticated sessions.
+2. Run safe profile behavior / warm-up when needed.
+3. Collect the authenticated Facebook profile home feed.
+4. Extract useful group/page text posts from captured feed payloads.
+5. Store normalized content items with categories and review status.
+6. Preview, select, reject, and mark content as used.
+7. Review discovered publishing sources.
+8. Promote approved Facebook group sources into managed source groups.
+
+This roadmap intentionally pauses broader Content Builder and Content Publisher expansion until the feed collector loop is validated against real captured payloads.
+
+## Product Scope Lock
+
+### Keep in the MVP
+
+- **Collector Profile Manager**
+  - Profile persistence.
+  - Session/provisioning persistence.
+  - Runtime profile configuration.
+  - Checkout/lease safety.
+  - Account readiness and authentication health.
+
+- **Profile Behavior**
+  - Safe operator-driven account exercise / warm-up behavior.
+  - Authentication health observation.
+  - No CAPTCHA solving, checkpoint bypass, credential automation, or unapproved social actions.
+
+- **Profile Feed Collector**
+  - Profile-bound Facebook home-feed run records.
+  - Bounded browser execution through the existing browser provider boundary.
+  - Payload capture through safe fetch/XHR/network capture.
+  - Extraction into normalized content candidates.
+  - Submission into Content Manager.
+
+- **Content Manager**
+  - Content categories.
+  - Managed source groups.
+  - Normalized content items.
+  - Content review lifecycle: `COLLECTED`, `SELECTED`, `REJECTED`, `USED`.
+  - Safe content preview and status update APIs.
+  - Discovered source identity (`SourcePublisher`) and approved group promotion into managed source groups.
 
-Create the documentation structure that future Builders use to understand project state, product intent, architecture, module boundaries, requirements, and active sprint scope.
+- **Web UI**
+  - Profiles.
+  - Profile feed runs.
+  - Content items / preview queue.
+  - Content categories and managed groups.
+  - Discovered sources and promote-to-group flow.
 
-## Sprints 001-013: Collector Profile Manager
+### Park for later
 
-Define and implement the core Collector Profile Manager backend slice for lifecycle state, profile properties, provisioning, session ingestion, checkout eligibility, leasing, PostgreSQL persistence, HTTP routes, read APIs, and opt-in DB-backed integration verification.
+- Content Builder Transform Type catalog.
+- Content Briefs.
+- Producer graphs.
+- Producer Sets.
+- Artifacts as a product workflow.
+- LLM provider integration.
+- Prompt execution and prompt versioning.
+- Content Publisher / publication scheduling.
+- Broad scheduler/operator-control surfaces that are not required for manual feed collector validation.
 
-## Sprint 014: Content Manager Requirement Amendment And Boundary Definition
+Existing code for parked areas should not be removed until the MVP loop is validated and the deletion risk is understood. Prefer hiding or de-emphasizing UI and commands first.
 
-Define Content Manager as the next Content Collector module. Record boundaries, requirements, first platform, first source type, initial content model, top comment rules, deduplication/upsert behavior, storage direction, and module separation. This sprint is documentation/design only.
+## Immediate Roadmap
 
-## Sprint 014A: Collector Extraction Boundary Amendment
+### Sprint 073: Product Scope Lock And Surface Trim
 
-Define the Platform Extractor boundary on the Collector Runtime side. Record that Facebook GraphQL payload parsing belongs to the future Facebook GraphQL Payload Extractor, not Content Manager core. This sprint is documentation/design only.
+Refocus the repository around the Profile Feed Collector MVP.
 
-## Sprint 015: Content Manager Domain Model
+- Update current-state docs to name the MVP and park Content Builder expansion.
+- Keep `active.md` changes explicit and separate from this roadmap update.
+- Trim Web UI primary navigation to the MVP surfaces.
+- Hide advanced/parked pages from the sidebar without deleting their implementation.
+- Split command documentation so daily commands are easy to find.
+- Reduce `package.json` script noise by keeping only canonical daily commands and moving advanced/operator details into docs or helper scripts.
 
-Implement the Content Manager domain model for source groups, group categories, content items, top comments, lifecycle statuses, and deduplication/upsert rules.
+Out of scope:
 
-## Sprint 016: Content Manager Application Use Cases
+- No extractor behavior changes.
+- No database table or migration deletion.
+- No runtime behavior changes.
+- No removal of parked modules.
 
-Add application use cases and application-owned ports for managing categories, managing source groups, ingesting/upserting collected content, changing content status, and reading safe content views.
+### Sprint 074: Home Feed Extraction Diagnostics
 
-## Sprint 017: Content Manager PostgreSQL Schema And Repository Adapters
+Make zero-candidate home-feed runs explain themselves safely.
 
-Add PostgreSQL schema, migrations, repository adapters, and opt-in persistence verification for Content Manager while keeping domain and application layers database-free.
+- Preserve safe capture diagnostics through the home-feed run summary.
+- Aggregate extractor warning codes per run.
+- Count unsupported payloads, invalid extractor results, skipped candidate reasons, and accepted candidates.
+- Expose only safe diagnostic counts and codes through HTTP and Web UI.
+- Do not expose raw Facebook payloads, cookies, localStorage, tokens, proxy details, viewer IDs, screenshots, raw HTML, or private response bodies.
 
-## Sprint 018: Content Manager Composition Root And Service Wiring
+Expected operator outcome:
 
-Wire Content Manager use cases to real infrastructure through the composition root, expose service types for future adapters, and verify construction without adding HTTP routes.
+```text
+capturedPayloads: 42
+jsonParseFailures: 0
+extractorCandidates: 0
+extractorWarnings:
+  UNKNOWN_PUBLISHER_KIND: 18
+  MISSING_SOURCE_URL: 11
+  SKIPPED_CANDIDATE_WITHOUT_BODY_TEXT: 7
+  UNSUPPORTED_PAYLOAD_SHAPE: 6
+```
 
-## Sprint 019: Content Manager HTTP API
+### Sprint 075: Real-Shape Home Feed Fixture Calibration
 
-Add HTTP adapter routes for Content Manager use cases and safe read APIs, with route handlers kept free of business logic.
+Calibrate the Facebook home-feed extractor against sanitized real-shape payloads.
 
-## Sprint 020: Facebook GraphQL Payload Extractor
+- Capture or derive sanitized real-shape fixtures from manual runs.
+- Keep all fixture data synthetic or sanitized.
+- Add failing tests that reproduce the current zero-candidate behavior.
+- Adjust extractor traversal and field resolution only enough to pass real-shape fixture tests.
+- Preserve strict safety filtering for personal-profile posts, sponsored/ad posts, missing body text, and missing stable source identity.
 
-Implement the collection-side extractor that converts captured Facebook GraphQL payloads into normalized Content Manager ingestion input, with parser fixtures and extractor tests owned by the Collector Runtime side.
+### Sprint 076: Manual Feed Collection To Preview Validation
 
-## Sprint 021: Collector Runtime Submission Flow
+Prove the manual MVP loop end to end.
 
-Implement the Collector Runtime submission flow for already-captured Facebook GraphQL payloads. This sprint invokes the Facebook GraphQL Payload Extractor and submits normalized ingestion input to the Content Manager HTTP API, without browser automation, network interception, profile checkout, lease release, scheduling, queues, or database access from Collector Runtime.
+- Queue or run a profile-bound home-feed collection.
+- Show run status and safe diagnostics.
+- Submit extracted content items.
+- Preview collected items.
+- Select, reject, and mark content as used.
+- Review discovered sources.
+- Approve and promote an eligible Facebook group source into a paused managed source group.
 
-## Sprint 022: Collector Runtime Profile-Orchestrated Collection Flow
+This sprint should produce explicit manual validation notes. Live Facebook validation remains opt-in and operator-driven.
 
-Add the next runtime layer that orchestrates profile checkout, captured payload collection through a placeholder port, content submission, and lease release through explicit application contracts.
+### Sprint 077: Discovered Sources Product Rename
 
-## Sprint 023: Collector Runtime Profile Manager HTTP Adapter
+Improve product language without renaming stable backend concepts.
 
-Add the concrete Collector Runtime HTTP adapter for Profile Manager checkout/release through the runtime-owned profile lease port.
+- Keep the backend/domain concept `SourcePublisher`.
+- Rename the Web UI surface from **Source Publishers** to **Discovered Sources**.
+- Present promotion as **Promote to Managed Group**.
+- Keep API routes and persistence unchanged unless a later compatibility sprint explicitly approves contract changes.
 
-## Sprint 024: Trusted Runtime Profile Configuration Contract
+### Sprint 078: Archive Or Remove Unneeded Surfaces
 
-Add a trusted, lease-scoped runtime profile configuration contract so Collector Runtime can fetch browser launch configuration from Profile Manager after checkout while public read DTOs remain safe.
+After the MVP loop is validated, remove or archive genuinely unnecessary surfaces.
 
-## Sprint 025: Web UI Foundation
+Candidates:
 
-Start the Web UI foundation for profile and content management, consuming application/API contracts instead of owning domain rules or persistence logic.
+- Content Builder Transform Type UI and routes.
+- Advanced scheduler pages not needed for manual feed collector validation.
+- Exercise/access-check pages if they are not part of the operator loop.
+- Legacy package scripts and aliases.
+- Docs that imply Content Builder is the current priority.
 
-## Sprint 026: Facebook Browser Payload Capture Adapter
+Deletion must be narrow and reversible where possible. Do not remove migrations or persistent data structures without a dedicated migration/deprecation plan.
 
-Add the first real Facebook browser payload capture adapter for Collector Runtime, behind the Sprint 022 capture port.
+## Historical Milestones
 
-## Sprint 060: Collection Scheduler Containerization
+Historical sprint details live in sprint documents and project history. The durable architectural decisions remain:
 
-Add the containerized collection scheduler service that drives the scheduled dispatch poller in the dev and preview stacks. The scheduler-runtime image is lightweight and does not install a browser.
+- Hexagonal architecture: Domain -> Application use cases and ports -> Infrastructure/interface adapters -> Composition/runtime wiring.
+- Collector Profile Manager owns profiles, sessions, leases, readiness, and trusted runtime configuration.
+- Collector Runtime owns browser execution, payload capture, extraction, runs, workers, and submission orchestration.
+- Content Manager owns categories, source groups, normalized content, deduplication, content lifecycle, and discovered source review/promotion.
+- Web UI consumes safe API contracts and must not duplicate domain rules.
 
-## Sprint 061: Operator Collection Schedule Management Surface
+## Later Roadmap
 
-Expose the existing `CollectionSchedule` aggregate to operators through HTTP routes and a Web UI management page. Closes the operator feedback loop for collection schedules.
+Only after the Profile Feed Collector MVP is proven:
 
-## Sprint 062: Feed Discovery Delivery Plan And Docker E2E Foundation
-
-Publish the feed discovery delivery plan, the cross-cutting testing strategy, the isolated Docker E2E harness, and a deterministic baseline E2E flow that proves the production-like stack works through Nginx, the API, migrations, and PostgreSQL using only synthetic fixtures.
-
-The cross-cutting testing strategy used by every sprint in the feed
-discovery sequence is documented in [`TESTING_STRATEGY.md`](TESTING_STRATEGY.md).
-
-## Sprint 063A: Source Publisher Domain And Application
-
-Define the Content Manager-owned `SourcePublisher` identity and observation behavior for Facebook groups and pages. Include statuses such as `discovered`, `approved`, `ignored`, and `blocked`. No persistence, no HTTP, no UI, no browser, no feed execution. `SourcePublisher` is a durable publishing-source identity, not the future Content Publisher pipeline module: it does not model drafts, publications, videos, publishing schedules, or published artifacts.
-
-## Sprint 063B: Source Publisher Persistence And Atomic Observation
-
-Add `SourcePublisher` PostgreSQL persistence, mapper, repository
-adapter, unique identity, and concurrency-safe observation / upsert
-behavior. Keep domain and application layers database-free. Wire
-the four `SourcePublisher` use cases through the Content Manager
-composition root. No HTTP routes, no Docker E2E, no Web UI review
-surface.
-
-## Sprint 063C: Source Publisher HTTP Contract And E2E
-
-Add safe observation and required list / get HTTP contracts for
-`SourcePublisher` and Docker E2E coverage. Composition wiring for
-`SourcePublisher` is already implemented in Sprint 063B and is not
-in scope for Sprint 063C. Do not add a review UI yet.
-
-## Sprint 064A: Content Collection Provenance Model
-
-Define the content collection provenance model that separates: the collection surface (such as a configured source group or a profile home feed); the publishing source, represented by an optional `SourcePublisher`; and the managed `SourceGroup` association. Do not model video publishing or published artifacts.
-
-## Sprint 064B: Provenance Persistence And Compatibility
-
-Persist collection provenance, migrate existing group-sourced content safely, and preserve current ingestion, deduplication, APIs, and source-group collection behavior. Keep domain and application layers database-free.
-
-## Sprint 065A: Facebook Home-Feed Extractor Fixtures
-
-Add sanitized, fixture-driven extraction for Facebook group posts, page posts, stable publisher identity, sponsored-content exclusion, personal-profile exclusion, and malformed payload handling. No browser execution.
-
-## Sprint 065B: Profile-Bound Home-Feed Run Model
-
-Introduce a profile-bound home-feed collection target and run lifecycle. Do not overload `sourceGroupId` and do not create a fake "Home Feed" source group.
-
-## Sprint 065C1: Bare Home-Feed Content Ingestion
-
-Close the gap between the Sprint 065A home-feed extractor (which
-produces normalized candidates without `sourceGroupId` and with a
-required `publisherObservation`) and Content Manager ingestion (which
-still requires `sourceGroupId`). Make `ContentItem.sourceGroupId`
-optional in the domain schema and DTOs and `NULL`-tolerant in
-PostgreSQL while keeping the existing `sourceGroupId`-required
-source-group ingestion contract. Add a dedicated
-`IngestHomeFeedCollectedContentUseCase` whose input carries only
-`sourcePublisherId` and normalized safe content, validates that the
-publisher exists and its platform matches, and persists the resulting
-item with `firstCollectionSurface.kind = "PROFILE_HOME_FEED"`, no
-`sourceGroupId`, no `managedSourceGroupId`, and no fake Home Feed
-`SourceGroup`. Add `POST /collector/content-items/home-feed` with a
-strict allowlist body schema and make `ContentItemDto.sourceGroupId`
-optional and omitted when absent. Extend the existing source-group
-ingestion so a later source-group collection can fill `sourceGroupId`
-and `managedSourceGroupId` on a home-feed-first item while preserving
-its `PROFILE_HOME_FEED` first surface. Update the Web UI to render
-"No managed source group" safely when `sourceGroupId` is omitted.
-Sprint 065C1 does not add browser execution, Facebook navigation,
-capture, extractor orchestration, Collector Runtime HTTP client
-changes, workers, schedulers, Docker service changes, live-Facebook
-validation, `SourcePublisher` review or status mutation,
-source-group promotion, Content Builder, or Content Publisher
-behavior. Sprint 065C1 is accepted at
-`40b3ce7023c126c03386994a719ae7acb7758f21`. The Sprint 065C "Manual
-Home-Feed Execution" work is decomposed into 065C1, 065C2, and
-065C3; 065C1, 065C2, and 065C3 are accepted.
-
-## Sprint 065C2: Profile-Bound Home-Feed Checkout
-
-Accepted at `6591a05b3ecde7e615f824efc715c815c25bc2d2`. Adds the
-explicit profile-bound `HOME_FEED_COLLECTION` checkout for the exact
-profile referenced by a `ProfileHomeFeedCollectionRun`. Adds
-`CheckoutProfileForHomeFeedCollectionUseCase`, the matching
-`POST /collector/profiles/:profileId/home-feed/checkout` route, the
-`ProfileHomeFeedCheckoutPort` and its `ProfileManagerHttpClient`
-binding, and migration `0024` extending the
-`collector_profile_lease_purpose` enum. The
-`ProfileHomeFeedCheckoutPort` was not wired into a worker or
-executor in Sprint 065C2 — that wiring is Sprint 065C3.
-
-## Sprint 065C3: Bounded Facebook Home-Feed Execution
-
-Accepted at `e60e5a8f0167cad84d7fac4545fdda2e29feea99`. Adds one-shot,
-operator-invoked execution of an existing
-durable `ProfileHomeFeedCollectionRun`. Claims at most one queued
-run, checks out the run's exact profile through
-`HOME_FEED_COLLECTION`, captures the authenticated Facebook home
-feed at the fixed internal URL `https://www.facebook.com/?sk=h_chr`
-under per-call bounded scroll/duration limits, invokes the existing
-Sprint 065A extractor, deduplicates across the run by
-`platform + externalPostId`, caps `extractorCandidates` at
-`maxPosts`, observes each distinct
-`platform + kind + externalPublisherId` once via
-`POST /collector/source-publishers/observations`, submits accepted
-candidates via `POST /collector/content-items/home-feed`, releases
-the lease (forwarding `LOGIN_REQUIRED` / `CHECKPOINT_REQUIRED` as
-the existing authentication observation), and persists a sanitized
-terminal `SUCCEEDED` or `FAILED` run through the existing CAS
-transition path. Defaults `maxScrolls=3`, `maxDurationMs=30000`,
-`maxPosts=20`; hard ceilings `maxScrolls<=10`,
-`maxDurationMs<=120000`, `maxPosts<=100`; bounds are never silently
-clamped — exceeding a ceiling fails the RUNNING run before checkout
-with `HOME_FEED_EXECUTION_BOUNDS_EXCEEDED`. Adds the operator
-command `pnpm profile:home-feed:run-next -- --base-url <url>
---browser-provider <provider>`. Sprint 065C3 does not add a polling
-loop, persistent worker, Docker service, scheduler integration, Web
-UI changes, or an HTTP execute route. Manual live-Facebook
-validation was not performed by Sprint 065C3.
-
-## Sprint 066: Source Publisher Discovery Review API And UI
-
-Add the discovered `SourcePublisher` review queue with approve, ignore, and block behavior, exposed through HTTP routes and a Web UI review page. Sprint 066 ships only the HTTP contract
-(`PATCH /collector/source-publishers/:sourcePublisherId/status`);
-the Web UI review page remains future work.
-
-## Sprint 067: Approved Group Promotion
-
-Promote an approved discovered Facebook group into a paused managed `SourceGroup`. Require category selection and existing-source matching. Do not automatically join, activate, or schedule the promoted group.
-
-## Sprint 068A: Profile Home-Feed Schedule Foundation
-
-Add the Collector Runtime-owned durable schedule model and safe operator HTTP
-API for profile-bound home-feed collection schedules. This foundation stores
-cadence and bounded run parameters only; it does not dispatch runs, wire the
-scheduler poller, execute browser collection, add Docker services, or change
-the one-shot home-feed executor.
-
-## Sprint 068B-D: Home-Feed Scheduled Dispatch Design
-
-Design scheduled profile home-feed dispatch from
-`ProfileHomeFeedCollectionSchedule` configuration into queued,
-profile-bound `ProfileHomeFeedCollectionRun` records. This sprint is
-accepted and was documentation-only: no runtime behavior, migrations,
-trigger enum changes, dispatch repositories, scheduler process changes,
-workers, Docker services, browser execution, Web UI, or execution routes.
-Manual live-Facebook validation remains separate.
-
-## Sprint 068B1: Home-Feed Scheduled Dispatch Persistence + Use Case
-
-Implement the separate home-feed scheduled dispatch path so a due schedule can
-create a profile-bound home-feed run with a `SCHEDULED` trigger, deterministic
-cadence advancement, active-run skip behavior, and safe retry/backoff tracking.
-Poller integration remains a separate authorized slice.
-
-## Sprint 072: Content Builder Transform Type Catalog
-
-Introduce the first Content Builder-owned product model: `TransformType`.
-Operators can create, list, view, update, and archive reusable initial
-transform prompts from the Web UI. This sprint stores prompt catalog entries
-only and does not execute LLM calls, add Content Briefs, Producer graphs,
-artifacts, provider integrations, prompt versioning, Content Publisher,
-Collector Runtime behavior, Facebook browser behavior, profile checkout,
-schedulers, or workers.
-
-## Future: Content Builder
-
-Retain the long-term Content Builder pipeline stage beyond the Transform Type
-catalog. Content Briefs, Producer workflows, prompt execution, artifacts, and
-provider integrations remain future work.
-
-## Future: Content Publisher
-
-Retain the long-term Content Publisher pipeline stage. The Content Publisher stage is the downstream video-publication pipeline and is not the `SourcePublisher` durable publishing-source identity introduced by Sprint 063A. The Content Publisher stage is not redefined or removed by the feed discovery sequence.
+1. Revisit Content Builder with a smaller product brief.
+2. Define how selected/used content becomes input to article/script/video workflows.
+3. Reintroduce Transform Types only if prompt cataloging is still required.
+4. Define artifacts and producer workflows from actual operator needs.
+5. Revisit Content Publisher as a separate downstream stage.
