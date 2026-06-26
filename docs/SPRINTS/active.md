@@ -1,12 +1,9 @@
 # Active Sprint
 
-Sprint 072 — Content Builder Transform Type Catalog is **active**.
+Sprint 073 — Product Scope Lock And Surface Trim is **active**.
 
-This sprint introduces the first Content Builder-owned product model:
-`TransformType`. Operators can create, list, view, update, and archive reusable
-initial LLM transform prompts from the Web UI. The sprint does not execute LLM
-calls and does not add Content Brief, Producer graph, artifact, provider,
-prompt versioning, collected-content selection, Content Publisher, Collector
-Runtime, Facebook browser, profile checkout, scheduler, or worker behavior.
+This sprint refocuses the repository around the **Profile Feed Collector MVP** before changing extractor behavior. It updates current-state docs, trims operator-facing Web UI navigation, and reduces command/script noise while preserving implemented modules and runtime behavior.
 
-- [Sprint 072 - Content Builder Transform Type Catalog](SPRINT-072-content-builder-transform-type-catalog.md)
+The sprint must not change extractor behavior, browser capture, profile checkout/leasing, HTTP contracts, database schemas/migrations, Content Builder internals, LLM execution, Content Briefs, Producers, artifacts, or Content Publisher behavior.
+
+- [Sprint 073 - Product Scope Lock And Surface Trim](SPRINT-073-product-scope-lock-and-surface-trim.md)
