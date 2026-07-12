@@ -19,11 +19,13 @@ Content Builder Transform Types, Content Briefs, Producers, Producer Sets, artif
 
 ## Current Active Sprint
 
-Sprint 073 — Product Scope Lock And Surface Trim is **active**.
+Sprint 074 — Home Feed Extraction Diagnostics is **active**.
 
-This sprint refocuses docs, Web UI navigation, and command/script surfaces around the Profile Feed Collector MVP. It must preserve implemented modules and runtime behavior while reducing operator-facing noise.
+The goal is to make profile home-feed collection runs explain their result safely before changing extractor behavior. The sprint should surface safe capture diagnostics and aggregated warning/count summaries so an operator can understand why a run produced zero or few candidates without exposing raw Facebook payloads or sensitive runtime data.
 
-Sprint 073 does not change extractor behavior, browser capture, profile checkout/leasing, HTTP contracts, database schemas/migrations, Content Builder internals, LLM execution, Content Briefs, Producers, artifacts, or Content Publisher behavior.
+Sprint 074 must not change Facebook extraction behavior, browser capture behavior, profile checkout/leasing, HTTP contracts, database schemas/migrations, Content Builder internals, LLM execution, Content Briefs, Producers, artifacts, or Content Publisher behavior unless a later approved handoff explicitly narrows such a change.
+
+Sprint 073 — Product Scope Lock And Surface Trim is accepted.
 
 Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted.
 
@@ -43,64 +45,12 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 - **Profile Behavior**: safe operator-driven account exercise / warm-up and authentication-health observation.
 - **Profile Feed Collection**: profile-bound home-feed run records, bounded browser execution through the existing browser provider boundary, payload capture, extraction, source-publisher observation, content submission, and safe run summaries.
 - **Content Management**: content categories, managed source groups, normalized content items, deduplication, review lifecycle, top comments, safe content preview/status APIs, discovered source identity, and approved group promotion into managed source groups.
-- **Web UI**: operator presentation and safe API consumption for profiles, profile feed runs, content items, managed source groups/categories, and discovered sources/promotion. Sprint 073 should trim primary navigation to these MVP surfaces.
-- **Operator Tools**: CLI tools for profile provisioning, manual collection, worker execution, browser probing, profile home-feed execution, schedulers, and worker processes. Sprint 073 should reduce package script noise while preserving discoverability through docs.
-- **Docker E2E**: isolated production-like Docker E2E harness using synthetic fixtures only. It does not perform live Facebook validation.
+- **Web UI**: Profile Feed Collector MVP surfaces for profiles, profile feed runs, content items, source groups/categories, and discovered sources. Parked/advanced pages may remain routed but are hidden from primary navigation.
+- **Operator Commands**: canonical `pnpm operator:*` commands for provisioning, manual collection, workers, schedulers, browser probe, and the profile home-feed one-shot runner.
 
-## Current Modules
+## Current Known Gaps
 
-- **Collector Profile Manager**: profiles, sessions, provisioning, readiness, account health, leases, and trusted runtime configuration.
-- **Content Manager**: categories, source groups, normalized content, deduplication, content lifecycle, discovered source review/promotion, and safe reads.
-- **Collector Runtime**: collection orchestration, browser providers, payload capture, platform extraction, run records, workers, scheduled dispatch support, and normalized content submission.
-- **Content Builder**: Transform Type catalog code may exist, but this stage is parked for now.
-- **Web UI**: operator presentation and safe API consumption.
-
-## Important Architectural Invariants
-
-- Hexagonal architecture: Domain logic has zero dependencies on HTTP, databases, browsers, queues, React, or framework code.
-- Dependencies point inward: Domain -> Application use cases and ports -> Infrastructure/interface adapters -> Composition/runtime wiring.
-- Collector Profile Manager owns profile identity, session state, account readiness, authentication health, leases, and trusted runtime profile configuration.
-- Collector Runtime owns browser execution, capture, platform extraction, run records, workers, and submission orchestration.
-- Content Manager owns categories, source groups, normalized content, deduplication, content lifecycle, discovered source review, and approved group promotion.
-- Web UI consumes safe APIs and must not duplicate durable domain rules.
-- Sensitive data such as cookies, localStorage, tokens, authorization headers, proxy credentials, trusted runtime configuration, fingerprint secrets, raw Facebook payloads, raw HTML, screenshots, viewer data, and private payloads must not be exposed through DTOs, logs, fixtures, docs, or Web UI contracts.
-
-## Important Unresolved Risks
-
-- The Facebook home-feed extractor can run but may produce zero candidates against real captured payloads. Sprint 074 should add safe extraction diagnostics before changing parser behavior.
-- Long-term viability of browser provider behavior against Facebook fingerprinting remains uncertain.
-- Package script and operator-surface sprawl can obscure the MVP path.
-- Hidden or parked surfaces must not be deleted until migration and compatibility risks are understood.
-
-## Testing Strategy
-
-The cross-cutting testing strategy is documented in [`docs/TESTING_STRATEGY.md`](TESTING_STRATEGY.md). It defines five layers: unit tests, opt-in database integration tests, opt-in HTTP integration tests, Docker E2E with synthetic fixtures, and opt-in operator-driven manual live-Facebook validation.
-
-## Verification Commands
-
-```bash
-pnpm typecheck
-pnpm test
-pnpm test:db
-pnpm test:http:db
-pnpm web:typecheck
-pnpm web:build
-pnpm test:e2e:docker
-```
-
-Sprint 073 may use a smaller safe verification set when it only changes docs, navigation, and scripts:
-
-```bash
-pnpm typecheck
-pnpm test
-pnpm web:typecheck
-pnpm web:build
-git diff --check
-git status --short
-```
-
-## Immediate Next Expected Work
-
-Sprint 073 should update the current-state docs, trim primary Web UI navigation to the Profile Feed Collector MVP, and reduce package command noise without deleting implemented modules or changing runtime behavior.
-
-After Sprint 073 is accepted, the next expected sprint is Sprint 074 — Home Feed Extraction Diagnostics. Sprint 074 should make zero-candidate home-feed runs explain themselves safely before any real-shape extractor calibration is attempted.
+- Home-feed runs need better safe diagnostics for zero-candidate or low-yield outcomes.
+- Manual live-Facebook validation of the profile home-feed path still needs operator execution and review.
+- Home-feed extractor fixture coverage exists, but real-shape calibration may still be needed after diagnostics reveal the failure reason.
+- Content Builder and Content Publisher remain parked until the collector loop is validated.
