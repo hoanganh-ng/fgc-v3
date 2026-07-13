@@ -36,6 +36,7 @@ import type {
   ProfileHomeFeedCollectionRunTarget,
   ProfileHomeFeedCollectionSchedule,
   ProfileHomeFeedCollectionScheduleFailureReason,
+  ProfileHomeFeedDiagnosticSummary,
   ProfileSourceAccessCheckRunTarget,
   ProfileSourceAccessCheckRunFailureReason,
   ProfileSourceAccessCheckRunOutcome,
@@ -192,6 +193,8 @@ export const profileHomeFeedCollectionRuns = pgTable(
       jsonb("parameters").$type<ProfileHomeFeedCollectionRunParameters>().notNull(),
     summary:
       jsonb("summary").$type<ProfileHomeFeedCollectionRunSummary>(),
+    diagnostics:
+      jsonb("diagnostics").$type<ProfileHomeFeedDiagnosticSummary>(),
     failureReason:
       jsonb("failure_reason").$type<ProfileHomeFeedCollectionRunFailureReason>(),
     requestedAt: timestampWithTimezone("requested_at").notNull(),

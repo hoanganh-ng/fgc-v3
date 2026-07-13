@@ -15,6 +15,9 @@ import {
   CollectionRunStatusSchema,
   PROFILE_HOME_FEED_COLLECTION_RUN_STATUSES,
   PROFILE_HOME_FEED_COLLECTION_RUN_TRIGGER_TYPES,
+  PROFILE_HOME_FEED_COLLECTION_RUN_FAILURE_STAGES,
+  PROFILE_HOME_FEED_COLLECTION_RUN_CAPTURE_STAGES,
+  PROFILE_HOME_FEED_DIAGNOSTIC_WARNING_CODES,
   ProfileHomeFeedCollectionRunIdSchema,
   ProfileHomeFeedCollectionRunProfileIdSchema,
   ProfileHomeFeedCollectionRunStatusSchema,
@@ -1218,6 +1221,70 @@ const profileHomeFeedCollectionRunSummaryJsonSchema = {
   },
 } as const;
 
+const profileHomeFeedDiagnosticCaptureCountersJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    pageContextFetchCaptureCount: { type: "integer", minimum: 0 },
+    pageContextXhrCaptureCount: { type: "integer", minimum: 0 },
+    networkListenerCaptureCount: { type: "integer", minimum: 0 },
+    parseFailureCount: { type: "integer", minimum: 0 },
+    totalPayloadsPassedToExtractor: { type: "integer", minimum: 0 },
+  },
+} as const;
+
+const profileHomeFeedDiagnosticExtractorCountersJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    extractedCandidateCount: { type: "integer", minimum: 0 },
+    deduplicatedCandidateCount: { type: "integer", minimum: 0 },
+  },
+} as const;
+
+const profileHomeFeedDiagnosticWarningCountsJsonSchema = {
+  type: "object",
+  additionalProperties: { type: "integer", minimum: 0 },
+  properties: Object.fromEntries(
+    PROFILE_HOME_FEED_DIAGNOSTIC_WARNING_CODES.map((code) => [
+      code,
+      { type: "integer", minimum: 0 },
+    ]),
+  ),
+} as const;
+
+const profileHomeFeedDiagnosticRunOutcomeJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    failureStage: {
+      type: "string",
+      enum: PROFILE_HOME_FEED_COLLECTION_RUN_FAILURE_STAGES,
+    },
+    failureCode: nonEmptyStringJsonSchema,
+  },
+} as const;
+
+const profileHomeFeedDiagnosticSummaryJsonSchema = {
+  type: "object",
+  required: ["schemaVersion"],
+  additionalProperties: false,
+  properties: {
+    schemaVersion: { type: "integer", enum: [1] },
+    capture: profileHomeFeedDiagnosticCaptureCountersJsonSchema,
+    captureStage: {
+      type: "string",
+      enum: PROFILE_HOME_FEED_COLLECTION_RUN_CAPTURE_STAGES,
+    },
+    captureFinalPageUrl: nonEmptyStringJsonSchema,
+    captureLoginRedirectSuspected: { type: "boolean" },
+    extractor: profileHomeFeedDiagnosticExtractorCountersJsonSchema,
+    warningCounts: profileHomeFeedDiagnosticWarningCountsJsonSchema,
+    unsupportedPayloadCount: { type: "integer", minimum: 0 },
+    runOutcome: profileHomeFeedDiagnosticRunOutcomeJsonSchema,
+  },
+} as const;
+
 const profileHomeFeedCollectionRunFailureReasonJsonSchema = {
   type: "object",
   required: ["code", "message"],
@@ -1271,6 +1338,7 @@ const profileHomeFeedCollectionRunJsonSchema = {
     target: profileHomeFeedCollectionRunTargetJsonSchema,
     parameters: profileHomeFeedCollectionRunParametersJsonSchema,
     summary: profileHomeFeedCollectionRunSummaryJsonSchema,
+    diagnostics: profileHomeFeedDiagnosticSummaryJsonSchema,
     failureReason: profileHomeFeedCollectionRunFailureReasonJsonSchema,
     requestedAt: isoDateTimeJsonSchema,
     startedAt: isoDateTimeJsonSchema,

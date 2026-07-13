@@ -197,6 +197,13 @@
       "when": 1782124800000,
       "tag": "0027_content_builder_transform_types",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1782211200000,
+      "tag": "0028_profile_home_feed_collection_runs_diagnostics",
+      "breakpoints": true
     }
   ]
 }

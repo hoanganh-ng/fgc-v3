@@ -27,4 +27,6 @@ export * from "./profile-home-feed-collection-run-trigger-type";
 export * from "./profile-home-feed-collection-run.schemas";
 export * from "./profile-home-feed-collection-schedule";
 export * from "./profile-home-feed-collection-schedule.schemas";
+export * from "./profile-home-feed-diagnostic-summary";
+export * from "./profile-home-feed-diagnostic-summary.schemas";
 export * from "./validation";

@@ -68,6 +68,7 @@ import type {
   ProfileHomeFeedCollectionScheduleIsoDateTime,
   ProfileHomeFeedCollectionScheduleDispatchStatus,
   ProfileHomeFeedCollectionScheduleFailureReason,
+  ProfileHomeFeedDiagnosticSummary,
   ProfileSourceAccessCheckRun,
   ProfileSourceAccessCheckRunFailureReason,
   ProfileSourceAccessCheckRunId,
@@ -302,6 +303,7 @@ export interface ProfileHomeFeedCollectionRunDto {
   readonly target: ProfileHomeFeedCollectionRunTarget;
   readonly parameters: ProfileHomeFeedCollectionRunParameters;
   readonly summary?: ProfileHomeFeedCollectionRunSummary;
+  readonly diagnostics?: ProfileHomeFeedDiagnosticSummary;
   readonly failureReason?: ProfileHomeFeedCollectionRunFailureReason;
   readonly requestedAt: ProfileHomeFeedCollectionRunIsoDateTime;
   readonly startedAt?: ProfileHomeFeedCollectionRunIsoDateTime;
@@ -1061,6 +1063,9 @@ export function toProfileHomeFeedCollectionRunDto(
     target: { ...run.target },
     parameters: { ...run.parameters },
     ...(run.summary !== undefined ? { summary: { ...run.summary } } : {}),
+    ...(run.diagnostics !== undefined
+      ? { diagnostics: cloneDiagnostics(run.diagnostics) }
+      : {}),
     ...(run.failureReason !== undefined
       ? { failureReason: { ...run.failureReason } }
       : {}),
@@ -1069,6 +1074,41 @@ export function toProfileHomeFeedCollectionRunDto(
     ...(run.finishedAt !== undefined ? { finishedAt: run.finishedAt } : {}),
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
+  };
+}
+
+function cloneDiagnostics(
+  diagnostics: ProfileHomeFeedDiagnosticSummary,
+): ProfileHomeFeedDiagnosticSummary {
+  return {
+    schemaVersion: diagnostics.schemaVersion,
+    ...(diagnostics.capture !== undefined
+      ? { capture: { ...diagnostics.capture } }
+      : {}),
+    ...(diagnostics.captureStage !== undefined
+      ? { captureStage: diagnostics.captureStage }
+      : {}),
+    ...(diagnostics.captureFinalPageUrl !== undefined
+      ? { captureFinalPageUrl: diagnostics.captureFinalPageUrl }
+      : {}),
+    ...(diagnostics.captureLoginRedirectSuspected !== undefined
+      ? {
+          captureLoginRedirectSuspected:
+            diagnostics.captureLoginRedirectSuspected,
+        }
+      : {}),
+    ...(diagnostics.extractor !== undefined
+      ? { extractor: { ...diagnostics.extractor } }
+      : {}),
+    ...(diagnostics.warningCounts !== undefined
+      ? { warningCounts: { ...diagnostics.warningCounts } }
+      : {}),
+    ...(diagnostics.unsupportedPayloadCount !== undefined
+      ? { unsupportedPayloadCount: diagnostics.unsupportedPayloadCount }
+      : {}),
+    ...(diagnostics.runOutcome !== undefined
+      ? { runOutcome: { ...diagnostics.runOutcome } }
+      : {}),
   };
 }
 

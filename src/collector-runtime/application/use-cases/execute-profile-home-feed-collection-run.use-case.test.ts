@@ -39,6 +39,7 @@ import type {
 import type {
   ProfileHomeFeedCollectionRun,
   ProfileHomeFeedCollectionRunParameters,
+  ProfileHomeFeedDiagnosticSummary,
 } from "../../domain";
 
 const createdAt = "2026-06-19T10:00:00.000Z";
@@ -742,6 +743,186 @@ describe("ExecuteProfileHomeFeedCollectionRunUseCase", () => {
     await expect(ctx.useCase.execute({ runId: ctx.runId })).rejects.toThrow(
       InvalidProfileHomeFeedCollectionRunStatusTransitionError,
     );
+  });
+
+  it("persists diagnostics on a successful run with capture counters and a zero-candidate warning histogram", async () => {
+    const ctx = await createContext({
+      capturedPayloads: [
+        { capturedAt: new Date(createdAt), payload: {} },
+        { capturedAt: new Date(createdAt), payload: {} },
+      ],
+      extractions: [
+        {
+          valid: true,
+          candidates: [],
+          warnings: [
+            { code: "UNKNOWN_PUBLISHER_KIND", message: "x" },
+            { code: "UNKNOWN_PUBLISHER_KIND", message: "x" },
+            { code: "MISSING_SOURCE_URL", message: "x" },
+            { code: "UNSUPPORTED_PAYLOAD_SHAPE", message: "x" },
+          ],
+        },
+        {
+          valid: true,
+          candidates: [],
+          warnings: [],
+        },
+      ],
+    });
+    ctx.capture.next = {
+      ok: true,
+      capturedPayloads: [
+        { capturedAt: new Date(createdAt), payload: {} },
+        { capturedAt: new Date(createdAt), payload: {} },
+      ],
+      warnings: [],
+      diagnostics: {
+        pageContextFetchCaptureCount: 0,
+        pageContextXhrCaptureCount: 0,
+        networkListenerCaptureCount: 4,
+        parseFailureCount: 1,
+        totalPayloadsPassedToExtractor: 2,
+        finalPageUrl: "https://www.facebook.com/?sk=h_chr",
+        loginRedirectSuspected: false,
+      },
+    };
+
+    const result = await ctx.useCase.execute({ runId: ctx.runId });
+
+    expect(result.status).toBe("SUCCEEDED");
+    const diagnostics = result.diagnostics as
+      | ProfileHomeFeedDiagnosticSummary
+      | undefined;
+    expect(diagnostics).toBeDefined();
+    expect(diagnostics?.schemaVersion).toBe(1);
+    expect(diagnostics?.captureStage).toBe("SUCCEEDED");
+    expect(diagnostics?.capture).toEqual({
+      pageContextFetchCaptureCount: 0,
+      pageContextXhrCaptureCount: 0,
+      networkListenerCaptureCount: 4,
+      parseFailureCount: 1,
+      totalPayloadsPassedToExtractor: 2,
+    });
+    expect(diagnostics?.captureFinalPageUrl).toBe(
+      "https://www.facebook.com/",
+    );
+    expect(diagnostics?.extractor).toEqual({
+      extractedCandidateCount: 0,
+      deduplicatedCandidateCount: 0,
+    });
+    expect(diagnostics?.warningCounts).toEqual({
+      UNKNOWN_PUBLISHER_KIND: 2,
+      MISSING_SOURCE_URL: 1,
+      UNSUPPORTED_PAYLOAD_SHAPE: 1,
+    });
+    expect(diagnostics?.unsupportedPayloadCount).toBe(1);
+  });
+
+  it("persists diagnostics with capture-stage CAPTURE_FAILED on a failed capture", async () => {
+    const ctx = await createContext();
+    ctx.capture.next = {
+      ok: false,
+      errorCode: "LOGIN_REQUIRED",
+      errorMessage: "Login required.",
+      warnings: [],
+      diagnostics: {
+        pageContextFetchCaptureCount: 0,
+        pageContextXhrCaptureCount: 0,
+        networkListenerCaptureCount: 0,
+        parseFailureCount: 3,
+        totalPayloadsPassedToExtractor: 0,
+        finalPageUrl: "https://www.facebook.com/login/?secret=ABC",
+        loginRedirectSuspected: true,
+      },
+    };
+
+    const result = await ctx.useCase.execute({ runId: ctx.runId });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.failureReason?.code).toBe("HOME_FEED_CAPTURE_FAILED");
+    const diagnostics = result.diagnostics as
+      | ProfileHomeFeedDiagnosticSummary
+      | undefined;
+    expect(diagnostics?.captureStage).toBe("CAPTURE_FAILED");
+    expect(diagnostics?.runOutcome).toEqual({
+      failureStage: "CAPTURE",
+      failureCode: "LOGIN_REQUIRED",
+    });
+    expect(diagnostics?.captureFinalPageUrl).toBe(
+      "https://www.facebook.com/login/",
+    );
+    expect(diagnostics?.captureLoginRedirectSuspected).toBe(true);
+  });
+
+  it("preserves captured diagnostics when capture succeeds but no candidates are submitted", async () => {
+    const ctx = await createContext({
+      capturedPayloads: [{ capturedAt: new Date(createdAt), payload: {} }],
+      extractions: [
+        {
+          valid: true,
+          candidates: [],
+          warnings: [
+            { code: "MISSING_STABLE_PUBLISHER_ID", message: "x" },
+          ],
+        },
+      ],
+    });
+    ctx.capture.next = {
+      ok: true,
+      capturedPayloads: [{ capturedAt: new Date(createdAt), payload: {} }],
+      warnings: [],
+      diagnostics: {
+        pageContextFetchCaptureCount: 0,
+        pageContextXhrCaptureCount: 0,
+        networkListenerCaptureCount: 1,
+        parseFailureCount: 0,
+        totalPayloadsPassedToExtractor: 1,
+        loginRedirectSuspected: false,
+      },
+    };
+
+    const result = await ctx.useCase.execute({ runId: ctx.runId });
+
+    expect(result.status).toBe("SUCCEEDED");
+    const diagnostics = result.diagnostics as
+      | ProfileHomeFeedDiagnosticSummary
+      | undefined;
+    expect(diagnostics?.warningCounts).toEqual({
+      MISSING_STABLE_PUBLISHER_ID: 1,
+    });
+    expect(diagnostics?.capture?.totalPayloadsPassedToExtractor).toBe(1);
+  });
+
+  it("populates diagnostics with PARTIAL stage when publisher observations fail", async () => {
+    const ctx = await createContext({
+      capturedPayloads: [{ capturedAt: new Date(createdAt), payload: {} }],
+      extractions: [
+        {
+          valid: true,
+          candidates: [createCandidate({ externalPostId: "p-1" })],
+          warnings: [],
+        },
+      ],
+    });
+    ctx.publisher.handler = () => ({
+      ok: false,
+      errorCode: "PUBLISHER_OBSERVATION_FAILED",
+      errorMessage: "Publisher observation failed.",
+    });
+
+    const result = await ctx.useCase.execute({ runId: ctx.runId });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.failureReason?.code).toBe(
+      "HOME_FEED_EXECUTION_PARTIAL_FAILURE",
+    );
+    const diagnostics = result.diagnostics as
+      | ProfileHomeFeedDiagnosticSummary
+      | undefined;
+    expect(diagnostics?.runOutcome).toEqual({
+      failureStage: "PARTIAL",
+      failureCode: "HOME_FEED_EXECUTION_PARTIAL_FAILURE",
+    });
   });
 });
 

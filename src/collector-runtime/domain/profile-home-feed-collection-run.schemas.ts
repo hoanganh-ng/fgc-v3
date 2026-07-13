@@ -2,6 +2,7 @@ import { z } from "zod";
 import { COLLECTOR_RUNTIME_ACCOUNT_STAGES } from "./account-stage";
 import { PROFILE_HOME_FEED_COLLECTION_RUN_STATUSES } from "./profile-home-feed-collection-run-status";
 import { PROFILE_HOME_FEED_COLLECTION_RUN_TRIGGER_TYPES } from "./profile-home-feed-collection-run-trigger-type";
+import { ProfileHomeFeedDiagnosticSummarySchema } from "./profile-home-feed-diagnostic-summary.schemas";
 
 const NonEmptyStringSchema = z
   .string()
@@ -52,6 +53,9 @@ export const ProfileHomeFeedCollectionRunSummarySchema = z
   })
   .strict();
 
+export const ProfileHomeFeedCollectionRunDiagnosticsSchema =
+  ProfileHomeFeedDiagnosticSummarySchema;
+
 export const ProfileHomeFeedCollectionRunFailureReasonSchema = z
   .object({
     code: NonEmptyStringSchema,
@@ -69,6 +73,7 @@ export const ProfileHomeFeedCollectionRunSchema = z
     target: ProfileHomeFeedCollectionRunTargetSchema,
     parameters: ProfileHomeFeedCollectionRunParametersSchema,
     summary: ProfileHomeFeedCollectionRunSummarySchema.optional(),
+    diagnostics: ProfileHomeFeedCollectionRunDiagnosticsSchema.optional(),
     failureReason: ProfileHomeFeedCollectionRunFailureReasonSchema.optional(),
     requestedAt: ProfileHomeFeedCollectionRunIsoDateTimeSchema,
     startedAt: ProfileHomeFeedCollectionRunIsoDateTimeSchema.optional(),
@@ -82,6 +87,7 @@ export const ProfileHomeFeedCollectionRunSchema = z
       rejectPresent(context, "startedAt", run.startedAt);
       rejectPresent(context, "finishedAt", run.finishedAt);
       rejectPresent(context, "summary", run.summary);
+      rejectPresent(context, "diagnostics", run.diagnostics);
       rejectPresent(context, "failureReason", run.failureReason);
 
       return;
@@ -91,6 +97,7 @@ export const ProfileHomeFeedCollectionRunSchema = z
       requirePresent(context, "startedAt", run.startedAt);
       rejectPresent(context, "finishedAt", run.finishedAt);
       rejectPresent(context, "summary", run.summary);
+      rejectPresent(context, "diagnostics", run.diagnostics);
       rejectPresent(context, "failureReason", run.failureReason);
 
       return;
@@ -116,6 +123,7 @@ export const ProfileHomeFeedCollectionRunSchema = z
     requirePresent(context, "finishedAt", run.finishedAt);
     rejectPresent(context, "startedAt", run.startedAt);
     rejectPresent(context, "summary", run.summary);
+    rejectPresent(context, "diagnostics", run.diagnostics);
     rejectPresent(context, "failureReason", run.failureReason);
   });
 

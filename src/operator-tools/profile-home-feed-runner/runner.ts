@@ -256,6 +256,10 @@ function logSafeSummary(
     }
   }
 
+  for (const line of formatDiagnosticLines(run)) {
+    logger.info(line);
+  }
+
   if (run.status === "FAILED" && run.failureReason !== undefined) {
     const message = `Failure code ${run.failureReason.code}: ${run.failureReason.message}`;
     if (logger.error !== undefined) {
@@ -278,4 +282,82 @@ function formatSummaryLines(
     `- Failed content submissions: ${summary.failedContentSubmissions ?? 0}`,
     `- Lease released: ${summary.leaseReleased === true ? "yes" : "no"}`,
   ];
+}
+
+function formatDiagnosticLines(
+  run: ProfileHomeFeedCollectionRun,
+): readonly string[] {
+  const diagnostics = run.diagnostics;
+  if (diagnostics === undefined) {
+    return ["- Diagnostics: unavailable for this run"];
+  }
+
+  const lines: string[] = [];
+  if (diagnostics.captureStage !== undefined) {
+    lines.push(`- Capture stage: ${diagnostics.captureStage}`);
+  }
+  if (diagnostics.capture?.pageContextFetchCaptureCount !== undefined) {
+    lines.push(
+      `- Page context fetch captures: ${diagnostics.capture.pageContextFetchCaptureCount}`,
+    );
+  }
+  if (diagnostics.capture?.pageContextXhrCaptureCount !== undefined) {
+    lines.push(
+      `- Page context XHR captures: ${diagnostics.capture.pageContextXhrCaptureCount}`,
+    );
+  }
+  if (diagnostics.capture?.networkListenerCaptureCount !== undefined) {
+    lines.push(
+      `- Network listener captures: ${diagnostics.capture.networkListenerCaptureCount}`,
+    );
+  }
+  if (diagnostics.capture?.parseFailureCount !== undefined) {
+    lines.push(`- Capture parse failures: ${diagnostics.capture.parseFailureCount}`);
+  }
+  if (diagnostics.capture?.totalPayloadsPassedToExtractor !== undefined) {
+    lines.push(
+      `- Payloads passed to extractor: ${diagnostics.capture.totalPayloadsPassedToExtractor}`,
+    );
+  }
+  if (diagnostics.captureLoginRedirectSuspected === true) {
+    lines.push("- Login redirect suspected during capture");
+  }
+  if (diagnostics.captureFinalPageUrl !== undefined) {
+    lines.push(`- Capture final page URL: ${diagnostics.captureFinalPageUrl}`);
+  }
+  if (diagnostics.extractor?.extractedCandidateCount !== undefined) {
+    lines.push(
+      `- Extracted candidates: ${diagnostics.extractor.extractedCandidateCount}`,
+    );
+  }
+  if (diagnostics.extractor?.deduplicatedCandidateCount !== undefined) {
+    lines.push(
+      `- After extractor dedup: ${diagnostics.extractor.deduplicatedCandidateCount}`,
+    );
+  }
+  if (diagnostics.unsupportedPayloadCount !== undefined) {
+    lines.push(`- Unsupported payloads: ${diagnostics.unsupportedPayloadCount}`);
+  }
+  if (
+    diagnostics.warningCounts !== undefined &&
+    Object.keys(diagnostics.warningCounts).length > 0
+  ) {
+    const entries = Object.entries(diagnostics.warningCounts).sort(
+      (left, right) => (right[1] ?? 0) - (left[1] ?? 0),
+    );
+    for (const [code, count] of entries) {
+      lines.push(`- Extractor warning ${code}: ${count}`);
+    }
+  }
+  if (diagnostics.runOutcome?.failureStage !== undefined) {
+    lines.push(`- Failure stage: ${diagnostics.runOutcome.failureStage}`);
+  }
+  if (diagnostics.runOutcome?.failureCode !== undefined) {
+    lines.push(`- Failure code: ${diagnostics.runOutcome.failureCode}`);
+  }
+
+  if (lines.length === 0) {
+    return ["- Diagnostics: no diagnostic facts recorded"];
+  }
+  return lines;
 }

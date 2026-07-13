@@ -1,9 +1,13 @@
 import type {
   ProfileHomeFeedCollectionRun,
   ProfileHomeFeedCollectionRunIsoDateTime,
+  ProfileHomeFeedDiagnosticSummary,
   ValidationIssue,
 } from "../../../collector-runtime/domain";
-import { validateProfileHomeFeedCollectionRun } from "../../../collector-runtime/domain";
+import {
+  validateProfileHomeFeedCollectionRun,
+  validateProfileHomeFeedDiagnosticSummary,
+} from "../../../collector-runtime/domain";
 import { profileHomeFeedCollectionRuns } from "../schema/collector-runtime.schema";
 
 export type ProfileHomeFeedCollectionRunRow =
@@ -24,6 +28,21 @@ export class InvalidPersistedProfileHomeFeedCollectionRunRecordError extends Err
   }
 }
 
+export class InvalidPersistedProfileHomeFeedDiagnosticSummaryError extends Error {
+  public readonly recordId: string;
+  public readonly issues: readonly ValidationIssue[];
+
+  public constructor(recordId: string, issues: readonly ValidationIssue[]) {
+    super(
+      `Persisted profile home-feed diagnostic summary is invalid: ${recordId}.`,
+    );
+    this.name = "InvalidPersistedProfileHomeFeedDiagnosticSummaryError";
+    this.recordId = recordId;
+    this.issues = issues;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 export function toDomainProfileHomeFeedCollectionRun(
   record: ProfileHomeFeedCollectionRunRow,
 ): ProfileHomeFeedCollectionRun {
@@ -36,6 +55,7 @@ export function toDomainProfileHomeFeedCollectionRun(
     target: record.target,
     parameters: record.parameters,
     ...optional("summary", record.summary),
+    ...optionalDiagnostics("diagnostics", record.diagnostics, record.id),
     ...optional("failureReason", record.failureReason),
     requestedAt: normalizeIsoDateTime(record.requestedAt),
     ...optionalIsoDateTime("startedAt", record.startedAt),
@@ -78,6 +98,7 @@ export function toProfileHomeFeedCollectionRunRecord(
     target: validRun.target,
     parameters: validRun.parameters,
     summary: validRun.summary ?? null,
+    diagnostics: validRun.diagnostics ?? null,
     failureReason: validRun.failureReason ?? null,
     requestedAt: validRun.requestedAt,
     startedAt: validRun.startedAt ?? null,
@@ -96,6 +117,27 @@ function optional<T>(
   }
 
   return { [key]: value };
+}
+
+function optionalDiagnostics(
+  key: string,
+  value: unknown,
+  recordId: string,
+): Record<string, ProfileHomeFeedDiagnosticSummary> | Record<string, never> {
+  if (value === null || value === undefined) {
+    return {};
+  }
+
+  const result = validateProfileHomeFeedDiagnosticSummary(value);
+
+  if (!result.valid) {
+    throw new InvalidPersistedProfileHomeFeedDiagnosticSummaryError(
+      recordId,
+      result.issues,
+    );
+  }
+
+  return { [key]: result.value };
 }
 
 function optionalIsoDateTime(

@@ -6,6 +6,7 @@ import type {
   ProfileHomeFeedCollectionRunStatus,
   ProfileHomeFeedCollectionRunSummary,
   ProfileHomeFeedCollectionRunFailureReason,
+  ProfileHomeFeedDiagnosticSummary,
 } from "../../domain";
 
 export interface ProfileHomeFeedCollectionRunListQuery {
@@ -27,6 +28,7 @@ export interface ProfileHomeFeedCollectionRunStatusTransition {
   readonly updatedAt: ProfileHomeFeedCollectionRunIsoDateTime;
   readonly finishedAt?: ProfileHomeFeedCollectionRunIsoDateTime;
   readonly summary?: ProfileHomeFeedCollectionRunSummary;
+  readonly diagnostics?: ProfileHomeFeedDiagnosticSummary;
   readonly failureReason?: ProfileHomeFeedCollectionRunFailureReason;
 }
 

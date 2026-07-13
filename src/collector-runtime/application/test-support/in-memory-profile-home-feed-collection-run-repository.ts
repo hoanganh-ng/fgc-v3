@@ -115,6 +115,9 @@ export class InMemoryProfileHomeFeedCollectionRunRepository
       ...(transition.summary !== undefined
         ? { summary: transition.summary }
         : {}),
+      ...(transition.diagnostics !== undefined
+        ? { diagnostics: transition.diagnostics }
+        : {}),
       ...(transition.failureReason !== undefined
         ? { failureReason: transition.failureReason }
         : {}),

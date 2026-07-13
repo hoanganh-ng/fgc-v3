@@ -287,6 +287,109 @@ export const ProfileHomeFeedCollectionRunSummarySchema = z
   })
   .strict();
 
+export const PROFILE_HOME_FEED_DIAGNOSTIC_WARNING_CODES = [
+  "DUPLICATE_POST_CANDIDATE",
+  "EXCLUDED_PERSONAL_PROFILE_POST",
+  "EXCLUDED_SPONSORED_POST",
+  "MISSING_OPTIONAL_AUTHOR",
+  "MISSING_POSTED_AT",
+  "MISSING_SOURCE_URL",
+  "MISSING_STABLE_PUBLISHER_ID",
+  "SKIPPED_CANDIDATE_WITHOUT_BODY_TEXT",
+  "SKIPPED_CANDIDATE_WITHOUT_POST_ID",
+  "SKIPPED_COMMENT_WITHOUT_BODY_TEXT",
+  "SKIPPED_COMMENT_WITHOUT_ID",
+  "UNKNOWN_PUBLISHER_KIND",
+  "UNSUPPORTED_PAYLOAD_SHAPE",
+] as const;
+
+export const PROFILE_HOME_FEED_DIAGNOSTIC_CAPTURE_STAGES = [
+  "NOT_STARTED",
+  "IN_PROGRESS",
+  "SUCCEEDED",
+  "CAPTURE_FAILED",
+  "INTERRUPTED",
+] as const;
+
+export const PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_STAGES = [
+  "BOUNDS_EXCEEDED",
+  "CHECKOUT",
+  "CAPTURE",
+  "PUBLISHER_OBSERVATION",
+  "CONTENT_SUBMISSION",
+  "LEASE_RELEASE",
+  "PARTIAL",
+  "INTERRUPTED",
+  "EXECUTION",
+] as const;
+
+export type ProfileHomeFeedDiagnosticWarningCode =
+  (typeof PROFILE_HOME_FEED_DIAGNOSTIC_WARNING_CODES)[number];
+export type ProfileHomeFeedDiagnosticCaptureStage =
+  (typeof PROFILE_HOME_FEED_DIAGNOSTIC_CAPTURE_STAGES)[number];
+export type ProfileHomeFeedDiagnosticFailureStage =
+  (typeof PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_STAGES)[number];
+
+export const ProfileHomeFeedDiagnosticSummaryCaptureCountersSchema = z
+  .object({
+    pageContextFetchCaptureCount: z.number().int().min(0).optional(),
+    pageContextXhrCaptureCount: z.number().int().min(0).optional(),
+    networkListenerCaptureCount: z.number().int().min(0).optional(),
+    parseFailureCount: z.number().int().min(0).optional(),
+    totalPayloadsPassedToExtractor: z.number().int().min(0).optional(),
+  })
+  .strict();
+
+export const ProfileHomeFeedDiagnosticSummaryExtractorCountersSchema = z
+  .object({
+    extractedCandidateCount: z.number().int().min(0).optional(),
+    deduplicatedCandidateCount: z.number().int().min(0).optional(),
+  })
+  .strict();
+
+export const ProfileHomeFeedDiagnosticSummaryWarningCountsSchema = z
+  .object(
+    Object.fromEntries(
+      PROFILE_HOME_FEED_DIAGNOSTIC_WARNING_CODES.map((code) => [
+        code,
+        z.number().int().min(0).optional(),
+      ]),
+    ) as Record<
+      (typeof PROFILE_HOME_FEED_DIAGNOSTIC_WARNING_CODES)[number],
+      z.ZodOptional<z.ZodNumber>
+    >,
+  )
+  .strict()
+  .optional();
+
+export const ProfileHomeFeedDiagnosticSummaryRunOutcomeSchema = z
+  .object({
+    failureStage: z
+      .enum(PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_STAGES)
+      .optional(),
+    failureCode: NonEmptyStringSchema.optional(),
+  })
+  .strict()
+  .optional();
+
+export const ProfileHomeFeedDiagnosticSummarySchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    capture:
+      ProfileHomeFeedDiagnosticSummaryCaptureCountersSchema.optional(),
+    captureStage: z
+      .enum(PROFILE_HOME_FEED_DIAGNOSTIC_CAPTURE_STAGES)
+      .optional(),
+    captureFinalPageUrl: NonEmptyStringSchema.optional(),
+    captureLoginRedirectSuspected: z.boolean().optional(),
+    extractor:
+      ProfileHomeFeedDiagnosticSummaryExtractorCountersSchema.optional(),
+    warningCounts: ProfileHomeFeedDiagnosticSummaryWarningCountsSchema,
+    unsupportedPayloadCount: z.number().int().min(0).optional(),
+    runOutcome: ProfileHomeFeedDiagnosticSummaryRunOutcomeSchema,
+  })
+  .strict();
+
 export const ProfileHomeFeedCollectionRunFailureReasonSchema = z
   .object({
     code: NonEmptyStringSchema,
@@ -304,6 +407,7 @@ export const ProfileHomeFeedCollectionRunSchema = z
     target: ProfileHomeFeedCollectionRunTargetSchema,
     parameters: ProfileHomeFeedCollectionRunParametersSchema,
     summary: ProfileHomeFeedCollectionRunSummarySchema.optional(),
+    diagnostics: ProfileHomeFeedDiagnosticSummarySchema.optional(),
     failureReason: ProfileHomeFeedCollectionRunFailureReasonSchema.optional(),
     requestedAt: z.string().datetime({ offset: true }),
     startedAt: z.string().datetime({ offset: true }).optional(),
@@ -384,6 +488,18 @@ export type ProfileHomeFeedCollectionRunParameters = z.infer<
 >;
 export type ProfileHomeFeedCollectionRunSummary = z.infer<
   typeof ProfileHomeFeedCollectionRunSummarySchema
+>;
+export type ProfileHomeFeedDiagnosticSummary = z.infer<
+  typeof ProfileHomeFeedDiagnosticSummarySchema
+>;
+export type ProfileHomeFeedDiagnosticSummaryCaptureCounters = z.infer<
+  typeof ProfileHomeFeedDiagnosticSummaryCaptureCountersSchema
+>;
+export type ProfileHomeFeedDiagnosticSummaryExtractorCounters = z.infer<
+  typeof ProfileHomeFeedDiagnosticSummaryExtractorCountersSchema
+>;
+export type ProfileHomeFeedDiagnosticSummaryRunOutcome = z.infer<
+  typeof ProfileHomeFeedDiagnosticSummaryRunOutcomeSchema
 >;
 export type ProfileHomeFeedCollectionRunFailureReason = z.infer<
   typeof ProfileHomeFeedCollectionRunFailureReasonSchema

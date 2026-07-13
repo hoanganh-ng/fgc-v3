@@ -72,6 +72,80 @@ describe("profile home-feed collection run database mapper", () => {
     );
   });
 
+  it("maps diagnostics through the persistence round-trip", () => {
+    const run = createRun({
+      status: "SUCCEEDED",
+      startedAt: "2026-06-19T10:01:00.000Z",
+      finishedAt: "2026-06-19T10:02:00.000Z",
+      summary: createSummary(),
+      diagnostics: {
+        schemaVersion: 1 as const,
+        capture: {
+          pageContextFetchCaptureCount: 2,
+          pageContextXhrCaptureCount: 0,
+          networkListenerCaptureCount: 1,
+          parseFailureCount: 1,
+          totalPayloadsPassedToExtractor: 3,
+        },
+        captureStage: "SUCCEEDED" as const,
+        captureFinalPageUrl: "https://www.facebook.com/?sk=h_chr",
+        captureLoginRedirectSuspected: false,
+        extractor: {
+          extractedCandidateCount: 4,
+          deduplicatedCandidateCount: 4,
+        },
+        warningCounts: {
+          UNKNOWN_PUBLISHER_KIND: 2,
+          MISSING_SOURCE_URL: 1,
+        },
+        unsupportedPayloadCount: 1,
+      },
+    });
+
+    const record = toProfileHomeFeedCollectionRunRecord(run);
+
+    expect(record.diagnostics).toMatchObject({
+      schemaVersion: 1,
+      captureStage: "SUCCEEDED",
+      unsupportedPayloadCount: 1,
+    });
+
+    expect(
+      toDomainProfileHomeFeedCollectionRun(toSelectRow(record, run)),
+    ).toEqual(run);
+  });
+
+  it("rejects rows that contain an unknown warning code", () => {
+    const run = createRun({
+      status: "SUCCEEDED",
+      startedAt: now,
+      finishedAt: now,
+      summary: createSummary(),
+      diagnostics: {
+        schemaVersion: 1 as const,
+        warningCounts: {
+          UNKNOWN_PUBLISHER_KIND: 1,
+        },
+      },
+    });
+    const record = toProfileHomeFeedCollectionRunRecord(run);
+    const row = {
+      ...toSelectRow(record, run),
+      diagnostics: {
+        schemaVersion: 1 as const,
+        warningCounts: {
+          NOT_A_REAL_CODE: 1,
+        },
+      },
+    } as unknown as ProfileHomeFeedCollectionRunRow;
+
+    expect(() => toDomainProfileHomeFeedCollectionRun(row)).toThrow(
+      expect.objectContaining({
+        name: "InvalidPersistedProfileHomeFeedDiagnosticSummaryError",
+      }),
+    );
+  });
+
   it.each([
     ["QUEUED", "startedAt", rowFor({ status: "QUEUED" }, { startedAt: now })],
     ["QUEUED", "finishedAt", rowFor({ status: "QUEUED" }, { finishedAt: now })],
@@ -243,6 +317,7 @@ function toSelectRow(
     target: record.target,
     parameters: record.parameters,
     summary: record.summary ?? null,
+    diagnostics: record.diagnostics ?? null,
     failureReason: record.failureReason ?? null,
     requestedAt: run.requestedAt,
     startedAt: record.startedAt ?? null,
@@ -271,6 +346,9 @@ function createRun(
       maxPosts: 12,
     },
     ...(options.summary !== undefined ? { summary: options.summary } : {}),
+    ...(options.diagnostics !== undefined
+      ? { diagnostics: options.diagnostics }
+      : {}),
     ...(options.failureReason !== undefined
       ? { failureReason: options.failureReason }
       : {}),

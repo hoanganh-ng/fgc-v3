@@ -113,6 +113,7 @@ export class DrizzleProfileHomeFeedCollectionRunRepository
         profile_home_feed_collection_runs.target,
         profile_home_feed_collection_runs.parameters,
         profile_home_feed_collection_runs.summary,
+        profile_home_feed_collection_runs.diagnostics,
         profile_home_feed_collection_runs.failure_reason AS "failureReason",
         profile_home_feed_collection_runs.requested_at AS "requestedAt",
         profile_home_feed_collection_runs.started_at AS "startedAt",
@@ -139,6 +140,10 @@ export class DrizzleProfileHomeFeedCollectionRunRepository
 
     if (transition.summary !== undefined) {
       updateSet.summary = transition.summary;
+    }
+
+    if (transition.diagnostics !== undefined) {
+      updateSet.diagnostics = transition.diagnostics;
     }
 
     if (transition.failureReason !== undefined) {

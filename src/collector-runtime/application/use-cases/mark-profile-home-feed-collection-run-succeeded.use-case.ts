@@ -7,6 +7,7 @@ import {
   toProfileHomeFeedCollectionRunIsoDateTime,
   validateProfileHomeFeedCollectionRunForApplication,
   validateProfileHomeFeedCollectionRunSummaryForApplication,
+  validateProfileHomeFeedDiagnosticSummaryForApplication,
 } from "../profile-home-feed-collection-run-validation";
 import type { Clock } from "../ports/clock.port";
 import type { ProfileHomeFeedCollectionRunRepository } from "../ports/profile-home-feed-collection-run-repository.port";
@@ -15,11 +16,13 @@ import {
   type ProfileHomeFeedCollectionRun,
   type ProfileHomeFeedCollectionRunId,
   type ProfileHomeFeedCollectionRunSummary,
+  type ProfileHomeFeedDiagnosticSummary,
 } from "../../domain";
 
 export interface MarkProfileHomeFeedCollectionRunSucceededInput {
   readonly runId: ProfileHomeFeedCollectionRunId;
   readonly summary: ProfileHomeFeedCollectionRunSummary;
+  readonly diagnostics?: ProfileHomeFeedDiagnosticSummary;
 }
 
 export class MarkProfileHomeFeedCollectionRunSucceededUseCase {
@@ -46,12 +49,19 @@ export class MarkProfileHomeFeedCollectionRunSucceededUseCase {
     const summary = validateProfileHomeFeedCollectionRunSummaryForApplication(
       input.summary,
     );
+    const diagnostics =
+      input.diagnostics === undefined
+        ? undefined
+        : validateProfileHomeFeedDiagnosticSummaryForApplication(
+            input.diagnostics,
+          );
     const { failureReason: _failureReason, ...runWithoutFailureReason } = run;
     const now = toProfileHomeFeedCollectionRunIsoDateTime(this.clock.now());
     const succeeded = validateProfileHomeFeedCollectionRunForApplication({
       ...runWithoutFailureReason,
       status: "SUCCEEDED",
       summary,
+      ...(diagnostics !== undefined ? { diagnostics } : {}),
       finishedAt: now,
       updatedAt: now,
     });
@@ -61,6 +71,7 @@ export class MarkProfileHomeFeedCollectionRunSucceededUseCase {
       expectedStatus: "RUNNING",
       nextStatus: "SUCCEEDED",
       summary,
+      ...(diagnostics !== undefined ? { diagnostics } : {}),
       finishedAt: now,
       updatedAt: now,
     });

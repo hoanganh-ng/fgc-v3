@@ -8,6 +8,7 @@ import {
   validateProfileHomeFeedCollectionRunFailureReason,
   validateProfileHomeFeedCollectionRunParameters,
   validateProfileHomeFeedCollectionRunSummary,
+  validateProfileHomeFeedDiagnosticSummary,
 } from "../domain";
 import type {
   ProfileHomeFeedCollectionRun,
@@ -16,6 +17,7 @@ import type {
   ProfileHomeFeedCollectionRunIsoDateTime,
   ProfileHomeFeedCollectionRunParameters,
   ProfileHomeFeedCollectionRunSummary,
+  ProfileHomeFeedDiagnosticSummary,
 } from "../domain";
 
 export function toProfileHomeFeedCollectionRunIsoDateTime(
@@ -65,6 +67,18 @@ export function validateProfileHomeFeedCollectionRunSummaryForApplication(
   summary: ProfileHomeFeedCollectionRunSummary,
 ): ProfileHomeFeedCollectionRunSummary {
   const result = validateProfileHomeFeedCollectionRunSummary(summary);
+
+  if (!result.valid) {
+    throw new ProfileHomeFeedCollectionRunValidationError(result.issues);
+  }
+
+  return result.value;
+}
+
+export function validateProfileHomeFeedDiagnosticSummaryForApplication(
+  diagnostics: ProfileHomeFeedDiagnosticSummary,
+): ProfileHomeFeedDiagnosticSummary {
+  const result = validateProfileHomeFeedDiagnosticSummary(diagnostics);
 
   if (!result.valid) {
     throw new ProfileHomeFeedCollectionRunValidationError(result.issues);

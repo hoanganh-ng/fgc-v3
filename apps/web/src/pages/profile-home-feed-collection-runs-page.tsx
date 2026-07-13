@@ -24,6 +24,12 @@ import {
   hasActiveProfileHomeFeedCollectionRuns,
   shouldShowPaginationControls,
   toRequestProfileHomeFeedCollectionRunRequest,
+  getProfileHomeFeedDiagnosticCaptureCounters,
+  getProfileHomeFeedDiagnosticCaptureStageLabel,
+  getProfileHomeFeedDiagnosticExtractorCounters,
+  getProfileHomeFeedDiagnosticFailureStageLabel,
+  getProfileHomeFeedDiagnosticWarningRows,
+  hasProfileHomeFeedDiagnosticData,
   type RequestProfileHomeFeedCollectionRunFormValues,
 } from "@/features/collector-runtime/profile-home-feed-collection-run-view-model";
 import { useProfilesQuery } from "@/features/profiles/profile-queries";
@@ -39,6 +45,7 @@ import { ProfileStatusBadge } from "@/features/profiles/profile-status-badge";
 import {
   type ProfileHomeFeedCollectionRun,
   type ProfileHomeFeedCollectionRunStatus,
+  type ProfileHomeFeedDiagnosticSummary,
   DEFAULT_PROFILE_HOME_FEED_COLLECTION_RUN_LIST_LIMIT,
 } from "@/lib/api/collector-runtime-client";
 import type { ProfileSummary } from "@/lib/api/profile-manager-client";
@@ -360,6 +367,7 @@ function HomeFeedRunRow({
       </dl>
 
       {run.summary !== undefined ? <SummaryPanel summary={run.summary} /> : null}
+      <DiagnosticsPanel run={run} />
       {run.failureReason !== undefined ? (
         <FailurePanel failureReason={run.failureReason} />
       ) : null}
@@ -452,6 +460,158 @@ function FailurePanel({
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DiagnosticsPanel({
+  run,
+}: {
+  readonly run: ProfileHomeFeedCollectionRun;
+}): JSX.Element {
+  if (run.diagnostics === undefined) {
+    if (
+      run.status === "QUEUED" ||
+      run.status === "RUNNING" ||
+      run.status === "CANCELED"
+    ) {
+      return <div />;
+    }
+    return (
+      <div
+        className="rounded border border-border bg-muted/25 px-3 py-2"
+        role="status"
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          Diagnostics
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Diagnostics unavailable for this run. The run was created before
+          diagnostics were recorded.
+        </p>
+      </div>
+    );
+  }
+
+  if (!hasProfileHomeFeedDiagnosticData(run.diagnostics)) {
+    return (
+      <div
+        className="rounded border border-border bg-muted/25 px-3 py-2"
+        role="status"
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          Diagnostics
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          No diagnostic facts were recorded for this run.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <DiagnosticsView diagnostics={run.diagnostics} />
+  );
+}
+
+function DiagnosticsView({
+  diagnostics,
+}: {
+  readonly diagnostics: ProfileHomeFeedDiagnosticSummary;
+}): JSX.Element {
+  const captureRows = getProfileHomeFeedDiagnosticCaptureCounters(diagnostics);
+  const extractorRows = getProfileHomeFeedDiagnosticExtractorCounters(
+    diagnostics,
+  );
+  const warningRows = getProfileHomeFeedDiagnosticWarningRows(diagnostics);
+
+  return (
+    <div className="rounded border border-border bg-muted/25 px-3 py-2">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        Diagnostics
+      </p>
+      <dl className="mt-2 grid gap-x-5 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
+        {diagnostics.captureStage !== undefined ? (
+          <div>
+            <dt className="sr-only">Capture stage</dt>
+            <dd>
+              {getProfileHomeFeedDiagnosticCaptureStageLabel(
+                diagnostics.captureStage,
+              )}
+            </dd>
+          </div>
+        ) : null}
+        {diagnostics.captureFinalPageUrl !== undefined ? (
+          <div>
+            <dt className="sr-only">Final page URL</dt>
+            <dd className="truncate" title={diagnostics.captureFinalPageUrl}>
+              Final page: {diagnostics.captureFinalPageUrl}
+            </dd>
+          </div>
+        ) : null}
+        {diagnostics.captureLoginRedirectSuspected === true ? (
+          <div>
+            <dt className="sr-only">Login redirect suspected</dt>
+            <dd>Login redirect suspected during capture</dd>
+          </div>
+        ) : null}
+        {diagnostics.runOutcome?.failureStage !== undefined ? (
+          <div>
+            <dt className="sr-only">Failure stage</dt>
+            <dd>
+              Failure stage:{" "}
+              {getProfileHomeFeedDiagnosticFailureStageLabel(
+                diagnostics.runOutcome.failureStage,
+              )}
+            </dd>
+          </div>
+        ) : null}
+        {diagnostics.runOutcome?.failureCode !== undefined ? (
+          <div>
+            <dt className="sr-only">Failure code</dt>
+            <dd>Failure code: {diagnostics.runOutcome.failureCode}</dd>
+          </div>
+        ) : null}
+        {diagnostics.unsupportedPayloadCount !== undefined ? (
+          <div>
+            <dt className="sr-only">Unsupported payloads</dt>
+            <dd>Unsupported payloads: {diagnostics.unsupportedPayloadCount}</dd>
+          </div>
+        ) : null}
+        {captureRows.map((row) => (
+          <div key={row.label}>
+            <dt className="sr-only">{row.label}</dt>
+            <dd>
+              {row.label}: {row.value}
+            </dd>
+          </div>
+        ))}
+        {extractorRows.map((row) => (
+          <div key={row.label}>
+            <dt className="sr-only">{row.label}</dt>
+            <dd>
+              {row.label}: {row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {warningRows.length > 0 ? (
+        <div className="mt-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Extractor warnings
+          </p>
+          <dl className="mt-1 grid gap-x-5 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
+            {warningRows.map((row) => (
+              <div key={row.code}>
+                <dt className="sr-only">{row.label}</dt>
+                <dd>
+                  {row.label}: {row.count}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
     </div>
   );
 }

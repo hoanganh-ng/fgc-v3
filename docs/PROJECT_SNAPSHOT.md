@@ -43,7 +43,7 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 
 - **Profile Management**: profile creation, lifecycle, session ingestion, provisioning/reprovisioning, authentication health, checkout leasing, and trusted runtime profile configuration.
 - **Profile Behavior**: safe operator-driven account exercise / warm-up and authentication-health observation.
-- **Profile Feed Collection**: profile-bound home-feed run records, bounded browser execution through the existing browser provider boundary, payload capture, extraction, source-publisher observation, content submission, and safe run summaries.
+- **Profile Feed Collection**: profile-bound home-feed run records with safe aggregate diagnostic summaries (capture counters, sanitized final URL, login-redirect flag, extractor counters, allowlisted warning-code histogram, failure stage/code), bounded browser execution through the existing browser provider boundary, payload capture, extraction, source-publisher observation, content submission, and safe run summaries.
 - **Content Management**: content categories, managed source groups, normalized content items, deduplication, review lifecycle, top comments, safe content preview/status APIs, discovered source identity, and approved group promotion into managed source groups.
 - **Web UI**: Profile Feed Collector MVP surfaces for profiles, profile feed runs, content items, source groups/categories, and discovered sources. Parked/advanced pages may remain routed but are hidden from primary navigation.
 - **Operator Commands**: canonical `pnpm operator:*` commands for provisioning, manual collection, workers, schedulers, browser probe, and the profile home-feed one-shot runner.

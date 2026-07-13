@@ -8,6 +8,7 @@ import {
   validateProfileHomeFeedCollectionRunFailureReasonForApplication,
   validateProfileHomeFeedCollectionRunForApplication,
   validateProfileHomeFeedCollectionRunSummaryForApplication,
+  validateProfileHomeFeedDiagnosticSummaryForApplication,
 } from "../profile-home-feed-collection-run-validation";
 import type { Clock } from "../ports/clock.port";
 import type { ProfileHomeFeedCollectionRunRepository } from "../ports/profile-home-feed-collection-run-repository.port";
@@ -17,12 +18,14 @@ import {
   type ProfileHomeFeedCollectionRunFailureReason,
   type ProfileHomeFeedCollectionRunId,
   type ProfileHomeFeedCollectionRunSummary,
+  type ProfileHomeFeedDiagnosticSummary,
 } from "../../domain";
 
 export interface MarkProfileHomeFeedCollectionRunFailedInput {
   readonly runId: ProfileHomeFeedCollectionRunId;
   readonly failureReason: ProfileHomeFeedCollectionRunFailureReason;
   readonly summary?: ProfileHomeFeedCollectionRunSummary;
+  readonly diagnostics?: ProfileHomeFeedDiagnosticSummary;
 }
 
 export class MarkProfileHomeFeedCollectionRunFailedUseCase {
@@ -56,11 +59,18 @@ export class MarkProfileHomeFeedCollectionRunFailedUseCase {
         : validateProfileHomeFeedCollectionRunSummaryForApplication(
             input.summary,
           );
+    const diagnostics =
+      input.diagnostics === undefined
+        ? undefined
+        : validateProfileHomeFeedDiagnosticSummaryForApplication(
+            input.diagnostics,
+          );
     const now = toProfileHomeFeedCollectionRunIsoDateTime(this.clock.now());
     const failed = validateProfileHomeFeedCollectionRunForApplication({
       ...run,
       status: "FAILED",
       ...(summary !== undefined ? { summary } : {}),
+      ...(diagnostics !== undefined ? { diagnostics } : {}),
       failureReason,
       finishedAt: now,
       updatedAt: now,
@@ -72,6 +82,7 @@ export class MarkProfileHomeFeedCollectionRunFailedUseCase {
       nextStatus: "FAILED",
       failureReason,
       ...(summary !== undefined ? { summary } : {}),
+      ...(diagnostics !== undefined ? { diagnostics } : {}),
       finishedAt: now,
       updatedAt: now,
     });

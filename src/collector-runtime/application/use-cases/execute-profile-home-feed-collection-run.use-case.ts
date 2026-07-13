@@ -2,6 +2,17 @@ import {
   InvalidProfileHomeFeedCollectionRunStatusTransitionError,
   ProfileHomeFeedCollectionRunNotFoundError,
 } from "../application-errors";
+import {
+  createEmptyDiagnosticSummary,
+  finalizeDiagnosticSummary,
+  recordCaptureAttempt,
+  recordCaptureFailed,
+  recordCaptureInterrupted,
+  recordCaptureSucceeded,
+  recordExtractionResult,
+  recordFailureStage,
+  type MutableProfileHomeFeedDiagnosticSummary,
+} from "../profile-home-feed-diagnostic-aggregator";
 import type {
   FacebookHomeFeedPayloadCapturePort,
   HomeFeedContentSubmissionInput,
@@ -21,6 +32,7 @@ import type {
   ProfileHomeFeedCollectionRunFailureReason,
   ProfileHomeFeedCollectionRunId,
   ProfileHomeFeedCollectionRunSummary,
+  ProfileHomeFeedDiagnosticSummary,
 } from "../../domain";
 import type {
   FacebookHomeFeedExtractedContentCandidate,
@@ -168,19 +180,51 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     }
 
     const bounds = computeEffectiveBounds(run.parameters);
+    const diagnostics: MutableProfileHomeFeedDiagnosticSummary =
+      createEmptyDiagnosticSummary();
 
     if (boundsExceedCeilings(bounds)) {
-      return this.failRun(run.id, FAILURE_BOUNDS_EXCEEDED, undefined);
+      recordFailureStage(
+        diagnostics,
+        "BOUNDS_EXCEEDED",
+        FAILURE_BOUNDS_EXCEEDED.code,
+      );
+      return this.failRun(
+        run.id,
+        FAILURE_BOUNDS_EXCEEDED,
+        undefined,
+        diagnostics,
+      );
     }
 
     if (abortSignal?.aborted === true) {
-      return this.failRun(run.id, FAILURE_INTERRUPTED, undefined);
+      recordFailureStage(
+        diagnostics,
+        "INTERRUPTED",
+        FAILURE_INTERRUPTED.code,
+      );
+      return this.failRun(
+        run.id,
+        FAILURE_INTERRUPTED,
+        undefined,
+        diagnostics,
+      );
     }
 
     const checkoutResult = await safeCheckout(this.checkoutPort, run.profileId);
 
     if (!checkoutResult.ok) {
-      return this.failRun(run.id, FAILURE_CHECKOUT_FAILED, undefined);
+      recordFailureStage(
+        diagnostics,
+        "CHECKOUT",
+        FAILURE_CHECKOUT_FAILED.code,
+      );
+      return this.failRun(
+        run.id,
+        FAILURE_CHECKOUT_FAILED,
+        undefined,
+        diagnostics,
+      );
     }
 
     const acquiredLease: AcquiredLease = {
@@ -198,6 +242,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
         bounds,
         readAbortSignal,
         summary,
+        diagnostics,
       );
     } catch {
       const finalization = await this.finalizeAcquiredLease(
@@ -205,6 +250,11 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
         undefined,
       );
       summary.leaseReleased = finalization.kind === "released";
+      recordFailureStage(
+        diagnostics,
+        "EXECUTION",
+        FAILURE_EXECUTION_FAILED.code,
+      );
       outcome =
         finalization.kind === "release_failed"
           ? { finalization }
@@ -217,14 +267,17 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
             };
     }
 
-    return this.persistOutcome(run.id, outcome, summary);
+    return this.persistOutcome(run.id, outcome, summary, diagnostics);
   }
 
   private async persistOutcome(
     runId: ProfileHomeFeedCollectionRunId,
     outcome: FinalOutcome,
     summary: MutableSummary,
+    diagnostics: MutableProfileHomeFeedDiagnosticSummary,
   ): Promise<ProfileHomeFeedCollectionRun> {
+    const finalizedDiagnostics = finalizeDiagnosticSummary(diagnostics);
+
     if (!isFinalOutcomeReleased(outcome)) {
       // Release failure always takes precedence because the profile may
       // remain BUSY. We persist HOME_FEED_LEASE_RELEASE_FAILED exactly once
@@ -234,28 +287,54 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       // terminal-persistence error is the relevant signal and is propagated
       // by `failRun` directly.
       summary.leaseReleased = false;
-      return await this.failRun(runId, FAILURE_LEASE_RELEASE_FAILED, summary);
+      recordFailureStage(
+        diagnostics,
+        "LEASE_RELEASE",
+        FAILURE_LEASE_RELEASE_FAILED.code,
+      );
+      return await this.failRun(
+        runId,
+        FAILURE_LEASE_RELEASE_FAILED,
+        summary,
+        diagnostics,
+        finalizedDiagnostics,
+      );
     }
 
     summary.leaseReleased = true;
     // The lease has been finalized; any terminal persistence error here is
     // propagated consistently after lease finalization rather than being
     // overridden by an earlier operational error.
-    return await this.persistTerminal(runId, outcome.terminal, summary);
+    return await this.persistTerminal(
+      runId,
+      outcome.terminal,
+      summary,
+      diagnostics,
+      finalizedDiagnostics,
+    );
   }
 
   private async persistTerminal(
     runId: ProfileHomeFeedCollectionRunId,
     terminal: TerminalDecision,
     summary: MutableSummary,
+    diagnostics: MutableProfileHomeFeedDiagnosticSummary,
+    finalizedDiagnostics: ProfileHomeFeedDiagnosticSummary,
   ): Promise<ProfileHomeFeedCollectionRun> {
     if (terminal.kind === "succeed") {
       return await this.markSucceeded.execute({
         runId,
         summary: toImmutableSummary(summary),
+        diagnostics: finalizedDiagnostics,
       });
     }
-    return await this.failRun(runId, terminal.reason, summary);
+    return await this.failRun(
+      runId,
+      terminal.reason,
+      summary,
+      diagnostics,
+      finalizedDiagnostics,
+    );
   }
 
   private async decideOutcome(
@@ -264,6 +343,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     bounds: EffectiveBounds,
     readAbortSignal: () => AbortSignal | undefined,
     summary: MutableSummary,
+    diagnostics: MutableProfileHomeFeedDiagnosticSummary,
   ): Promise<FinalOutcome> {
     if (acquiredLease.profileId !== run.profileId) {
       const finalization = await this.finalizeAcquiredLease(
@@ -274,6 +354,11 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       if (finalization.kind === "release_failed") {
         return { finalization };
       }
+      recordFailureStage(
+        diagnostics,
+        "CHECKOUT",
+        FAILURE_PROFILE_MISMATCH.code,
+      );
       return {
         finalization,
         terminal: { kind: "fail", reason: FAILURE_PROFILE_MISMATCH },
@@ -286,6 +371,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       bounds,
       readAbortSignal,
       summary,
+      diagnostics,
     );
   }
 
@@ -295,7 +381,9 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     bounds: EffectiveBounds,
     readAbortSignal: () => AbortSignal | undefined,
     summary: MutableSummary,
+    diagnostics: MutableProfileHomeFeedDiagnosticSummary,
   ): Promise<FinalOutcome> {
+    recordCaptureAttempt(diagnostics);
     const captureSignal = readAbortSignal();
     const captureResult = await safeCapture(this.capturePort, {
       profileId: acquiredLease.profileId,
@@ -321,12 +409,18 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       }
 
       if (interrupted) {
+        recordCaptureInterrupted(diagnostics, captureResult.diagnostics);
         return {
           finalization,
           terminal: { kind: "fail", reason: FAILURE_INTERRUPTED },
         };
       }
 
+      recordCaptureFailed(
+        diagnostics,
+        captureResult.diagnostics,
+        captureResult.errorCode,
+      );
       return {
         finalization,
         terminal: { kind: "fail", reason: FAILURE_CAPTURE_FAILED },
@@ -334,6 +428,11 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     }
 
     summary.capturedPayloads = captureResult.capturedPayloads.length;
+    recordCaptureSucceeded(
+      diagnostics,
+      captureResult.diagnostics,
+      captureResult.capturedPayloads.length,
+    );
 
     if (readAbortSignal()?.aborted === true) {
       const finalization = await this.finalizeAcquiredLease(
@@ -344,6 +443,11 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       if (finalization.kind === "release_failed") {
         return { finalization };
       }
+      recordFailureStage(
+        diagnostics,
+        "INTERRUPTED",
+        FAILURE_INTERRUPTED.code,
+      );
       return {
         finalization,
         terminal: { kind: "fail", reason: FAILURE_INTERRUPTED },
@@ -354,13 +458,14 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       captureResult.capturedPayloads,
       this.extractor,
       bounds.maxPosts,
+      diagnostics,
     );
-    summary.extractorCandidates = candidates.length;
+    summary.extractorCandidates = candidates.accepted.length;
 
     const publisherCache = new Map<string, PublisherCacheEntry>();
     const observedAt = this.clock.now().toISOString();
 
-    for (const candidate of candidates) {
+    for (const candidate of candidates.accepted) {
       if (readAbortSignal()?.aborted === true) {
         const finalization = await this.finalizeAcquiredLease(
           acquiredLease,
@@ -370,6 +475,11 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
         if (finalization.kind === "release_failed") {
           return { finalization };
         }
+        recordFailureStage(
+          diagnostics,
+          "INTERRUPTED",
+          FAILURE_INTERRUPTED.code,
+        );
         return {
           finalization,
           terminal: { kind: "fail", reason: FAILURE_INTERRUPTED },
@@ -390,6 +500,11 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
           if (finalization.kind === "release_failed") {
             return { finalization };
           }
+          recordFailureStage(
+            diagnostics,
+            "INTERRUPTED",
+            FAILURE_INTERRUPTED.code,
+          );
           return {
             finalization,
             terminal: { kind: "fail", reason: FAILURE_INTERRUPTED },
@@ -413,12 +528,22 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
           publisherCache.set(publisherKey, { ok: false });
           summary.failedPublisherObservations += 1;
           summary.failedContentSubmissions += 1;
+          recordFailureStage(
+            diagnostics,
+            "PUBLISHER_OBSERVATION",
+            "HOME_FEED_PUBLISHER_OBSERVATION_FAILED",
+          );
           continue;
         }
       } else if (cached.ok) {
         sourcePublisherId = cached.sourcePublisherId;
       } else {
         summary.failedContentSubmissions += 1;
+        recordFailureStage(
+          diagnostics,
+          "CONTENT_SUBMISSION",
+          "HOME_FEED_CONTENT_SUBMISSION_FAILED",
+        );
         continue;
       }
 
@@ -431,6 +556,11 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
         if (finalization.kind === "release_failed") {
           return { finalization };
         }
+        recordFailureStage(
+          diagnostics,
+          "INTERRUPTED",
+          FAILURE_INTERRUPTED.code,
+        );
         return {
           finalization,
           terminal: { kind: "fail", reason: FAILURE_INTERRUPTED },
@@ -445,6 +575,11 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
 
       if (!submission.ok) {
         summary.failedContentSubmissions += 1;
+        recordFailureStage(
+          diagnostics,
+          "CONTENT_SUBMISSION",
+          "HOME_FEED_CONTENT_SUBMISSION_FAILED",
+        );
         continue;
       }
 
@@ -468,6 +603,11 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       return { finalization, terminal: { kind: "succeed" } };
     }
 
+    recordFailureStage(
+      diagnostics,
+      "PARTIAL",
+      FAILURE_PARTIAL.code,
+    );
     return {
       finalization,
       terminal: { kind: "fail", reason: FAILURE_PARTIAL },
@@ -498,15 +638,20 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     runId: ProfileHomeFeedCollectionRunId,
     failureReason: ProfileHomeFeedCollectionRunFailureReason,
     summary: MutableSummary | undefined,
+    diagnostics: MutableProfileHomeFeedDiagnosticSummary,
+    finalizedDiagnostics?: ProfileHomeFeedDiagnosticSummary,
   ): Promise<ProfileHomeFeedCollectionRun> {
     const summaryValue =
       summary === undefined ? undefined : toImmutableSummary(summary);
+    const diagnosticsValue =
+      finalizedDiagnostics ?? finalizeDiagnosticSummary(diagnostics);
 
     try {
       return await this.markFailed.execute({
         runId,
         failureReason,
         ...(summaryValue === undefined ? {} : { summary: summaryValue }),
+        diagnostics: diagnosticsValue,
       });
     } catch (error) {
       if (error instanceof ProfileHomeFeedCollectionRunNotFoundError) {
@@ -607,17 +752,25 @@ async function safeCapture(
         readonly capturedAt: Date;
         readonly payload: unknown;
       }>;
+      readonly diagnostics?: import("../collector-runtime.ports").FacebookPayloadCaptureDiagnostics;
     }
   | {
       readonly ok: false;
       readonly errorCode: string;
+      readonly diagnostics?: import("../collector-runtime.ports").FacebookPayloadCaptureDiagnostics;
     }
 > {
   try {
     const result = await port.captureHomeFeedPayloads(input);
 
     if (!result.ok) {
-      return { ok: false, errorCode: result.errorCode };
+      return {
+        ok: false,
+        errorCode: result.errorCode,
+        ...(result.diagnostics !== undefined
+          ? { diagnostics: result.diagnostics }
+          : {}),
+      };
     }
 
     return {
@@ -626,6 +779,9 @@ async function safeCapture(
         capturedAt: payload.capturedAt,
         payload: payload.payload,
       })),
+      ...(result.diagnostics !== undefined
+        ? { diagnostics: result.diagnostics }
+        : {}),
     };
   } catch {
     return { ok: false, errorCode: "HOME_FEED_CAPTURE_PORT_ERROR" };
@@ -651,9 +807,14 @@ function collectCandidates(
   }>,
   extractor: HomeFeedExtractorLike,
   maxPosts: number,
-): readonly FacebookHomeFeedExtractedContentCandidate[] {
+  diagnostics: MutableProfileHomeFeedDiagnosticSummary,
+): {
+  readonly accepted: readonly FacebookHomeFeedExtractedContentCandidate[];
+  readonly dedupCount: number;
+} {
   const accepted: FacebookHomeFeedExtractedContentCandidate[] = [];
   const seenPostKeys = new Set<string>();
+  const dedupedBeforeAccept = new Set<string>();
 
   for (const capturedPayload of capturedPayloads) {
     if (accepted.length >= maxPosts) {
@@ -672,11 +833,21 @@ function collectCandidates(
     }
 
     if (!extraction.valid) {
+      recordExtractionResult(diagnostics, {
+        acceptedCount: 0,
+        deduplicatedAfterCaptureCount: 0,
+        warnings: [],
+      });
       continue;
     }
 
     for (const candidate of extraction.candidates) {
       const key = `${candidate.platform}|${candidate.externalPostId}`;
+
+      if (dedupedBeforeAccept.has(key)) {
+        continue;
+      }
+      dedupedBeforeAccept.add(key);
 
       if (seenPostKeys.has(key)) {
         continue;
@@ -689,9 +860,18 @@ function collectCandidates(
       seenPostKeys.add(key);
       accepted.push(candidate);
     }
+
+    recordExtractionResult(diagnostics, {
+      acceptedCount: extraction.candidates.length,
+      deduplicatedAfterCaptureCount: extraction.candidates.length,
+      warnings: extraction.warnings,
+    });
   }
 
-  return accepted;
+  return {
+    accepted,
+    dedupCount: 0,
+  };
 }
 
 function buildPublisherKey(
