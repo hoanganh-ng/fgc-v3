@@ -69,7 +69,7 @@ describe("profile home-feed collection run diagnostics HTTP", () => {
             totalPayloadsPassedToExtractor: 3,
           },
           captureStage: "SUCCEEDED",
-          captureFinalPageUrl: "https://www.facebook.com/?sk=h_chr",
+          capturePageState: "HOME_FEED",
           captureLoginRedirectSuspected: false,
           extractor: {
             extractedCandidateCount: 3,
@@ -110,7 +110,7 @@ describe("profile home-feed collection run diagnostics HTTP", () => {
         totalPayloadsPassedToExtractor: 3,
       },
       captureStage: "SUCCEEDED",
-      captureFinalPageUrl: "https://www.facebook.com/?sk=h_chr",
+      capturePageState: "HOME_FEED",
       captureLoginRedirectSuspected: false,
       extractor: {
         extractedCandidateCount: 3,

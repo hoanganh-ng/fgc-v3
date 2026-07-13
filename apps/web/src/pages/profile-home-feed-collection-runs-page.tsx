@@ -28,6 +28,7 @@ import {
   getProfileHomeFeedDiagnosticCaptureStageLabel,
   getProfileHomeFeedDiagnosticExtractorCounters,
   getProfileHomeFeedDiagnosticFailureStageLabel,
+  getProfileHomeFeedDiagnosticPageStateLabel,
   getProfileHomeFeedDiagnosticWarningRows,
   hasProfileHomeFeedDiagnosticData,
   type RequestProfileHomeFeedCollectionRunFormValues,
@@ -541,11 +542,14 @@ function DiagnosticsView({
             </dd>
           </div>
         ) : null}
-        {diagnostics.captureFinalPageUrl !== undefined ? (
+        {diagnostics.capturePageState !== undefined ? (
           <div>
-            <dt className="sr-only">Final page URL</dt>
-            <dd className="truncate" title={diagnostics.captureFinalPageUrl}>
-              Final page: {diagnostics.captureFinalPageUrl}
+            <dt className="sr-only">Capture page state</dt>
+            <dd>
+              Capture page state:{" "}
+              {getProfileHomeFeedDiagnosticPageStateLabel(
+                diagnostics.capturePageState,
+              )}
             </dd>
           </div>
         ) : null}

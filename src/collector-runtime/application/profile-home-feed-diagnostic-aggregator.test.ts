@@ -26,7 +26,7 @@ describe("profile-home-feed diagnostic aggregator", () => {
     };
     recordCaptureSucceeded(summary, captureDiagnostics, 3);
     recordExtractionResult(summary, {
-      acceptedCount: 4,
+      extractedCount: 4,
       deduplicatedAfterCaptureCount: 4,
       warnings: [
         {
@@ -52,7 +52,7 @@ describe("profile-home-feed diagnostic aggregator", () => {
         parseFailureCount: 0,
         totalPayloadsPassedToExtractor: 3,
       },
-      captureFinalPageUrl: "https://www.facebook.com/",
+      capturePageState: "HOME_FEED",
       captureLoginRedirectSuspected: false,
       extractor: {
         extractedCandidateCount: 4,
@@ -79,18 +79,17 @@ describe("profile-home-feed diagnostic aggregator", () => {
         finalPageUrl: "https://www.facebook.com/login/?next=foo&secret=ABC",
         loginRedirectSuspected: true,
       },
-      "LOGIN_REQUIRED",
+      "HOME_FEED_CAPTURE_AUTH_REQUIRED",
+      "LOGIN",
     );
 
     const finalized = finalizeDiagnosticSummary(summary);
     expect(finalized.captureStage).toBe("CAPTURE_FAILED");
     expect(finalized.captureLoginRedirectSuspected).toBe(true);
-    expect(finalized.captureFinalPageUrl).toBe(
-      "https://www.facebook.com/login/",
-    );
+    expect(finalized.capturePageState).toBe("LOGIN");
     expect(finalized.runOutcome).toEqual({
       failureStage: "CAPTURE",
-      failureCode: "LOGIN_REQUIRED",
+      failureCode: "HOME_FEED_CAPTURE_AUTH_REQUIRED",
     });
   });
 
@@ -118,7 +117,7 @@ describe("profile-home-feed diagnostic aggregator", () => {
     recordCaptureAttempt(summary);
     recordCaptureSucceeded(summary, undefined, 0);
     recordExtractionResult(summary, {
-      acceptedCount: 0,
+      extractedCount: 0,
       deduplicatedAfterCaptureCount: 0,
       warnings: [
         { code: "UNKNOWN_PUBLISHER_KIND", message: "x" },
@@ -138,7 +137,7 @@ describe("profile-home-feed diagnostic aggregator", () => {
     recordCaptureAttempt(summary);
     recordCaptureSucceeded(summary, undefined, 0);
     recordExtractionResult(summary, {
-      acceptedCount: 0,
+      extractedCount: 0,
       deduplicatedAfterCaptureCount: 0,
       warnings: [
         { code: "UNSUPPORTED_PAYLOAD_SHAPE", message: "shape" },

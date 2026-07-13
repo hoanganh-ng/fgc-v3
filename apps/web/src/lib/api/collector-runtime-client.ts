@@ -323,12 +323,37 @@ export const PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_STAGES = [
   "EXECUTION",
 ] as const;
 
+export const PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_CODES = [
+  "HOME_FEED_EXECUTION_BOUNDS_EXCEEDED",
+  "HOME_FEED_CHECKOUT_FAILED",
+  "PROFILE_HOME_FEED_CHECKOUT_PROFILE_MISMATCH",
+  "HOME_FEED_CAPTURE_FAILED",
+  "HOME_FEED_CAPTURE_AUTH_REQUIRED",
+  "HOME_FEED_PUBLISHER_OBSERVATION_FAILED",
+  "HOME_FEED_CONTENT_SUBMISSION_FAILED",
+  "HOME_FEED_LEASE_RELEASE_FAILED",
+  "HOME_FEED_EXECUTION_PARTIAL_FAILURE",
+  "HOME_FEED_EXECUTION_INTERRUPTED",
+  "HOME_FEED_EXECUTION_FAILED",
+] as const;
+
+export const PROFILE_HOME_FEED_DIAGNOSTIC_PAGE_STATES = [
+  "HOME_FEED",
+  "LOGIN",
+  "CHECKPOINT",
+  "OTHER",
+] as const;
+
 export type ProfileHomeFeedDiagnosticWarningCode =
   (typeof PROFILE_HOME_FEED_DIAGNOSTIC_WARNING_CODES)[number];
 export type ProfileHomeFeedDiagnosticCaptureStage =
   (typeof PROFILE_HOME_FEED_DIAGNOSTIC_CAPTURE_STAGES)[number];
 export type ProfileHomeFeedDiagnosticFailureStage =
   (typeof PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_STAGES)[number];
+export type ProfileHomeFeedDiagnosticFailureCode =
+  (typeof PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_CODES)[number];
+export type ProfileHomeFeedDiagnosticPageState =
+  (typeof PROFILE_HOME_FEED_DIAGNOSTIC_PAGE_STATES)[number];
 
 export const ProfileHomeFeedDiagnosticSummaryCaptureCountersSchema = z
   .object({
@@ -367,7 +392,9 @@ export const ProfileHomeFeedDiagnosticSummaryRunOutcomeSchema = z
     failureStage: z
       .enum(PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_STAGES)
       .optional(),
-    failureCode: NonEmptyStringSchema.optional(),
+    failureCode: z
+      .enum(PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_CODES)
+      .optional(),
   })
   .strict()
   .optional();
@@ -380,7 +407,9 @@ export const ProfileHomeFeedDiagnosticSummarySchema = z
     captureStage: z
       .enum(PROFILE_HOME_FEED_DIAGNOSTIC_CAPTURE_STAGES)
       .optional(),
-    captureFinalPageUrl: NonEmptyStringSchema.optional(),
+    capturePageState: z
+      .enum(PROFILE_HOME_FEED_DIAGNOSTIC_PAGE_STATES)
+      .optional(),
     captureLoginRedirectSuspected: z.boolean().optional(),
     extractor:
       ProfileHomeFeedDiagnosticSummaryExtractorCountersSchema.optional(),

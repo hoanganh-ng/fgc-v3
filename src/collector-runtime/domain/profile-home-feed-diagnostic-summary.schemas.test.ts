@@ -31,7 +31,7 @@ describe("ProfileHomeFeedDiagnosticSummarySchema", () => {
         totalPayloadsPassedToExtractor: 3,
       },
       captureStage: "SUCCEEDED" as const,
-      captureFinalPageUrl: "https://www.facebook.com/?sk=h_chr",
+      capturePageState: "HOME_FEED" as const,
       captureLoginRedirectSuspected: false,
       extractor: {
         extractedCandidateCount: 4,
@@ -44,7 +44,7 @@ describe("ProfileHomeFeedDiagnosticSummarySchema", () => {
       unsupportedPayloadCount: 1,
       runOutcome: {
         failureStage: "CAPTURE" as const,
-        failureCode: "HOME_FEED_CAPTURE_FAILED",
+        failureCode: "HOME_FEED_CAPTURE_FAILED" as const,
       },
     };
     const result = ProfileHomeFeedDiagnosticSummarySchema.safeParse(summary);
@@ -56,6 +56,18 @@ describe("ProfileHomeFeedDiagnosticSummarySchema", () => {
       ...base,
       warningCounts: {
         NOT_A_REAL_CODE: 1,
+      },
+    };
+    const result = ProfileHomeFeedDiagnosticSummarySchema.safeParse(summary);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unknown warning keys in the strict histogram allowlist", () => {
+    const summary = {
+      ...base,
+      warningCounts: {
+        UNKNOWN_PUBLISHER_KIND: 1,
+        NOT_AN_ALLOWLISTED_CODE: 2,
       },
     };
     const result = ProfileHomeFeedDiagnosticSummarySchema.safeParse(summary);

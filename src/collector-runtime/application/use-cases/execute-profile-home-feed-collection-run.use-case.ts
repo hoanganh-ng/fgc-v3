@@ -5,6 +5,8 @@ import {
 import {
   createEmptyDiagnosticSummary,
   finalizeDiagnosticSummary,
+  mapCaptureErrorCodeToFailureCode,
+  mapToPageState,
   recordCaptureAttempt,
   recordCaptureFailed,
   recordCaptureInterrupted,
@@ -187,28 +189,18 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       recordFailureStage(
         diagnostics,
         "BOUNDS_EXCEEDED",
-        FAILURE_BOUNDS_EXCEEDED.code,
+        "HOME_FEED_EXECUTION_BOUNDS_EXCEEDED",
       );
-      return this.failRun(
-        run.id,
-        FAILURE_BOUNDS_EXCEEDED,
-        undefined,
-        diagnostics,
-      );
+      return this.failRun(run.id, FAILURE_BOUNDS_EXCEEDED, undefined, diagnostics);
     }
 
     if (abortSignal?.aborted === true) {
       recordFailureStage(
         diagnostics,
         "INTERRUPTED",
-        FAILURE_INTERRUPTED.code,
+        "HOME_FEED_EXECUTION_INTERRUPTED",
       );
-      return this.failRun(
-        run.id,
-        FAILURE_INTERRUPTED,
-        undefined,
-        diagnostics,
-      );
+      return this.failRun(run.id, FAILURE_INTERRUPTED, undefined, diagnostics);
     }
 
     const checkoutResult = await safeCheckout(this.checkoutPort, run.profileId);
@@ -217,14 +209,9 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       recordFailureStage(
         diagnostics,
         "CHECKOUT",
-        FAILURE_CHECKOUT_FAILED.code,
+        "HOME_FEED_CHECKOUT_FAILED",
       );
-      return this.failRun(
-        run.id,
-        FAILURE_CHECKOUT_FAILED,
-        undefined,
-        diagnostics,
-      );
+      return this.failRun(run.id, FAILURE_CHECKOUT_FAILED, undefined, diagnostics);
     }
 
     const acquiredLease: AcquiredLease = {
@@ -253,7 +240,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       recordFailureStage(
         diagnostics,
         "EXECUTION",
-        FAILURE_EXECUTION_FAILED.code,
+        "HOME_FEED_EXECUTION_FAILED",
       );
       outcome =
         finalization.kind === "release_failed"
@@ -276,22 +263,21 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     summary: MutableSummary,
     diagnostics: MutableProfileHomeFeedDiagnosticSummary,
   ): Promise<ProfileHomeFeedCollectionRun> {
-    const finalizedDiagnostics = finalizeDiagnosticSummary(diagnostics);
-
     if (!isFinalOutcomeReleased(outcome)) {
       // Release failure always takes precedence because the profile may
       // remain BUSY. We persist HOME_FEED_LEASE_RELEASE_FAILED exactly once
       // on the FAILED terminal; the operationally-decided reason is
-      // discarded and not persisted a second time. If terminal persistence
-      // itself throws after the lease has already been finalized, the
-      // terminal-persistence error is the relevant signal and is propagated
-      // by `failRun` directly.
+      // discarded and not persisted a second time. The diagnostic
+      // runOutcome is force-overwritten to LEASE_RELEASE so a stale
+      // runOutcome from a previous stage does not leak into the
+      // persisted row.
       summary.leaseReleased = false;
       recordFailureStage(
         diagnostics,
         "LEASE_RELEASE",
-        FAILURE_LEASE_RELEASE_FAILED.code,
+        "HOME_FEED_LEASE_RELEASE_FAILED",
       );
+      const finalizedDiagnostics = finalizeDiagnosticSummary(diagnostics);
       return await this.failRun(
         runId,
         FAILURE_LEASE_RELEASE_FAILED,
@@ -305,23 +291,8 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     // The lease has been finalized; any terminal persistence error here is
     // propagated consistently after lease finalization rather than being
     // overridden by an earlier operational error.
-    return await this.persistTerminal(
-      runId,
-      outcome.terminal,
-      summary,
-      diagnostics,
-      finalizedDiagnostics,
-    );
-  }
-
-  private async persistTerminal(
-    runId: ProfileHomeFeedCollectionRunId,
-    terminal: TerminalDecision,
-    summary: MutableSummary,
-    diagnostics: MutableProfileHomeFeedDiagnosticSummary,
-    finalizedDiagnostics: ProfileHomeFeedDiagnosticSummary,
-  ): Promise<ProfileHomeFeedCollectionRun> {
-    if (terminal.kind === "succeed") {
+    const finalizedDiagnostics = finalizeDiagnosticSummary(diagnostics);
+    if (outcome.terminal.kind === "succeed") {
       return await this.markSucceeded.execute({
         runId,
         summary: toImmutableSummary(summary),
@@ -330,7 +301,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     }
     return await this.failRun(
       runId,
-      terminal.reason,
+      outcome.terminal.reason,
       summary,
       diagnostics,
       finalizedDiagnostics,
@@ -357,7 +328,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       recordFailureStage(
         diagnostics,
         "CHECKOUT",
-        FAILURE_PROFILE_MISMATCH.code,
+        "PROFILE_HOME_FEED_CHECKOUT_PROFILE_MISMATCH",
       );
       return {
         finalization,
@@ -416,10 +387,15 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
         };
       }
 
+      const failureCode = mapCaptureErrorCodeToFailureCode(
+        captureResult.errorCode,
+      );
+      const pageState = mapToPageState(captureResult.errorCode);
       recordCaptureFailed(
         diagnostics,
         captureResult.diagnostics,
-        captureResult.errorCode,
+        failureCode,
+        pageState,
       );
       return {
         finalization,
@@ -432,6 +408,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       diagnostics,
       captureResult.diagnostics,
       captureResult.capturedPayloads.length,
+      "HOME_FEED",
     );
 
     if (readAbortSignal()?.aborted === true) {
@@ -446,7 +423,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
       recordFailureStage(
         diagnostics,
         "INTERRUPTED",
-        FAILURE_INTERRUPTED.code,
+        "HOME_FEED_EXECUTION_INTERRUPTED",
       );
       return {
         finalization,
@@ -478,7 +455,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
         recordFailureStage(
           diagnostics,
           "INTERRUPTED",
-          FAILURE_INTERRUPTED.code,
+          "HOME_FEED_EXECUTION_INTERRUPTED",
         );
         return {
           finalization,
@@ -503,7 +480,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
           recordFailureStage(
             diagnostics,
             "INTERRUPTED",
-            FAILURE_INTERRUPTED.code,
+            "HOME_FEED_EXECUTION_INTERRUPTED",
           );
           return {
             finalization,
@@ -559,7 +536,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
         recordFailureStage(
           diagnostics,
           "INTERRUPTED",
-          FAILURE_INTERRUPTED.code,
+          "HOME_FEED_EXECUTION_INTERRUPTED",
         );
         return {
           finalization,
@@ -606,7 +583,7 @@ export class ExecuteProfileHomeFeedCollectionRunUseCase {
     recordFailureStage(
       diagnostics,
       "PARTIAL",
-      FAILURE_PARTIAL.code,
+      "HOME_FEED_EXECUTION_PARTIAL_FAILURE",
     );
     return {
       finalization,
@@ -800,6 +777,25 @@ function toAuthenticationObservation(
   return undefined;
 }
 
+interface CollectionOutcome {
+  readonly accepted: readonly FacebookHomeFeedExtractedContentCandidate[];
+}
+
+/**
+ * Runs the extractor over the captured payloads and produces the
+ * deduplicated candidate set that downstream submission consumes.
+ *
+ * The aggregator receives:
+ * - `extractedCount`: total candidate count from the extractor for a
+ *   payload, BEFORE the executor's cross-payload dedup. This is the
+ *   raw extractor output for diagnostic accounting.
+ * - `deduplicatedAfterCaptureCount`: how many of those candidates
+ *   were NEW after executor-level cross-payload dedup (i.e. survived
+ *   the `platform + externalPostId` cross-payload dedup at this
+ *   payload). The total over all payloads is the count of candidates
+ *   that survived executor-level cross-payload dedup and were passed
+ *   to downstream submission.
+ */
 function collectCandidates(
   capturedPayloads: ReadonlyArray<{
     readonly capturedAt: Date;
@@ -808,13 +804,9 @@ function collectCandidates(
   extractor: HomeFeedExtractorLike,
   maxPosts: number,
   diagnostics: MutableProfileHomeFeedDiagnosticSummary,
-): {
-  readonly accepted: readonly FacebookHomeFeedExtractedContentCandidate[];
-  readonly dedupCount: number;
-} {
+): CollectionOutcome {
   const accepted: FacebookHomeFeedExtractedContentCandidate[] = [];
   const seenPostKeys = new Set<string>();
-  const dedupedBeforeAccept = new Set<string>();
 
   for (const capturedPayload of capturedPayloads) {
     if (accepted.length >= maxPosts) {
@@ -829,25 +821,26 @@ function collectCandidates(
         payload: capturedPayload.payload,
       });
     } catch {
-      continue;
-    }
-
-    if (!extraction.valid) {
       recordExtractionResult(diagnostics, {
-        acceptedCount: 0,
+        extractedCount: 0,
         deduplicatedAfterCaptureCount: 0,
         warnings: [],
       });
       continue;
     }
 
+    if (!extraction.valid) {
+      recordExtractionResult(diagnostics, {
+        extractedCount: 0,
+        deduplicatedAfterCaptureCount: 0,
+        warnings: [],
+      });
+      continue;
+    }
+
+    let payloadDeduplicated = 0;
     for (const candidate of extraction.candidates) {
       const key = `${candidate.platform}|${candidate.externalPostId}`;
-
-      if (dedupedBeforeAccept.has(key)) {
-        continue;
-      }
-      dedupedBeforeAccept.add(key);
 
       if (seenPostKeys.has(key)) {
         continue;
@@ -859,19 +852,17 @@ function collectCandidates(
 
       seenPostKeys.add(key);
       accepted.push(candidate);
+      payloadDeduplicated += 1;
     }
 
     recordExtractionResult(diagnostics, {
-      acceptedCount: extraction.candidates.length,
-      deduplicatedAfterCaptureCount: extraction.candidates.length,
+      extractedCount: extraction.candidates.length,
+      deduplicatedAfterCaptureCount: payloadDeduplicated,
       warnings: extraction.warnings,
     });
   }
 
-  return {
-    accepted,
-    dedupCount: 0,
-  };
+  return { accepted };
 }
 
 function buildPublisherKey(

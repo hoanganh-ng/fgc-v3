@@ -88,7 +88,7 @@ describe("profile home-feed collection run database mapper", () => {
           totalPayloadsPassedToExtractor: 3,
         },
         captureStage: "SUCCEEDED" as const,
-        captureFinalPageUrl: "https://www.facebook.com/?sk=h_chr",
+        capturePageState: "HOME_FEED" as const,
         captureLoginRedirectSuspected: false,
         extractor: {
           extractedCandidateCount: 4,

@@ -2,12 +2,6 @@ import { z } from "zod";
 
 const NonNegativeIntegerSchema = z.number().int().min(0);
 
-const NonEmptyStringSchema = z
-  .string()
-  .refine((value) => value.trim().length > 0, {
-    message: "Expected non-empty string.",
-  });
-
 /**
  * Mirrors the allowlisted
  * `FacebookHomeFeedExtractionWarningCode` vocabulary in
@@ -74,6 +68,57 @@ export const ProfileHomeFeedDiagnosticSummaryFailureStageSchema = z.enum(
 );
 
 /**
+ * Allowlisted diagnostic failure codes. Every code persisted on
+ * the diagnostic summary, returned in HTTP DTOs, surfaced in the
+ * Web UI, and emitted by the operator runner MUST be one of these
+ * values. Upstream capture-port error codes are mapped to a safe
+ * value from this vocabulary at the application boundary and never
+ * copied through unchanged.
+ */
+export const PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_CODES = [
+  "HOME_FEED_EXECUTION_BOUNDS_EXCEEDED",
+  "HOME_FEED_CHECKOUT_FAILED",
+  "PROFILE_HOME_FEED_CHECKOUT_PROFILE_MISMATCH",
+  "HOME_FEED_CAPTURE_FAILED",
+  "HOME_FEED_CAPTURE_AUTH_REQUIRED",
+  "HOME_FEED_PUBLISHER_OBSERVATION_FAILED",
+  "HOME_FEED_CONTENT_SUBMISSION_FAILED",
+  "HOME_FEED_LEASE_RELEASE_FAILED",
+  "HOME_FEED_EXECUTION_PARTIAL_FAILURE",
+  "HOME_FEED_EXECUTION_INTERRUPTED",
+  "HOME_FEED_EXECUTION_FAILED",
+] as const;
+
+export type ProfileHomeFeedDiagnosticFailureCode =
+  (typeof PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_CODES)[number];
+
+export const ProfileHomeFeedDiagnosticFailureCodeSchema = z.enum(
+  PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_CODES,
+);
+
+/**
+ * Allowlisted page-state classifications. The runner never persists
+ * or surfaces a raw URL fragment or arbitrary Facebook field; if a
+ * page-state detail is required, it MUST be one of these enum
+ * values. The `OTHER` value is the safe default for any unclassified
+ * state and is the only value upstream `FacebookPageBlockingState`
+ * values that do not map to `LOGIN` or `CHECKPOINT` can reach.
+ */
+export const PROFILE_HOME_FEED_DIAGNOSTIC_PAGE_STATES = [
+  "HOME_FEED",
+  "LOGIN",
+  "CHECKPOINT",
+  "OTHER",
+] as const;
+
+export type ProfileHomeFeedDiagnosticPageState =
+  (typeof PROFILE_HOME_FEED_DIAGNOSTIC_PAGE_STATES)[number];
+
+export const ProfileHomeFeedDiagnosticPageStateSchema = z.enum(
+  PROFILE_HOME_FEED_DIAGNOSTIC_PAGE_STATES,
+);
+
+/**
  * Aggregated capture counters. Each field is optional so partial
  * facts collected before a later failure can still be persisted.
  */
@@ -132,7 +177,7 @@ const ProfileHomeFeedDiagnosticSummaryExtractorCountersSchema = z
 const ProfileHomeFeedDiagnosticSummaryRunOutcomeSchema = z
   .object({
     failureStage: ProfileHomeFeedDiagnosticSummaryFailureStageSchema.optional(),
-    failureCode: NonEmptyStringSchema.optional(),
+    failureCode: ProfileHomeFeedDiagnosticFailureCodeSchema.optional(),
   })
   .strict();
 
@@ -142,7 +187,7 @@ export const ProfileHomeFeedDiagnosticSummarySchema = z
     capture: ProfileHomeFeedDiagnosticSummaryCaptureCountersSchema.optional(),
     captureStage:
       ProfileHomeFeedDiagnosticSummaryCaptureStageSchema.optional(),
-    captureFinalPageUrl: NonEmptyStringSchema.optional(),
+    capturePageState: ProfileHomeFeedDiagnosticPageStateSchema.optional(),
     captureLoginRedirectSuspected: z.boolean().optional(),
     extractor:
       ProfileHomeFeedDiagnosticSummaryExtractorCountersSchema.optional(),
@@ -167,7 +212,9 @@ export type ProfileHomeFeedDiagnosticSummary = {
   readonly captureStage?:
     | ProfileHomeFeedDiagnosticSummaryCaptureStage
     | undefined;
-  readonly captureFinalPageUrl?: string | undefined;
+  readonly capturePageState?:
+    | ProfileHomeFeedDiagnosticPageState
+    | undefined;
   readonly captureLoginRedirectSuspected?: boolean | undefined;
   readonly extractor?:
     | {
@@ -184,7 +231,9 @@ export type ProfileHomeFeedDiagnosticSummary = {
         readonly failureStage?:
           | ProfileHomeFeedDiagnosticSummaryFailureStage
           | undefined;
-        readonly failureCode?: string | undefined;
+        readonly failureCode?:
+          | ProfileHomeFeedDiagnosticFailureCode
+          | undefined;
       }
     | undefined;
 };

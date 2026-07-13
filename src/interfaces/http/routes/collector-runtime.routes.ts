@@ -1088,8 +1088,8 @@ function cloneDiagnostics(
     ...(diagnostics.captureStage !== undefined
       ? { captureStage: diagnostics.captureStage }
       : {}),
-    ...(diagnostics.captureFinalPageUrl !== undefined
-      ? { captureFinalPageUrl: diagnostics.captureFinalPageUrl }
+    ...(diagnostics.capturePageState !== undefined
+      ? { capturePageState: diagnostics.capturePageState }
       : {}),
     ...(diagnostics.captureLoginRedirectSuspected !== undefined
       ? {

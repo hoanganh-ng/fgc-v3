@@ -187,6 +187,16 @@ const PROFILE_HOME_FEED_CAPTURE_STAGE_LABELS: Record<
   INTERRUPTED: "Capture interrupted",
 };
 
+const PROFILE_HOME_FEED_PAGE_STATE_LABELS: Record<
+  NonNullable<ProfileHomeFeedDiagnosticSummary["capturePageState"]>,
+  string
+> = {
+  HOME_FEED: "Home feed",
+  LOGIN: "Login wall",
+  CHECKPOINT: "Checkpoint wall",
+  OTHER: "Other",
+};
+
 const PROFILE_HOME_FEED_FAILURE_STAGE_LABELS: Record<
   ProfileHomeFeedDiagnosticFailureStage,
   string
@@ -212,6 +222,12 @@ export function getProfileHomeFeedDiagnosticCaptureStageLabel(
   stage: NonNullable<ProfileHomeFeedDiagnosticSummary["captureStage"]>,
 ): string {
   return PROFILE_HOME_FEED_CAPTURE_STAGE_LABELS[stage];
+}
+
+export function getProfileHomeFeedDiagnosticPageStateLabel(
+  pageState: NonNullable<ProfileHomeFeedDiagnosticSummary["capturePageState"]>,
+): string {
+  return PROFILE_HOME_FEED_PAGE_STATE_LABELS[pageState];
 }
 
 export function getProfileHomeFeedDiagnosticFailureStageLabel(
@@ -312,7 +328,7 @@ export function hasProfileHomeFeedDiagnosticData(
   return (
     diagnostics.capture !== undefined ||
     diagnostics.captureStage !== undefined ||
-    diagnostics.captureFinalPageUrl !== undefined ||
+    diagnostics.capturePageState !== undefined ||
     diagnostics.captureLoginRedirectSuspected !== undefined ||
     diagnostics.extractor !== undefined ||
     (diagnostics.warningCounts !== undefined &&

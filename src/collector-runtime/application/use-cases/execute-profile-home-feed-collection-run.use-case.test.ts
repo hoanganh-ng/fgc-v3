@@ -803,9 +803,7 @@ describe("ExecuteProfileHomeFeedCollectionRunUseCase", () => {
       parseFailureCount: 1,
       totalPayloadsPassedToExtractor: 2,
     });
-    expect(diagnostics?.captureFinalPageUrl).toBe(
-      "https://www.facebook.com/",
-    );
+    expect(diagnostics?.capturePageState).toBe("HOME_FEED");
     expect(diagnostics?.extractor).toEqual({
       extractedCandidateCount: 0,
       deduplicatedCandidateCount: 0,
@@ -846,11 +844,9 @@ describe("ExecuteProfileHomeFeedCollectionRunUseCase", () => {
     expect(diagnostics?.captureStage).toBe("CAPTURE_FAILED");
     expect(diagnostics?.runOutcome).toEqual({
       failureStage: "CAPTURE",
-      failureCode: "LOGIN_REQUIRED",
+      failureCode: "HOME_FEED_CAPTURE_AUTH_REQUIRED",
     });
-    expect(diagnostics?.captureFinalPageUrl).toBe(
-      "https://www.facebook.com/login/",
-    );
+    expect(diagnostics?.capturePageState).toBe("LOGIN");
     expect(diagnostics?.captureLoginRedirectSuspected).toBe(true);
   });
 
@@ -922,6 +918,151 @@ describe("ExecuteProfileHomeFeedCollectionRunUseCase", () => {
     expect(diagnostics?.runOutcome).toEqual({
       failureStage: "PARTIAL",
       failureCode: "HOME_FEED_EXECUTION_PARTIAL_FAILURE",
+    });
+  });
+
+  it("overwrites runOutcome to LEASE_RELEASE when lease release fails after a successful run", async () => {
+    const ctx = await createContext({
+      capturedPayloads: [{ capturedAt: new Date(createdAt), payload: {} }],
+      extractions: [
+        {
+          valid: true,
+          candidates: [
+            createCandidate({ externalPostId: "p-1" }),
+          ],
+          warnings: [],
+        },
+      ],
+    });
+    ctx.lease.releaseResult = { ok: false, errorCode: "RELEASE_FAILED", errorMessage: "Release failed." };
+
+    const result = await ctx.useCase.execute({ runId: ctx.runId });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.failureReason?.code).toBe("HOME_FEED_LEASE_RELEASE_FAILED");
+    const diagnostics = result.diagnostics as
+      | ProfileHomeFeedDiagnosticSummary
+      | undefined;
+    expect(diagnostics?.runOutcome).toEqual({
+      failureStage: "LEASE_RELEASE",
+      failureCode: "HOME_FEED_LEASE_RELEASE_FAILED",
+    });
+  });
+
+  it("overwrites runOutcome to LEASE_RELEASE when lease release fails after interruption", async () => {
+    const abortController = new AbortController();
+    const ctx = await createContext();
+    ctx.lease.releaseResult = { ok: false, errorCode: "RELEASE_FAILED", errorMessage: "Release failed." };
+    ctx.capture.next = () => {
+      abortController.abort();
+      return Promise.resolve({
+        ok: true,
+        capturedPayloads: [{ capturedAt: new Date(createdAt), payload: {} }],
+        warnings: [],
+      });
+    };
+    const extractor = new ScriptedExtractor([
+      {
+        valid: true,
+        candidates: [createCandidate({ externalPostId: "p-1" })],
+        warnings: [],
+      },
+    ]);
+    // Replace the use case with one that has the abort-triggering capture port.
+    const useCase = new ExecuteProfileHomeFeedCollectionRunUseCase(
+      ctx.runs,
+      new MarkProfileHomeFeedCollectionRunSucceededUseCase(ctx.runs, ctx.clock),
+      new MarkProfileHomeFeedCollectionRunFailedUseCase(ctx.runs, ctx.clock),
+      ctx.checkout,
+      ctx.lease,
+      ctx.capture,
+      ctx.publisher,
+      ctx.submission,
+      extractor,
+      ctx.clock,
+    );
+
+    const result = await useCase.execute({
+      runId: ctx.runId,
+      abortSignal: abortController.signal,
+    });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.failureReason?.code).toBe("HOME_FEED_LEASE_RELEASE_FAILED");
+    const diagnostics = result.diagnostics as
+      | ProfileHomeFeedDiagnosticSummary
+      | undefined;
+    expect(diagnostics?.runOutcome).toEqual({
+      failureStage: "LEASE_RELEASE",
+      failureCode: "HOME_FEED_LEASE_RELEASE_FAILED",
+    });
+  });
+
+  it("overwrites runOutcome to LEASE_RELEASE when lease release fails after a checkout profile mismatch", async () => {
+    const ctx = await createContext();
+    ctx.checkout.next = {
+      ok: true,
+      profileId: "different-profile",
+      accountStage: "WARMING",
+      leaseId: "lease-1",
+    };
+    ctx.lease.releaseResult = { ok: false, errorCode: "RELEASE_FAILED", errorMessage: "Release failed." };
+
+    const result = await ctx.useCase.execute({ runId: ctx.runId });
+
+    expect(result.status).toBe("FAILED");
+    expect(result.failureReason?.code).toBe("HOME_FEED_LEASE_RELEASE_FAILED");
+    const diagnostics = result.diagnostics as
+      | ProfileHomeFeedDiagnosticSummary
+      | undefined;
+    expect(diagnostics?.runOutcome).toEqual({
+      failureStage: "LEASE_RELEASE",
+      failureCode: "HOME_FEED_LEASE_RELEASE_FAILED",
+    });
+  });
+
+  it("separates executor-level cross-payload dedup from raw extractor output", async () => {
+    const ctx = await createContext({
+      capturedPayloads: [
+        { capturedAt: new Date(createdAt), payload: { a: 1 } },
+        { capturedAt: new Date(createdAt), payload: { b: 2 } },
+      ],
+      extractions: [
+        {
+          valid: true,
+          candidates: [
+            createCandidate({ externalPostId: "p-shared" }),
+          ],
+          warnings: [],
+        },
+        {
+          valid: true,
+          candidates: [
+            createCandidate({ externalPostId: "p-shared" }),
+            createCandidate({ externalPostId: "p-extra" }),
+          ],
+          warnings: [],
+        },
+      ],
+    });
+    ctx.capture.next = {
+      ok: true,
+      capturedPayloads: [
+        { capturedAt: new Date(createdAt), payload: { a: 1 } },
+        { capturedAt: new Date(createdAt), payload: { b: 2 } },
+      ],
+      warnings: [],
+    };
+
+    const result = await ctx.useCase.execute({ runId: ctx.runId });
+
+    expect(result.status).toBe("SUCCEEDED");
+    const diagnostics = result.diagnostics as
+      | ProfileHomeFeedDiagnosticSummary
+      | undefined;
+    expect(diagnostics?.extractor).toEqual({
+      extractedCandidateCount: 3,
+      deduplicatedCandidateCount: 2,
     });
   });
 });

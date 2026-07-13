@@ -1,14 +1,14 @@
 import type { FacebookPayloadCaptureDiagnostics } from "./collector-runtime.ports";
 import {
   PROFILE_HOME_FEED_DIAGNOSTIC_WARNING_CODES,
+  type ProfileHomeFeedDiagnosticFailureCode,
+  type ProfileHomeFeedDiagnosticPageState,
   type ProfileHomeFeedDiagnosticSummary,
   type ProfileHomeFeedDiagnosticSummaryFailureStage,
   type ProfileHomeFeedDiagnosticWarningCode,
 } from "../domain";
 import type { FacebookHomeFeedExtractionWarning } from "../platform-extractors/facebook";
 import { PROFILE_HOME_FEED_DIAGNOSTIC_SUMMARY_SCHEMA_VERSION } from "../domain/profile-home-feed-diagnostic-summary";
-
-const NonNegativeIntegerSchemaPattern = /^\d+$/u;
 
 const KNOWN_WARNING_CODES = new Set<string>(
   PROFILE_HOME_FEED_DIAGNOSTIC_WARNING_CODES,
@@ -32,25 +32,6 @@ function sanitizeOptionalString(value: string | undefined): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function sanitizeSanitizedUrl(value: string | undefined): string | undefined {
-  const trimmed = sanitizeOptionalString(value);
-  if (trimmed === undefined) {
-    return undefined;
-  }
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-      return `${parsed.origin}${parsed.pathname}`;
-    }
-    if (parsed.protocol === "about:") {
-      return `${parsed.protocol}${parsed.pathname}`;
-    }
-    return undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 interface MutableCaptureCounters {
   pageContextFetchCaptureCount?: number;
   pageContextXhrCaptureCount?: number;
@@ -72,14 +53,14 @@ export interface MutableProfileHomeFeedDiagnosticSummary {
     | "SUCCEEDED"
     | "CAPTURE_FAILED"
     | "INTERRUPTED";
-  captureFinalPageUrl?: string;
+  capturePageState?: ProfileHomeFeedDiagnosticPageState;
   captureLoginRedirectSuspected?: boolean;
   extractor?: MutableExtractorCounters;
   warningCounts: Map<ProfileHomeFeedDiagnosticWarningCode, number>;
   unsupportedPayloadCount?: number;
   runOutcome: {
     failureStage?: ProfileHomeFeedDiagnosticSummaryFailureStage;
-    failureCode?: string;
+    failureCode?: ProfileHomeFeedDiagnosticFailureCode;
   };
 }
 
@@ -100,8 +81,14 @@ export function recordCaptureSucceeded(
   summary: MutableProfileHomeFeedDiagnosticSummary,
   diagnostics: FacebookPayloadCaptureDiagnostics | undefined,
   payloadCount: number,
+  pageState?: ProfileHomeFeedDiagnosticPageState,
 ): void {
   summary.captureStage = "SUCCEEDED";
+  if (pageState !== undefined) {
+    summary.capturePageState = pageState;
+  } else if (summary.capturePageState === undefined) {
+    summary.capturePageState = "HOME_FEED";
+  }
   if (diagnostics === undefined) {
     return;
   }
@@ -113,22 +100,21 @@ export function recordCaptureSucceeded(
     totalPayloadsPassedToExtractor: payloadCount,
   };
   summary.captureLoginRedirectSuspected = diagnostics.loginRedirectSuspected;
-  const sanitized = sanitizeSanitizedUrl(diagnostics.finalPageUrl);
-  if (sanitized !== undefined) {
-    summary.captureFinalPageUrl = sanitized;
-  }
 }
 
 export function recordCaptureFailed(
   summary: MutableProfileHomeFeedDiagnosticSummary,
   diagnostics: FacebookPayloadCaptureDiagnostics | undefined,
-  errorCode: string,
+  failureCode: ProfileHomeFeedDiagnosticFailureCode,
+  pageState?: ProfileHomeFeedDiagnosticPageState,
 ): void {
   summary.captureStage = "CAPTURE_FAILED";
-  summary.runOutcome = {
-    failureStage: "CAPTURE",
-    failureCode: errorCode,
-  };
+  summary.runOutcome = { failureStage: "CAPTURE", failureCode };
+  if (pageState !== undefined) {
+    summary.capturePageState = pageState;
+  } else if (summary.capturePageState === undefined) {
+    summary.capturePageState = "OTHER";
+  }
   if (diagnostics !== undefined) {
     summary.capture = {
       pageContextFetchCaptureCount: diagnostics.pageContextFetchCaptureCount,
@@ -138,10 +124,6 @@ export function recordCaptureFailed(
       totalPayloadsPassedToExtractor: diagnostics.totalPayloadsPassedToExtractor,
     };
     summary.captureLoginRedirectSuspected = diagnostics.loginRedirectSuspected;
-    const sanitized = sanitizeSanitizedUrl(diagnostics.finalPageUrl);
-    if (sanitized !== undefined) {
-      summary.captureFinalPageUrl = sanitized;
-    }
   }
 }
 
@@ -154,6 +136,9 @@ export function recordCaptureInterrupted(
     failureStage: "INTERRUPTED",
     failureCode: "HOME_FEED_EXECUTION_INTERRUPTED",
   };
+  if (summary.capturePageState === undefined) {
+    summary.capturePageState = "OTHER";
+  }
   if (diagnostics !== undefined) {
     summary.capture = {
       pageContextFetchCaptureCount: diagnostics.pageContextFetchCaptureCount,
@@ -163,26 +148,22 @@ export function recordCaptureInterrupted(
       totalPayloadsPassedToExtractor: diagnostics.totalPayloadsPassedToExtractor,
     };
     summary.captureLoginRedirectSuspected = diagnostics.loginRedirectSuspected;
-    const sanitized = sanitizeSanitizedUrl(diagnostics.finalPageUrl);
-    if (sanitized !== undefined) {
-      summary.captureFinalPageUrl = sanitized;
-    }
   }
 }
 
 export function recordExtractionResult(
   summary: MutableProfileHomeFeedDiagnosticSummary,
   input: {
-    readonly acceptedCount: number;
+    readonly extractedCount: number;
     readonly deduplicatedAfterCaptureCount: number;
     readonly warnings: readonly FacebookHomeFeedExtractionWarning[];
   },
 ): void {
-  if (isNonNegativeInteger(input.acceptedCount)) {
+  if (isNonNegativeInteger(input.extractedCount)) {
     summary.extractor = {
       ...(summary.extractor ?? {}),
       extractedCandidateCount:
-        (summary.extractor?.extractedCandidateCount ?? 0) + input.acceptedCount,
+        (summary.extractor?.extractedCandidateCount ?? 0) + input.extractedCount,
       deduplicatedCandidateCount:
         (summary.extractor?.deduplicatedCandidateCount ?? 0) +
         input.deduplicatedAfterCaptureCount,
@@ -207,7 +188,7 @@ export function recordExtractionResult(
 export function recordFailureStage(
   summary: MutableProfileHomeFeedDiagnosticSummary,
   stage: ProfileHomeFeedDiagnosticSummaryFailureStage,
-  code: string,
+  code: ProfileHomeFeedDiagnosticFailureCode,
 ): void {
   summary.runOutcome = { failureStage: stage, failureCode: code };
 }
@@ -273,28 +254,32 @@ export function finalizeDiagnosticSummary(
         };
 
   const warningCounts: Partial<
-    Record<ProfileHomeFeedDiagnosticWarningCode, number>
+    Record<ProfileHomeFeedDiagnosticWarningCode, number | undefined>
   > = {};
   for (const [code, value] of summary.warningCounts) {
-    if (isNonNegativeInteger(value)) {
+    if (isNonNegativeInteger(value) && value > 0) {
       warningCounts[code] = value;
     }
   }
 
-  const runOutcome: { failureStage?: string; failureCode?: string } = {};
+  const runOutcome: {
+    failureStage?: ProfileHomeFeedDiagnosticSummaryFailureStage;
+    failureCode?: ProfileHomeFeedDiagnosticFailureCode;
+  } = {};
   if (summary.runOutcome.failureStage !== undefined) {
     runOutcome.failureStage = summary.runOutcome.failureStage;
   }
-  const failureCode = sanitizeOptionalString(summary.runOutcome.failureCode);
-  if (failureCode !== undefined) {
-    runOutcome.failureCode = failureCode;
+  if (summary.runOutcome.failureCode !== undefined) {
+    runOutcome.failureCode = summary.runOutcome.failureCode;
   }
 
   const finalized: {
     schemaVersion: 1;
     capture?: typeof capture;
     captureStage?: MutableProfileHomeFeedDiagnosticSummary["captureStage"];
-    captureFinalPageUrl?: string;
+    capturePageState?:
+      | MutableProfileHomeFeedDiagnosticSummary["capturePageState"]
+      | undefined;
     captureLoginRedirectSuspected?: boolean;
     extractor?: typeof extractor;
     warningCounts?: typeof warningCounts;
@@ -310,9 +295,8 @@ export function finalizeDiagnosticSummary(
   if (summary.captureStage !== undefined) {
     finalized.captureStage = summary.captureStage;
   }
-  const sanitizedUrl = sanitizeSanitizedUrl(summary.captureFinalPageUrl);
-  if (sanitizedUrl !== undefined) {
-    finalized.captureFinalPageUrl = sanitizedUrl;
+  if (summary.capturePageState !== undefined) {
+    finalized.capturePageState = summary.capturePageState;
   }
   if (typeof summary.captureLoginRedirectSuspected === "boolean") {
     finalized.captureLoginRedirectSuspected =
@@ -324,7 +308,10 @@ export function finalizeDiagnosticSummary(
   if (Object.keys(warningCounts).length > 0) {
     finalized.warningCounts = warningCounts;
   }
-  if (isNonNegativeInteger(summary.unsupportedPayloadCount) && summary.unsupportedPayloadCount > 0) {
+  if (
+    isNonNegativeInteger(summary.unsupportedPayloadCount) &&
+    summary.unsupportedPayloadCount > 0
+  ) {
     finalized.unsupportedPayloadCount = summary.unsupportedPayloadCount;
   }
   if (Object.keys(runOutcome).length > 0) {
@@ -332,4 +319,55 @@ export function finalizeDiagnosticSummary(
   }
 
   return finalized as unknown as ProfileHomeFeedDiagnosticSummary;
+}
+
+/**
+ * Map an arbitrary upstream capture-port error code to a safe
+ * allowlisted diagnostic failure code. Unknown values fall back to
+ * `HOME_FEED_CAPTURE_FAILED`; the original code is never copied
+ * through into persistence, HTTP, UI, or operator logs.
+ */
+export function mapCaptureErrorCodeToFailureCode(
+  upstreamErrorCode: string,
+): ProfileHomeFeedDiagnosticFailureCode {
+  switch (upstreamErrorCode) {
+    case "LOGIN_REQUIRED":
+      return "HOME_FEED_CAPTURE_AUTH_REQUIRED";
+    case "CHECKPOINT_REQUIRED":
+      return "HOME_FEED_CAPTURE_AUTH_REQUIRED";
+    case "RUNTIME_PROFILE_CONFIGURATION_FAILED":
+    case "RUNTIME_PROFILE_CONFIGURATION_MISMATCH":
+    case "FACEBOOK_HOME_FEED_NAVIGATION_FAILED":
+    case "FACEBOOK_BROWSER_CAPTURE_INTERRUPTED":
+    case "HOME_FEED_CAPTURE_PORT_ERROR":
+    default:
+      return "HOME_FEED_CAPTURE_FAILED";
+  }
+}
+
+/**
+ * Map a page-state observation to an allowlisted diagnostic page
+ * state. The original observation is never copied through into
+ * persistence, HTTP, UI, or operator logs.
+ */
+export function mapToPageState(
+  value: string | undefined,
+): ProfileHomeFeedDiagnosticPageState {
+  if (value === undefined) {
+    return "OTHER";
+  }
+  const normalized = value.trim().toUpperCase();
+  if (normalized === "HOME_FEED" || normalized === "NONE_DETECTED") {
+    return "HOME_FEED";
+  }
+  if (normalized === "LOGIN" || normalized === "LOGIN_REQUIRED") {
+    return "LOGIN";
+  }
+  if (
+    normalized === "CHECKPOINT" ||
+    normalized === "CHECKPOINT_REQUIRED"
+  ) {
+    return "CHECKPOINT";
+  }
+  return "OTHER";
 }

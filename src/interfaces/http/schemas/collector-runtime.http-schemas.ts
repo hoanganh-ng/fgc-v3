@@ -18,6 +18,8 @@ import {
   PROFILE_HOME_FEED_COLLECTION_RUN_FAILURE_STAGES,
   PROFILE_HOME_FEED_COLLECTION_RUN_CAPTURE_STAGES,
   PROFILE_HOME_FEED_DIAGNOSTIC_WARNING_CODES,
+  PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_CODES,
+  PROFILE_HOME_FEED_DIAGNOSTIC_PAGE_STATES,
   ProfileHomeFeedCollectionRunIdSchema,
   ProfileHomeFeedCollectionRunProfileIdSchema,
   ProfileHomeFeedCollectionRunStatusSchema,
@@ -1244,7 +1246,7 @@ const profileHomeFeedDiagnosticExtractorCountersJsonSchema = {
 
 const profileHomeFeedDiagnosticWarningCountsJsonSchema = {
   type: "object",
-  additionalProperties: { type: "integer", minimum: 0 },
+  additionalProperties: false,
   properties: Object.fromEntries(
     PROFILE_HOME_FEED_DIAGNOSTIC_WARNING_CODES.map((code) => [
       code,
@@ -1261,7 +1263,10 @@ const profileHomeFeedDiagnosticRunOutcomeJsonSchema = {
       type: "string",
       enum: PROFILE_HOME_FEED_COLLECTION_RUN_FAILURE_STAGES,
     },
-    failureCode: nonEmptyStringJsonSchema,
+    failureCode: {
+      type: "string",
+      enum: PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_CODES,
+    },
   },
 } as const;
 
@@ -1276,7 +1281,10 @@ const profileHomeFeedDiagnosticSummaryJsonSchema = {
       type: "string",
       enum: PROFILE_HOME_FEED_COLLECTION_RUN_CAPTURE_STAGES,
     },
-    captureFinalPageUrl: nonEmptyStringJsonSchema,
+    capturePageState: {
+      type: "string",
+      enum: PROFILE_HOME_FEED_DIAGNOSTIC_PAGE_STATES,
+    },
     captureLoginRedirectSuspected: { type: "boolean" },
     extractor: profileHomeFeedDiagnosticExtractorCountersJsonSchema,
     warningCounts: profileHomeFeedDiagnosticWarningCountsJsonSchema,

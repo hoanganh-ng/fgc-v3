@@ -296,6 +296,9 @@ function formatDiagnosticLines(
   if (diagnostics.captureStage !== undefined) {
     lines.push(`- Capture stage: ${diagnostics.captureStage}`);
   }
+  if (diagnostics.capturePageState !== undefined) {
+    lines.push(`- Capture page state: ${diagnostics.capturePageState}`);
+  }
   if (diagnostics.capture?.pageContextFetchCaptureCount !== undefined) {
     lines.push(
       `- Page context fetch captures: ${diagnostics.capture.pageContextFetchCaptureCount}`,
@@ -322,9 +325,6 @@ function formatDiagnosticLines(
   if (diagnostics.captureLoginRedirectSuspected === true) {
     lines.push("- Login redirect suspected during capture");
   }
-  if (diagnostics.captureFinalPageUrl !== undefined) {
-    lines.push(`- Capture final page URL: ${diagnostics.captureFinalPageUrl}`);
-  }
   if (diagnostics.extractor?.extractedCandidateCount !== undefined) {
     lines.push(
       `- Extracted candidates: ${diagnostics.extractor.extractedCandidateCount}`,
@@ -332,7 +332,7 @@ function formatDiagnosticLines(
   }
   if (diagnostics.extractor?.deduplicatedCandidateCount !== undefined) {
     lines.push(
-      `- After extractor dedup: ${diagnostics.extractor.deduplicatedCandidateCount}`,
+      `- After executor-level cross-payload dedup: ${diagnostics.extractor.deduplicatedCandidateCount}`,
     );
   }
   if (diagnostics.unsupportedPayloadCount !== undefined) {
