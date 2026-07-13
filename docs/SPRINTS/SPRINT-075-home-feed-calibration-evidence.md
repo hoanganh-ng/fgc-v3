@@ -2,9 +2,8 @@
 
 ## Status
 
-Required Evidence Packet complete. Stage classified as `EXTRACTION`;
-operator-assisted fixture acquisition is authorized and fixture admission
-remains pending.
+Required Evidence Packet complete. Stage classified as `EXTRACTION`; the
+sanitized fixture is admitted and narrow extractor calibration is authorized.
 
 This file is the safe evidence handoff for Sprint 075. It records aggregate
 values from the existing run summary and Sprint 074 diagnostics only. No run or
@@ -78,12 +77,12 @@ content submission were not reached because extraction yielded no candidates.
 
 ## Sanitized Fixture Admission
 
-Fixture acquisition complete; awaiting Architect/Product Owner admission before
-extractor calibration.
+Fixture acquisition and Architect review complete. The sanitized fixture is
+admitted for narrow extractor calibration.
 
 ```text
 fixturePath: src/collector-runtime/platform-extractors/facebook/__fixtures__/sanitized-realshape-home-feed-group-text-post.fixture.ts
-diagnosedWarningOrGap: Eligible configured-group Story is classified GROUP via comet_sections.action_link.group but only carries a generic GraphQL id, so extraction emits MISSING_STABLE_PUBLISHER_ID and zero candidates.
+diagnosedWarningOrGap: Eligible configured-group Story contains explicitly type-qualified Group publisher objects with GraphQL node ids on demonstrated paths, but the extractor ignores those ids and emits MISSING_STABLE_PUBLISHER_ID with zero candidates.
 expectedEligibleCandidateCount: at least 1
 expectedPublisherKind: GROUP
 expectedWarningBehavior: Unchanged extractor yields zero candidates with MISSING_STABLE_PUBLISHER_ID (publisherKind GROUP) on the root Story; nested content story paths may also warn UNKNOWN_PUBLISHER_KIND.
@@ -105,9 +104,10 @@ Sanitization confirmation:
 Sanitization note:
 `src/collector-runtime/platform-extractors/facebook/__fixtures__/sanitized-realshape-home-feed-group-text-post.md`.
 
-No raw payload or HAR export is admitted by this evidence packet. Extractor
-implementation remains blocked until this sanitized fixture is reviewed and
-admitted.
+No raw payload or HAR export is admitted by this evidence packet. Calibration
+may use `id` only from explicitly type-qualified `Group` objects on the
+fixture-demonstrated publisher paths. Arbitrary object ids, actor/user ids, and
+unqualified `target_group.id` remain ineligible.
 
 ## Before/After Evidence
 
@@ -124,6 +124,6 @@ afterLiveRunSafeSummary:
 ## Review Decision
 
 ```text
-decision: FIXTURE_ACQUISITION_AUTHORIZED
-reviewNotes: Extraction is the confirmed responsible layer. Execute the bounded Sprint 075A handoff on the Product Owner's dev stack and logged-in profile; do not change the extractor until the sanitized fixture is reviewed and admitted.
+decision: FIXTURE_ADMITTED_IMPLEMENTATION_AUTHORIZED
+reviewNotes: Commit 765ccad is limited to the sanitized fixture, note, fixture index, focused failing test, and evidence. No proxy-bypass or runtime code was committed. Implement only the type-qualified Group id rule on fixture-demonstrated publisher paths; preserve all unqualified-id exclusions.
 ```
