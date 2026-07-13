@@ -2,9 +2,9 @@
 
 ## Status
 
-Active. The Required Evidence Packet classifies the gap as `EXTRACTION`.
-Operator-assisted fixture acquisition is authorized; extractor implementation
-remains blocked until the resulting sanitized fixture is reviewed and admitted.
+Active. The Required Evidence Packet classifies the gap as `EXTRACTION`, and
+the sanitized real-shape group-text-post fixture is admitted. Narrow extractor
+calibration against that fixture is authorized.
 
 ## Goal
 
@@ -101,9 +101,9 @@ authority covers one headed collection run, minimum relevant response
 inspection inside the operator-controlled environment, sanitization, fixture
 creation, fixture-safety verification, and one focused failing regression test.
 
-It does not authorize extractor or browser-capture changes. The Builder must
-stop after returning the Fixture Admission Report. Architect/Product Owner
-review must admit the fixture before extractor calibration begins.
+Sprint 075A did not authorize extractor or browser-capture changes and stopped
+with a Fixture Admission Report. That fixture has now passed Architect review;
+only the narrow Sprint 075 extractor calibration is authorized.
 
 ## Fixture Admission Gate
 
@@ -127,9 +127,23 @@ The fixture must:
 
 The raw source payload must never be committed, pasted into a sprint document,
 issue, chat, test output, or application log. Sanitization happens only in the
-operator-controlled environment. When Sprint 075A is explicitly handed off,
-the Builder may perform that bounded local sanitization workflow but must delete
-any temporary raw artifact and stop for fixture-admission review.
+operator-controlled environment. Sprint 075A completed that bounded workflow,
+deleted its temporary raw artifact, and committed only the reviewed sanitized
+fixture.
+
+### Admission decision
+
+The fixture in
+`src/collector-runtime/platform-extractors/facebook/__fixtures__/sanitized-realshape-home-feed-group-text-post.fixture.ts`
+is admitted for Sprint 075 calibration.
+
+The demonstrated publisher identity rule is deliberately narrow: a generic
+GraphQL `id` may be used as the external publisher ID only when it belongs to an
+object explicitly type-qualified as `Group` on a fixture-demonstrated publisher
+path such as `to` or `comet_sections.action_link.group`. Do not accept an
+arbitrary `id`, an actor/user `id`, or `target_group.id` without independent
+explicit `Group` qualification. Preserve the existing missing-stable-ID warning
+for all unqualified cases.
 
 ## Required Context
 
