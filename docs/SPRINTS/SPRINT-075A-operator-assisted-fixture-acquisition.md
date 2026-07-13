@@ -2,9 +2,10 @@
 
 ## Status
 
-Authorized as a bounded evidence-acquisition phase within active Sprint 075.
-This is not a new roadmap sprint. Extractor implementation remains blocked until
-the sanitized fixture produced here is reviewed and admitted.
+Complete. The bounded evidence-acquisition phase produced the sanitized
+real-shape fixture in commit `765ccad`; Architect review admitted it for narrow
+Sprint 075 extractor calibration. This remains a supporting phase, not a new
+roadmap sprint.
 
 ## User Authorization
 
