@@ -2,52 +2,59 @@
 
 ## Status
 
-Awaiting the first operator-driven run after Sprint 074 acceptance.
+Required Evidence Packet complete. Stage classified as `EXTRACTION`; sanitized
+fixture admission remains pending.
 
-This file is the safe evidence handoff for Sprint 075. Record aggregate values
-from the existing run summary and Sprint 074 diagnostics only. Do not paste raw
-payload material or sensitive runtime data here.
+This file is the safe evidence handoff for Sprint 075. It records aggregate
+values from the existing run summary and Sprint 074 diagnostics only. No run or
+profile identifier, raw payload material, or sensitive runtime data is retained
+here.
 
 ## Run Evidence
 
 ```text
 runDateUtc:
-terminalStatus:
-captureStage:
-capturePageState:
+terminalStatus: SUCCEEDED
+captureStage: SUCCEEDED
+capturePageState: HOME_FEED
 captureCounters:
-  pageContextFetchCaptureCount:
-  pageContextXhrCaptureCount:
-  networkListenerCaptureCount:
-  parseFailureCount:
-  totalPayloadsPassedToExtractor:
+  pageContextFetchCaptureCount: 0
+  pageContextXhrCaptureCount: 76
+  networkListenerCaptureCount: 77
+  parseFailureCount: 0
+  totalPayloadsPassedToExtractor: 77
 extractorCounters:
-  extractedCandidateCount:
-  deduplicatedCandidateCount:
+  extractedCandidateCount: 0
+  deduplicatedCandidateCount: 0
 warningCounts:
-unsupportedPayloadCount:
+  UNKNOWN_PUBLISHER_KIND: 105
+  UNSUPPORTED_PAYLOAD_SHAPE: 62
+  MISSING_STABLE_PUBLISHER_ID: 14
+  EXCLUDED_SPONSORED_POST: 6
+  SKIPPED_CANDIDATE_WITHOUT_POST_ID: 2
+unsupportedPayloadCount: 62
 runOutcome:
 existingRunSummary:
-  capturedPayloads:
-  extractorCandidates:
-  sourcePublishersObserved:
-  contentItemsSubmitted:
-  failedPublisherObservations:
-  failedContentSubmissions:
-  leaseReleased:
-operatorClassification:
+  capturedPayloads: 77
+  extractorCandidates: 0
+  sourcePublishersObserved: 0
+  contentItemsSubmitted: 0
+  failedPublisherObservations: 0
+  failedContentSubmissions: 0
+  leaseReleased: true
+operatorClassification: EXTRACTION
 ```
 
-Leave an unavailable field blank or remove it. Never substitute `0` unless the
-diagnostic surface explicitly reported zero.
+`runDateUtc` and `runOutcome` remain blank because the supplied safe summary
+did not include a UTC timestamp and the terminal run succeeded without a
+failure outcome. Reported zeroes are explicit diagnostic or run-summary values,
+not substitutions for unavailable facts.
 
 ## Stage Classification
 
-Choose exactly one after reviewing the safe values above:
-
 - [ ] `CAPTURE_OR_AUTH` — capture did not succeed or no payload reached the
   extractor; stop Sprint 075 extractor implementation.
-- [ ] `EXTRACTION` — payloads reached the extractor and warning/count evidence
+- [x] `EXTRACTION` — payloads reached the extractor and warning/count evidence
   identifies a supported-shape or rejection-path gap; fixture admission may
   proceed.
 - [ ] `DOWNSTREAM` — candidates were extracted but publisher observation or
@@ -60,20 +67,26 @@ Choose exactly one after reviewing the safe values above:
 Classification rationale:
 
 ```text
-
+During a headed operator run, at least one eligible, non-sponsored text post
+from a configured Facebook group was visibly present. Capture succeeded, 77
+payloads reached the extractor, and no parse failures occurred. The extractor
+nevertheless produced zero candidates. The dominant warnings were
+UNKNOWN_PUBLISHER_KIND and UNSUPPORTED_PAYLOAD_SHAPE. Publisher observation and
+content submission were not reached because extraction yielded no candidates.
 ```
 
 ## Sanitized Fixture Admission
 
-Complete this section only when the classification is `EXTRACTION`.
+Classification permits fixture preparation, but the admission gate is not yet
+satisfied.
 
 ```text
-fixturePath:
-diagnosedWarningOrGap:
-expectedEligibleCandidateCount:
-expectedPublisherKind:
-expectedWarningBehavior:
-structuralPathsPreserved:
+fixturePath: pending
+diagnosedWarningOrGap: Current eligible home-feed group-post shape is not recognized; exact structural path awaits a sanitized fixture.
+expectedEligibleCandidateCount: at least 1
+expectedPublisherKind: GROUP
+expectedWarningBehavior: The admitted fixture must reproduce the current zero-candidate behavior before calibration.
+structuralPathsPreserved: pending
 ```
 
 Sanitization confirmation:
@@ -87,6 +100,10 @@ Sanitization confirmation:
   HTML, private response bodies, or stack traces remain.
 - [ ] The original raw payload is not committed, pasted into documentation,
   included in test output, or logged.
+
+No raw payload or HAR export is admitted by this evidence packet. Extractor
+implementation remains blocked until a sanitized fixture is reviewed and every
+sanitization confirmation above is satisfied.
 
 ## Before/After Evidence
 
@@ -103,6 +120,6 @@ afterLiveRunSafeSummary:
 ## Review Decision
 
 ```text
-decision: PENDING
-reviewNotes:
+decision: EVIDENCE_ACCEPTED_FIXTURE_PENDING
+reviewNotes: Extraction is the confirmed responsible layer. Do not change the extractor until the Sanitized Fixture Admission gate is complete.
 ```
