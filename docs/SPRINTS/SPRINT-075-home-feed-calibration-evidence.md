@@ -148,6 +148,15 @@ afterLiveRunSafeSummary:
 ## Review Decision
 
 ```text
-decision: FIXTURE_ADMITTED_IMPLEMENTATION_AUTHORIZED
-reviewNotes: Commit 765ccad is limited to the sanitized fixture, note, fixture index, focused failing test, and evidence. No proxy-bypass or runtime code was committed. Implement only the type-qualified Group id rule on fixture-demonstrated publisher paths; preserve all unqualified-id exclusions.
+decision: PRODUCT_OWNER_CHANGES_REQUIRED
+reviewedImplementationCommit: 6ee4b53
+acceptedEvidence: Focused test changed from 0 to 1 GROUP candidate; focused suite, typecheck, and full unit suite passed; repeated live run improved from 0 to 5 candidates with no MISSING_STABLE_PUBLISHER_ID.
+blockingFinding: The implementation accepts id from any explicitly type-qualified Group object reached through recursive publisher-container discovery because extractStablePublisherId does not receive or validate PublisherReference.path. The documented restriction to $.to and $.comet_sections.action_link.group is therefore not enforced.
+requiredCorrection: Pass the publisher-reference path into stable-id resolution and permit the GraphQL id fallback only for explicitly type-qualified Group objects at exactly $.to or $.comet_sections.action_link.group relative to the candidate Story.
+requiredNegativeTests: Prove that an explicitly type-qualified Group plus id is still rejected with MISSING_STABLE_PUBLISHER_ID when placed under (1) a non-demonstrated generic publisher container and (2) an unrelated nested group key. Preserve the existing kind-only rejection test.
+scope: Extractor implementation and focused extractor tests only. Do not repeat the live run unless the correction changes the admitted positive fixture result or diagnostics.
 ```
+
+Sprint 075 remains active and is not accepted. The successful live-run evidence is
+retained; Product Owner review resumes after the narrow path-enforcement
+correction and required negative tests pass.
