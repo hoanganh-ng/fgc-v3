@@ -17,15 +17,46 @@ The project has enough Content Collector foundation to focus on proving one oper
 
 Content Builder Transform Types, Content Briefs, Producers, Producer Sets, artifacts, LLM execution, prompt versioning, collected-content selection, and Content Publisher behavior are parked until the feed collector loop is validated.
 
+The priority is actual working behavior as soon as possible: explain current
+home-feed outcomes, calibrate only from real diagnostic evidence, validate the
+complete loop repeatedly, then lock the Collector baseline and move directly to
+Content Builder discovery.
+
 ## Current Active Sprint
 
-Sprint 074 — Home Feed Extraction Diagnostics is **active**.
+Sprint 075 — Real-Shape Home Feed Extractor Calibration is **active, with
+evidence intake pending**.
 
-The goal is to make profile home-feed collection runs explain their result safely before changing extractor behavior. The sprint should surface safe capture diagnostics and aggregated warning/count summaries so an operator can understand why a run produced zero or few candidates without exposing raw Facebook payloads or sensitive runtime data.
+Sprint 074 is accepted and profile home-feed runs now retain and expose a
+strict, safe aggregate diagnostic summary. Sprint 075 uses that diagnostic
+surface to determine whether the current low-yield or zero-yield behavior is
+actually an extractor gap. Extractor implementation begins only after one
+operator-driven run provides a safe diagnostic packet and a sanitized fixture
+reproduces the confirmed real-shape failure.
 
-Sprint 074 must not change Facebook extraction behavior, browser capture behavior, profile checkout/leasing, HTTP contracts, database schemas/migrations, Content Builder internals, LLM execution, Content Briefs, Producers, artifacts, or Content Publisher behavior unless a later approved handoff explicitly narrows such a change.
+If diagnostics point to capture, checkout, leasing, publisher observation, or
+content submission, Sprint 075 stops without changing extraction and a narrow
+correction sprint is shaped at the responsible layer.
+
+The planned completion sequence is:
+
+- **Sprint 075 — Real-Shape Home Feed Extractor Calibration**: reproduce
+  confirmed failures with sanitized real-shape fixtures and make only the
+  evidence-backed extractor correction.
+- **Sprint 076 — Repeated Live Collector Validation**: complete at least five
+  live runs across multiple days, preferably with at least two profiles, and
+  evaluate reliability, usefulness, diagnostics, deduplication, lease release,
+  content review, and discovered-source review/promotion.
+- **Sprint 077 — Collector MVP Baseline Lock**: record the supported provider,
+  regression fixtures, limitations, recovery guidance, and smoke test, then
+  move active product development to Content Builder.
+
+If live validation reveals a blocking defect, a narrow correction sprint is
+inserted before acceptance rather than expanding the validation sprint.
 
 Sprint 073 — Product Scope Lock And Surface Trim is accepted.
+
+Sprint 074 — Home Feed Extraction Diagnostics is accepted.
 
 Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted.
 
@@ -43,14 +74,33 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 
 - **Profile Management**: profile creation, lifecycle, session ingestion, provisioning/reprovisioning, authentication health, checkout leasing, and trusted runtime profile configuration.
 - **Profile Behavior**: safe operator-driven account exercise / warm-up and authentication-health observation.
-- **Profile Feed Collection**: profile-bound home-feed run records with safe aggregate diagnostic summaries (capture counters, sanitized final URL, login-redirect flag, extractor counters, allowlisted warning-code histogram, failure stage/code), bounded browser execution through the existing browser provider boundary, payload capture, extraction, source-publisher observation, content submission, and safe run summaries.
+- **Profile Feed Collection**: profile-bound home-feed run records, bounded browser execution through the existing browser provider boundary, payload capture, extraction, source-publisher observation, content submission, safe run summaries, and strict aggregate diagnostics for capture, extraction, warnings, deduplication, and terminal failure stages.
 - **Content Management**: content categories, managed source groups, normalized content items, deduplication, review lifecycle, top comments, safe content preview/status APIs, discovered source identity, and approved group promotion into managed source groups.
 - **Web UI**: Profile Feed Collector MVP surfaces for profiles, profile feed runs, content items, source groups/categories, and discovered sources. Parked/advanced pages may remain routed but are hidden from primary navigation.
 - **Operator Commands**: canonical `pnpm operator:*` commands for provisioning, manual collection, workers, schedulers, browser probe, and the profile home-feed one-shot runner.
 
 ## Current Known Gaps
 
-- Home-feed runs need better safe diagnostics for zero-candidate or low-yield outcomes.
 - Manual live-Facebook validation of the profile home-feed path still needs operator execution and review.
-- Home-feed extractor fixture coverage exists, but real-shape calibration may still be needed after diagnostics reveal the failure reason.
+- The first Sprint 075 evidence packet has not yet established whether the next
+  defect belongs to capture, extraction, publisher observation, or submission.
+- Home-feed extractor fixture coverage exists, but any further calibration must
+  be justified by diagnostics and a sanitized real-shape regression fixture.
 - Content Builder and Content Publisher remain parked until the collector loop is validated.
+
+## Collector Completion Gate
+
+Before moving to Content Builder:
+
+- At least five live home-feed runs must be completed across multiple days,
+  preferably using at least two provisioned profiles.
+- Eligible feeds must repeatedly produce useful group/page content.
+- Zero-yield and failed runs must be safely explainable.
+- Duplicate posts must merge instead of creating duplicate review items.
+- Profile leases must release on the exercised terminal paths.
+- The Web UI must support run inspection, content review, discovered-source
+  review, and eligible group promotion.
+- No unresolved blocking defect may remain in the normal
+  home-feed-to-review loop.
+- Logs, DTOs, fixtures, docs, and UI must remain free of sensitive browser,
+  profile, and raw Facebook data.

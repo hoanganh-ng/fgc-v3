@@ -2,7 +2,7 @@
 
 ## Status
 
-Active, not accepted.
+Accepted.
 
 ## Goal
 
@@ -234,9 +234,32 @@ Sprint 074 is complete only when all of the following are demonstrated:
   results reported.
 - No live-Facebook success claim is made by this sprint.
 
-Product Owner review, not Builder implementation, determines acceptance. The
-`Active, not accepted` status is therefore intentional and does not block
-implementation.
+Product Owner review, not Builder implementation, determines acceptance. That
+review gate was satisfied by the decision below.
+
+## Acceptance Decision
+
+Accepted after Product Owner review of implementation commit `d2d3c4c`.
+
+The review confirmed:
+
+- safe diagnostics persist through success, failure, interruption, and lease
+  release failure paths;
+- extractor output and executor-level cross-payload deduplication counts have
+  distinct, truthful meanings;
+- warning keys, failure codes, page states, and HTTP fields are closed
+  allowlists;
+- URLs, upstream error codes, raw payloads, and other prohibited data do not
+  cross the diagnostic contract;
+- legacy rows with `NULL` diagnostics remain readable and render the explicit
+  unavailable state;
+- backend typecheck and the six focused Sprint 074 suites passed during review
+  (`94/94` focused tests).
+
+The initial unaccepted Sprint 074 diagnostic JSON shape must not be carried into
+a persistent deployment. Disposable development databases containing that
+shape should be recreated before deployment; the accepted schema is the only
+Sprint 074 persistence contract.
 
 ## Risks and Review Focus
 

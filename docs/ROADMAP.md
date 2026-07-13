@@ -2,179 +2,125 @@
 
 ## Current Product Direction
 
-The near-term product direction is the **Profile Feed Collector MVP**.
+The immediate product goal is a reliable **Facebook Profile Home-Feed Collector**.
 
-The project should focus on a small, operator-usable loop:
+The project must first prove one operator-usable loop:
 
-1. Persist collector profiles and authenticated sessions.
-2. Run safe profile behavior / warm-up when needed.
-3. Collect the authenticated Facebook profile home feed.
-4. Extract useful group/page text posts from captured feed payloads.
-5. Store normalized content items with categories and review status.
-6. Preview, select, reject, and mark content as used.
-7. Review discovered publishing sources.
-8. Promote approved Facebook group sources into managed source groups.
+1. Provision an authenticated collector profile.
+2. Request a profile home-feed collection run.
+3. Capture current Facebook home-feed payloads through bounded browser execution.
+4. Extract useful Facebook group/page text posts.
+5. Store or merge normalized content items.
+6. Review collected content and discovered sources in the Web UI.
+7. Promote approved Facebook group sources into paused managed source groups.
 
-This roadmap intentionally pauses broader Content Builder and Content Publisher expansion until the feed collector loop is validated against real captured payloads.
+Content Builder and Content Publisher remain parked until this loop is reliable, useful, explainable, and repeatable against live Facebook.
 
-## Product Scope Lock
+## Delivery Principle
 
-### Keep in the MVP
+Reach actual working behavior as soon as possible.
 
-- **Collector Profile Manager**
-  - Profile persistence.
-  - Session/provisioning persistence.
-  - Runtime profile configuration.
-  - Checkout/lease safety.
-  - Account readiness and authentication health.
+- Prefer manual, operator-driven validation before autonomous operation.
+- Change capture or extraction only when diagnostics and sanitized real-shape fixtures identify a concrete failure.
+- Use narrow correction sprints when live validation reveals a defect.
+- Do not expand scheduling, account exercise, source-group collection, Content Builder, or Content Publisher unless required to complete the home-feed loop.
+- Do not redesign established modules or remove parked code during this validation sequence.
 
-- **Profile Behavior**
-  - Safe operator-driven account exercise / warm-up behavior.
-  - Authentication health observation.
-  - No CAPTCHA solving, checkpoint bypass, credential automation, or unapproved social actions.
+## Collector Completion Gate
 
-- **Profile Feed Collector**
-  - Profile-bound Facebook home-feed run records.
-  - Bounded browser execution through the existing browser provider boundary.
-  - Payload capture through safe fetch/XHR/network capture.
-  - Extraction into normalized content candidates.
-  - Submission into Content Manager.
+The Collector MVP is ready to lock only when all of the following have evidence.
 
-- **Content Manager**
-  - Content categories.
-  - Managed source groups.
-  - Normalized content items.
-  - Content review lifecycle: `COLLECTED`, `SELECTED`, `REJECTED`, `USED`.
-  - Safe content preview and status update APIs.
-  - Discovered source identity (`SourcePublisher`) and approved group promotion into managed source groups.
+### Reliability
 
-- **Web UI**
-  - Profiles.
-  - Profile feed runs.
-  - Content items / preview queue.
-  - Content categories and managed groups.
-  - Discovered sources and promote-to-group flow.
+- At least five live home-feed runs have been completed on more than one day.
+- Preferably at least two provisioned profiles have been exercised.
+- Eligible feeds repeatedly produce useful content candidates.
+- Successful, failed, interrupted, and zero-yield outcomes are distinguishable.
+- Leases are released correctly on success, failure, and interruption.
+- Duplicate posts merge instead of creating duplicate review items.
 
-### Park for later
+### Content quality
 
-- Content Builder Transform Type catalog.
-- Content Briefs.
-- Producer graphs.
-- Producer Sets.
-- Artifacts as a product workflow.
-- LLM provider integration.
-- Prompt execution and prompt versioning.
-- Content Publisher / publication scheduling.
-- Broad scheduler/operator-control surfaces that are not required for manual feed collector validation.
+- Accepted posts have stable post identity, stable group/page publisher identity, and meaningful body text.
+- Sponsored posts and personal-profile posts are excluded.
+- Source URL and engagement data are preserved when available.
+- Discovered publishers are created or updated correctly.
+- Operator review confirms that collected posts are useful inputs for future Content Builder workflows.
 
-Existing code for parked areas should not be removed until the MVP loop is validated and the deletion risk is understood. Prefer hiding or de-emphasizing UI and commands first.
+### Observability and safety
 
-## Immediate Roadmap
+- Every run safely explains capture, parsing, extraction, rejection, publisher observation, submission, and merge counts.
+- Zero-candidate and low-yield runs explain why without exposing raw payloads or sensitive browser/profile data.
+- Logs, HTTP DTOs, fixtures, and Web UI do not expose cookies, localStorage, tokens, headers, proxy credentials, fingerprint secrets, viewer data, screenshots, raw HTML, or private response bodies.
 
-### Sprint 073: Product Scope Lock And Surface Trim
+### Operator usability
 
-Refocus the repository around the Profile Feed Collector MVP.
+- An operator can request a run, observe status and diagnostics, review collected content, review discovered sources, and promote an eligible group through the Web UI.
+- CLI may remain for provisioning, diagnostics, recovery, and deliberate live validation; routine content review must not require database access.
 
-- Update current-state docs to name the MVP and park Content Builder expansion.
-- Keep `active.md` changes explicit and separate from this roadmap update.
-- Trim Web UI primary navigation to the MVP surfaces.
-- Hide advanced/parked pages from the sidebar without deleting their implementation.
-- Split command documentation so daily commands are easy to find.
-- Reduce `package.json` script noise by keeping only canonical daily commands and moving advanced/operator details into docs or helper scripts.
+## Immediate Sprints
 
-Out of scope:
+### Sprint 074 — Home Feed Extraction Diagnostics
 
-- No extractor behavior changes.
-- No database table or migration deletion.
-- No runtime behavior changes.
-- No removal of parked modules.
+Status: **accepted**.
 
-### Sprint 074: Home Feed Extraction Diagnostics
+Make every profile home-feed run explain its result safely without changing capture or extraction behavior.
 
-Make zero-candidate home-feed runs explain themselves safely.
+Expected outcome: distinguish capture failure, parse failure, unsupported payload shape, extraction rejection, publisher-resolution rejection, submission failure, duplicate merge, and a legitimately low-yield feed.
 
-- Preserve safe capture diagnostics through the home-feed run summary.
-- Aggregate extractor warning codes per run.
-- Count unsupported payloads, invalid extractor results, skipped candidate reasons, and accepted candidates.
-- Expose only safe diagnostic counts and codes through HTTP and Web UI.
-- Do not expose raw Facebook payloads, cookies, localStorage, tokens, proxy details, viewer IDs, screenshots, raw HTML, or private response bodies.
+### Sprint 075 — Real-Shape Home Feed Extractor Calibration
 
-Expected operator outcome:
+Status: **active; evidence intake pending**.
 
-```text
-capturedPayloads: 42
-jsonParseFailures: 0
-extractorCandidates: 0
-extractorWarnings:
-  UNKNOWN_PUBLISHER_KIND: 18
-  MISSING_SOURCE_URL: 11
-  SKIPPED_CANDIDATE_WITHOUT_BODY_TEXT: 7
-  UNSUPPORTED_PAYLOAD_SHAPE: 6
-```
+Use Sprint 074 diagnostics and sanitized real-shape fixtures to reproduce confirmed failures and make the narrowest evidence-based extractor correction.
 
-### Sprint 075: Real-Shape Home Feed Fixture Calibration
+Expected outcome: current eligible Facebook group/page posts represented by approved fixtures are extracted while personal-profile, sponsored, unstable-identity, and bodyless candidates remain excluded.
 
-Calibrate the Facebook home-feed extractor against sanitized real-shape payloads.
+### Sprint 076 — Repeated Live Collector Validation
 
-- Capture or derive sanitized real-shape fixtures from manual runs.
-- Keep all fixture data synthetic or sanitized.
-- Add failing tests that reproduce the current zero-candidate behavior.
-- Adjust extractor traversal and field resolution only enough to pass real-shape fixture tests.
-- Preserve strict safety filtering for personal-profile posts, sponsored/ad posts, missing body text, and missing stable source identity.
+Run the complete home-feed-to-review flow repeatedly against live Facebook and record evidence against the Collector Completion Gate.
 
-### Sprint 076: Manual Feed Collection To Preview Validation
+Expected outcome: either the gate passes, or each failure becomes a narrow correction sprint. One successful run is not sufficient for acceptance.
 
-Prove the manual MVP loop end to end.
+### Sprint 077 — Collector MVP Baseline Lock
 
-- Queue or run a profile-bound home-feed collection.
-- Show run status and safe diagnostics.
-- Submit extracted content items.
-- Preview collected items.
-- Select, reject, and mark content as used.
-- Review discovered sources.
-- Approve and promote an eligible Facebook group source into a paused managed source group.
+After Sprint 076 passes, record the supported baseline, known limitations, regression fixtures, provider choice, recovery guidance, and manual smoke test.
 
-This sprint should produce explicit manual validation notes. Live Facebook validation remains opt-in and operator-driven.
+Expected outcome: the Collector becomes a stable upstream source and active product development moves to Content Builder.
 
-### Sprint 077: Discovered Sources Product Rename
+## Correction Sprint Rule
 
-Improve product language without renaming stable backend concepts.
+If Sprint 075 or Sprint 076 reveals a blocking defect, insert a narrowly named correction sprint before advancing. It must:
 
-- Keep the backend/domain concept `SourcePublisher`.
-- Rename the Web UI surface from **Source Publishers** to **Discovered Sources**.
-- Present promotion as **Promote to Managed Group**.
-- Keep API routes and persistence unchanged unless a later compatibility sprint explicitly approves contract changes.
+- cite diagnostic and live-validation evidence;
+- change the lowest responsible layer;
+- preserve security and module ownership;
+- add a regression fixture or test when possible;
+- avoid unrelated refactoring;
+- repeat the affected live validation afterward.
 
-### Sprint 078: Archive Or Remove Unneeded Surfaces
+## Parked Until Collector Lock
 
-After the MVP loop is validated, remove or archive genuinely unnecessary surfaces.
+- Content Builder Transform Type expansion.
+- Content Briefs, Producers, Producer Sets, graphs, artifacts, and LLM execution.
+- Content Publisher and publication scheduling.
+- Broad autonomous-operation improvements not required for manual validation.
+- Broad UI redesign or module cleanup.
 
-Candidates:
+## After the Collector Baseline Lock
 
-- Content Builder Transform Type UI and routes.
-- Advanced scheduler pages not needed for manual feed collector validation.
-- Exercise/access-check pages if they are not part of the operator loop.
-- Legacy package scripts and aliases.
-- Docs that imply Content Builder is the current priority.
+Content Builder discovery starts from actual selected content and this operator need:
 
-Deletion must be narrow and reversible where possible. Do not remove migrations or persistent data structures without a dedicated migration/deprecation plan.
+> Turn selected collected posts into a useful article, script, or video-content input.
 
-## Historical Milestones
+The first Content Builder sprint must be shaped from observed workflow. It must not assume that the parked Transform Type catalog, Producer graph, or Artifact model is automatically the correct starting point.
 
-Historical sprint details live in sprint documents and project history. The durable architectural decisions remain:
+Content Publisher remains parked until a useful generated-content workflow exists.
+
+## Durable Architecture Decisions
 
 - Hexagonal architecture: Domain -> Application use cases and ports -> Infrastructure/interface adapters -> Composition/runtime wiring.
-- Collector Profile Manager owns profiles, sessions, leases, readiness, and trusted runtime configuration.
-- Collector Runtime owns browser execution, payload capture, extraction, runs, workers, and submission orchestration.
-- Content Manager owns categories, source groups, normalized content, deduplication, content lifecycle, and discovered source review/promotion.
-- Web UI consumes safe API contracts and must not duplicate domain rules.
-
-## Later Roadmap
-
-Only after the Profile Feed Collector MVP is proven:
-
-1. Revisit Content Builder with a smaller product brief.
-2. Define how selected/used content becomes input to article/script/video workflows.
-3. Reintroduce Transform Types only if prompt cataloging is still required.
-4. Define artifacts and producer workflows from actual operator needs.
-5. Revisit Content Publisher as a separate downstream stage.
+- Collector Profile Manager owns profiles, sessions, leases, readiness, authentication health, and trusted runtime configuration.
+- Collector Runtime owns browser execution, capture, extraction, run records, workers, schedulers, and submission orchestration.
+- Content Manager owns categories, source groups, normalized content, deduplication, content lifecycle, discovered-source review, and promotion.
+- Web UI consumes safe contracts and does not duplicate domain rules.
