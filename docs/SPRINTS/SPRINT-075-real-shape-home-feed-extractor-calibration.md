@@ -2,8 +2,9 @@
 
 ## Status
 
-Active. Evidence intake pending; Builder implementation is blocked until the
-Required Evidence Packet is complete.
+Active. The Required Evidence Packet classifies the gap as `EXTRACTION`.
+Operator-assisted fixture acquisition is authorized; extractor implementation
+remains blocked until the resulting sanitized fixture is reviewed and admitted.
 
 ## Goal
 
@@ -91,6 +92,19 @@ trace.
 - If the run is legitimately low-yield and no eligible group/page post can be
   identified, collect another operator sample; do not change code.
 
+## Operator-Assisted Fixture Acquisition
+
+The Product Owner authorizes the bounded workflow in
+[`SPRINT-075A-operator-assisted-fixture-acquisition.md`](SPRINT-075A-operator-assisted-fixture-acquisition.md)
+to run against the existing local dev stack and already logged-in profile. This
+authority covers one headed collection run, minimum relevant response
+inspection inside the operator-controlled environment, sanitization, fixture
+creation, fixture-safety verification, and one focused failing regression test.
+
+It does not authorize extractor or browser-capture changes. The Builder must
+stop after returning the Fixture Admission Report. Architect/Product Owner
+review must admit the fixture before extractor calibration begins.
+
 ## Fixture Admission Gate
 
 At least one fixture derived from the diagnosed shape must be approved before
@@ -112,8 +126,10 @@ The fixture must:
 - pass the existing fixture safety assertions before being committed.
 
 The raw source payload must never be committed, pasted into a sprint document,
-issue, chat, test output, or application log. Sanitization happens in the
-operator-controlled environment before Builder handoff.
+issue, chat, test output, or application log. Sanitization happens only in the
+operator-controlled environment. When Sprint 075A is explicitly handed off,
+the Builder may perform that bounded local sanitization workflow but must delete
+any temporary raw artifact and stop for fixture-admission review.
 
 ## Required Context
 
@@ -128,6 +144,8 @@ Read only:
 - `docs/TESTING_STRATEGY.md`;
 - `docs/SPRINTS/SPRINT-075-home-feed-calibration-evidence.md` with a completed
   Required Evidence Packet;
+- `docs/SPRINTS/SPRINT-075A-operator-assisted-fixture-acquisition.md` when the
+  fixture-acquisition phase is being executed;
 - the approved sanitized fixture and its sanitization note;
 - `src/collector-runtime/platform-extractors/facebook/facebook-home-feed-extractor.types.ts`;
 - `src/collector-runtime/platform-extractors/facebook/facebook-home-feed-graphql-payload-extractor.ts`;
