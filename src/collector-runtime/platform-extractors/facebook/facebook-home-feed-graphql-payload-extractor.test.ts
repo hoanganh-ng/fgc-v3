@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  sanitizedRealshapeHomeFeedGroupTextPostPayload,
   syntheticHomeFeedDuplicatePostsPayload,
   syntheticHomeFeedFixtures,
   syntheticHomeFeedGroupPostByIndividualPayload,
@@ -208,6 +209,30 @@ describe("FacebookHomeFeedGraphQLPayloadExtractor", () => {
     ]);
   });
 
+  it("fails to extract the sanitized real-shape configured-group home-feed text post before calibration", () => {
+    const result = requireValid(
+      extract(sanitizedRealshapeHomeFeedGroupTextPostPayload),
+    );
+
+    // Desired calibrated outcome (currently fails against the unchanged extractor):
+    // eligible configured-group text post becomes one GROUP candidate.
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]).toMatchObject({
+      platform: "FACEBOOK",
+      externalPostId: "fixture-realshape-group-post-1",
+      bodyText:
+        "Synthetic eligible configured-group text post body for home-feed calibration.",
+      publisherObservation: {
+        platform: "FACEBOOK",
+        kind: "GROUP",
+        externalPublisherId: "fixture-group-graphql-node-id",
+      },
+    });
+    expect(result.warnings.map((warning) => warning.code)).not.toContain(
+      "MISSING_STABLE_PUBLISHER_ID",
+    );
+  });
+
   it("does not throw on malformed payloads", () => {
     const extractor = new FacebookHomeFeedGraphQLPayloadExtractor();
     const cyclicPayload: Record<string, unknown> = {};
@@ -375,7 +400,10 @@ describe("FacebookHomeFeedGraphQLPayloadExtractor", () => {
   });
 
   it("does not include raw or sensitive payload data in output or fixtures", () => {
-    const fixtureText = JSON.stringify(syntheticHomeFeedFixtures).toLowerCase();
+    const fixtureText = JSON.stringify([
+      ...syntheticHomeFeedFixtures,
+      sanitizedRealshapeHomeFeedGroupTextPostPayload,
+    ]).toLowerCase();
     const forbiddenFixtureFragments = [
       "access_token",
       "authorization",

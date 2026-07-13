@@ -78,33 +78,36 @@ content submission were not reached because extraction yielded no candidates.
 
 ## Sanitized Fixture Admission
 
-Classification permits fixture preparation, but the admission gate is not yet
-satisfied.
+Fixture acquisition complete; awaiting Architect/Product Owner admission before
+extractor calibration.
 
 ```text
-fixturePath: pending
-diagnosedWarningOrGap: Current eligible home-feed group-post shape is not recognized; exact structural path awaits a sanitized fixture.
+fixturePath: src/collector-runtime/platform-extractors/facebook/__fixtures__/sanitized-realshape-home-feed-group-text-post.fixture.ts
+diagnosedWarningOrGap: Eligible configured-group Story is classified GROUP via comet_sections.action_link.group but only carries a generic GraphQL id, so extraction emits MISSING_STABLE_PUBLISHER_ID and zero candidates.
 expectedEligibleCandidateCount: at least 1
 expectedPublisherKind: GROUP
-expectedWarningBehavior: The admitted fixture must reproduce the current zero-candidate behavior before calibration.
-structuralPathsPreserved: pending
+expectedWarningBehavior: Unchanged extractor yields zero candidates with MISSING_STABLE_PUBLISHER_ID (publisherKind GROUP) on the root Story; nested content story paths may also warn UNKNOWN_PUBLISHER_KIND.
+structuralPathsPreserved: data.node(Story).post_id; permalink_url; actors[]; to(Group); comet_sections.content.story.message; target_group.id; comet_sections.action_link.group(Group with id only)
 ```
 
 Sanitization confirmation:
 
-- [ ] All identifiers use deterministic fixture values.
-- [ ] Body/comment text is synthetic.
-- [ ] URLs are deterministic fixture URLs or omitted.
-- [ ] Unrelated payload branches were removed.
-- [ ] No cookies, localStorage, tokens, headers, session data, viewer/account
+- [x] All identifiers use deterministic fixture values.
+- [x] Body/comment text is synthetic.
+- [x] URLs are deterministic fixture URLs or omitted.
+- [x] Unrelated payload branches were removed.
+- [x] No cookies, localStorage, tokens, headers, session data, viewer/account
   identifiers, tracking values, proxy/fingerprint values, screenshots, raw
   HTML, private response bodies, or stack traces remain.
-- [ ] The original raw payload is not committed, pasted into documentation,
+- [x] The original raw payload is not committed, pasted into documentation,
   included in test output, or logged.
 
+Sanitization note:
+`src/collector-runtime/platform-extractors/facebook/__fixtures__/sanitized-realshape-home-feed-group-text-post.md`.
+
 No raw payload or HAR export is admitted by this evidence packet. Extractor
-implementation remains blocked until a sanitized fixture is reviewed and every
-sanitization confirmation above is satisfied.
+implementation remains blocked until this sanitized fixture is reviewed and
+admitted.
 
 ## Before/After Evidence
 
