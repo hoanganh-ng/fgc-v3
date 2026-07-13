@@ -741,7 +741,11 @@ function collectPublisherReferencesFromValue(
     const implicitKind = publisherKindFromContainerKey(normalizedKey);
     const childPath = `${path}.${key}`;
 
-    if (isPublisherContainerKey(normalizedKey) || implicitKind !== undefined) {
+    if (
+      isPublisherContainerKey(normalizedKey) ||
+      implicitKind !== undefined ||
+      isFixtureDemonstratedGroupPublisherPath(normalizedKey)
+    ) {
       collectPublisherReferenceFromContainer(
         child,
         childPath,
@@ -814,10 +818,36 @@ function extractStablePublisherId(
   record: Record<string, unknown>,
   kind: FacebookHomeFeedPublisherKind,
 ): string | undefined {
-  return getScalarStringByKeys(
+  const stableId = getScalarStringByKeys(
     record,
     kind === "GROUP" ? GROUP_STABLE_ID_KEYS : PAGE_STABLE_ID_KEYS,
   );
+
+  if (stableId !== undefined) {
+    return stableId;
+  }
+
+  // Accept GraphQL `id` only from an object explicitly type-qualified as Group
+  // (e.g. fixture-demonstrated paths `to` or `comet_sections.action_link.group`).
+  // Do not accept arbitrary object ids, actor/user ids, or unqualified
+  // `target_group.id` without independent Group type qualification.
+  if (kind === "GROUP" && isExplicitlyTypeQualifiedGroup(record)) {
+    return getScalarStringByKeys(record, ["id"]);
+  }
+
+  return undefined;
+}
+
+function isExplicitlyTypeQualifiedGroup(
+  record: Record<string, unknown>,
+): boolean {
+  const typeName = getTypeName(record);
+
+  if (typeName === undefined) {
+    return false;
+  }
+
+  return normalizeKey(typeName) === "group";
 }
 
 function isHomeFeedPublisherKind(
@@ -891,6 +921,15 @@ function publisherKindFromContainerKey(
   }
 
   return undefined;
+}
+
+function isFixtureDemonstratedGroupPublisherPath(
+  normalizedKey: string,
+): boolean {
+  // Story destination `to` is a fixture-demonstrated publisher path. Collect
+  // it only when the child is explicitly type-qualified as Group (handled in
+  // collectPublisherReferenceFromContainer via extractPublisherKindByKeys).
+  return normalizedKey === "to";
 }
 
 function isPublisherContainerKey(normalizedKey: string): boolean {

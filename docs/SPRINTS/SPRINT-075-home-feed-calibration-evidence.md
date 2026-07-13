@@ -116,9 +116,33 @@ change. The operator records the repeated live-run safe summary after automated
 verification.
 
 ```text
-beforeFocusedTest:
-afterFocusedTest:
+beforeFocusedTest: FAIL — expected 1 candidate, got 0 (MISSING_STABLE_PUBLISHER_ID on GROUP)
+afterFocusedTest: PASS — 1 GROUP candidate with stable GraphQL Group id; no MISSING_STABLE_PUBLISHER_ID
 afterLiveRunSafeSummary:
+  terminalStatus: SUCCEEDED
+  captureStage: SUCCEEDED
+  capturePageState: HOME_FEED
+  captureCounters:
+    pageContextFetchCaptureCount: 0
+    pageContextXhrCaptureCount: 0
+    networkListenerCaptureCount: 42
+    parseFailureCount: 0
+    totalPayloadsPassedToExtractor: 42
+  extractorCounters:
+    extractedCandidateCount: 5
+    deduplicatedCandidateCount: 5
+  warningCounts:
+    UNKNOWN_PUBLISHER_KIND: 66
+    UNSUPPORTED_PAYLOAD_SHAPE: 37
+  unsupportedPayloadCount: 37
+  existingRunSummary:
+    capturedPayloads: 42
+    extractorCandidates: 5
+    sourcePublishersObserved: 3
+    contentItemsSubmitted: 5
+    failedPublisherObservations: 0
+    failedContentSubmissions: 0
+    leaseReleased: true
 ```
 
 ## Review Decision

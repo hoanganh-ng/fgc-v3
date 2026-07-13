@@ -24,19 +24,18 @@ Content Builder discovery.
 
 ## Current Active Sprint
 
-Sprint 075 — Real-Shape Home Feed Extractor Calibration is **active, with
-evidence intake pending**.
+Sprint 075 — Real-Shape Home Feed Extractor Calibration is **active**; the
+sanitized real-shape fixture is admitted and the narrow extractor calibration
+is implemented pending Product Owner review.
 
-Sprint 074 is accepted and profile home-feed runs now retain and expose a
-strict, safe aggregate diagnostic summary. Sprint 075 uses that diagnostic
-surface to determine whether the current low-yield or zero-yield behavior is
-actually an extractor gap. Extractor implementation begins only after one
-operator-driven run provides a safe diagnostic packet and a sanitized fixture
-reproduces the confirmed real-shape failure.
-
-If diagnostics point to capture, checkout, leasing, publisher observation, or
-content submission, Sprint 075 stops without changing extraction and a narrow
-correction sprint is shaped at the responsible layer.
+Sprint 074 is accepted and profile home-feed runs retain and expose a strict,
+safe aggregate diagnostic summary. Sprint 075 classified the gap as
+`EXTRACTION`, admitted the sanitized configured-group text-post fixture from
+commit `765ccad`, and calibrated the home-feed extractor to accept GraphQL
+`id` only from objects explicitly type-qualified as `Group` on
+fixture-demonstrated publisher paths (`to`,
+`comet_sections.action_link.group`). Arbitrary object ids, actor/user ids, and
+unqualified `target_group.id` remain excluded.
 
 The planned completion sequence is:
 
@@ -81,11 +80,10 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 
 ## Current Known Gaps
 
-- Manual live-Facebook validation of the profile home-feed path still needs operator execution and review.
-- The first Sprint 075 evidence packet has not yet established whether the next
-  defect belongs to capture, extraction, publisher observation, or submission.
-- Home-feed extractor fixture coverage exists, but any further calibration must
-  be justified by diagnostics and a sanitized real-shape regression fixture.
+- Manual live-Facebook validation of the calibrated home-feed extractor still
+  needs Product Owner review of the repeated operator run summary.
+- Further extractor calibration beyond the admitted Group-qualified `id` path
+  must be justified by new diagnostics and a separate sanitized fixture.
 - Content Builder and Content Publisher remain parked until the collector loop is validated.
 
 ## Collector Completion Gate

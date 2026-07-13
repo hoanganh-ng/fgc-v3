@@ -82,6 +82,18 @@ Sprint 074 is unaccepted. The chosen compatibility behavior for any pre-Sprint 0
 - Extractor rules must yield data complying with the Content Manager schema.
 - Must safely detect and yield on authentication issues, relying on Profile Manager to handle health states.
 
+## Home-Feed Publisher Identity (Sprint 075)
+
+The Facebook home-feed GraphQL extractor accepts a GraphQL node `id` as the
+stable external publisher id only when the object is explicitly type-qualified
+as `Group` (for example `__typename: "Group"`) on a fixture-demonstrated
+publisher path such as Story destination `to` or
+`comet_sections.action_link.group`.
+
+It does not accept arbitrary object ids, actor/user ids, or
+`target_group.id` without independent explicit `Group` qualification. Unqualified
+group/page publishers continue to emit `MISSING_STABLE_PUBLISHER_ID`.
+
 ## Cross-Module Communication
 - Uses explicit HTTP or adapter contracts to interface with Profile Manager (for leases/config) and Content Manager (for submission).
 - Does not import repositories from other modules.

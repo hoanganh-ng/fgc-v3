@@ -209,13 +209,11 @@ describe("FacebookHomeFeedGraphQLPayloadExtractor", () => {
     ]);
   });
 
-  it("fails to extract the sanitized real-shape configured-group home-feed text post before calibration", () => {
+  it("extracts the sanitized real-shape configured-group home-feed text post after Group-qualified id calibration", () => {
     const result = requireValid(
       extract(sanitizedRealshapeHomeFeedGroupTextPostPayload),
     );
 
-    // Desired calibrated outcome (currently fails against the unchanged extractor):
-    // eligible configured-group text post becomes one GROUP candidate.
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0]).toMatchObject({
       platform: "FACEBOOK",
