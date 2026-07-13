@@ -1,7 +1,7 @@
 # Active Sprint
 
-Sprint 075 — Real-Shape Home Feed Extractor Calibration is **active; extraction
-evidence is accepted and operator-assisted fixture acquisition is authorized**.
+Sprint 075 — Real-Shape Home Feed Extractor Calibration is **active; the
+sanitized fixture is admitted and narrow extractor calibration is authorized**.
 
 The goal is to use Sprint 074 diagnostics and a sanitized real-shape fixture to
 reproduce one confirmed home-feed extraction gap, then make the smallest
@@ -11,11 +11,11 @@ weakening safety filters.
 - [Sprint 075 - Real-Shape Home Feed Extractor Calibration](SPRINT-075-real-shape-home-feed-extractor-calibration.md)
 - [Sprint 075A - Operator-Assisted Fixture Acquisition](SPRINT-075A-operator-assisted-fixture-acquisition.md)
 
-The Builder may execute Sprint 075A against the Product Owner's local dev stack
-and already logged-in profile. Extractor implementation must not begin until
-the resulting sanitized fixture is reviewed and admitted.
+Sprint 075A fixture acquisition is complete. The Builder may now execute the
+narrow extractor-calibration phase in Sprint 075 against the admitted fixture.
 
-If safe diagnostics identify capture, checkout, lease, publisher observation, or content submission as the exhausted stage, stop and
+If new safe diagnostics identify capture, checkout, lease, publisher
+observation, or content submission as the exhausted stage, stop and
 shape a narrow correction sprint at that layer instead of changing extraction.
 
 Sprint 074 — Home Feed Extraction Diagnostics is accepted.
