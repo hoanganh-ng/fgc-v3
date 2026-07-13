@@ -2,8 +2,9 @@
 
 ## Status
 
-Required Evidence Packet complete. Stage classified as `EXTRACTION`; sanitized
-fixture admission remains pending.
+Required Evidence Packet complete. Stage classified as `EXTRACTION`;
+operator-assisted fixture acquisition is authorized and fixture admission
+remains pending.
 
 This file is the safe evidence handoff for Sprint 075. It records aggregate
 values from the existing run summary and Sprint 074 diagnostics only. No run or
@@ -120,6 +121,6 @@ afterLiveRunSafeSummary:
 ## Review Decision
 
 ```text
-decision: EVIDENCE_ACCEPTED_FIXTURE_PENDING
-reviewNotes: Extraction is the confirmed responsible layer. Do not change the extractor until the Sanitized Fixture Admission gate is complete.
+decision: FIXTURE_ACQUISITION_AUTHORIZED
+reviewNotes: Extraction is the confirmed responsible layer. Execute the bounded Sprint 075A handoff on the Product Owner's dev stack and logged-in profile; do not change the extractor until the sanitized fixture is reviewed and admitted.
 ```
