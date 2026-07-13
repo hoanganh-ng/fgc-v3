@@ -13,8 +13,9 @@ weakening safety filters.
 
 The Builder may execute Sprint 075A against the Product Owner's local dev stack
 and already logged-in profile. Extractor implementation must not begin until
-the resulting sanitized fixture is reviewed and admitted. If safe diagnostics identify capture, checkout, lease,
-publisher observation, or content submission as the exhausted stage, stop and
+the resulting sanitized fixture is reviewed and admitted.
+
+If safe diagnostics identify capture, checkout, lease, publisher observation, or content submission as the exhausted stage, stop and
 shape a narrow correction sprint at that layer instead of changing extraction.
 
 Sprint 074 — Home Feed Extraction Diagnostics is accepted.
