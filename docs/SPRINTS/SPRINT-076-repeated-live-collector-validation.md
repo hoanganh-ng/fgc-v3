@@ -2,9 +2,10 @@
 
 ## Status
 
-Active and approved for Builder execution. Sprint 075 is accepted. This sprint
-is operator-driven validation; it does not authorize product implementation or
-speculative fixes.
+Paused while Sprint 076A implements and verifies explicit direct-network
+support. Samples `V01`–`V05` are retained as exploratory evidence but do not
+count as the final supported-path baseline because they used a temporary
+proxy-eligibility bypass.
 
 ## Goal
 
@@ -76,16 +77,21 @@ changes.
 
 ## Required Validation Matrix
 
-The acceptance packet contains five baseline runs:
+After Sprint 076A acceptance, the final acceptance packet contains five
+supported-path baseline runs:
 
-- exactly five numbered baseline samples, `V01` through `V05`;
-- runs occur on at least two distinct UTC calendar dates;
-- all five baseline samples use the contractual Playwright provider;
+- exactly five numbered baseline samples, `V06` through `V10`;
+- `V06` is the clean direct-network live proof from accepted Sprint 076A;
+- `V07` through `V10` run on at least one genuinely later UTC calendar date,
+  so the final baseline spans at least two distinct UTC dates;
+- all five samples use an explicitly configured `DIRECT` profile, the normal
+  `https://www.facebook.com/` target, standard checkout, and the contractual
+  Playwright provider with no temporary source edits or bypasses;
 - at least one already provisioned profile is required;
 - a second profile should be used when safely available, but its absence is not
   an acceptance blocker when documented;
 - CloakBrowser runs may be recorded as supplementary evidence but do not replace
-  `V01` through `V05` without a separate Product Owner provider decision;
+  `V06` through `V10` without a separate Product Owner provider decision;
 - at least three baseline runs must succeed with one or more extracted
   candidates;
 - at least two baseline runs must contain one or more items the Product Owner
@@ -103,7 +109,7 @@ failed runs are valid evidence when diagnostics explain them.
 
 ## Procedure Per Baseline Run
 
-1. Assign the next safe sample reference, `V01` through `V05`.
+1. Assign the next supported-path sample reference, `V06` through `V10`.
 2. Record the UTC date, provider, and a non-sensitive profile alias such as
    `P1`; never record the real profile ID or account identity.
 3. Request or queue the profile-bound home-feed run through the existing
@@ -179,7 +185,7 @@ Manual live evidence is not an automated-test result.
 
 Sprint 076 is complete only when:
 
-- all five baseline rows are complete across at least two UTC dates;
+- supported-path rows `V06` through `V10` are complete across at least two UTC dates;
 - the provider and profile requirements are satisfied or the optional second
   profile absence is explicitly documented;
 - at least three runs yield candidates and at least two yield useful content;
@@ -224,13 +230,17 @@ Do not mark Sprint 076 accepted, activate Sprint 077, or begin Content Builder.
 
 ## Builder Handoff Prompt
 
-Execute Sprint 076 — Repeated Live Collector Validation from
+Do not execute this handoff until Sprint 076A is accepted and the active pointer
+returns to Sprint 076.
+
+Then execute Sprint 076 — Repeated Live Collector Validation from
 `docs/SPRINTS/SPRINT-076-repeated-live-collector-validation.md`.
 
 Use the existing local dev stack and already logged-in eligible profile. Load
 only Required Context. Confirm the accepted baseline with `pnpm typecheck` and
-`pnpm test`, then execute the five Playwright baseline samples `V01` through
-`V05` across at least two genuine UTC dates.
+`pnpm test`, then complete the supported-path Playwright baseline samples `V06` through
+`V10` across at least two genuine UTC dates. Use only an explicitly configured
+`DIRECT` profile and standard checkout; no source edits or bypasses.
 
 After every sample, update
 `docs/SPRINTS/SPRINT-076-live-validation-evidence.md` with safe aggregate facts
