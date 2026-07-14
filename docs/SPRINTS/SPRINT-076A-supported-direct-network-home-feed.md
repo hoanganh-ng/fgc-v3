@@ -3,8 +3,7 @@
 ## Status
 
 Accepted by the Product Owner on 2026-07-14 at commit `f7a4970`. Sprint 076B —
-Reviewable Discovered-Source Identity is active. Sprint 076 remains paused
-until Sprint 076B is accepted.
+Reviewable Discovered-Source Identity is also accepted. Sprint 076 is active.
 
 ## Acceptance Record
 
@@ -22,8 +21,7 @@ until Sprint 076B is accepted.
   released its lease.
 - No proxy/session secrets were present in the safe runner output.
 
-`V06` remains proposed until Sprint 076B is accepted, at which point it becomes
-the first Sprint 076 supported-baseline sample.
+`V06` is the first Sprint 076 supported-baseline sample.
 
 ## Goal
 

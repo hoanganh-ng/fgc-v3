@@ -92,29 +92,31 @@ provisioning, checkout, trusted runtime configuration, and browser launch work
 without a proxy bypass.
 
 Expected outcome achieved: explicit direct-network configuration passes the
-supported path, and proposed `V06` completed one clean normal-home Playwright
+supported path, and accepted sample `V06` completed one clean normal-home Playwright
 run with no bypass and a released lease.
 
 ### Sprint 076B — Reviewable Discovered-Source Identity
 
-Status: **active and approved for Builder execution**.
+Status: **accepted**.
 
 Give every approval candidate a safe Facebook review destination, keep opaque
 IDs as technical details, and reject approval when no safe destination exists.
 
-Expected outcome: an operator can open and verify an existing ID-only Facebook
-group before approving it; the admitted real-shape fixture also proves its
-captured display name and canonical URL.
+Expected outcome achieved: the Product Owner opened and recognized an existing
+ID-only Facebook group through the safe link, approved it, confirmed the
+`APPROVED` state and safe promotion default, and recorded no sensitive
+evidence. Unsafe persisted canonical URLs remain compatible but are not
+clickable or used as promotion defaults.
 
 ### Sprint 076 — Repeated Live Collector Validation
 
-Status: **paused behind Sprint 076B**.
+Status: **active and approved for Builder execution**.
 
-After Sprint 076B is accepted, run the complete supported
-home-feed-to-review flow five times with Playwright across at least two UTC dates
-and record safe evidence against the Collector Completion Gate. Repeat the
-discovered-source review and promotion proof through the accepted review-link
-flow.
+The accepted Sprint 076A proof now counts as `V06`. Run supported samples
+`V07`–`V10` with Playwright on a genuinely later UTC date and record safe
+evidence against the Collector Completion Gate. Complete the required
+usefulness, duplicate-merge, lease-release, review, and paused-group promotion
+proof through the accepted review-link flow.
 
 Expected outcome: either the gate passes, or each failure becomes a narrow
 correction sprint. One successful run is not sufficient for acceptance.

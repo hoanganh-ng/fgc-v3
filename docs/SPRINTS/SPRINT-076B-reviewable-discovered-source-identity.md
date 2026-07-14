@@ -2,9 +2,30 @@
 
 ## Status
 
-Active and approved for Builder execution. Sprint 076A was accepted by the
-Product Owner on 2026-07-14 at commit `f7a4970`. Sprint 076 remains paused until
-this correction is accepted.
+Accepted by the Product Owner on 2026-07-15. Implementation commit `7c8fdd1`
+introduced the review-identity flow; correction commit `bc5c73d` ensures unsafe
+persisted canonical URLs are not rendered or selected as promotion defaults.
+Sprint 076 is active.
+
+## Acceptance Record
+
+- The safe review URL resolver normalizes supported Facebook canonical URLs,
+  derives fixed-host ID-only group URLs with encoded path segments, and does
+  not invent Page URLs.
+- Approval fails closed with `SOURCE_PUBLISHER_NOT_REVIEWABLE` when no safe
+  review destination exists; the rejected status remains unchanged.
+- The Web UI presents unnamed group/page labels, technical IDs, safe review
+  guidance, secure external-link attributes, and a disabled approval state for
+  non-reviewable rows.
+- Unsafe persisted canonical URLs remain readable for compatibility but are not
+  clickable and never become promotion defaults.
+- Focused tests, backend/Web typechecks, Web build, 1,992 unit tests, Docker DB,
+  and 19 Docker E2E tests passed. HTTP DB reported 207 passes plus two existing
+  missing-`DATABASE_URL` environment guards.
+- In the required live proof, the Product Owner recognized one intended ID-only
+  group through the safe link, approved it, confirmed `APPROVED`, and confirmed
+  the promotion form used the safe review destination. No promotion was
+  performed and no sensitive evidence was recorded.
 
 ## Goal
 

@@ -2,12 +2,10 @@
 
 ## Status
 
-Paused while Sprint 076A implements explicit direct-network support and Sprint
-076B then makes discovered-source approval reviewable. Samples `V01`–`V05`
-are retained as exploratory evidence but do not count as the final
-supported-path baseline because they used a temporary proxy-eligibility bypass.
-The earlier source approval/promotion also does not count because the UI exposed
-only an opaque publisher ID with no review URL.
+Active and approved for Builder execution. Sprint 076A and Sprint 076B are
+accepted. The clean supported DIRECT proof counts as `V06`; complete `V07`
+through `V10` on a genuinely later UTC date. Samples `V01`–`V05` remain
+exploratory only because they used a temporary proxy-eligibility bypass.
 
 ## Goal
 
@@ -79,8 +77,7 @@ changes.
 
 ## Required Validation Matrix
 
-After Sprint 076A and Sprint 076B acceptance, the final acceptance packet
-contains five supported-path baseline runs:
+The final acceptance packet contains five supported-path baseline runs:
 
 - exactly five numbered baseline samples, `V06` through `V10`;
 - `V06` is the clean direct-network live proof from accepted Sprint 076A;
@@ -235,10 +232,7 @@ Do not mark Sprint 076 accepted, activate Sprint 077, or begin Content Builder.
 
 ## Builder Handoff Prompt
 
-Do not execute this handoff until Sprint 076A and Sprint 076B are accepted and
-the active pointer returns to Sprint 076.
-
-Then execute Sprint 076 — Repeated Live Collector Validation from
+Execute Sprint 076 — Repeated Live Collector Validation from
 `docs/SPRINTS/SPRINT-076-repeated-live-collector-validation.md`.
 
 Use the existing local dev stack and already logged-in eligible profile. Load

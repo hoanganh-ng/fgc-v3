@@ -24,8 +24,8 @@ Content Builder discovery.
 
 ## Current Active Sprint
 
-Sprint 076B — Reviewable Discovered-Source Identity is **active and approved
-for Builder execution**.
+Sprint 076 — Repeated Live Collector Validation is **active and approved for
+Builder execution**.
 
 Sprint 075 is accepted. It classified the live gap as `EXTRACTION`, admitted a
 sanitized configured-group text-post fixture, and calibrated the extractor to
@@ -40,25 +40,25 @@ and lease release, but they required a temporary proxy eligibility bypass.
 Sprint 076A is accepted at commit `f7a4970`. It adds the explicit persisted
 `UNCONFIGURED | DIRECT | PROXY` contract, preserves the accepted normal
 `https://www.facebook.com/` target, and proves one clean supported Playwright
-DIRECT run with no checkout bypass and a released lease. That proof remains
-proposed `V06` until Sprint 076B is accepted.
+DIRECT run with no checkout bypass and a released lease. That proof now counts
+as `V06`.
 
-The Product Owner also found a second acceptance blocker: Discovered Sources can
-show only an opaque external publisher ID, omit any review URL, and still enable
-Approve. Sprint 076B — Reviewable Discovered-Source Identity is shaped and
-approved as the active correction. The earlier exploratory source
-approval/promotion does not count as acceptance evidence.
+Sprint 076B is accepted at correction commit `bc5c73d`. Discovered Sources now
+provide fixed-host safe review links for ID-only groups, preserve opaque IDs as
+technical detail, fail approval closed without a safe destination, and never
+render or default to unsafe persisted canonical URLs. The Product Owner
+recognized and approved one live ID-only group through this supported flow and
+confirmed the safe promotion default without promoting it.
 
 The planned completion sequence is:
 
 - **Sprint 076A — Supported Direct-Network Home-Feed Baseline**: accepted;
   standard direct-network checkout and one clean Playwright run are proven.
-- **Sprint 076B — Reviewable Discovered-Source Identity**: expose a safe
-  Facebook review link, keep opaque IDs as technical detail, and fail approval
-  closed when no safe review destination exists.
-- **Sprint 076 — Repeated Live Collector Validation**: resume after both
-  corrections, complete supported samples `V06`–`V10` across multiple UTC
-  dates, and repeat review/promotion through the accepted reviewable flow.
+- **Sprint 076B — Reviewable Discovered-Source Identity**: accepted; safe
+  inspection and fail-closed approval are proven.
+- **Sprint 076 — Repeated Live Collector Validation**: active; `V06` is counted
+  and supported samples `V07`–`V10` remain across a later UTC date, followed by
+  the final review/promotion proof.
 - **Sprint 077 — Collector MVP Baseline Lock**: record the supported provider,
   regression fixtures, limitations, recovery guidance, and smoke test, then
   move active product development to Content Builder.
@@ -92,18 +92,16 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 - **Content Management**: content categories, managed source groups, normalized
   content items, deduplication, review lifecycle, top comments, safe content
   preview/status APIs, discovered source records, and approved group promotion
-  into managed source groups. Discovered-source approval is not yet safely
-  reviewable when optional name/URL metadata is absent.
+  into managed source groups, including safe reviewable identity for ID-only
+  Facebook groups and fail-closed approval when no safe destination exists.
 - **Web UI**: Profile Feed Collector MVP surfaces for profiles, profile feed runs, content items, source groups/categories, and discovered sources. Parked/advanced pages may remain routed but are hidden from primary navigation.
 - **Operator Commands**: canonical `pnpm operator:*` commands for provisioning, manual collection, workers, schedulers, browser probe, and the profile home-feed one-shot runner.
 
 ## Current Known Gaps
 
-- ID-only discovered groups need Sprint 076B safe review links and
-  application-level approval gating.
-- The complete home-feed-to-review loop still needs five supported baseline live
-  runs across multiple days with duplicate, lease, review, and promotion
-  evidence.
+- The complete home-feed-to-review loop still needs supported samples
+  `V07`–`V10` on a later UTC date, plus final usefulness, duplicate, lease, and
+  paused-group promotion evidence.
 - Further extractor calibration beyond the admitted exact Group-qualified
   `id` paths requires new diagnostics and a separate sanitized fixture.
 - Content Builder and Content Publisher remain parked until the collector loop is validated.
