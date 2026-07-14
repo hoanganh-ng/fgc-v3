@@ -2,10 +2,12 @@
 
 ## Status
 
-Paused while Sprint 076A implements and verifies explicit direct-network
-support. Samples `V01`–`V05` are retained as exploratory evidence but do not
-count as the final supported-path baseline because they used a temporary
-proxy-eligibility bypass.
+Paused while Sprint 076A implements explicit direct-network support and Sprint
+076B then makes discovered-source approval reviewable. Samples `V01`–`V05`
+are retained as exploratory evidence but do not count as the final
+supported-path baseline because they used a temporary proxy-eligibility bypass.
+The earlier source approval/promotion also does not count because the UI exposed
+only an opaque publisher ID with no review URL.
 
 ## Goal
 
@@ -77,8 +79,8 @@ changes.
 
 ## Required Validation Matrix
 
-After Sprint 076A acceptance, the final acceptance packet contains five
-supported-path baseline runs:
+After Sprint 076A and Sprint 076B acceptance, the final acceptance packet
+contains five supported-path baseline runs:
 
 - exactly five numbered baseline samples, `V06` through `V10`;
 - `V06` is the clean direct-network live proof from accepted Sprint 076A;
@@ -192,8 +194,11 @@ Sprint 076 is complete only when:
 - zero-yield or failed outcomes, if any, are safely explained;
 - every exercised terminal run releases its lease;
 - duplicate/merge behavior is demonstrated once without duplicate review items;
-- content and discovered-source review are usable through the Web UI;
-- one eligible approved Facebook group is promoted to a paused managed source;
+- content review is usable through the Web UI;
+- every approval candidate used for evidence has a safe review link and is
+  identifiable through the accepted Sprint 076B flow;
+- one eligible reviewed-and-approved Facebook group is promoted to a paused
+  managed source;
 - no sensitive material appears in evidence, logs, DTOs, fixtures, docs, or UI;
 - no unresolved blocking defect remains in the normal home-feed-to-review loop;
 - Product Owner review accepts the completed worksheet.
@@ -230,8 +235,8 @@ Do not mark Sprint 076 accepted, activate Sprint 077, or begin Content Builder.
 
 ## Builder Handoff Prompt
 
-Do not execute this handoff until Sprint 076A is accepted and the active pointer
-returns to Sprint 076.
+Do not execute this handoff until Sprint 076A and Sprint 076B are accepted and
+the active pointer returns to Sprint 076.
 
 Then execute Sprint 076 — Repeated Live Collector Validation from
 `docs/SPRINTS/SPRINT-076-repeated-live-collector-validation.md`.
@@ -240,7 +245,9 @@ Use the existing local dev stack and already logged-in eligible profile. Load
 only Required Context. Confirm the accepted baseline with `pnpm typecheck` and
 `pnpm test`, then complete the supported-path Playwright baseline samples `V06` through
 `V10` across at least two genuine UTC dates. Use only an explicitly configured
-`DIRECT` profile and standard checkout; no source edits or bypasses.
+`DIRECT` profile and standard checkout; no source edits or bypasses. Review
+and approve discovered groups only through the accepted Sprint 076B safe review
+link flow.
 
 After every sample, update
 `docs/SPRINTS/SPRINT-076-live-validation-evidence.md` with safe aggregate facts
