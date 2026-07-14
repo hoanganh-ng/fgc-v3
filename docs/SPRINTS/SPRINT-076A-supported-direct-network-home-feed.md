@@ -2,8 +2,10 @@
 
 ## Status
 
-Active and approved for Builder execution. Sprint 076 is paused until this
-correction is accepted and the supported-path live-validation baseline restarts.
+Active and approved for Builder execution. Sprint 076 is paused. After this
+correction is accepted, Sprint 076B — Reviewable Discovered-Source Identity is
+the next active correction; live validation restarts only after both are
+accepted.
 
 ## Goal
 
@@ -252,8 +254,9 @@ the existing profile configured through supported UI/API as `DIRECT`:
 - lease releases;
 - trusted/runtime output and logs expose no proxy/session secrets.
 
-This proof validates only Sprint 076A. It becomes the first final-baseline sample
-for resumed Sprint 076 when Product Owner accepts the correction.
+This proof validates only Sprint 076A. Preserve its safe facts as proposed
+sample `V06`; it becomes the first final-baseline sample only after the Product
+Owner accepts Sprint 076A and Sprint 076B.
 
 ## Acceptance Gate
 
@@ -302,5 +305,5 @@ home-feed run with no temporary source edits. Return exact files changed,
 migration/backfill evidence, verification results, and the safe live-run
 summary.
 
-Do not commit or push. Do not accept Sprint 076A, resume Sprint 076, activate
-Sprint 077, or begin Content Builder.
+Do not commit or push. Do not accept Sprint 076A, activate Sprint 076B, resume
+Sprint 076, activate Sprint 077, or begin Content Builder.
