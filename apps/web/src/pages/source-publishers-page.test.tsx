@@ -136,6 +136,41 @@ describe("SourcePublishersPage", () => {
     expect(markup).not.toContain(SOURCE_PUBLISHER_APPROVAL_UNAVAILABLE_REASON);
   });
 
+  it("never renders an unsafe persisted canonical URL as a link and uses the safe reviewUrl destination", () => {
+    const { displayName: _displayName, ...publisher } = createSourcePublisher({
+      canonicalUrl: "https://evil.example/groups/fb-group-1/",
+      reviewUrl: "https://www.facebook.com/groups/fb-group-1/",
+    });
+    const markup = renderPage({ sourcePublishers: [publisher] });
+
+    expect(markup).not.toContain("evil.example");
+    expect(markup).not.toContain(
+      'href="https://evil.example/groups/fb-group-1/"',
+    );
+    expect(markup).toContain("Open on Facebook");
+    expect(markup).toContain(
+      'href="https://www.facebook.com/groups/fb-group-1/"',
+    );
+  });
+
+  it("never leaks an unsafe canonical URL into an approved group's promotion panel", () => {
+    const { displayName: _displayName, ...publisher } = createSourcePublisher({
+      status: "APPROVED",
+      canonicalUrl: "https://evil.example/groups/fb-group-1/",
+      reviewUrl: "https://www.facebook.com/groups/fb-group-1/",
+    });
+    const markup = renderPage({
+      sourcePublishers: [publisher],
+      categories: [createCategory()],
+    });
+
+    expect(markup).toContain("Promote to Source Group");
+    expect(markup).not.toContain("evil.example");
+    expect(markup).toContain(
+      'href="https://www.facebook.com/groups/fb-group-1/"',
+    );
+  });
+
   it("renders a captured display name instead of the unnamed heading", () => {
     const markup = renderPage({
       sourcePublishers: [createSourcePublisher()],

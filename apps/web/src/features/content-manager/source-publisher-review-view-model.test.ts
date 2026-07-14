@@ -112,7 +112,7 @@ describe("source publisher review view model", () => {
     );
   });
 
-  it("builds promotion defaults from displayName and prefers canonicalUrl over reviewUrl", () => {
+  it("builds promotion defaults from displayName and the safe reviewUrl", () => {
     expect(
       toSourcePublisherPromotionDefaultValues(
         createSourcePublisher(),
@@ -127,6 +127,23 @@ describe("source publisher review view model", () => {
     });
   });
 
+  it("prefers the safe reviewUrl over a persisted unsafe canonical URL", () => {
+    const { displayName: _displayName, ...publisher } = createSourcePublisher({
+      canonicalUrl: "https://evil.example/groups/fb-group-1/",
+      reviewUrl: "https://www.facebook.com/groups/fb-group-1/",
+    });
+
+    expect(
+      toSourcePublisherPromotionDefaultValues(publisher, "category-1"),
+    ).toEqual({
+      categoryId: "category-1",
+      collectionPriority: 50,
+      name: "Unnamed Facebook group",
+      url: "https://www.facebook.com/groups/fb-group-1/",
+      notes: "",
+    });
+  });
+
   it("defaults promotion URL to reviewUrl when canonicalUrl is absent", () => {
     const { canonicalUrl: _canonicalUrl, ...publisher } = createSourcePublisher({
       reviewUrl: "https://www.facebook.com/groups/fb-group-1/",
@@ -135,6 +152,17 @@ describe("source publisher review view model", () => {
     expect(
       toSourcePublisherPromotionDefaultValues(publisher, "category-1").url,
     ).toBe("https://www.facebook.com/groups/fb-group-1/");
+  });
+
+  it("never defaults the promotion URL to an unsafe canonical URL when no reviewUrl exists", () => {
+    const { reviewUrl: _reviewUrl, ...publisher } = createSourcePublisher({
+      kind: "PAGE",
+      canonicalUrl: "https://evil.example/synthetic-page/",
+    });
+
+    expect(
+      toSourcePublisherPromotionDefaultValues(publisher, "category-1").url,
+    ).toBe("");
   });
 
   it("validates promotion form priority bounds", () => {
@@ -179,7 +207,7 @@ describe("source publisher review view model", () => {
     ).toBe(false);
   });
 
-  it("allows canonical-url publishers to promote with the default URL included", () => {
+  it("promotes with the safe reviewUrl default included", () => {
     const defaults = toSourcePublisherPromotionDefaultValues(
       createSourcePublisher(),
       "category-1",
@@ -214,7 +242,24 @@ describe("source publisher review view model", () => {
     ).toBe(true);
   });
 
-  it("requires an operator URL when the publisher has no canonical or review URL", () => {
+  it("still requires an operator URL when a canonical URL exists but no safe reviewUrl was produced", () => {
+    const { reviewUrl: _reviewUrl, ...publisher } = createSourcePublisher({
+      kind: "PAGE",
+      canonicalUrl: "https://evil.example/synthetic-page/",
+    });
+
+    expect(
+      getSourcePublisherPromotionFormSchema(publisher).safeParse({
+        categoryId: "category-1",
+        collectionPriority: 50,
+        name: "",
+        url: "",
+        notes: "",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires an operator URL when the publisher has no review URL", () => {
     const {
       canonicalUrl: _canonicalUrl,
       reviewUrl: _reviewUrl,

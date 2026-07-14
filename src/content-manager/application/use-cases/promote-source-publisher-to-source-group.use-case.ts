@@ -95,9 +95,12 @@ export class PromoteSourcePublisherToSourceGroupUseCase {
       };
     }
 
+    // Only an explicit operator URL or the computed safe reviewUrl may be used
+    // as the promotion destination. A persisted canonicalUrl can be unsafe
+    // (HTTP, credential-bearing, or a lookalike host) and must never be chosen
+    // as a default; the safe reviewUrl already reflects any usable canonical.
     const reviewUrl = resolveSourcePublisherReviewUrl(sourcePublisher);
-    const resolvedUrl =
-      input.url ?? sourcePublisher.canonicalUrl ?? reviewUrl;
+    const resolvedUrl = input.url ?? reviewUrl;
 
     if (resolvedUrl === undefined || resolvedUrl.trim().length === 0) {
       throw new SourcePublisherNotPromotableError(

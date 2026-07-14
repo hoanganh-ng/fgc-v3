@@ -390,21 +390,21 @@ function SourcePublishersList({
                   <Field label="Updated">
                     {formatDateTime(sourcePublisher.updatedAt)}
                   </Field>
-                  {sourcePublisher.canonicalUrl !== undefined ? (
+                  {sourcePublisher.reviewUrl !== undefined ? (
                     <div className="min-w-0 sm:col-span-2 lg:col-span-3">
                       <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                        Canonical URL
+                        Safe Review Link
                       </dt>
                       <dd className="mt-1 min-w-0">
                         <a
                           className="inline-flex max-w-full items-center gap-2 truncate font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary"
-                          href={sourcePublisher.canonicalUrl}
+                          href={sourcePublisher.reviewUrl}
                           rel="noopener noreferrer"
                           target="_blank"
-                          title={sourcePublisher.canonicalUrl}
+                          title={sourcePublisher.reviewUrl}
                         >
                           <span className="truncate">
-                            {sourcePublisher.canonicalUrl}
+                            {sourcePublisher.reviewUrl}
                           </span>
                           <ExternalLink aria-hidden="true" className="size-4" />
                         </a>
@@ -608,10 +608,7 @@ function SourcePublisherPromotionPanel({
             id={`${sourcePublisher.id}-promotion-url`}
             autoComplete="off"
             disabled={!gate.allowed}
-            required={
-              sourcePublisher.canonicalUrl === undefined &&
-              sourcePublisher.reviewUrl === undefined
-            }
+            required={sourcePublisher.reviewUrl === undefined}
             {...form.register("url")}
           />
         </FormField>

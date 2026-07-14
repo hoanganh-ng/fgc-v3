@@ -132,7 +132,10 @@ export function toSourcePublisherPromotionDefaultValues(
     categoryId: firstCategoryId ?? "",
     collectionPriority: 50,
     name: getSourcePublisherDisplayName(sourcePublisher),
-    url: sourcePublisher.canonicalUrl ?? sourcePublisher.reviewUrl ?? "",
+    // Only the computed safe reviewUrl may seed the default destination. A
+    // persisted canonicalUrl can be unsafe (HTTP, credential-bearing, or a
+    // lookalike host) and must never become a promotion default.
+    url: sourcePublisher.reviewUrl ?? "",
     notes: "",
   };
 }
@@ -141,11 +144,10 @@ export function getSourcePublisherPromotionFormSchema(
   sourcePublisher: SourcePublisher,
 ) {
   return SourcePublisherPromotionFormSchema.superRefine((values, context) => {
-    const hasDefaultUrl =
-      sourcePublisher.canonicalUrl !== undefined ||
-      sourcePublisher.reviewUrl !== undefined;
-
-    if (!hasDefaultUrl && values.url.trim().length === 0) {
+    if (
+      sourcePublisher.reviewUrl === undefined &&
+      values.url.trim().length === 0
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: "URL is required when the publisher has no safe review URL.",

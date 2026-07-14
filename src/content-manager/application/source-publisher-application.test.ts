@@ -1028,7 +1028,7 @@ describe("PromoteSourcePublisherToSourceGroupUseCase", () => {
       platform: "FACEBOOK",
       externalGroupId: "synthetic-group-123",
       name: "Synthetic Knowledge Group",
-      url: "https://www.facebook.com/groups/synthetic-group-123",
+      url: "https://www.facebook.com/groups/synthetic-group-123/",
       categoryId: "category-1",
       status: "PAUSED",
       collectionPriority: 80,
@@ -1235,6 +1235,27 @@ describe("PromoteSourcePublisherToSourceGroupUseCase", () => {
     expect(result.outcome).toBe("CREATED");
     expect(result.sourceGroup.url).toBe(
       "https://www.facebook.com/groups/synthetic-group-no-canonical/",
+    );
+  });
+
+  it("promotes using the safe derived review URL even when the persisted canonical URL is unsafe", async () => {
+    const context = createPromoteContext(["source-group-unsafe-canonical"]);
+    await seedCategory(context.categories);
+    await seedApprovedGroupPublisher(context, {
+      id: "publisher-unsafe-canonical",
+      externalPublisherId: "synthetic-group-unsafe",
+      canonicalUrl: "https://evil.example/groups/synthetic-group-unsafe/",
+    });
+
+    const result = await createUseCase(context).execute({
+      sourcePublisherId: "publisher-unsafe-canonical",
+      categoryId: "category-1",
+      collectionPriority: 50,
+    });
+
+    expect(result.outcome).toBe("CREATED");
+    expect(result.sourceGroup.url).toBe(
+      "https://www.facebook.com/groups/synthetic-group-unsafe/",
     );
   });
 

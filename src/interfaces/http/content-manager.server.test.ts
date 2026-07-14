@@ -1548,6 +1548,38 @@ describe("Content Manager HTTP routes", () => {
     expect(dto).not.toHaveProperty("reviewUrl");
   });
 
+  it("exposes only the safe derived reviewUrl for an ID-only group with an unsafe persisted canonical URL", async () => {
+    const dto = toSourcePublisherDto(
+      createSourcePublisher({
+        kind: "GROUP",
+        displayName: undefined,
+        externalPublisherId: "synthetic-group-123",
+        canonicalUrl: "https://evil.example/groups/synthetic-group-123",
+      }),
+    );
+
+    expect(dto.reviewUrl).toBe(
+      "https://www.facebook.com/groups/synthetic-group-123/",
+    );
+    expect(dto.canonicalUrl).toBe(
+      "https://evil.example/groups/synthetic-group-123",
+    );
+    expect(dto.reviewUrl).not.toBe(dto.canonicalUrl);
+  });
+
+  it("omits reviewUrl for a page with an unsafe persisted canonical URL", async () => {
+    const dto = toSourcePublisherDto(
+      createSourcePublisher({
+        kind: "PAGE",
+        displayName: undefined,
+        externalPublisherId: "synthetic-page-1",
+        canonicalUrl: "https://evil.example/synthetic-page-1",
+      }),
+    );
+
+    expect(dto).not.toHaveProperty("reviewUrl");
+  });
+
   it("maps SOURCE_PUBLISHER_NOT_REVIEWABLE status PATCH to 409", async () => {
     const { server, service } = createTestServer();
 
