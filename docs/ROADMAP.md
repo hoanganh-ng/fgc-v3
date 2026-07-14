@@ -55,7 +55,10 @@ The Collector MVP is ready to lock only when all of the following have evidence.
 
 ### Operator usability
 
-- An operator can request a run, observe status and diagnostics, review collected content, review discovered sources, and promote an eligible group through the Web UI.
+- An operator can request a run, observe status and diagnostics, review
+  collected content, open a safe Facebook destination for each approval
+  candidate, review discovered sources, and promote an eligible group through
+  the Web UI.
 - CLI may remain for provisioning, diagnostics, recovery, and deliberate live validation; routine content review must not require database access.
 
 ## Immediate Sprints
@@ -80,15 +83,40 @@ Expected outcome achieved: the admitted fixture extracts one expected
 `GROUP` candidate, focused and full-unit verification passes, and the repeated
 live run improved from zero to five candidates with five submissions.
 
-### Sprint 076 — Repeated Live Collector Validation
+### Sprint 076A — Supported Direct-Network Home-Feed Baseline
 
 Status: **active**.
 
-Run the complete home-feed-to-review flow five times with Playwright across at
-least two UTC dates and record safe evidence against the Collector Completion
-Gate.
+Make direct networking an explicit persisted profile mode so standard
+provisioning, checkout, trusted runtime configuration, and browser launch work
+without a proxy bypass.
 
-Expected outcome: either the gate passes, or each failure becomes a narrow correction sprint. One successful run is not sufficient for acceptance.
+Expected outcome: one clean normal-home Playwright run through supported
+`DIRECT` checkout, with its lease released.
+
+### Sprint 076B — Reviewable Discovered-Source Identity
+
+Status: **shaped and approved; queued after Sprint 076A**.
+
+Give every approval candidate a safe Facebook review destination, keep opaque
+IDs as technical details, and reject approval when no safe destination exists.
+
+Expected outcome: an operator can open and verify an existing ID-only Facebook
+group before approving it; the admitted real-shape fixture also proves its
+captured display name and canonical URL.
+
+### Sprint 076 — Repeated Live Collector Validation
+
+Status: **paused behind Sprint 076A and Sprint 076B**.
+
+After both corrections are accepted, run the complete supported
+home-feed-to-review flow five times with Playwright across at least two UTC dates
+and record safe evidence against the Collector Completion Gate. Repeat the
+discovered-source review and promotion proof through the accepted review-link
+flow.
+
+Expected outcome: either the gate passes, or each failure becomes a narrow
+correction sprint. One successful run is not sufficient for acceptance.
 
 ### Sprint 077 — Collector MVP Baseline Lock
 
