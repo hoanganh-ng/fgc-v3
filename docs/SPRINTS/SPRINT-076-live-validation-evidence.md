@@ -48,14 +48,63 @@ Facebook names, text, identifiers, or URLs.
 
 | Sample | UTC date | Profile alias | Provider | Network mode | Status | Captured | Extracted | Submitted | Useful | Lease released |
 |---|---|---|---|---|---|---:|---:|---:|---:|---|
-| V06 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
+| V06 | 2026-07-14 | P1 | PLAYWRIGHT | DIRECT | SUCCEEDED | 72 | 6 | 6 |  | yes |
 | V07 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
 | V08 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
 | V09 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
 | V10 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
 
+`V06` is the Sprint 076A proposed clean DIRECT proof: configured through the
+supported configuration API (`mode: DIRECT`, `proxy: null`, killswitch
+`false`/`false`), no temporary checkout bypass, normal
+`https://www.facebook.com/` target, standard checkout, `HOME_FEED` page state,
+and lease release. It becomes the first final-baseline sample only after Product
+Owner acceptance of Sprint 076A and Sprint 076B. Content usefulness for V06 is
+not scored in this packet.
+
 No sample counts here if it requires a checkout bypass, temporary source edit,
 proxy-rule comment, or non-standard profile mutation.
+
+## Proposed Sprint 076A Direct-Network Proof Detail
+
+```text
+sample: V06
+proposedFor: Sprint 076A supported DIRECT baseline
+utcDate: 2026-07-14
+profileAlias: P1
+provider: PLAYWRIGHT
+networkMode: DIRECT
+configuredVia: supported PATCH /collector/profiles/:id/configuration
+checkoutBypassUsed: no
+terminalStatus: SUCCEEDED
+durationSeconds: 24.294
+captureStage: SUCCEEDED
+capturePageState: HOME_FEED
+captureCounters:
+  pageContextFetchCaptureCount: 0
+  pageContextXhrCaptureCount: 71
+  networkListenerCaptureCount: 72
+  parseFailureCount: 0
+  totalPayloadsPassedToExtractor: 72
+extractorCounters:
+  extractedCandidateCount: 6
+  deduplicatedCandidateCount: 6
+warningCounts:
+  EXCLUDED_SPONSORED_POST: 6
+  MISSING_STABLE_PUBLISHER_ID: 2
+  UNKNOWN_PUBLISHER_KIND: 106
+  UNSUPPORTED_PAYLOAD_SHAPE: 59
+unsupportedPayloadCount: 59
+existingRunSummary:
+  capturedPayloads: 72
+  extractorCandidates: 6
+  sourcePublishersObserved: 6
+  contentItemsSubmitted: 6
+  failedPublisherObservations: 0
+  failedContentSubmissions: 0
+  leaseReleased: true
+notes: Clean supported-path DIRECT proof for Sprint 076A. Normal facebook.com home URL. Profile returned to READY. No proxy/session secrets observed in runner output.
+```
 
 ## Exploratory Per-Run Detail
 
@@ -354,8 +403,8 @@ contentReviewUsable: yes
 discoveredSourceReviewUsable: no — opaque ID only, no safe review URL
 eligibleGroupPromotedPaused: exploratory action only; final proof must be repeated
 safetyConfirmationComplete: exploratory packet safe; final baseline pending
-unresolvedBlockingDefects: direct networking is not supported by standard checkout; discovered-source approval is not reviewable
-acceptanceBlocker: Sprint 076A, Sprint 076B, and final V06-V10 baseline required
+unresolvedBlockingDefects: discovered-source approval is not reviewable (Sprint 076B); final multi-day DIRECT baseline V07-V10 still required after both corrections
+acceptanceBlocker: Sprint 076A Product Owner acceptance, Sprint 076B, and final V07-V10 baseline required
 productOwnerDecision: PAUSED_FOR_SPRINT_076A_AND_076B
 ```
 
@@ -363,9 +412,10 @@ productOwnerDecision: PAUSED_FOR_SPRINT_076A_AND_076B
 
 ```text
 resumeRequired: yes
-resumeReason: final evidence must use supported DIRECT checkout and reviewable discovered-source approval
-onResume: accept Sprint 076A, then accept Sprint 076B; count the clean direct-network proof as V06; run V07-V10 on a genuinely later UTC date; repeat source review/promotion through the safe review-link flow; never reapply the proxy bypass
+resumeReason: final evidence must use accepted DIRECT checkout and reviewable discovered-source approval
+onResume: accept Sprint 076A (proposed V06 already recorded), then accept Sprint 076B; count V06 as first final-baseline sample; run V07-V10 on a genuinely later UTC date; repeat source review/promotion through the safe review-link flow; never reapply the proxy bypass
 cloakhrowserSubstitution: not used
+sprint076AImplementedPendingAcceptance: yes
 sprint076Accepted: no
 sprint077Activated: no
 contentBuilderStarted: no

@@ -397,6 +397,7 @@ class FixedClock implements Clock {
 
 function createNetworkContext(): NetworkContext {
   return {
+    mode: "PROXY",
     proxy: {
       protocol: "HTTPS",
       host: "proxy.example.test",
@@ -417,6 +418,7 @@ function createNetworkContext(): NetworkContext {
 
 function createAlternateNetworkContext(): NetworkContext {
   return {
+    mode: "PROXY",
     proxy: {
       protocol: "SOCKS5",
       host: "backup-proxy.example.test",

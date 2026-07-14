@@ -204,6 +204,7 @@ function createActiveLease(): ProfileLease {
 
 function createNetworkContext(): NetworkContext {
   return {
+    mode: "PROXY",
     proxy: {
       protocol: "HTTPS",
       host: "proxy.example.test",

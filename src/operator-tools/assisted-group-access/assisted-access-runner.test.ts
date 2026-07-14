@@ -543,9 +543,11 @@ class FakeProfileManager implements AssistedAccessProfileManagerPort {
           timezone: "America/Los_Angeles",
         },
         networkContext: {
+          mode: "DIRECT",
           proxy: null,
           killswitch: {
-            enabled: true,
+            enabled: false,
+            failClosed: false,
           },
         },
         authenticationState: {

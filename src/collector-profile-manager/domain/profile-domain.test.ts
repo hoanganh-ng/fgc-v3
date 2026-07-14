@@ -208,6 +208,151 @@ describe("collector profile validation", () => {
     expectValidationIssue(result, "networkContext");
   });
 
+  it("accepts valid UNCONFIGURED, DIRECT, and PROXY network contexts", () => {
+    const profile = createMinimalProfile();
+
+    expect(
+      validateCollectorProfile({
+        ...profile,
+        networkContext: {
+          mode: "UNCONFIGURED",
+          proxy: null,
+          killswitch: { enabled: true, failClosed: true },
+        },
+      }).valid,
+    ).toBe(true);
+
+    expect(
+      validateCollectorProfile({
+        ...profile,
+        networkContext: {
+          mode: "DIRECT",
+          proxy: null,
+          killswitch: { enabled: false, failClosed: false },
+        },
+      }).valid,
+    ).toBe(true);
+
+    expect(
+      validateCollectorProfile({
+        ...profile,
+        networkContext: {
+          mode: "PROXY",
+          proxy: {
+            protocol: "HTTPS",
+            host: "proxy.example.test",
+            port: 443,
+            credentials: null,
+          },
+          killswitch: { enabled: true, failClosed: true },
+        },
+      }).valid,
+    ).toBe(true);
+  });
+
+  it("rejects unknown and contradictory network modes", () => {
+    const profile = createMinimalProfile();
+
+    expectValidationIssue(
+      validateCollectorProfile({
+        ...profile,
+        networkContext: {
+          mode: "VPN",
+          proxy: null,
+          killswitch: { enabled: false, failClosed: false },
+        },
+      }),
+      "networkContext.mode",
+    );
+
+    expectValidationIssue(
+      validateCollectorProfile({
+        ...profile,
+        networkContext: {
+          mode: "DIRECT",
+          proxy: {
+            protocol: "HTTPS",
+            host: "proxy.example.test",
+            port: 443,
+            credentials: null,
+          },
+          killswitch: { enabled: false, failClosed: false },
+        },
+      }),
+      "networkContext.proxy",
+    );
+
+    expectValidationIssue(
+      validateCollectorProfile({
+        ...profile,
+        networkContext: {
+          mode: "DIRECT",
+          proxy: null,
+          killswitch: { enabled: true, failClosed: false },
+        },
+      }),
+      "networkContext.killswitch",
+    );
+
+    expectValidationIssue(
+      validateCollectorProfile({
+        ...profile,
+        networkContext: {
+          mode: "PROXY",
+          proxy: null,
+          killswitch: { enabled: true, failClosed: true },
+        },
+      }),
+      "networkContext.proxy",
+    );
+
+    expectValidationIssue(
+      validateCollectorProfile({
+        ...profile,
+        networkContext: {
+          mode: "UNCONFIGURED",
+          proxy: {
+            protocol: "HTTPS",
+            host: "proxy.example.test",
+            port: 443,
+            credentials: null,
+          },
+          killswitch: { enabled: true, failClosed: true },
+        },
+      }),
+      "networkContext.proxy",
+    );
+  });
+
+  it("treats UNCONFIGURED as missing required configuration and accepts DIRECT", () => {
+    const unconfigured = createMinimalProfile();
+    const configured = createPendingConfigProfile();
+    const directConfigured: CollectorProfile = {
+      ...configured,
+      networkContext: {
+        mode: "DIRECT",
+        proxy: null,
+        killswitch: { enabled: false, failClosed: false },
+      },
+    };
+
+    expect(() =>
+      transitionCollectorProfileStatusForProvisioning(
+        unconfigured,
+        "PENDING_LOGIN",
+        updatedAt,
+      ),
+    ).toThrow(MissingRequiredProfileConfigurationError);
+
+    expect(
+      transitionCollectorProfileStatusForProvisioning(
+        directConfigured,
+        "PENDING_LOGIN",
+        updatedAt,
+      ).identity.status,
+    ).toBe("PENDING_LOGIN");
+  });
+
   it("fails when provisioning token state is invalid", () => {
     const profile = createMinimalProfile();
     const result = validateCollectorProfile({
@@ -633,6 +778,7 @@ function createPendingConfigProfile(): CollectorProfile {
     displayName: "Profile 1",
     createdAt,
     networkContext: {
+      mode: "PROXY",
       proxy: {
         protocol: "HTTPS",
         host: "proxy.example.test",

@@ -34,6 +34,12 @@
 ## Critical Invariants
 - Checkout rules must be respected; profiles are leased atomically to prevent concurrent access.
 - `accountStage` is independent of operational `status`. Collection checkout requires `accountStage = COLLECTION_READY`.
+- Network context uses an explicit mode `UNCONFIGURED | DIRECT | PROXY`. Do not
+  infer direct networking from a null proxy alone. `UNCONFIGURED` fails required
+  configuration and checkout (`NETWORK_CONTEXT_MISSING`). Valid `DIRECT` and
+  `PROXY` pass provisioning and standard checkout. Contradictory mode/proxy/
+  killswitch combinations are rejected at domain, HTTP, persistence, and launch
+  boundaries. Generic read DTOs expose `mode` and non-secret proxy metadata only.
 
 ## Cross-Module Communication
 - Does not import Content Manager repositories or runtime implementation directly.

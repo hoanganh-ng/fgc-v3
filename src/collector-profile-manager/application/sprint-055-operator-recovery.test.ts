@@ -596,6 +596,7 @@ describe("Sprint 055 superseded token use case failures", () => {
 
 function createNetworkContext(): NetworkContext {
   return {
+    mode: "PROXY",
     proxy: {
       protocol: "HTTPS",
       host: "proxy.example.test",

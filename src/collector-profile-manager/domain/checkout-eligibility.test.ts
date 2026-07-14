@@ -4,32 +4,36 @@ import {
   evaluateCheckoutEligibility,
   markCollectorProfileSessionIngested,
   type CollectorProfile,
+  type NetworkContext,
 } from "./index";
 
 // ---------------------------------------------------------------------------
 // Fixture: a READY + COLLECTION_READY profile with HEALTHY auth and a
-// configured network proxy. The NETWORK_CONTEXT_MISSING regression tests
-// strip `networkContext.proxy` to verify the invariant.
+// configured PROXY network context. UNCONFIGURED / DIRECT cases mutate mode
+// explicitly — no eligibility bypass is required for supported DIRECT.
 // ---------------------------------------------------------------------------
 
 const createdAt = "2026-06-21T10:00:00.000Z";
 const sessionCapturedAt = "2026-06-21T10:05:00.000Z";
 const tokenExpiry = "2026-06-21T11:05:00.000Z";
 
-function createReadyCollectionReadyProfile(): CollectorProfile {
+function createReadyCollectionReadyProfile(
+  networkContext: NetworkContext = {
+    mode: "PROXY",
+    proxy: {
+      protocol: "HTTPS",
+      host: "proxy.example.test",
+      port: 443,
+      credentials: { username: "user", password: "pass" },
+    },
+    killswitch: { enabled: true, failClosed: true },
+  },
+): CollectorProfile {
   const base = createPendingCollectorProfile({
     id: "profile-1",
     displayName: "Profile 1",
     createdAt,
-    networkContext: {
-      proxy: {
-        protocol: "HTTPS",
-        host: "proxy.example.test",
-        port: 443,
-        credentials: { username: "user", password: "pass" },
-      },
-      killswitch: { enabled: true, failClosed: true },
-    },
+    networkContext,
     hardwareFingerprint: {
       userAgent:
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
@@ -109,32 +113,43 @@ function createReadyCollectionReadyProfile(): CollectorProfile {
   };
 }
 
-function stripNetworkProxy(
+function withUnconfiguredNetwork(
   profile: CollectorProfile,
 ): CollectorProfile {
   return {
     ...profile,
     networkContext: {
-      ...profile.networkContext,
+      mode: "UNCONFIGURED",
       proxy: null,
+      killswitch: profile.networkContext.killswitch,
+    },
+  };
+}
+
+function withDirectNetwork(profile: CollectorProfile): CollectorProfile {
+  return {
+    ...profile,
+    networkContext: {
+      mode: "DIRECT",
+      proxy: null,
+      killswitch: { enabled: false, failClosed: false },
     },
   };
 }
 
 // ---------------------------------------------------------------------------
-// NETWORK_CONTEXT_MISSING invariant
-// Sprint 065C2 contract: both `COLLECTION` and `HOME_FEED_COLLECTION`
-// require the full existing safety and readiness check set, including the
-// approved `NETWORK_CONTEXT_MISSING` rule.
+// Network-mode checkout eligibility (Sprint 076A)
+// UNCONFIGURED → NETWORK_CONTEXT_MISSING; DIRECT and PROXY accept
+// COLLECTION and HOME_FEED_COLLECTION through the normal eligibility path.
 // ---------------------------------------------------------------------------
 
-describe("evaluateCheckoutEligibility NETWORK_CONTEXT_MISSING", () => {
-  const base = createReadyCollectionReadyProfile();
+describe("evaluateCheckoutEligibility network mode", () => {
+  const proxyProfile = createReadyCollectionReadyProfile();
   const checkoutNow = new Date("2026-06-21T10:30:00.000Z");
 
-  it("rejects COLLECTION checkout when networkContext.proxy is null", () => {
+  it("rejects COLLECTION checkout when network mode is UNCONFIGURED", () => {
     const result = evaluateCheckoutEligibility(
-      stripNetworkProxy(base),
+      withUnconfiguredNetwork(proxyProfile),
       checkoutNow,
       { purpose: "COLLECTION" },
     );
@@ -152,9 +167,9 @@ describe("evaluateCheckoutEligibility NETWORK_CONTEXT_MISSING", () => {
     }
   });
 
-  it("rejects HOME_FEED_COLLECTION checkout when networkContext.proxy is null", () => {
+  it("rejects HOME_FEED_COLLECTION checkout when network mode is UNCONFIGURED", () => {
     const result = evaluateCheckoutEligibility(
-      stripNetworkProxy(base),
+      withUnconfiguredNetwork(proxyProfile),
       checkoutNow,
       { purpose: "HOME_FEED_COLLECTION" },
     );
@@ -172,9 +187,9 @@ describe("evaluateCheckoutEligibility NETWORK_CONTEXT_MISSING", () => {
     }
   });
 
-  it("rejects default-purpose checkout when networkContext.proxy is null", () => {
+  it("rejects default-purpose checkout when network mode is UNCONFIGURED", () => {
     const result = evaluateCheckoutEligibility(
-      stripNetworkProxy(base),
+      withUnconfiguredNetwork(proxyProfile),
       checkoutNow,
     );
 
@@ -190,16 +205,36 @@ describe("evaluateCheckoutEligibility NETWORK_CONTEXT_MISSING", () => {
     }
   });
 
-  it("accepts COLLECTION checkout when networkContext.proxy is configured", () => {
-    const result = evaluateCheckoutEligibility(base, checkoutNow, {
+  it("accepts COLLECTION checkout when network mode is DIRECT", () => {
+    const result = evaluateCheckoutEligibility(
+      withDirectNetwork(proxyProfile),
+      checkoutNow,
+      { purpose: "COLLECTION" },
+    );
+
+    expect(result.eligible).toBe(true);
+  });
+
+  it("accepts HOME_FEED_COLLECTION checkout when network mode is DIRECT", () => {
+    const result = evaluateCheckoutEligibility(
+      withDirectNetwork(proxyProfile),
+      checkoutNow,
+      { purpose: "HOME_FEED_COLLECTION" },
+    );
+
+    expect(result.eligible).toBe(true);
+  });
+
+  it("accepts COLLECTION checkout when network mode is PROXY", () => {
+    const result = evaluateCheckoutEligibility(proxyProfile, checkoutNow, {
       purpose: "COLLECTION",
     });
 
     expect(result.eligible).toBe(true);
   });
 
-  it("accepts HOME_FEED_COLLECTION checkout when networkContext.proxy is configured", () => {
-    const result = evaluateCheckoutEligibility(base, checkoutNow, {
+  it("accepts HOME_FEED_COLLECTION checkout when network mode is PROXY", () => {
+    const result = evaluateCheckoutEligibility(proxyProfile, checkoutNow, {
       purpose: "HOME_FEED_COLLECTION",
     });
 

@@ -594,10 +594,11 @@ class FakeProfileExerciseProfileManager
           timezone: "America/Los_Angeles",
         },
         networkContext: {
+          mode: "DIRECT",
           proxy: null,
           killswitch: {
-            enabled: true,
-            failClosed: true,
+            enabled: false,
+            failClosed: false,
           },
         },
         authenticationState: {

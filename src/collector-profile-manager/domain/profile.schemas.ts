@@ -15,6 +15,7 @@ import {
 import {
   CHRONOTYPES,
   COOKIE_SAME_SITE_VALUES,
+  NETWORK_MODES,
   PROVISIONING_TOKEN_STATUSES,
   PROXY_PROTOCOLS,
   SCROLL_STYLES,
@@ -121,12 +122,60 @@ export const NetworkKillswitchSchema = z
   })
   .strict();
 
+export const NetworkModeSchema = z.enum(NETWORK_MODES);
+
 export const NetworkContextSchema = z
   .object({
+    mode: NetworkModeSchema,
     proxy: ProxyRoutingSchema.nullable(),
     killswitch: NetworkKillswitchSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((context, refineContext) => {
+    if (context.mode === "UNCONFIGURED") {
+      if (context.proxy !== null) {
+        refineContext.addIssue({
+          code: "custom",
+          message: "UNCONFIGURED network mode requires proxy to be null",
+          path: ["proxy"],
+        });
+      }
+
+      return;
+    }
+
+    if (context.mode === "DIRECT") {
+      if (context.proxy !== null) {
+        refineContext.addIssue({
+          code: "custom",
+          message: "DIRECT network mode requires proxy to be null",
+          path: ["proxy"],
+        });
+      }
+
+      if (
+        context.killswitch.enabled !== false ||
+        context.killswitch.failClosed !== false
+      ) {
+        refineContext.addIssue({
+          code: "custom",
+          message:
+            "DIRECT network mode requires killswitch.enabled and killswitch.failClosed to be false",
+          path: ["killswitch"],
+        });
+      }
+
+      return;
+    }
+
+    if (context.proxy === null) {
+      refineContext.addIssue({
+        code: "custom",
+        message: "PROXY network mode requires a configured proxy",
+        path: ["proxy"],
+      });
+    }
+  });
 
 export const ViewportSizeSchema = z
   .object({

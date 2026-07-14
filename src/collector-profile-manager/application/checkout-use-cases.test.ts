@@ -372,6 +372,7 @@ describe("collector profile checkout use cases", () => {
         ...profile,
         networkContext: {
           ...profile.networkContext,
+          mode: "UNCONFIGURED" as const,
           proxy: null,
         },
       }),
@@ -1856,6 +1857,7 @@ class FakeSourceGroupReference implements SourceGroupReferencePort {
 
 function createNetworkContext(): NetworkContext {
   return {
+    mode: "PROXY",
     proxy: {
       protocol: "HTTPS",
       host: "proxy.example.test",

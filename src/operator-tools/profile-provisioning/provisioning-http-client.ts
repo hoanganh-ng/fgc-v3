@@ -54,6 +54,7 @@ export interface ProvisioningNetworkKillswitch {
 }
 
 export interface ProvisioningNetworkContext {
+  readonly mode: "UNCONFIGURED" | "DIRECT" | "PROXY";
   readonly proxy: ProvisioningProxyRouting | null;
   readonly killswitch: ProvisioningNetworkKillswitch;
 }
@@ -336,17 +337,45 @@ function toNetworkContext(
     return undefined;
   }
 
+  const mode = toNetworkMode(value.mode);
   const proxy = toProxyRouting(value.proxy);
   const killswitch = toNetworkKillswitch(value.killswitch);
 
-  if (proxy === undefined || killswitch === undefined) {
+  if (mode === undefined || proxy === undefined || killswitch === undefined) {
+    return undefined;
+  }
+
+  if (mode === "UNCONFIGURED" || mode === "DIRECT") {
+    if (proxy !== null) {
+      return undefined;
+    }
+  }
+
+  if (mode === "DIRECT") {
+    if (killswitch.enabled !== false || killswitch.failClosed !== false) {
+      return undefined;
+    }
+  }
+
+  if (mode === "PROXY" && proxy === null) {
     return undefined;
   }
 
   return {
+    mode,
     proxy,
     killswitch,
   };
+}
+
+function toNetworkMode(
+  value: unknown,
+): ProvisioningNetworkContext["mode"] | undefined {
+  if (value === "UNCONFIGURED" || value === "DIRECT" || value === "PROXY") {
+    return value;
+  }
+
+  return undefined;
 }
 
 function toNetworkKillswitch(

@@ -20,6 +20,7 @@ import type {
   LocalTimeSchema,
   NetworkContextSchema,
   NetworkKillswitchSchema,
+  NetworkModeSchema,
   NumericRangeSchema,
   ProfileIdSchema,
   ProvisioningTokenStateSchema,
@@ -51,6 +52,17 @@ export function isProxyProtocol(value: unknown): value is ProxyProtocol {
   return (
     typeof value === "string" &&
     PROXY_PROTOCOLS.some((protocol) => protocol === value)
+  );
+}
+
+export const NETWORK_MODES = ["UNCONFIGURED", "DIRECT", "PROXY"] as const;
+
+export type NetworkMode = zInfer<typeof NetworkModeSchema>;
+
+export function isNetworkMode(value: unknown): value is NetworkMode {
+  return (
+    typeof value === "string" &&
+    NETWORK_MODES.some((mode) => mode === value)
   );
 }
 

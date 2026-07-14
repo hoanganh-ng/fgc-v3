@@ -141,6 +141,7 @@ function createProbeRuntimeProfileConfiguration(): RuntimeProfileConfiguration {
       fingerprintSeed: "browser-probe-profile",
     },
     networkContext: {
+      mode: "DIRECT",
       proxy: null,
       killswitch: {
         enabled: false,

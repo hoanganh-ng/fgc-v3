@@ -679,6 +679,7 @@ function toProfileReadNetworkContext(
 ): ProfileReadNetworkContext {
   if (networkContext.proxy === null) {
     return {
+      mode: networkContext.mode,
       proxy: null,
       killswitch: networkContext.killswitch,
     };
@@ -687,6 +688,7 @@ function toProfileReadNetworkContext(
   const { credentials: _credentials, ...proxy } = networkContext.proxy;
 
   return {
+    mode: networkContext.mode,
     proxy,
     killswitch: networkContext.killswitch,
   };

@@ -8,6 +8,10 @@
 - Platform Extractors (e.g. Facebook GraphQL Payload Extractor) converting raw artifacts to normalized inputs.
 - Submitting normalized collected content to Content Manager.
 - Processing lease-scoped runtime profile configuration.
+- Shared browser-provider launch config maps trusted runtime `networkContext.mode`
+  to launch settings: valid `DIRECT` omits proxy settings; valid `PROXY` keeps
+  existing proxy settings; `UNCONFIGURED` and contradictory network configuration
+  fail closed with the browser-configuration error family.
 - Detecting authentication walls (login, checkpoints).
 - Owns the `CollectionSchedule` aggregate (one schedule per source group; persisted schedule, not yet driving dispatch).
 - Atomic scheduled dispatch: `DispatchNextDueCollectionScheduleUseCase` selects one enabled due schedule with `FOR UPDATE SKIP LOCKED`, inserts a `QUEUED` `SCHEDULED` `CollectionRun`, and advances the schedule's `next_run_at` per the cadence policy, all in a single PostgreSQL transaction. Missed intervals produce one run only. See [Sprint 058](../SPRINTS/SPRINT-058-atomic-scheduled-collection-dispatch.md).

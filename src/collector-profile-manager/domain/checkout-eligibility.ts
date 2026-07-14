@@ -131,7 +131,7 @@ export function evaluateCheckoutEligibility(
     });
   }
 
-  if (profile.networkContext.proxy === null) {
+  if (profile.networkContext.mode === "UNCONFIGURED") {
     reasons.push({
       code: "NETWORK_CONTEXT_MISSING",
       message: "Profile requires a configured network context.",

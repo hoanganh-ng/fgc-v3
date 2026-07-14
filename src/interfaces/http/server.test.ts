@@ -2491,6 +2491,7 @@ function createReleasedLease(): ProfileLease {
 
 function createNetworkContext(): NetworkContext {
   return {
+    mode: "PROXY",
     proxy: {
       protocol: "HTTPS",
       host: "proxy.example.test",
@@ -2519,6 +2520,7 @@ function createSafeNetworkContext() {
   const { credentials: _credentials, ...proxy } = networkContext.proxy;
 
   return {
+    mode: networkContext.mode,
     proxy,
     killswitch: networkContext.killswitch,
   };

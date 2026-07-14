@@ -241,7 +241,11 @@ class FakeRuntimeProfileConfigurationPort
           },
           languages: ["en-US"],
         },
-        networkContext: {},
+        networkContext: {
+          mode: "DIRECT",
+          proxy: null,
+          killswitch: { enabled: false, failClosed: false },
+        },
         authenticationState: {
           cookies: [],
           localStorage: [],

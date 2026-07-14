@@ -84,6 +84,7 @@ describe("provisioning browser provider boundary", () => {
           ...configuration,
           networkContext: {
             ...configuration.networkContext,
+            mode: "PROXY",
             proxy: {
               protocol: "SOCKS5",
               host: "proxy.example.test",
@@ -399,6 +400,7 @@ function createConfiguration(): ProvisioningConfiguration {
   return {
     profileId: "profile-1",
     networkContext: {
+      mode: "PROXY",
       proxy: {
         protocol: "HTTPS",
         host: "proxy.example.test",

@@ -21,6 +21,7 @@ describe("ProfileProvisioningHttpClient", () => {
       configuration: {
         profileId: "profile-1",
         networkContext: {
+          mode: "PROXY",
           proxy: {
             protocol: "HTTPS",
             host: "proxy.example.test",
@@ -266,6 +267,7 @@ function createConfigurationResponse(): FetchLikeResponse {
   return createResponse(200, {
     profileId: "profile-1",
     networkContext: {
+      mode: "PROXY",
       proxy: {
         protocol: "HTTPS",
         host: "proxy.example.test",

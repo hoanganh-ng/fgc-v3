@@ -56,6 +56,56 @@ describe("collector profile database mapper", () => {
     );
   });
 
+  it("rejects unknown persisted network modes", () => {
+    const row = {
+      ...toCollectorProfileRow(createPersistableProfile()),
+      networkContext: {
+        mode: "VPN",
+        proxy: null,
+        killswitch: { enabled: false, failClosed: false },
+      },
+    } as unknown as Parameters<typeof toCollectorProfileDomain>[0];
+
+    expect(() => toCollectorProfileDomain(row)).toThrow(
+      InvalidPersistedCollectorProfileError,
+    );
+  });
+
+  it("rejects contradictory persisted DIRECT network contexts", () => {
+    const row = {
+      ...toCollectorProfileRow(createPersistableProfile()),
+      networkContext: {
+        mode: "DIRECT",
+        proxy: {
+          protocol: "HTTPS",
+          host: "proxy.example.test",
+          port: 443,
+          credentials: null,
+        },
+        killswitch: { enabled: false, failClosed: false },
+      },
+    } as unknown as Parameters<typeof toCollectorProfileDomain>[0];
+
+    expect(() => toCollectorProfileDomain(row)).toThrow(
+      InvalidPersistedCollectorProfileError,
+    );
+  });
+
+  it("rejects contradictory persisted PROXY network contexts", () => {
+    const row = {
+      ...toCollectorProfileRow(createPersistableProfile()),
+      networkContext: {
+        mode: "PROXY",
+        proxy: null,
+        killswitch: { enabled: true, failClosed: true },
+      },
+    } as unknown as Parameters<typeof toCollectorProfileDomain>[0];
+
+    expect(() => toCollectorProfileDomain(row)).toThrow(
+      InvalidPersistedCollectorProfileError,
+    );
+  });
+
   it("hashes provisioning tokens for persisted lookup and verifies lookup tokens deterministically", () => {
     const profile = createIssuedProvisioningProfile("provisioning-token-1");
     const row = toCollectorProfileRow(profile);
@@ -182,6 +232,7 @@ function createIssuedProvisioningProfile(token: string): CollectorProfile {
 
 function createNetworkContext(): NetworkContext {
   return {
+    mode: "PROXY",
     proxy: {
       protocol: "HTTPS",
       host: "proxy.example.test",

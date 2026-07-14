@@ -121,6 +121,7 @@ function createProbeProvisioningConfiguration(): ProvisioningConfiguration {
   return {
     profileId: "cloakbrowser-provisioning-probe-profile",
     networkContext: {
+      mode: "DIRECT",
       proxy: null,
       killswitch: {
         enabled: false,

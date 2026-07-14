@@ -38,7 +38,11 @@ live run improved from zero to five candidates and submitted all five.
 Sprint 076 exploratory samples then proved useful content, duplicate merging,
 and lease release, but they required a temporary proxy eligibility bypass.
 Sprint 076A now adds an explicit supported `DIRECT` network mode and keeps the
-accepted normal `https://www.facebook.com/` target.
+accepted normal `https://www.facebook.com/` target. Builder implementation and
+automated verification are complete in the worktree, including migration
+`0029_network_context_mode_backfill` and one proposed clean Playwright DIRECT
+home-feed proof (`V06` candidate). Sprint 076A remains unaccepted until Product
+Owner review.
 
 The Product Owner also found a second acceptance blocker: Discovered Sources can
 show only an opaque external publisher ID, omit any review URL, and still enable

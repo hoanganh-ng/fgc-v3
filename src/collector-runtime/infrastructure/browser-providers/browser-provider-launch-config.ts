@@ -52,7 +52,7 @@ export function buildBrowserProviderLaunchConfig(
     leaseId: configuration.leaseId,
     headless: input.headless,
     storageState,
-    ...(toBrowserProviderProxySettings(toRecord(networkContext.proxy)) ?? {}),
+    ...(toBrowserProviderProxySettingsFromNetworkContext(networkContext) ?? {}),
     ...(viewportWidth !== undefined && viewportHeight !== undefined
       ? {
           viewport: {
@@ -81,11 +81,52 @@ export function buildBrowserProviderLaunchConfig(
   };
 }
 
+function toBrowserProviderProxySettingsFromNetworkContext(
+  networkContext: Record<string, unknown>,
+): { readonly proxy?: BrowserProviderProxySettings } | undefined {
+  const mode = readString(networkContext, "mode");
+  const proxy = toRecord(networkContext.proxy);
+  const killswitch = toRecord(networkContext.killswitch);
+
+  if (mode === "DIRECT") {
+    if (proxy !== undefined) {
+      throw new BrowserProviderError(
+        "BROWSER_PROVIDER_CONFIGURATION_INVALID",
+        "Runtime profile DIRECT network mode cannot include proxy settings.",
+      );
+    }
+
+    if (
+      killswitch !== undefined &&
+      (killswitch.enabled !== false || killswitch.failClosed !== false)
+    ) {
+      throw new BrowserProviderError(
+        "BROWSER_PROVIDER_CONFIGURATION_INVALID",
+        "Runtime profile DIRECT network mode requires disabled killswitch flags.",
+      );
+    }
+
+    return undefined;
+  }
+
+  if (mode === "PROXY") {
+    return toBrowserProviderProxySettings(proxy);
+  }
+
+  throw new BrowserProviderError(
+    "BROWSER_PROVIDER_CONFIGURATION_INVALID",
+    "Runtime profile network mode is missing or unsupported.",
+  );
+}
+
 function toBrowserProviderProxySettings(
   proxy: Record<string, unknown> | undefined,
 ): { readonly proxy?: BrowserProviderProxySettings } | undefined {
-  if (proxy === undefined || proxy === null) {
-    return undefined;
+  if (proxy === undefined) {
+    throw new BrowserProviderError(
+      "BROWSER_PROVIDER_CONFIGURATION_INVALID",
+      "Runtime profile PROXY network mode requires proxy settings.",
+    );
   }
 
   const protocol = readString(proxy, "protocol");

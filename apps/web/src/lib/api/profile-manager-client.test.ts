@@ -74,6 +74,7 @@ function makeDetailProfile(overrides: Record<string, unknown> = {}): Record<stri
   return {
     ...makeBaseSummary(),
     networkContext: {
+      mode: "UNCONFIGURED",
       proxy: null,
       killswitch: { enabled: true, failClosed: true },
     },

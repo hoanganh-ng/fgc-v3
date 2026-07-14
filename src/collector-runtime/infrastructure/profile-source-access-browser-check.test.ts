@@ -259,7 +259,11 @@ describe("profile-source access browser check adapter", () => {
           },
           languages: ["en-US"],
         },
-        networkContext: {},
+        networkContext: {
+          mode: "DIRECT",
+          proxy: null,
+          killswitch: { enabled: false, failClosed: false },
+        },
         authenticationState: {
           cookies: [],
           localStorage: [],
@@ -559,7 +563,11 @@ class FakeProfileManager {
         },
         languages: ["en-US"],
       },
-      networkContext: {},
+      networkContext: {
+        mode: "DIRECT",
+        proxy: null,
+        killswitch: { enabled: false, failClosed: false },
+      },
       authenticationState: {
         cookies: [],
         localStorage: [],

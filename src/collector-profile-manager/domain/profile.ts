@@ -240,8 +240,8 @@ export function getMissingRequiredProfileConfiguration(
     missingFields.push("identity.displayName");
   }
 
-  if (profile.networkContext.proxy === null) {
-    missingFields.push("networkContext.proxy");
+  if (profile.networkContext.mode === "UNCONFIGURED") {
+    missingFields.push("networkContext.mode");
   }
 
   if (profile.hardwareFingerprint === null) {
@@ -303,6 +303,7 @@ export function assertValidProvisioningTokenState(
 
 function createUnconfiguredNetworkContext(): NetworkContext {
   return {
+    mode: "UNCONFIGURED",
     proxy: null,
     killswitch: {
       enabled: true,

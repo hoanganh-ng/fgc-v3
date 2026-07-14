@@ -173,6 +173,7 @@ function createReadyProfile(): CollectorProfile {
     displayName: "Profile 1",
     createdAt: checkoutNow,
     networkContext: {
+      mode: "PROXY",
       proxy: {
         protocol: "HTTPS",
         host: "proxy.example.test",
@@ -454,6 +455,7 @@ async function seedReadyProfile(
   ).execute({
     profileId: "profile-1",
     networkContext: {
+      mode: "PROXY",
       proxy: {
         protocol: "HTTPS",
         host: "proxy.example.test",

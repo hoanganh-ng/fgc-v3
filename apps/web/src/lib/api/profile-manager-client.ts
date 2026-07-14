@@ -122,6 +122,7 @@ const ProxyRoutingConfigurationSchema = ProfileReadProxyRoutingSchema.extend({
 
 const ProfileReadNetworkContextSchema = z
   .object({
+    mode: z.enum(["UNCONFIGURED", "DIRECT", "PROXY"]),
     proxy: ProfileReadProxyRoutingSchema.nullable(),
     killswitch: z
       .object({
@@ -134,6 +135,7 @@ const ProfileReadNetworkContextSchema = z
 
 const NetworkContextConfigurationSchema = z
   .object({
+    mode: z.enum(["UNCONFIGURED", "DIRECT", "PROXY"]),
     proxy: ProxyRoutingConfigurationSchema.nullable(),
     killswitch: z
       .object({

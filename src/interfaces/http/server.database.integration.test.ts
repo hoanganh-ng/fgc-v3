@@ -220,6 +220,7 @@ if (!shouldRunHttpDbTests) {
           accountStage: "NEW_ACCOUNT",
           timezone: "Etc/UTC",
           networkContext: {
+            mode: "PROXY",
             proxy: {
               host: "proxy.integration.test",
               port: 443,
@@ -281,6 +282,7 @@ if (!shouldRunHttpDbTests) {
       expect(provisioningConfigurationBody).toMatchObject({
         profileId,
         networkContext: {
+          mode: "PROXY",
           proxy: {
             host: "proxy.integration.test",
             port: 443,
@@ -1315,6 +1317,7 @@ if (!shouldRunHttpDbTests) {
 function createConfiguration() {
   return {
     networkContext: {
+      mode: "PROXY",
       proxy: {
         protocol: "HTTPS",
         host: "proxy.integration.test",

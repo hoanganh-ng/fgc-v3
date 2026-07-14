@@ -778,6 +778,7 @@ describe("ProfileManagerHttpClient", () => {
           userAgent: "Synthetic Browser",
         },
         networkContext: {
+          mode: "PROXY",
           proxy: {
             protocol: "HTTPS",
             host: "proxy.example.test",
@@ -1159,6 +1160,7 @@ function createCheckoutResponse(): FetchLikeResponse {
     profile: {
       profileId: "profile-1",
       networkContext: {
+        mode: "PROXY",
         proxy: {
           protocol: "HTTPS",
           host: "proxy.example.test",
@@ -1230,6 +1232,7 @@ function createAssistedGroupAccessCheckoutResponse(): FetchLikeResponse {
       profileId: "profile-1",
       accountStage: "WARMING",
       networkContext: {
+        mode: "PROXY",
         proxy: {
           credentials: {
             password: "secret",
@@ -1255,6 +1258,7 @@ function createHomeFeedCheckoutResponse(): FetchLikeResponse {
       profileId: "profile-1",
       accountStage: "COLLECTION_READY",
       networkContext: {
+        mode: "PROXY",
         proxy: {
           credentials: {
             password: "secret",
@@ -1305,6 +1309,7 @@ function createRuntimeConfigurationResponse(): FetchLikeResponse {
     leaseId: "lease-1",
     leaseExpiresAt: "2026-01-05T18:45:00.000Z",
     networkContext: {
+      mode: "PROXY",
       proxy: {
         protocol: "HTTPS",
         host: "proxy.example.test",

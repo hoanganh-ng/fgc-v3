@@ -206,10 +206,16 @@ function StatusSummaryCard({
           />
         </div>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm text-muted-foreground">Proxy Routing</span>
+          <span className="text-sm text-muted-foreground">Network</span>
           <StatusBadge
-            label={profile.networkContext.proxy === null ? "Direct" : "Configured"}
-            tone={profile.networkContext.proxy === null ? "neutral" : "info"}
+            label={networkModeLabel(profile.networkContext.mode)}
+            tone={
+              profile.networkContext.mode === "PROXY"
+                ? "info"
+                : profile.networkContext.mode === "DIRECT"
+                  ? "success"
+                  : "neutral"
+            }
           />
         </div>
       </CardContent>
@@ -565,6 +571,20 @@ function isKnownAccountStage(
   return profileAccountStages.some((stage) => stage === accountStage);
 }
 
+function networkModeLabel(
+  mode: ProfileDetail["networkContext"]["mode"],
+): string {
+  if (mode === "DIRECT") {
+    return "Direct network";
+  }
+
+  if (mode === "PROXY") {
+    return "Proxy";
+  }
+
+  return "Unconfigured";
+}
+
 function ConfigurationSummaryCard({
   profile,
 }: {
@@ -591,17 +611,17 @@ function ConfigurationSummaryCard({
       <CardContent>
         <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <Field
-            label="Proxy"
+            label="Network"
             value={
-              proxy === null
-                ? "Direct connection"
-                : `${proxy.protocol} ${proxy.host}:${proxy.port}`
+              profile.networkContext.mode === "PROXY" && proxy !== null
+                ? `${proxy.protocol} ${proxy.host}:${proxy.port}`
+                : networkModeLabel(profile.networkContext.mode)
             }
           />
           <Field
             label="Proxy Region"
             value={
-              proxy === null
+              profile.networkContext.mode !== "PROXY" || proxy === null
                 ? "None"
                 : [proxy.countryCode, proxy.region].filter(Boolean).join(" / ") ||
                   "Unspecified"

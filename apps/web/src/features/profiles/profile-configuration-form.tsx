@@ -84,7 +84,7 @@ const ProfileConfigurationFormSchema = z
   .object({
     networkContext: z
       .object({
-        proxyMode: z.enum(["none", "proxy"]),
+        proxyMode: z.enum(["unconfigured", "direct", "proxy"]),
         protocol: ProxyProtocolSchema,
         host: z.string(),
         port: z.number().int().min(1).max(65_535),
@@ -108,7 +108,7 @@ const ProfileConfigurationFormSchema = z
         const hasUsername = value.username.trim().length > 0;
         const hasPassword = value.password.trim().length > 0;
 
-        if (hasUsername !== hasPassword) {
+        if (value.proxyMode === "proxy" && hasUsername !== hasPassword) {
           context.addIssue({
             code: "custom",
             message: "Proxy username and password must be entered together.",
@@ -212,10 +212,22 @@ export function ProfileConfigurationForm({
     name: "contentAffinities.secondaryTopics",
   });
   const canAssignHardwareFingerprint = profile.hardwareFingerprint === null;
+  const networkMode = form.watch("networkContext.proxyMode");
+  const isProxyMode = networkMode === "proxy";
+  const isDirectMode = networkMode === "direct";
 
   useEffect(() => {
     reset(toProfileConfigurationFormValues(profile));
   }, [profile.id, profile.updatedAt, reset]);
+
+  useEffect(() => {
+    if (!isDirectMode) {
+      return;
+    }
+
+    form.setValue("networkContext.killswitchEnabled", false);
+    form.setValue("networkContext.killswitchFailClosed", false);
+  }, [form, isDirectMode]);
 
   async function submit(values: ProfileConfigurationFormValues): Promise<void> {
     setValidationSummary(undefined);
@@ -263,20 +275,23 @@ export function ProfileConfigurationForm({
       <Card>
         <CardHeader>
           <CardTitle>Network Context</CardTitle>
-          <CardDescription>Proxy routing and network fail-closed behavior.</CardDescription>
+          <CardDescription>
+            Explicit network mode for direct connection or proxy routing.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-4 md:grid-cols-3">
             <FormField
               error={getErrorMessage(form.formState.errors.networkContext?.proxyMode)}
               htmlFor="network-proxy-mode"
-              label="Proxy Mode"
+              label="Network Mode"
             >
               <Select
                 id="network-proxy-mode"
                 {...form.register("networkContext.proxyMode")}
               >
-                <option value="none">None</option>
+                <option value="unconfigured">Unconfigured</option>
+                <option value="direct">Direct network</option>
                 <option value="proxy">Proxy</option>
               </Select>
             </FormField>
@@ -286,6 +301,7 @@ export function ProfileConfigurationForm({
               label="Proxy Protocol"
             >
               <Select
+                disabled={!isProxyMode}
                 id="network-proxy-protocol"
                 {...form.register("networkContext.protocol")}
               >
@@ -300,6 +316,7 @@ export function ProfileConfigurationForm({
               label="Proxy Port"
             >
               <Input
+                disabled={!isProxyMode}
                 id="network-proxy-port"
                 inputMode="numeric"
                 type="number"
@@ -315,6 +332,7 @@ export function ProfileConfigurationForm({
               label="Proxy Host"
             >
               <Input
+                disabled={!isProxyMode}
                 id="network-proxy-host"
                 {...form.register("networkContext.host")}
               />
@@ -325,6 +343,7 @@ export function ProfileConfigurationForm({
               label="Country Code"
             >
               <Input
+                disabled={!isProxyMode}
                 id="network-proxy-country"
                 {...form.register("networkContext.countryCode")}
               />
@@ -335,6 +354,7 @@ export function ProfileConfigurationForm({
               label="Region"
             >
               <Input
+                disabled={!isProxyMode}
                 id="network-proxy-region"
                 {...form.register("networkContext.region")}
               />
@@ -345,8 +365,9 @@ export function ProfileConfigurationForm({
               label="Proxy Username"
             >
               <Input
-                id="network-proxy-username"
                 autoComplete="off"
+                disabled={!isProxyMode}
+                id="network-proxy-username"
                 {...form.register("networkContext.username")}
               />
             </FormField>
@@ -356,8 +377,9 @@ export function ProfileConfigurationForm({
               label="Proxy Password"
             >
               <Input
-                id="network-proxy-password"
                 autoComplete="new-password"
+                disabled={!isProxyMode}
+                id="network-proxy-password"
                 type="password"
                 {...form.register("networkContext.password")}
               />
@@ -368,6 +390,7 @@ export function ProfileConfigurationForm({
             <label className="flex min-h-11 items-center gap-3 rounded border border-border bg-muted/30 px-3 text-sm">
               <input
                 className="size-4 accent-[hsl(var(--primary))]"
+                disabled={!isProxyMode}
                 type="checkbox"
                 {...form.register("networkContext.killswitchEnabled")}
               />
@@ -376,6 +399,7 @@ export function ProfileConfigurationForm({
             <label className="flex min-h-11 items-center gap-3 rounded border border-border bg-muted/30 px-3 text-sm">
               <input
                 className="size-4 accent-[hsl(var(--primary))]"
+                disabled={!isProxyMode}
                 type="checkbox"
                 {...form.register("networkContext.killswitchFailClosed")}
               />
@@ -1154,7 +1178,12 @@ function toProfileConfigurationFormValues(
 
   return {
     networkContext: {
-      proxyMode: proxy === null ? "none" : "proxy",
+      proxyMode:
+        profile.networkContext.mode === "PROXY"
+          ? "proxy"
+          : profile.networkContext.mode === "DIRECT"
+            ? "direct"
+            : "unconfigured",
       protocol: proxy !== null ? asProxyProtocol(proxy.protocol) : "HTTPS",
       host: proxy?.host ?? "",
       port: proxy?.port ?? 8080,
@@ -1299,12 +1328,24 @@ function toUpdateProfileConfigurationRequest(
 function toNetworkContextConfiguration(
   values: ProfileConfigurationFormValues["networkContext"],
 ): NetworkContextConfiguration {
-  if (values.proxyMode === "none") {
+  if (values.proxyMode === "unconfigured") {
     return {
+      mode: "UNCONFIGURED",
       proxy: null,
       killswitch: {
         enabled: values.killswitchEnabled,
         failClosed: values.killswitchFailClosed,
+      },
+    };
+  }
+
+  if (values.proxyMode === "direct") {
+    return {
+      mode: "DIRECT",
+      proxy: null,
+      killswitch: {
+        enabled: false,
+        failClosed: false,
       },
     };
   }
@@ -1315,6 +1356,7 @@ function toNetworkContextConfiguration(
   const region = cleanOptionalText(values.region);
 
   return {
+    mode: "PROXY",
     proxy: {
       protocol: values.protocol,
       host: values.host.trim(),

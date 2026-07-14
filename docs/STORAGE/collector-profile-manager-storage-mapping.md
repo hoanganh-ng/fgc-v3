@@ -44,7 +44,19 @@ Root-level columns:
 JSONB columns:
 
 - `identity_metadata`: remaining identity metadata such as optional external references and labels, if not promoted to columns.
-- `network_context`: maps to the Network Context property group.
+- `network_context`: maps to the Network Context property group. Required JSON shape is
+  `{ mode, proxy, killswitch }` where `mode` is the closed enum
+  `UNCONFIGURED | DIRECT | PROXY`.
+  - `UNCONFIGURED`: `proxy` is null; not provisionable or checkout-eligible.
+  - `DIRECT`: `proxy` is null and proxy killswitch flags are `false`/`false`.
+  - `PROXY`: `proxy` is a complete routing object; existing proxy validation is
+    preserved. Credentials remain trusted-only and never appear in generic read
+    DTOs.
+  Migration `0029_network_context_mode_backfill` is a forward JSONB contract
+  migration (no new column): non-null `proxy` rows become `PROXY`; null-proxy
+  rows in `READY`/`BUSY` become `DIRECT` with killswitch `false`/`false`;
+  null-proxy rows in `PENDING_CONFIG`/`PENDING_LOGIN` become `UNCONFIGURED`.
+  The update is idempotent for rows that already carry `mode`.
 - `hardware_fingerprint`: maps to the Hardware Fingerprinting property group.
 - `authentication_state`: maps to the Authentication State property group.
 - `behavioral_persona`: maps to the Behavioral Persona property group.

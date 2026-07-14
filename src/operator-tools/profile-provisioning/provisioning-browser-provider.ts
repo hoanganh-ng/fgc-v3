@@ -5,6 +5,7 @@ import type {
   ProvisioningConfiguration,
   ProvisioningCookieSameSite,
   ProvisioningLocalStorageEntry,
+  ProvisioningNetworkContext,
   ProvisioningProxyRouting,
 } from "./provisioning-http-client";
 import type {
@@ -416,8 +417,8 @@ export function buildProvisioningBrowserProviderLaunchConfig(input: {
 }): ProvisioningBrowserProviderLaunchConfig {
   const { hardwareFingerprint, networkContext, profileId } = input.configuration;
   const firstLanguage = hardwareFingerprint.languages[0];
-  const proxy = toProvisioningBrowserProviderProxySettings(
-    networkContext.proxy,
+  const proxy = toProvisioningBrowserProviderProxySettingsFromNetworkContext(
+    networkContext,
   );
 
   return {
@@ -746,11 +747,44 @@ function toProvisioningBrowserCookie(
   };
 }
 
+function toProvisioningBrowserProviderProxySettingsFromNetworkContext(
+  networkContext: ProvisioningNetworkContext,
+): ProvisioningBrowserProviderProxySettings | undefined {
+  if (networkContext.mode === "DIRECT") {
+    if (networkContext.proxy !== null) {
+      throw new Error(
+        "Provisioning DIRECT network mode cannot include proxy settings.",
+      );
+    }
+
+    if (
+      networkContext.killswitch.enabled !== false ||
+      networkContext.killswitch.failClosed !== false
+    ) {
+      throw new Error(
+        "Provisioning DIRECT network mode requires disabled killswitch flags.",
+      );
+    }
+
+    return undefined;
+  }
+
+  if (networkContext.mode === "PROXY") {
+    return toProvisioningBrowserProviderProxySettings(networkContext.proxy);
+  }
+
+  throw new Error(
+    "Provisioning network mode is missing or unsupported for browser launch.",
+  );
+}
+
 function toProvisioningBrowserProviderProxySettings(
   proxy: ProvisioningProxyRouting | null,
-): ProvisioningBrowserProviderProxySettings | undefined {
+): ProvisioningBrowserProviderProxySettings {
   if (proxy === null) {
-    return undefined;
+    throw new Error(
+      "Provisioning PROXY network mode requires proxy settings.",
+    );
   }
 
   const credentials = proxy.credentials ?? undefined;

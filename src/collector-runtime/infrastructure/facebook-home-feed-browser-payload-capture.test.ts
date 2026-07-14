@@ -245,7 +245,11 @@ class FakeRuntimeProfileConfigurationPort
           viewport: { width: 1280, height: 720 },
           languages: ["en-US"],
         },
-        networkContext: {},
+        networkContext: {
+          mode: "DIRECT",
+          proxy: null,
+          killswitch: { enabled: false, failClosed: false },
+        },
         authenticationState: { cookies: [], localStorage: [] },
       },
     };

@@ -7,6 +7,7 @@ import type {
   IanaTimezone,
   IsoDateTime,
   NetworkKillswitch,
+  NetworkMode,
   ProfileAuthenticationHealth,
   ProfileId,
   ProfileAccountStage,
@@ -19,6 +20,7 @@ import type {
 export type ProfileReadProxyRouting = Omit<ProxyRouting, "credentials">;
 
 export interface ProfileReadNetworkContext {
+  readonly mode: NetworkMode;
   readonly proxy: ProfileReadProxyRouting | null;
   readonly killswitch: NetworkKillswitch;
 }
@@ -102,6 +104,7 @@ function toProfileReadNetworkContext(
 
   if (networkContext.proxy === null) {
     return {
+      mode: networkContext.mode,
       proxy: null,
       killswitch: networkContext.killswitch,
     };
@@ -110,6 +113,7 @@ function toProfileReadNetworkContext(
   const { credentials: _credentials, ...proxy } = networkContext.proxy;
 
   return {
+    mode: networkContext.mode,
     proxy,
     killswitch: networkContext.killswitch,
   };

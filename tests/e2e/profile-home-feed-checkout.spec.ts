@@ -271,6 +271,7 @@ function expectSafeExceptProfileDetail(payload: unknown): void {
 function buildSyntheticProfileConfiguration(): Record<string, unknown> {
   return {
     networkContext: {
+      mode: "PROXY",
       proxy: {
         protocol: "HTTPS",
         host: "proxy.example.invalid",

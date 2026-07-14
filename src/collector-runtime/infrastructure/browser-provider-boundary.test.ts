@@ -121,6 +121,7 @@ describe("browser provider boundary", () => {
         configuration: {
           ...createRuntimeProfileConfiguration(),
           networkContext: {
+            mode: "PROXY",
             proxy: {
               protocol: "HTTPS",
               host: "proxy.example.test",
@@ -130,6 +131,59 @@ describe("browser provider boundary", () => {
         headless: false,
       }),
     ).toThrow("Runtime profile proxy configuration is incomplete.");
+  });
+
+  it("omits proxy settings for DIRECT network mode", () => {
+    const launchConfig = buildBrowserProviderLaunchConfig({
+      providerName: "PLAYWRIGHT_CHROMIUM",
+      configuration: {
+        ...createRuntimeProfileConfiguration(),
+        networkContext: {
+          mode: "DIRECT",
+          proxy: null,
+          killswitch: { enabled: false, failClosed: false },
+        },
+      },
+      headless: false,
+    });
+
+    expect(launchConfig.proxy).toBeUndefined();
+  });
+
+  it("fails closed for UNCONFIGURED network mode", () => {
+    expect(() =>
+      buildBrowserProviderLaunchConfig({
+        providerName: "PLAYWRIGHT_CHROMIUM",
+        configuration: {
+          ...createRuntimeProfileConfiguration(),
+          networkContext: {
+            mode: "UNCONFIGURED",
+            proxy: null,
+            killswitch: { enabled: true, failClosed: true },
+          },
+        },
+        headless: false,
+      }),
+    ).toThrow("Runtime profile network mode is missing or unsupported.");
+  });
+
+  it("fails closed for DIRECT mode with proxy killswitch enabled", () => {
+    expect(() =>
+      buildBrowserProviderLaunchConfig({
+        providerName: "PLAYWRIGHT_CHROMIUM",
+        configuration: {
+          ...createRuntimeProfileConfiguration(),
+          networkContext: {
+            mode: "DIRECT",
+            proxy: null,
+            killswitch: { enabled: true, failClosed: false },
+          },
+        },
+        headless: false,
+      }),
+    ).toThrow(
+      "Runtime profile DIRECT network mode requires disabled killswitch flags.",
+    );
   });
 
   it("attaches page instrumentation through the provider abstraction", async () => {
@@ -329,6 +383,7 @@ function createRuntimeProfileConfiguration(): RuntimeProfileConfiguration {
       fingerprintSeed: "profile-owned-seed",
     },
     networkContext: {
+      mode: "PROXY",
       proxy: {
         protocol: "HTTPS",
         host: "proxy.example.test",

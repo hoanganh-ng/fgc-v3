@@ -25,6 +25,7 @@ function createLaunchConfig(overrides?: Record<string, unknown>) {
         fingerprintSeed: "probe-seed",
       },
       networkContext: {
+        mode: "PROXY",
         proxy: {
           protocol: "HTTPS",
           host: "proxy.example.test",
@@ -158,6 +159,45 @@ describe("CloakBrowserProvider (Collector Runtime)", () => {
     expect(contextOpts.deviceScaleFactor).toBe(2);
     expect((contextOpts.extraHTTPHeaders as Record<string, string>)["Accept-Language"]).toBe("en-US,en");
     expect(opts.storageState).toBeUndefined();
+  });
+
+  it("omits proxy options for DIRECT network mode", async () => {
+    const fakeContext = new FakeContext();
+    const receivedOptions: unknown[] = [];
+    const provider = new CloakBrowserProvider({
+      importModule: async () => ({
+        launchContext: async (options: unknown) => {
+          receivedOptions.push(options);
+          return fakeContext;
+        },
+      }),
+    });
+
+    await provider.launch(
+      createLaunchConfig({
+        networkContext: {
+          mode: "DIRECT",
+          proxy: null,
+          killswitch: { enabled: false, failClosed: false },
+        },
+      }),
+    );
+
+    expect(receivedOptions).toHaveLength(1);
+    const opts = receivedOptions[0] as Record<string, unknown>;
+    expect(opts.proxy).toBeUndefined();
+  });
+
+  it("fails closed for UNCONFIGURED network mode before launch", () => {
+    expect(() =>
+      createLaunchConfig({
+        networkContext: {
+          mode: "UNCONFIGURED",
+          proxy: null,
+          killswitch: { enabled: true, failClosed: true },
+        },
+      }),
+    ).toThrow("Runtime profile network mode is missing or unsupported.");
   });
 
   it("passes storageState inside contextOptions", async () => {
@@ -333,7 +373,11 @@ describe("CloakBrowserProvider (Collector Runtime)", () => {
           languages: ["en"],
           timezone: "UTC",
         },
-        networkContext: { proxy: null, killswitch: { enabled: false, failClosed: false } },
+        networkContext: {
+          mode: "DIRECT",
+          proxy: null,
+          killswitch: { enabled: false, failClosed: false },
+        },
         authenticationState: {
           cookies: [],
           localStorage: [],

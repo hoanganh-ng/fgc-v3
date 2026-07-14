@@ -584,9 +584,11 @@ class FakeProfileManager implements AssistedAccessProfileManagerPort {
           userAgent: "Mozilla/5.0 Test",
         },
         networkContext: {
+          mode: "DIRECT",
           proxy: null,
           killswitch: {
-            enabled: true,
+            enabled: false,
+            failClosed: false,
           },
         },
         authenticationState: {
