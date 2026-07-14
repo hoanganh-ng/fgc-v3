@@ -2,15 +2,22 @@
 
 ## Status
 
-Paused for Sprint 076A. Same-day samples `V01`–`V05` are retained as
-exploratory evidence only because they used a temporary proxy-eligibility
-bypass. The bypass was restored. The Product Owner chose supported direct
-networking and accepted the normal `https://www.facebook.com/` home target;
-the chronological `?sk=h_chr` override remains retired.
+Paused for Sprint 076A and Sprint 076B. Same-day samples `V01`–`V05` are
+retained as exploratory evidence only because they used a temporary
+proxy-eligibility bypass. The bypass was restored. The Product Owner chose
+supported direct networking and accepted the normal
+`https://www.facebook.com/` home target; the chronological `?sk=h_chr`
+override remains retired.
 
-After Sprint 076A acceptance, record the clean direct-network proof as `V06`
-and complete final supported-path samples `V07`–`V10` on a genuinely later
-UTC date.
+The Product Owner subsequently found that Discovered Sources exposed opaque
+publisher IDs without names or review URLs while leaving Approve enabled.
+Therefore the exploratory source-review/promotion observation below does not
+satisfy the Collector acceptance gate.
+
+After Sprint 076A and Sprint 076B acceptance, record the clean direct-network
+proof as `V06` and complete final supported-path samples `V07`–`V10` on a
+genuinely later UTC date. Repeat source review and promotion through the
+accepted safe review-link flow.
 
 ## Baseline Verification
 
@@ -290,16 +297,18 @@ verificationSurface: SAFE_API
 notes: V02 submitted 4 with content-total delta 3. End-of-day inventory: content item count equals unique externalPostId count (214/214); zero duplicate review rows.
 ```
 
-## Discovered-Source Promotion Evidence
+## Exploratory Discovered-Source Promotion — Not Acceptance Evidence
 
 ```text
 demonstratedBySample: V02
-reviewedThroughWebUi: yes
-eligibleGroupApproved: yes
-promotionCompleted: yes
+reviewedThroughWebUi: no
+reviewabilityDefect: UI showed only an opaque publisher ID and no safe review URL
+eligibleGroupApproved: yes (action occurred, but identity was not reviewable)
+promotionCompleted: yes (exploratory only)
 managedSourceInitialStatus: PAUSED
 duplicateManagedSourcePrevented: yes
-notes: One DISCOVERED FACEBOOK GROUP approved then promoted through supported API into a PAUSED managed source group (outcome CREATED). No group name, Facebook ID, source-group ID, or URL recorded here. Post-promotion inventory includes one PAUSED managed source among existing ACTIVE groups.
+acceptanceCredit: none
+notes: The source was approved and promoted, but the Product Owner could not identify or independently inspect it. No live group name, ID, source-group ID, or URL is recorded here. Final evidence must repeat review and promotion after Sprint 076B acceptance.
 ```
 
 ## Provider and Profile Coverage
@@ -325,8 +334,9 @@ homeFeedUrlModeBySample: V01-V03 chronological query param; V04-V05 normal faceb
   stack trace is present.
 - [x] Unavailable values were omitted rather than replaced with invented zeroes.
 - [x] Temporary proxy eligibility bypass restored after samples.
-- [ ] No durable runtime change: FACEBOOK_HOME_FEED_URL remains changed to the
-      normal home URL pending Product Owner keep-or-revert decision.
+- [x] The Product Owner accepted the durable normal
+      `https://www.facebook.com/` home target; the chronological override
+      remains retired.
 
 ## Acceptance Summary
 
@@ -341,20 +351,20 @@ allTerminalLeasesReleased: yes
 zeroYieldOrFailuresExplained: not applicable (no zero-yield/failure among V01–V05)
 duplicateMergeDemonstrated: yes
 contentReviewUsable: yes
-discoveredSourceReviewUsable: yes
-eligibleGroupPromotedPaused: yes
+discoveredSourceReviewUsable: no — opaque ID only, no safe review URL
+eligibleGroupPromotedPaused: exploratory action only; final proof must be repeated
 safetyConfirmationComplete: exploratory packet safe; final baseline pending
-unresolvedBlockingDefects: proxy-null profiles are not supported by standard checkout
-acceptanceBlocker: Sprint 076A explicit direct-network correction and final V06-V10 baseline required
-productOwnerDecision: PAUSED_FOR_SPRINT_076A
+unresolvedBlockingDefects: direct networking is not supported by standard checkout; discovered-source approval is not reviewable
+acceptanceBlocker: Sprint 076A, Sprint 076B, and final V06-V10 baseline required
+productOwnerDecision: PAUSED_FOR_SPRINT_076A_AND_076B
 ```
 
 ## Progress / Resume Notes
 
 ```text
 resumeRequired: yes
-resumeReason: final evidence must use standard checkout with an explicitly supported DIRECT profile
-onResume: accept Sprint 076A first; count its clean direct-network proof as V06; run V07-V10 on a genuinely later UTC date; never reapply the proxy bypass
+resumeReason: final evidence must use supported DIRECT checkout and reviewable discovered-source approval
+onResume: accept Sprint 076A, then accept Sprint 076B; count the clean direct-network proof as V06; run V07-V10 on a genuinely later UTC date; repeat source review/promotion through the safe review-link flow; never reapply the proxy bypass
 cloakhrowserSubstitution: not used
 sprint076Accepted: no
 sprint077Activated: no
