@@ -2,11 +2,15 @@
 
 ## Status
 
-Same-day Playwright samples `V01`–`V05` completed on UTC date `2026-07-14`.
-A second genuine UTC date is still required before Sprint 076 can be accepted.
-Product Owner authorized a temporary local proxy-eligibility ignore for testing
-(restored after today's samples). Operator also authorized removing the chronological
-home-feed URL query param before `V04`/`V05`.
+Paused for Sprint 076A. Same-day samples `V01`–`V05` are retained as
+exploratory evidence only because they used a temporary proxy-eligibility
+bypass. The bypass was restored. The Product Owner chose supported direct
+networking and accepted the normal `https://www.facebook.com/` home target;
+the chronological `?sk=h_chr` override remains retired.
+
+After Sprint 076A acceptance, record the clean direct-network proof as `V06`
+and complete final supported-path samples `V07`–`V10` on a genuinely later
+UTC date.
 
 ## Baseline Verification
 
@@ -19,7 +23,8 @@ unitResult: Test Files 146 passed | 17 skipped (163); Tests 1952 passed | 18 ski
 runtimeCodeChangedDuringSprint: temporary local-only proxy eligibility bypass applied then restored; FACEBOOK_HOME_FEED_URL changed from chronological (?sk=h_chr) to normal https://www.facebook.com/ under operator direction (focused capture-adapter tests 9/9 pass)
 ```
 
-## Validation Matrix
+## Exploratory Validation Matrix — Not Acceptance Baseline
+
 
 | Sample | UTC date | Profile alias | Provider | Status | Duration (s) | Captured | Extracted | Submitted | Useful | Lease released |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---|
@@ -32,7 +37,20 @@ runtimeCodeChangedDuringSprint: temporary local-only proxy eligibility bypass ap
 Use aliases only. Do not record real profile IDs, run IDs, account identities,
 Facebook names, text, identifiers, or URLs.
 
-## Per-Run Detail
+## Final Supported-Path Validation Matrix
+
+| Sample | UTC date | Profile alias | Provider | Network mode | Status | Captured | Extracted | Submitted | Useful | Lease released |
+|---|---|---|---|---|---|---:|---:|---:|---:|---|
+| V06 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
+| V07 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
+| V08 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
+| V09 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
+| V10 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
+
+No sample counts here if it requires a checkout bypass, temporary source edit,
+proxy-rule comment, or non-standard profile mutation.
+
+## Exploratory Per-Run Detail
 
 ```text
 sample: V01
@@ -313,9 +331,10 @@ homeFeedUrlModeBySample: V01-V03 chronological query param; V04-V05 normal faceb
 ## Acceptance Summary
 
 ```text
-fiveBaselineRunsComplete: yes (same UTC date only)
+fiveSupportedBaselineRunsComplete: no
+supportedBaselineSamplesRequired: V06-V10
 runsSpanAtLeastTwoUtcDates: no
-playwrightBaselineSatisfied: yes for provider/count; date coverage incomplete
+playwrightBaselineSatisfied: pending
 atLeastThreeRunsYieldCandidates: yes (V01–V05 all yielded >=1)
 atLeastTwoRunsYieldUsefulContent: yes (V01–V05)
 allTerminalLeasesReleased: yes
@@ -324,18 +343,18 @@ duplicateMergeDemonstrated: yes
 contentReviewUsable: yes
 discoveredSourceReviewUsable: yes
 eligibleGroupPromotedPaused: yes
-safetyConfirmationComplete: pending PO decision on retaining home-URL change
-unresolvedBlockingDefects: none observed in today's completed samples after authorized temp proxy ignore
-acceptanceBlocker: second genuine UTC date still required
-productOwnerDecision: PENDING
+safetyConfirmationComplete: exploratory packet safe; final baseline pending
+unresolvedBlockingDefects: proxy-null profiles are not supported by standard checkout
+acceptanceBlocker: Sprint 076A explicit direct-network correction and final V06-V10 baseline required
+productOwnerDecision: PAUSED_FOR_SPRINT_076A
 ```
 
 ## Progress / Resume Notes
 
 ```text
 resumeRequired: yes
-resumeReason: acceptance requires at least two distinct UTC calendar dates; all five Playwright samples today are on 2026-07-14 only
-onResume: keep restored proxy checks unless Product Owner re-authorizes temporary ignore; decide whether to keep normal facebook.com home URL; run at least one additional Playwright baseline sample on a later UTC date if Product Owner wants date-coverage completion without redoing all five
+resumeReason: final evidence must use standard checkout with an explicitly supported DIRECT profile
+onResume: accept Sprint 076A first; count its clean direct-network proof as V06; run V07-V10 on a genuinely later UTC date; never reapply the proxy bypass
 cloakhrowserSubstitution: not used
 sprint076Accepted: no
 sprint077Activated: no
