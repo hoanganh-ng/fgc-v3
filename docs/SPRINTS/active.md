@@ -1,6 +1,7 @@
 # Active Sprint
 
-Sprint 076 — Repeated Live Collector Validation is **active**.
+Sprint 076 — Repeated Live Collector Validation is **active and approved for
+Builder execution**.
 
 The goal is to prove that the complete Facebook profile home-feed-to-review loop
 is reliable, useful, explainable, and repeatable before locking the Collector
@@ -15,7 +16,9 @@ implementation commit `0932eba`. The admitted fixture extracts one expected
 suite passes 23/23, and the repeated live run improved from zero to five
 candidates with five submissions.
 
-Sprint 076 is validation-only. Complete five Playwright baseline runs across at
+The Product Owner authorizes the Builder to use the existing local dev stack and
+already logged-in eligible profile. Sprint 076 is validation-only. Complete five
+Playwright baseline runs across at
 least two UTC dates, record only safe aggregate evidence, verify useful content,
 duplicate merging, lease release, discovered-source review, and one approved
 group promotion. Do not change runtime code inside this sprint.
