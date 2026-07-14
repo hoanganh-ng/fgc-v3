@@ -2,8 +2,9 @@
 
 ## Status
 
-Required Evidence Packet complete. Stage classified as `EXTRACTION`; the
-sanitized fixture is admitted and narrow extractor calibration is authorized.
+Accepted. The extraction gap was reproduced, calibrated through an admitted
+sanitized fixture, corrected after Product Owner review, and validated by focused,
+full-unit, typecheck, and repeated live-run evidence.
 
 This file is the safe evidence handoff for Sprint 075. It records aggregate
 values from the existing run summary and Sprint 074 diagnostics only. No run or
@@ -148,15 +149,15 @@ afterLiveRunSafeSummary:
 ## Review Decision
 
 ```text
-decision: PRODUCT_OWNER_CHANGES_REQUIRED
-reviewedImplementationCommit: 6ee4b53
-acceptedEvidence: Focused test changed from 0 to 1 GROUP candidate; focused suite, typecheck, and full unit suite passed; repeated live run improved from 0 to 5 candidates with no MISSING_STABLE_PUBLISHER_ID.
-blockingFinding: The implementation accepts id from any explicitly type-qualified Group object reached through recursive publisher-container discovery because extractStablePublisherId does not receive or validate PublisherReference.path. The documented restriction to $.to and $.comet_sections.action_link.group is therefore not enforced.
-requiredCorrection: Pass the publisher-reference path into stable-id resolution and permit the GraphQL id fallback only for explicitly type-qualified Group objects at exactly $.to or $.comet_sections.action_link.group relative to the candidate Story.
-requiredNegativeTests: Prove that an explicitly type-qualified Group plus id is still rejected with MISSING_STABLE_PUBLISHER_ID when placed under (1) a non-demonstrated generic publisher container and (2) an unrelated nested group key. Preserve the existing kind-only rejection test.
-scope: Extractor implementation and focused extractor tests only. Do not repeat the live run unless the correction changes the admitted positive fixture result or diagnostics.
+decision: ACCEPTED
+initialImplementationCommit: 6ee4b53
+reviewCorrectionCommit: 0932eba
+acceptedEvidence: Focused fixture changed from 0 to 1 GROUP candidate; repeated live run improved from 0 to 5 candidates and submitted all 5; MISSING_STABLE_PUBLISHER_ID disappeared from that run; lease released.
+boundaryEvidence: GraphQL id fallback now requires kind GROUP, explicit __typename Group, and the exact candidate-relative path $.to or $.comet_sections.action_link.group. Generic publisher containers, unrelated nested group keys, kind-only ids, actor/user ids, and unqualified target_group.id remain rejected.
+verification: Focused extractor suite 23/23 passed; pnpm typecheck passed; pnpm test passed with 1952 passed and 18 skipped.
+productOwnerDecision: Sprint 075 acceptance gate satisfied.
 ```
 
-Sprint 075 remains active and is not accepted. The successful live-run evidence is
-retained; Product Owner review resumes after the narrow path-enforcement
-correction and required negative tests pass.
+Sprint 075 is accepted. Further payload families require new diagnostics and a
+separate sanitized fixture; this acceptance does not claim general Facebook
+payload compatibility.
