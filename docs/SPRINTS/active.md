@@ -1,33 +1,32 @@
 # Active Sprint
 
-Sprint 075 — Real-Shape Home Feed Extractor Calibration is **active; narrow
-extractor calibration is implemented against the admitted fixture and awaits
-Product Owner review**.
+Sprint 076 — Repeated Live Collector Validation is **active**.
 
-The goal is to use Sprint 074 diagnostics and a sanitized real-shape fixture to
-reproduce one confirmed home-feed extraction gap, then make the smallest
-extractor correction that restores eligible group/page post extraction without
-weakening safety filters.
+The goal is to prove that the complete Facebook profile home-feed-to-review loop
+is reliable, useful, explainable, and repeatable before locking the Collector
+baseline and moving product work to Content Builder.
 
-- [Sprint 075 - Real-Shape Home Feed Extractor Calibration](SPRINT-075-real-shape-home-feed-extractor-calibration.md)
-- [Sprint 075A - Operator-Assisted Fixture Acquisition](SPRINT-075A-operator-assisted-fixture-acquisition.md)
+- [Sprint 076 - Repeated Live Collector Validation](SPRINT-076-repeated-live-collector-validation.md)
+- [Sprint 076 - Live Validation Evidence](SPRINT-076-live-validation-evidence.md)
 
-Sprint 075A fixture acquisition is complete. The Builder has applied the narrow
-Group-qualified GraphQL `id` publisher-identity calibration against the admitted
-fixture. Keep Sprint 075 active until Product Owner review; do not activate
-Sprint 076 yet.
+Sprint 075 — Real-Shape Home Feed Extractor Calibration is accepted at
+implementation commit `0932eba`. The admitted fixture extracts one expected
+`GROUP` candidate, off-path GraphQL ids remain rejected, the focused extractor
+suite passes 23/23, and the repeated live run improved from zero to five
+candidates with five submissions.
 
-If new safe diagnostics identify capture, checkout, lease, publisher
-observation, or content submission as the exhausted stage, stop and
-shape a narrow correction sprint at that layer instead of changing extraction.
+Sprint 076 is validation-only. Complete five Playwright baseline runs across at
+least two UTC dates, record only safe aggregate evidence, verify useful content,
+duplicate merging, lease release, discovered-source review, and one approved
+group promotion. Do not change runtime code inside this sprint.
 
-Sprint 074 — Home Feed Extraction Diagnostics is accepted.
+If validation reveals a blocking defect, stop the affected acceptance claim and
+shape a narrow correction sprint at the lowest responsible layer.
 
 Remaining Collector-completion sequence:
 
-1. Complete Sprint 075 Product Owner review.
-2. [Sprint 076 - Repeated Live Collector Validation](SPRINT-076-repeated-live-collector-validation.md)
-3. [Sprint 077 - Collector MVP Baseline Lock](SPRINT-077-collector-mvp-baseline-lock.md)
+1. Complete Sprint 076 repeated live validation.
+2. [Sprint 077 - Collector MVP Baseline Lock](SPRINT-077-collector-mvp-baseline-lock.md)
 
-Content Builder remains parked until the Collector completion gate passes and
-Sprint 077 locks the operational baseline.
+Content Builder remains parked until Sprint 077 locks the Collector operational
+baseline.
