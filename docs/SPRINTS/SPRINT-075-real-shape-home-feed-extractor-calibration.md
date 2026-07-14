@@ -2,9 +2,8 @@
 
 ## Status
 
-Active. The Required Evidence Packet classifies the gap as `EXTRACTION`, and
-the sanitized real-shape group-text-post fixture is admitted. Narrow extractor
-calibration against that fixture is authorized.
+Accepted. Product Owner review accepted the calibrated extractor at commit
+`0932eba` after the path-enforcement correction and negative regressions.
 
 ## Goal
 
@@ -280,7 +279,10 @@ Sprint 075 is complete only when all of the following are demonstrated:
 - No broad live-Facebook success or general extractor-compatibility claim is
   made from one fixture/run.
 
-Product Owner review determines acceptance.
+Product Owner review accepted Sprint 075. The admitted fixture changed from
+zero candidates to one expected `GROUP` candidate, the repeated live run changed
+from zero to five candidates with five submissions, and the exact path guard plus
+negative regressions preserve the stable-publisher boundary.
 
 ## Stop Conditions
 
