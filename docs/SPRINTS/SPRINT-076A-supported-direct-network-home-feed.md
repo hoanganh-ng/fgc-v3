@@ -2,10 +2,28 @@
 
 ## Status
 
-Active and approved for Builder execution. Sprint 076 is paused. After this
-correction is accepted, Sprint 076B — Reviewable Discovered-Source Identity is
-the next active correction; live validation restarts only after both are
-accepted.
+Accepted by the Product Owner on 2026-07-14 at commit `f7a4970`. Sprint 076B —
+Reviewable Discovered-Source Identity is active. Sprint 076 remains paused
+until Sprint 076B is accepted.
+
+## Acceptance Record
+
+- Focused network-mode verification: 164 tests passed.
+- Backend/Web typecheck and Web production build passed.
+- Full unit suite: 1,965 passed, 18 skipped.
+- HTTP DB suite: 214 passed; Docker E2E suite: 19 passed.
+- Profile-focused Docker DB verification: 31 passed, including mapper, journal,
+  repository, and migration `0029` coverage.
+- Full Docker DB noise was separated as pre-existing isolated-database,
+  shared-state, and concurrent-claim harness behavior; affected profile suites
+  passed.
+- Proposed `V06` used supported `DIRECT` configuration with no checkout bypass,
+  reached `HOME_FEED`, captured 72 payloads, extracted/submitted six items, and
+  released its lease.
+- No proxy/session secrets were present in the safe runner output.
+
+`V06` remains proposed until Sprint 076B is accepted, at which point it becomes
+the first Sprint 076 supported-baseline sample.
 
 ## Goal
 

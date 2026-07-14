@@ -24,8 +24,8 @@ Content Builder discovery.
 
 ## Current Active Sprint
 
-Sprint 076A — Supported Direct-Network Home-Feed Baseline is **active and
-approved for Builder execution**.
+Sprint 076B — Reviewable Discovered-Source Identity is **active and approved
+for Builder execution**.
 
 Sprint 075 is accepted. It classified the live gap as `EXTRACTION`, admitted a
 sanitized configured-group text-post fixture, and calibrated the extractor to
@@ -37,23 +37,22 @@ live run improved from zero to five candidates and submitted all five.
 
 Sprint 076 exploratory samples then proved useful content, duplicate merging,
 and lease release, but they required a temporary proxy eligibility bypass.
-Sprint 076A now adds an explicit supported `DIRECT` network mode and keeps the
-accepted normal `https://www.facebook.com/` target. Builder implementation and
-automated verification are complete in the worktree, including migration
-`0029_network_context_mode_backfill` and one proposed clean Playwright DIRECT
-home-feed proof (`V06` candidate). Sprint 076A remains unaccepted until Product
-Owner review.
+Sprint 076A is accepted at commit `f7a4970`. It adds the explicit persisted
+`UNCONFIGURED | DIRECT | PROXY` contract, preserves the accepted normal
+`https://www.facebook.com/` target, and proves one clean supported Playwright
+DIRECT run with no checkout bypass and a released lease. That proof remains
+proposed `V06` until Sprint 076B is accepted.
 
 The Product Owner also found a second acceptance blocker: Discovered Sources can
 show only an opaque external publisher ID, omit any review URL, and still enable
 Approve. Sprint 076B — Reviewable Discovered-Source Identity is shaped and
-approved as the next correction after Sprint 076A. The earlier exploratory
-source approval/promotion does not count as acceptance evidence.
+approved as the active correction. The earlier exploratory source
+approval/promotion does not count as acceptance evidence.
 
 The planned completion sequence is:
 
-- **Sprint 076A — Supported Direct-Network Home-Feed Baseline**: implement and
-  prove standard direct-network checkout with one clean Playwright run.
+- **Sprint 076A — Supported Direct-Network Home-Feed Baseline**: accepted;
+  standard direct-network checkout and one clean Playwright run are proven.
 - **Sprint 076B — Reviewable Discovered-Source Identity**: expose a safe
   Facebook review link, keep opaque IDs as technical detail, and fail approval
   closed when no safe review destination exists.
@@ -100,8 +99,6 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 
 ## Current Known Gaps
 
-- Direct-network profiles need the explicit supported Sprint 076A mode and clean
-  no-bypass proof.
 - ID-only discovered groups need Sprint 076B safe review links and
   application-level approval gating.
 - The complete home-feed-to-review loop still needs five supported baseline live

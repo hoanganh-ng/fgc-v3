@@ -2,7 +2,7 @@
 
 ## Status
 
-Paused for Sprint 076A and Sprint 076B. Same-day samples `V01`–`V05` are
+Paused for Sprint 076B. Sprint 076A is accepted. Same-day samples `V01`–`V05` are
 retained as exploratory evidence only because they used a temporary
 proxy-eligibility bypass. The bypass was restored. The Product Owner chose
 supported direct networking and accepted the normal
@@ -14,7 +14,7 @@ publisher IDs without names or review URLs while leaving Approve enabled.
 Therefore the exploratory source-review/promotion observation below does not
 satisfy the Collector acceptance gate.
 
-After Sprint 076A and Sprint 076B acceptance, record the clean direct-network
+After Sprint 076B acceptance, count the already-recorded clean direct-network
 proof as `V06` and complete final supported-path samples `V07`–`V10` on a
 genuinely later UTC date. Repeat source review and promotion through the
 accepted safe review-link flow.
@@ -54,13 +54,13 @@ Facebook names, text, identifiers, or URLs.
 | V09 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
 | V10 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
 
-`V06` is the Sprint 076A proposed clean DIRECT proof: configured through the
+`V06` is the accepted Sprint 076A clean DIRECT proof: configured through the
 supported configuration API (`mode: DIRECT`, `proxy: null`, killswitch
 `false`/`false`), no temporary checkout bypass, normal
 `https://www.facebook.com/` target, standard checkout, `HOME_FEED` page state,
-and lease release. It becomes the first final-baseline sample only after Product
-Owner acceptance of Sprint 076A and Sprint 076B. Content usefulness for V06 is
-not scored in this packet.
+and lease release. It becomes the first final-baseline sample after Product
+Owner acceptance of Sprint 076B. Content usefulness for V06 is not scored in
+this packet.
 
 No sample counts here if it requires a checkout bypass, temporary source edit,
 proxy-rule comment, or non-standard profile mutation.
@@ -403,21 +403,21 @@ contentReviewUsable: yes
 discoveredSourceReviewUsable: no — opaque ID only, no safe review URL
 eligibleGroupPromotedPaused: exploratory action only; final proof must be repeated
 safetyConfirmationComplete: exploratory packet safe; final baseline pending
-unresolvedBlockingDefects: discovered-source approval is not reviewable (Sprint 076B); final multi-day DIRECT baseline V07-V10 still required after both corrections
-acceptanceBlocker: Sprint 076A Product Owner acceptance, Sprint 076B, and final V07-V10 baseline required
-productOwnerDecision: PAUSED_FOR_SPRINT_076A_AND_076B
+unresolvedBlockingDefects: discovered-source approval is not reviewable (Sprint 076B); final multi-day DIRECT baseline V07-V10 remains required
+acceptanceBlocker: Sprint 076B and final V07-V10 baseline required
+productOwnerDecision: PAUSED_FOR_SPRINT_076B
 ```
 
 ## Progress / Resume Notes
 
 ```text
 resumeRequired: yes
-resumeReason: final evidence must use accepted DIRECT checkout and reviewable discovered-source approval
-onResume: accept Sprint 076A (proposed V06 already recorded), then accept Sprint 076B; count V06 as first final-baseline sample; run V07-V10 on a genuinely later UTC date; repeat source review/promotion through the safe review-link flow; never reapply the proxy bypass
+resumeReason: final evidence has accepted DIRECT checkout but still requires reviewable discovered-source approval
+onResume: accept Sprint 076B; count V06 as first final-baseline sample; run V07-V10 on a genuinely later UTC date; repeat source review/promotion through the safe review-link flow; never reapply the proxy bypass
 cloakhrowserSubstitution: not used
-sprint076AImplementedPendingAcceptance: yes
+sprint076AAccepted: yes
 sprint076Accepted: no
 sprint077Activated: no
 contentBuilderStarted: no
-committed: no
+latestAcceptedCorrectionCommit: f7a4970
 ```

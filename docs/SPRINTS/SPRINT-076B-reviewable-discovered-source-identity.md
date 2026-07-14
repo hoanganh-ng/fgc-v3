@@ -2,9 +2,9 @@
 
 ## Status
 
-Shaped and approved for Builder execution **after Sprint 076A is accepted**.
-Sprint 076 remains paused. This sprint is not active while Sprint 076A is active,
-and it must not be implemented concurrently with that network-mode correction.
+Active and approved for Builder execution. Sprint 076A was accepted by the
+Product Owner on 2026-07-14 at commit `f7a4970`. Sprint 076 remains paused until
+this correction is accepted.
 
 ## Goal
 
@@ -49,6 +49,8 @@ extractor-to-UI flow.
 Read only:
 
 - `AGENTS.md`;
+- `DESIGN.md` as visual context only; the Review Identity Contract remains the
+  behavior authority;
 - `docs/SPRINTS/active.md`;
 - this sprint;
 - `docs/SPRINTS/SPRINT-076-repeated-live-collector-validation.md`;
@@ -283,16 +285,15 @@ Stop and report instead of expanding scope when:
 
 ## Builder Handoff Prompt
 
-Do not execute until Sprint 076A is accepted and the active pointer is moved to
-this sprint.
-
-Then implement Sprint 076B —
+Implement Sprint 076B —
 `docs/SPRINTS/SPRINT-076B-reviewable-discovered-source-identity.md`.
 
 Use the exact Review Identity Contract and Required Context. Add the computed
 safe `reviewUrl`, enforce the same application-level approval gate, fix the
 ID-only UI state, and tighten the admitted Sprint 075 fixture assertion. Make no
-new raw capture and no database migration.
+new raw capture and no database migration. Use root `DESIGN.md` to preserve the
+existing operator-console visual language; it does not authorize behavior or
+scope beyond this sprint.
 
 Run every required verification command, then perform the Required Manual Proof
 against one existing ID-only discovered group. Return files changed, focused

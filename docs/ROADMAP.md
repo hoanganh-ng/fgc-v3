@@ -85,18 +85,19 @@ live run improved from zero to five candidates with five submissions.
 
 ### Sprint 076A — Supported Direct-Network Home-Feed Baseline
 
-Status: **active**.
+Status: **accepted**.
 
 Make direct networking an explicit persisted profile mode so standard
 provisioning, checkout, trusted runtime configuration, and browser launch work
 without a proxy bypass.
 
-Expected outcome: one clean normal-home Playwright run through supported
-`DIRECT` checkout, with its lease released.
+Expected outcome achieved: explicit direct-network configuration passes the
+supported path, and proposed `V06` completed one clean normal-home Playwright
+run with no bypass and a released lease.
 
 ### Sprint 076B — Reviewable Discovered-Source Identity
 
-Status: **shaped and approved; queued after Sprint 076A**.
+Status: **active and approved for Builder execution**.
 
 Give every approval candidate a safe Facebook review destination, keep opaque
 IDs as technical details, and reject approval when no safe destination exists.
@@ -107,9 +108,9 @@ captured display name and canonical URL.
 
 ### Sprint 076 — Repeated Live Collector Validation
 
-Status: **paused behind Sprint 076A and Sprint 076B**.
+Status: **paused behind Sprint 076B**.
 
-After both corrections are accepted, run the complete supported
+After Sprint 076B is accepted, run the complete supported
 home-feed-to-review flow five times with Playwright across at least two UTC dates
 and record safe evidence against the Collector Completion Gate. Repeat the
 discovered-source review and promotion proof through the accepted review-link
