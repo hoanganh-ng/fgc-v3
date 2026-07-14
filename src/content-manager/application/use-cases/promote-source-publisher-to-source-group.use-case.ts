@@ -13,7 +13,10 @@ import type { ContentCategoryRepository } from "../ports/content-category-reposi
 import type { IdGenerator } from "../ports/id-generator.port";
 import type { SourceGroupRepository } from "../ports/source-group-repository.port";
 import type { SourcePublisherRepository } from "../ports/source-publisher-repository.port";
-import { createDefaultSourceGroupEntryRoute } from "../../domain";
+import {
+  createDefaultSourceGroupEntryRoute,
+  resolveSourcePublisherReviewUrl,
+} from "../../domain";
 import type {
   ContentCategoryId,
   SourceGroup,
@@ -92,7 +95,9 @@ export class PromoteSourcePublisherToSourceGroupUseCase {
       };
     }
 
-    const resolvedUrl = input.url ?? sourcePublisher.canonicalUrl;
+    const reviewUrl = resolveSourcePublisherReviewUrl(sourcePublisher);
+    const resolvedUrl =
+      input.url ?? sourcePublisher.canonicalUrl ?? reviewUrl;
 
     if (resolvedUrl === undefined || resolvedUrl.trim().length === 0) {
       throw new SourcePublisherNotPromotableError(

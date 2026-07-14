@@ -404,6 +404,91 @@ describe("source publisher application use cases", () => {
     expect(statusRepository.updateStatusCount).toBe(updateStatusCountBefore);
   });
 
+  it("rejects APPROVED when no safe reviewUrl can be produced and leaves status unchanged", async () => {
+    const statusRepository = new CountingSourcePublisherRepository();
+    const context = createTestContext(["publisher-1"]);
+
+    await new ObserveSourcePublisherUseCase(
+      statusRepository,
+      context.ids,
+      context.clock,
+    ).execute({
+      platform: "FACEBOOK",
+      kind: "PAGE",
+      externalPublisherId: "facebook-page-1",
+      observedAt: baseObservedAt,
+    });
+
+    const before = (await statusRepository.findById("publisher-1"))!;
+    const updateStatusCountBefore = statusRepository.updateStatusCount;
+
+    await expect(
+      new UpdateSourcePublisherStatusUseCase(
+        statusRepository,
+        context.clock,
+      ).execute({
+        sourcePublisherId: "publisher-1",
+        status: "APPROVED",
+      }),
+    ).rejects.toMatchObject({
+      code: "SOURCE_PUBLISHER_NOT_REVIEWABLE",
+      sourcePublisherId: "publisher-1",
+    });
+
+    expect(await statusRepository.findById("publisher-1")).toEqual(before);
+    expect(statusRepository.updateStatusCount).toBe(updateStatusCountBefore);
+  });
+
+  it("allows APPROVED for ID-only Facebook groups via the derived reviewUrl", async () => {
+    const context = createTestContext(["publisher-1"]);
+
+    await new ObserveSourcePublisherUseCase(
+      context.sourcePublishers,
+      context.ids,
+      context.clock,
+    ).execute({
+      platform: "FACEBOOK",
+      kind: "GROUP",
+      externalPublisherId: "facebook-group-only-id",
+      observedAt: baseObservedAt,
+    });
+
+    const updated = await new UpdateSourcePublisherStatusUseCase(
+      context.sourcePublishers,
+      context.clock,
+    ).execute({
+      sourcePublisherId: "publisher-1",
+      status: "APPROVED",
+    });
+
+    expect(updated.status).toBe("APPROVED");
+  });
+
+  it("allows non-APPROVED status updates without a reviewUrl", async () => {
+    const context = createTestContext(["publisher-1"]);
+
+    await new ObserveSourcePublisherUseCase(
+      context.sourcePublishers,
+      context.ids,
+      context.clock,
+    ).execute({
+      platform: "FACEBOOK",
+      kind: "PAGE",
+      externalPublisherId: "facebook-page-1",
+      observedAt: baseObservedAt,
+    });
+
+    const updated = await new UpdateSourcePublisherStatusUseCase(
+      context.sourcePublishers,
+      context.clock,
+    ).execute({
+      sourcePublisherId: "publisher-1",
+      status: "IGNORED",
+    });
+
+    expect(updated.status).toBe("IGNORED");
+  });
+
   it("rejects a malformed aggregate returned by updateStatus", async () => {
     const malformedRepository = new MalformedUpdateStatusSourcePublisherRepository();
     const context = createTestContext(["publisher-1"]);
@@ -1132,30 +1217,25 @@ describe("PromoteSourcePublisherToSourceGroupUseCase", () => {
     ).rejects.toBeInstanceOf(ContentCategoryNotFoundError);
   });
 
-  it("rejects promotion when no URL is available from input or publisher", async () => {
-    const context = createPromoteContext();
+  it("promotes using the derived safe review URL when canonicalUrl is absent", async () => {
+    const context = createPromoteContext(["source-group-review-url"]);
     await seedCategory(context.categories);
     await seedApprovedGroupPublisher(context, {
-      id: "publisher-no-url",
+      id: "publisher-no-canonical",
+      externalPublisherId: "synthetic-group-no-canonical",
       canonicalUrl: undefined,
     });
 
-    await expect(
-      createUseCase(context).execute({
-        sourcePublisherId: "publisher-no-url",
-        categoryId: "category-1",
-        collectionPriority: 50,
-      }),
-    ).rejects.toMatchObject({
-      code: "SOURCE_PUBLISHER_NOT_PROMOTABLE",
-      reason: "MISSING_URL",
+    const result = await createUseCase(context).execute({
+      sourcePublisherId: "publisher-no-canonical",
+      categoryId: "category-1",
+      collectionPriority: 50,
     });
 
-    const storedAfter = await context.sourceGroups.list({
-      limit: 50,
-      offset: 0,
-    });
-    expect(storedAfter.items).toEqual([]);
+    expect(result.outcome).toBe("CREATED");
+    expect(result.sourceGroup.url).toBe(
+      "https://www.facebook.com/groups/synthetic-group-no-canonical/",
+    );
   });
 
   it("does not mutate SourcePublisher status or observation counts on promotion", async () => {

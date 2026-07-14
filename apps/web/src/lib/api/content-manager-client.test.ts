@@ -137,18 +137,29 @@ describe("SourcePublisher API schema (Sprint 069)", () => {
     expect(result.success).toBe(true);
   });
 
-  it("accepts omitted optional displayName and canonicalUrl", () => {
+  it("accepts omitted optional displayName, canonicalUrl, and reviewUrl", () => {
     const result = SourcePublisherSchema.safeParse({
       ...makeSourcePublisher(),
       displayName: undefined,
       canonicalUrl: undefined,
+      reviewUrl: undefined,
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.displayName).toBeUndefined();
       expect(result.data.canonicalUrl).toBeUndefined();
+      expect(result.data.reviewUrl).toBeUndefined();
     }
+  });
+
+  it("accepts a safe reviewUrl on the SourcePublisher DTO", () => {
+    const result = SourcePublisherSchema.safeParse({
+      ...makeSourcePublisher(),
+      reviewUrl: "https://www.facebook.com/groups/fb-group-1/",
+    });
+
+    expect(result.success).toBe(true);
   });
 
   it("rejects null optional SourcePublisher fields", () => {

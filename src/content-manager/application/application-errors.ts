@@ -15,6 +15,7 @@ export type ContentManagerApplicationErrorCode =
   | "CONTENT_VALIDATION_ERROR"
   | "SOURCE_PUBLISHER_NOT_FOUND"
   | "SOURCE_PUBLISHER_NOT_PROMOTABLE"
+  | "SOURCE_PUBLISHER_NOT_REVIEWABLE"
   | "HOME_FEED_CONTENT_PLATFORM_MISMATCH";
 
 export abstract class ContentManagerApplicationError extends Error {
@@ -156,6 +157,18 @@ export class SourcePublisherNotPromotableError extends ContentManagerApplication
     );
     this.sourcePublisherId = sourcePublisherId;
     this.reason = reason;
+  }
+}
+
+export class SourcePublisherNotReviewableError extends ContentManagerApplicationError {
+  public readonly sourcePublisherId: string;
+
+  public constructor(sourcePublisherId: string) {
+    super(
+      "SOURCE_PUBLISHER_NOT_REVIEWABLE",
+      `Source publisher cannot be approved without a safe Facebook review link: ${sourcePublisherId}.`,
+    );
+    this.sourcePublisherId = sourcePublisherId;
   }
 }
 

@@ -108,6 +108,7 @@ export const SourcePublisherSchema = z
     externalPublisherId: NonEmptyStringSchema,
     displayName: NonEmptyStringSchema.optional(),
     canonicalUrl: z.string().url().optional(),
+    reviewUrl: z.string().url().optional(),
     status: SourcePublisherStatusSchema,
     firstObservedAt: NonEmptyStringSchema,
     lastObservedAt: NonEmptyStringSchema,

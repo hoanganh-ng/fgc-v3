@@ -224,6 +224,9 @@ describe("FacebookHomeFeedGraphQLPayloadExtractor", () => {
         platform: "FACEBOOK",
         kind: "GROUP",
         externalPublisherId: "fixture-group-graphql-node-id",
+        displayName: "Synthetic Home Feed Group",
+        canonicalUrl:
+          "https://www.facebook.com/groups/synthetic-home-feed-group/",
       },
     });
     expect(result.warnings.map((warning) => warning.code)).not.toContain(

@@ -18,6 +18,12 @@ export const SOURCE_PUBLISHER_STATUS_FILTER_OPTIONS = [
 export const SOURCE_PUBLISHER_KIND_FILTER_OPTIONS = ["GROUP", "PAGE"] as const;
 export const SOURCE_PUBLISHER_PLATFORM_FILTER_OPTIONS = ["FACEBOOK"] as const;
 
+export const SOURCE_PUBLISHER_APPROVAL_UNAVAILABLE_REASON =
+  "Approval unavailable until this source has a safe Facebook review link.";
+
+export const SOURCE_PUBLISHER_REVIEW_GUIDANCE =
+  "Open and verify the source on Facebook before approving it.";
+
 export const SourcePublisherFilterSchema = z
   .object({
     status: z.union([SourcePublisherStatusSchema, z.literal("ALL")]),
@@ -59,10 +65,34 @@ export interface SourcePublisherPromotionGate {
   readonly reason?: string;
 }
 
+export interface SourcePublisherApprovalGate {
+  readonly allowed: boolean;
+  readonly reason?: string;
+}
+
 export function getSourcePublisherDisplayName(
   sourcePublisher: SourcePublisher,
 ): string {
-  return sourcePublisher.displayName ?? sourcePublisher.externalPublisherId;
+  if (sourcePublisher.displayName !== undefined) {
+    return sourcePublisher.displayName;
+  }
+
+  return sourcePublisher.kind === "PAGE"
+    ? "Unnamed Facebook page"
+    : "Unnamed Facebook group";
+}
+
+export function getSourcePublisherApprovalGate(
+  sourcePublisher: SourcePublisher,
+): SourcePublisherApprovalGate {
+  if (sourcePublisher.reviewUrl === undefined) {
+    return {
+      allowed: false,
+      reason: SOURCE_PUBLISHER_APPROVAL_UNAVAILABLE_REASON,
+    };
+  }
+
+  return { allowed: true };
 }
 
 export function getSourcePublisherPromotionGate(
@@ -102,7 +132,7 @@ export function toSourcePublisherPromotionDefaultValues(
     categoryId: firstCategoryId ?? "",
     collectionPriority: 50,
     name: getSourcePublisherDisplayName(sourcePublisher),
-    url: sourcePublisher.canonicalUrl ?? "",
+    url: sourcePublisher.canonicalUrl ?? sourcePublisher.reviewUrl ?? "",
     notes: "",
   };
 }
@@ -111,13 +141,14 @@ export function getSourcePublisherPromotionFormSchema(
   sourcePublisher: SourcePublisher,
 ) {
   return SourcePublisherPromotionFormSchema.superRefine((values, context) => {
-    if (
-      sourcePublisher.canonicalUrl === undefined &&
-      values.url.trim().length === 0
-    ) {
+    const hasDefaultUrl =
+      sourcePublisher.canonicalUrl !== undefined ||
+      sourcePublisher.reviewUrl !== undefined;
+
+    if (!hasDefaultUrl && values.url.trim().length === 0) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "URL is required when the publisher has no canonical URL.",
+        message: "URL is required when the publisher has no safe review URL.",
         path: ["url"],
       });
     }

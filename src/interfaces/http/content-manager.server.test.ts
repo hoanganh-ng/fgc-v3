@@ -7,6 +7,7 @@ import {
   SourceGroupNotFoundError,
   SourcePublisherNotFoundError,
   SourcePublisherNotPromotableError,
+  SourcePublisherNotReviewableError,
 } from "../../content-manager/application";
 import { toSourcePublisherDto } from "./routes/content-manager.routes";
 import { createHttpServer } from "./server";
@@ -961,6 +962,7 @@ describe("Content Manager HTTP routes", () => {
       });
       expect(body.sourcePublisher).not.toHaveProperty("displayName");
       expect(body.sourcePublisher).not.toHaveProperty("canonicalUrl");
+      expect(body.sourcePublisher).not.toHaveProperty("reviewUrl");
     } finally {
       await server.close();
     }
@@ -1514,18 +1516,65 @@ describe("Content Manager HTTP routes", () => {
     }
   });
 
-  it("toSourcePublisherDto omits displayName and canonicalUrl when absent", async () => {
+  it("toSourcePublisherDto omits displayName and canonicalUrl when absent and includes derived group reviewUrl", async () => {
     const dto = toSourcePublisherDto(
       createSourcePublisher({
         displayName: undefined,
         canonicalUrl: undefined,
+        kind: "GROUP",
+        externalPublisherId: "fb-group-derived",
       }),
     );
 
     expect(dto).not.toHaveProperty("displayName");
     expect(dto).not.toHaveProperty("canonicalUrl");
+    expect(dto.reviewUrl).toBe(
+      "https://www.facebook.com/groups/fb-group-derived/",
+    );
     expect(dto.id).toBe("source-publisher-1");
     expect(dto.observationCount).toBe(1);
+  });
+
+  it("toSourcePublisherDto omits reviewUrl for pages without a safe canonical URL", async () => {
+    const dto = toSourcePublisherDto(
+      createSourcePublisher({
+        kind: "PAGE",
+        displayName: undefined,
+        canonicalUrl: undefined,
+        externalPublisherId: "fb-page-1",
+      }),
+    );
+
+    expect(dto).not.toHaveProperty("reviewUrl");
+  });
+
+  it("maps SOURCE_PUBLISHER_NOT_REVIEWABLE status PATCH to 409", async () => {
+    const { server, service } = createTestServer();
+
+    service.updateSourcePublisherStatus.setError(
+      new SourcePublisherNotReviewableError("source-publisher-1"),
+    );
+
+    try {
+      const response = await server.inject({
+        method: "PATCH",
+        url: "/collector/source-publishers/source-publisher-1/status",
+        payload: { status: "APPROVED" },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: { code: "SOURCE_PUBLISHER_NOT_REVIEWABLE" },
+      });
+      expect(service.updateSourcePublisherStatus.calls).toEqual([
+        {
+          sourcePublisherId: "source-publisher-1",
+          status: "APPROVED",
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
   });
 });
 

@@ -3,10 +3,16 @@ import {
   toIsoDateTime,
   validateSourcePublisherForApplication,
 } from "../content-validation";
-import { SourcePublisherNotFoundError } from "../application-errors";
+import {
+  SourcePublisherNotFoundError,
+  SourcePublisherNotReviewableError,
+} from "../application-errors";
 import type { Clock } from "../ports/clock.port";
 import type { SourcePublisherRepository } from "../ports/source-publisher-repository.port";
-import { applySourcePublisherStatusUpdate } from "../../domain";
+import {
+  applySourcePublisherStatusUpdate,
+  resolveSourcePublisherReviewUrl,
+} from "../../domain";
 import type {
   SourcePublisher,
   SourcePublisherId,
@@ -32,6 +38,14 @@ export class UpdateSourcePublisherStatusUseCase {
       this.sourcePublishers,
       input.sourcePublisherId,
     );
+
+    if (
+      input.status === "APPROVED" &&
+      existing.status !== "APPROVED" &&
+      resolveSourcePublisherReviewUrl(existing) === undefined
+    ) {
+      throw new SourcePublisherNotReviewableError(existing.id);
+    }
 
     const candidate = applySourcePublisherStatusUpdate(
       existing,

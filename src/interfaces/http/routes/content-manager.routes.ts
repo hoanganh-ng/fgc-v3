@@ -39,7 +39,10 @@ import type {
   SourcePublisherId,
   TopComment,
 } from "../../../content-manager/domain";
-import { resolveSourceGroupEntryRoutes } from "../../../content-manager/domain";
+import {
+  resolveSourceGroupEntryRoutes,
+  resolveSourcePublisherReviewUrl,
+} from "../../../content-manager/domain";
 import {
   ContentItemIdHttpParamsSchema,
   CreateContentCategoryHttpBodySchema,
@@ -244,6 +247,7 @@ export interface SourcePublisherDto {
   readonly externalPublisherId: string;
   readonly displayName?: string;
   readonly canonicalUrl?: string;
+  readonly reviewUrl?: string;
   readonly status: SourcePublisher["status"];
   readonly firstObservedAt: IsoDateTime;
   readonly lastObservedAt: IsoDateTime;
@@ -803,6 +807,8 @@ function toTopCommentDto(comment: TopComment): TopCommentDto {
 export function toSourcePublisherDto(
   sourcePublisher: SourcePublisher,
 ): SourcePublisherDto {
+  const reviewUrl = resolveSourcePublisherReviewUrl(sourcePublisher);
+
   return {
     id: sourcePublisher.id,
     platform: sourcePublisher.platform,
@@ -814,6 +820,7 @@ export function toSourcePublisherDto(
     ...(sourcePublisher.canonicalUrl !== undefined
       ? { canonicalUrl: sourcePublisher.canonicalUrl }
       : {}),
+    ...(reviewUrl !== undefined ? { reviewUrl } : {}),
     status: sourcePublisher.status,
     firstObservedAt: sourcePublisher.firstObservedAt,
     lastObservedAt: sourcePublisher.lastObservedAt,

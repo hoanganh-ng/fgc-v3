@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  getSourcePublisherApprovalGate,
   getSourcePublisherDisplayName,
   getSourcePublisherPromotionFormSchema,
   getSourcePublisherPromotionGate,
+  SOURCE_PUBLISHER_APPROVAL_UNAVAILABLE_REASON,
   SourcePublisherFilterSchema,
   SourcePublisherPromotionFormSchema,
   toPromoteSourcePublisherRequest,
@@ -24,7 +26,8 @@ function createSourcePublisher(
     kind: "GROUP",
     externalPublisherId: "fb-group-1",
     displayName: "Publisher Group",
-    canonicalUrl: "https://facebook.test/groups/fb-group-1",
+    canonicalUrl: "https://www.facebook.com/groups/fb-group-1/",
+    reviewUrl: "https://www.facebook.com/groups/fb-group-1/",
     status: "APPROVED",
     firstObservedAt: timestamp,
     lastObservedAt: timestamp,
@@ -57,12 +60,34 @@ describe("source publisher review view model", () => {
     ).toBe(true);
   });
 
-  it("falls back to externalPublisherId when displayName is omitted", () => {
-    const { displayName: _displayName, ...publisher } = createSourcePublisher();
+  it("uses unnamed Facebook group/page labels instead of the opaque external ID", () => {
+    const { displayName: _displayName, ...group } = createSourcePublisher();
+    const { displayName: _pageName, ...page } = createSourcePublisher({
+      kind: "PAGE",
+      externalPublisherId: "fb-page-1",
+    });
 
-    expect(
-      getSourcePublisherDisplayName(publisher),
-    ).toBe("fb-group-1");
+    expect(getSourcePublisherDisplayName(group)).toBe("Unnamed Facebook group");
+    expect(getSourcePublisherDisplayName(page)).toBe("Unnamed Facebook page");
+    expect(getSourcePublisherDisplayName(createSourcePublisher())).toBe(
+      "Publisher Group",
+    );
+  });
+
+  it("allows approval only when a safe reviewUrl is present", () => {
+    expect(getSourcePublisherApprovalGate(createSourcePublisher())).toEqual({
+      allowed: true,
+    });
+
+    const { reviewUrl: _reviewUrl, ...withoutReviewUrl } = createSourcePublisher({
+      kind: "PAGE",
+      canonicalUrl: undefined,
+    });
+
+    expect(getSourcePublisherApprovalGate(withoutReviewUrl)).toEqual({
+      allowed: false,
+      reason: SOURCE_PUBLISHER_APPROVAL_UNAVAILABLE_REASON,
+    });
   });
 
   it("allows promotion only for approved Facebook group publishers with categories", () => {
@@ -87,7 +112,7 @@ describe("source publisher review view model", () => {
     );
   });
 
-  it("builds promotion defaults from publisher displayName, canonicalUrl, and first category", () => {
+  it("builds promotion defaults from displayName and prefers canonicalUrl over reviewUrl", () => {
     expect(
       toSourcePublisherPromotionDefaultValues(
         createSourcePublisher(),
@@ -97,9 +122,19 @@ describe("source publisher review view model", () => {
       categoryId: "category-1",
       collectionPriority: 50,
       name: "Publisher Group",
-      url: "https://facebook.test/groups/fb-group-1",
+      url: "https://www.facebook.com/groups/fb-group-1/",
       notes: "",
     });
+  });
+
+  it("defaults promotion URL to reviewUrl when canonicalUrl is absent", () => {
+    const { canonicalUrl: _canonicalUrl, ...publisher } = createSourcePublisher({
+      reviewUrl: "https://www.facebook.com/groups/fb-group-1/",
+    });
+
+    expect(
+      toSourcePublisherPromotionDefaultValues(publisher, "category-1").url,
+    ).toBe("https://www.facebook.com/groups/fb-group-1/");
   });
 
   it("validates promotion form priority bounds", () => {
@@ -159,12 +194,32 @@ describe("source publisher review view model", () => {
       categoryId: "category-1",
       collectionPriority: 50,
       name: "Publisher Group",
-      url: "https://facebook.test/groups/fb-group-1",
+      url: "https://www.facebook.com/groups/fb-group-1/",
     });
   });
 
-  it("requires an operator URL when the publisher has no canonical URL", () => {
-    const { canonicalUrl: _canonicalUrl, ...publisher } = createSourcePublisher();
+  it("allows promotion with an empty operator URL when reviewUrl defaults apply", () => {
+    const { canonicalUrl: _canonicalUrl, ...publisher } = createSourcePublisher({
+      reviewUrl: "https://www.facebook.com/groups/fb-group-1/",
+    });
+
+    expect(
+      getSourcePublisherPromotionFormSchema(publisher).safeParse({
+        categoryId: "category-1",
+        collectionPriority: 50,
+        name: "",
+        url: "",
+        notes: "",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires an operator URL when the publisher has no canonical or review URL", () => {
+    const {
+      canonicalUrl: _canonicalUrl,
+      reviewUrl: _reviewUrl,
+      ...publisher
+    } = createSourcePublisher();
 
     expect(
       getSourcePublisherPromotionFormSchema(publisher).safeParse({

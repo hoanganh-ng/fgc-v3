@@ -36,11 +36,13 @@ import {
   useSourcePublishersQuery,
 } from "@/features/content-manager/content-manager-queries";
 import {
+  getSourcePublisherApprovalGate,
   getSourcePublisherDisplayName,
   getSourcePublisherPromotionFormSchema,
   getSourcePublisherPromotionGate,
   SOURCE_PUBLISHER_KIND_FILTER_OPTIONS,
   SOURCE_PUBLISHER_PLATFORM_FILTER_OPTIONS,
+  SOURCE_PUBLISHER_REVIEW_GUIDANCE,
   SOURCE_PUBLISHER_STATUS_FILTER_OPTIONS,
   SourcePublisherFilterSchema,
   toPromoteSourcePublisherRequest,
@@ -256,6 +258,7 @@ function SourcePublishersList({
         <div className="divide-y divide-border">
           {sourcePublishers.map((sourcePublisher) => {
             const displayName = getSourcePublisherDisplayName(sourcePublisher);
+            const approvalGate = getSourcePublisherApprovalGate(sourcePublisher);
             const isStatusPending =
               updateStatus.isPending &&
               updateStatus.variables?.sourcePublisherId === sourcePublisher.id;
@@ -292,14 +295,44 @@ function SourcePublishersList({
                       <StatusBadge label={sourcePublisher.kind} tone="info" />
                       <StatusBadge label={sourcePublisher.platform} tone="neutral" />
                       {isStatusPending ? (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs font-medium text-muted-foreground">
                           Updating
                         </span>
                       ) : null}
                     </div>
+                    {sourcePublisher.reviewUrl !== undefined ? (
+                      <a
+                        className="inline-flex max-w-full items-center gap-2 truncate text-sm font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary lg:justify-self-end"
+                        href={sourcePublisher.reviewUrl}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                        title={sourcePublisher.reviewUrl}
+                      >
+                        <span className="truncate">Open on Facebook</span>
+                        <ExternalLink aria-hidden="true" className="size-4" />
+                      </a>
+                    ) : null}
+                    <p className="max-w-md text-sm text-muted-foreground lg:text-right">
+                      {SOURCE_PUBLISHER_REVIEW_GUIDANCE}
+                    </p>
+                    {!approvalGate.allowed && approvalGate.reason !== undefined ? (
+                      <div
+                        className="max-w-md rounded border border-[#dfc36e] bg-[#fff7dc] px-3 py-2 text-sm font-medium text-[#76591a] lg:justify-self-end"
+                        role="status"
+                      >
+                        {approvalGate.reason}
+                      </div>
+                    ) : null}
                     <div className="flex flex-wrap gap-2 lg:justify-end">
                       <Button
-                        disabled={updateStatus.isPending}
+                        aria-label={
+                          approvalGate.allowed
+                            ? `Approve ${displayName}`
+                            : `Approve unavailable for ${displayName}`
+                        }
+                        disabled={
+                          updateStatus.isPending || !approvalGate.allowed
+                        }
                         size="sm"
                         variant="secondary"
                         onClick={() => changeStatus(sourcePublisher.id, "APPROVED")}
@@ -366,7 +399,7 @@ function SourcePublishersList({
                         <a
                           className="inline-flex max-w-full items-center gap-2 truncate font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary"
                           href={sourcePublisher.canonicalUrl}
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           target="_blank"
                           title={sourcePublisher.canonicalUrl}
                         >
@@ -575,7 +608,10 @@ function SourcePublisherPromotionPanel({
             id={`${sourcePublisher.id}-promotion-url`}
             autoComplete="off"
             disabled={!gate.allowed}
-            required={sourcePublisher.canonicalUrl === undefined}
+            required={
+              sourcePublisher.canonicalUrl === undefined &&
+              sourcePublisher.reviewUrl === undefined
+            }
             {...form.register("url")}
           />
         </FormField>

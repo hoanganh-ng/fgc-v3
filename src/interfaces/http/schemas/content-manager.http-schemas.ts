@@ -792,6 +792,10 @@ const sourcePublisherJsonSchema = {
       type: "string",
       format: "uri",
     },
+    reviewUrl: {
+      type: "string",
+      format: "uri",
+    },
     status: {
       type: "string",
       enum: SOURCE_PUBLISHER_STATUSES,

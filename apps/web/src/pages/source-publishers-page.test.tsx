@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 import type { ReactNode } from "react";
 import { primaryNavigation } from "@/app/navigation";
 import { contentManagerQueryKeys } from "@/features/content-manager/content-manager-queries";
+import {
+  SOURCE_PUBLISHER_APPROVAL_UNAVAILABLE_REASON,
+  SOURCE_PUBLISHER_REVIEW_GUIDANCE,
+} from "@/features/content-manager/source-publisher-review-view-model";
 import { SourcePublishersPage } from "@/pages/source-publishers-page";
 import type {
   ContentCategory,
@@ -27,7 +31,8 @@ function createSourcePublisher(
     kind: "GROUP",
     externalPublisherId: "fb-group-1",
     displayName: "Publisher Group",
-    canonicalUrl: "https://facebook.test/groups/fb-group-1",
+    canonicalUrl: "https://www.facebook.com/groups/fb-group-1/",
+    reviewUrl: "https://www.facebook.com/groups/fb-group-1/",
     status: "DISCOVERED",
     firstObservedAt: timestamp,
     lastObservedAt: timestamp,
@@ -111,14 +116,63 @@ describe("SourcePublishersPage", () => {
     ).toBe("/source-publishers");
   });
 
-  it("renders default review filters, fallback display name, canonical URL, and status actions", () => {
-    const { displayName: _displayName, ...publisher } = createSourcePublisher();
+  it("renders ID-only groups with unnamed heading, Open on Facebook, guidance, and Approve enabled", () => {
+    const { displayName: _displayName, canonicalUrl: _canonicalUrl, ...publisher } =
+      createSourcePublisher({
+        reviewUrl: "https://www.facebook.com/groups/fb-group-1/",
+      });
     const markup = renderPage({ sourcePublishers: [publisher] });
+
+    expect(markup).toContain("Unnamed Facebook group");
+    expect(markup).toContain("External Publisher ID");
+    expect(markup).toContain("fb-group-1");
+    expect(markup).toContain("Open on Facebook");
+    expect(markup).toContain('href="https://www.facebook.com/groups/fb-group-1/"');
+    expect(markup).toContain('rel="noopener noreferrer"');
+    expect(markup).toContain('target="_blank"');
+    expect(markup).toContain(SOURCE_PUBLISHER_REVIEW_GUIDANCE);
+    expect(markup).toContain("Approve");
+    expect(markup).not.toContain("Approve unavailable");
+    expect(markup).not.toContain(SOURCE_PUBLISHER_APPROVAL_UNAVAILABLE_REASON);
+  });
+
+  it("renders a captured display name instead of the unnamed heading", () => {
+    const markup = renderPage({
+      sourcePublishers: [createSourcePublisher()],
+    });
+
+    expect(markup).toContain("Publisher Group");
+    expect(markup).not.toContain("Unnamed Facebook group");
+  });
+
+  it("disables Approve and explains missing review links for non-reviewable pages", () => {
+    const {
+      displayName: _displayName,
+      canonicalUrl: _canonicalUrl,
+      reviewUrl: _reviewUrl,
+      ...publisher
+    } = createSourcePublisher({
+      kind: "PAGE",
+      externalPublisherId: "fb-page-1",
+    });
+    const markup = renderPage({ sourcePublishers: [publisher] });
+
+    expect(markup).toContain("Unnamed Facebook page");
+    expect(markup).toContain(SOURCE_PUBLISHER_APPROVAL_UNAVAILABLE_REASON);
+    expect(markup).toContain("Approve unavailable for Unnamed Facebook page");
+    expect(markup).toContain("disabled=\"\"");
+    expect(markup).not.toContain("Open on Facebook");
+  });
+
+  it("renders default review filters, review link, and status actions", () => {
+    const markup = renderPage({
+      sourcePublishers: [createSourcePublisher()],
+    });
 
     expect(markup).toContain("Review Filters");
     expect(markup).toContain("DISCOVERED");
     expect(markup).toContain("fb-group-1");
-    expect(markup).toContain("https://facebook.test/groups/fb-group-1");
+    expect(markup).toContain("https://www.facebook.com/groups/fb-group-1/");
     expect(markup).toContain("Approve");
     expect(markup).toContain("Ignore");
     expect(markup).toContain("Block");
@@ -140,9 +194,10 @@ describe("SourcePublishersPage", () => {
     expect(markup).toContain("Publisher Group");
   });
 
-  it("marks the promotion URL as required when an approved group has no canonical URL", () => {
+  it("does not require a promotion URL when reviewUrl can default the form", () => {
     const { canonicalUrl: _canonicalUrl, ...publisher } = createSourcePublisher({
       status: "APPROVED",
+      reviewUrl: "https://www.facebook.com/groups/fb-group-1/",
     });
     const markup = renderPage({
       sourcePublishers: [publisher],
@@ -150,7 +205,9 @@ describe("SourcePublishersPage", () => {
     });
 
     expect(markup).toContain("Promote to Source Group");
-    expect(markup).toContain(
+    expect(markup).toContain("Open on Facebook");
+    expect(markup).toContain('href="https://www.facebook.com/groups/fb-group-1/"');
+    expect(markup).not.toContain(
       'id="source-publisher-1-promotion-url" autoComplete="off" required=""',
     );
   });
