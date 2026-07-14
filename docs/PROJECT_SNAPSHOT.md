@@ -24,18 +24,20 @@ Content Builder discovery.
 
 ## Current Active Sprint
 
-Sprint 075 — Real-Shape Home Feed Extractor Calibration is **active**; the
-sanitized real-shape fixture is admitted and the narrow extractor calibration
-is implemented pending Product Owner review.
+Sprint 076 — Repeated Live Collector Validation is **active**.
 
-Sprint 074 is accepted and profile home-feed runs retain and expose a strict,
-safe aggregate diagnostic summary. Sprint 075 classified the gap as
-`EXTRACTION`, admitted the sanitized configured-group text-post fixture from
-commit `765ccad`, and calibrated the home-feed extractor to accept GraphQL
-`id` only from objects explicitly type-qualified as `Group` on
-fixture-demonstrated publisher paths (`to`,
-`comet_sections.action_link.group`). Arbitrary object ids, actor/user ids, and
-unqualified `target_group.id` remain excluded.
+Sprint 075 is accepted. It classified the live gap as `EXTRACTION`, admitted a
+sanitized configured-group text-post fixture, and calibrated the extractor to
+accept GraphQL `id` only from explicitly type-qualified `Group` objects at
+the exact candidate-relative paths `$.to` and
+`$.comet_sections.action_link.group`. Off-path, actor/user, kind-only, and
+unqualified `target_group.id` cases remain excluded. The accepted repeated
+live run improved from zero to five candidates and submitted all five.
+
+Sprint 076 now validates the complete existing home-feed-to-review loop through
+five Playwright baseline runs across at least two UTC dates, including useful
+content review, duplicate merging, lease release, discovered-source review, and
+one approved group promotion.
 
 The planned completion sequence is:
 
@@ -56,6 +58,8 @@ inserted before acceptance rather than expanding the validation sprint.
 Sprint 073 — Product Scope Lock And Surface Trim is accepted.
 
 Sprint 074 — Home Feed Extraction Diagnostics is accepted.
+
+Sprint 075 — Real-Shape Home Feed Extractor Calibration is accepted.
 
 Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted.
 
@@ -80,10 +84,10 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 
 ## Current Known Gaps
 
-- Manual live-Facebook validation of the calibrated home-feed extractor still
-  needs Product Owner review of the repeated operator run summary.
-- Further extractor calibration beyond the admitted Group-qualified `id` path
-  must be justified by new diagnostics and a separate sanitized fixture.
+- The complete home-feed-to-review loop still needs five baseline live runs
+  across multiple days with duplicate, lease, review, and promotion evidence.
+- Further extractor calibration beyond the admitted exact Group-qualified
+  `id` paths requires new diagnostics and a separate sanitized fixture.
 - Content Builder and Content Publisher remain parked until the collector loop is validated.
 
 ## Collector Completion Gate
