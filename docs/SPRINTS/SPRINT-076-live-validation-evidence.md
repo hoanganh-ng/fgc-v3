@@ -2,7 +2,8 @@
 
 ## Status
 
-Evidence intake active. Record safe aggregate facts only.
+Execution approved; evidence intake active. Record safe aggregate facts only.
+Awaiting baseline sample `V01`.
 
 ## Baseline Verification
 
