@@ -744,7 +744,7 @@ function collectPublisherReferencesFromValue(
     if (
       isPublisherContainerKey(normalizedKey) ||
       implicitKind !== undefined ||
-      isFixtureDemonstratedGroupPublisherPath(normalizedKey)
+      isFixtureDemonstratedGroupPublisherKey(normalizedKey)
     ) {
       collectPublisherReferenceFromContainer(
         child,
@@ -798,7 +798,7 @@ function buildPublisherReference(
   kind: PublisherReferenceKind,
 ): PublisherReference {
   const externalPublisherId = isHomeFeedPublisherKind(kind)
-    ? extractStablePublisherId(record, kind)
+    ? extractStablePublisherId(record, kind, path)
     : undefined;
   const displayName = extractTextByDirectKeys(record, PUBLISHER_DISPLAY_NAME_KEYS);
   const canonicalUrl = getUrlByKeys(record, PUBLISHER_CANONICAL_URL_KEYS);
@@ -814,9 +814,15 @@ function buildPublisherReference(
   };
 }
 
+const FIXTURE_DEMONSTRATED_GROUP_PUBLISHER_PATHS = new Set([
+  "$.to",
+  "$.comet_sections.action_link.group",
+]);
+
 function extractStablePublisherId(
   record: Record<string, unknown>,
   kind: FacebookHomeFeedPublisherKind,
+  path: string,
 ): string | undefined {
   const stableId = getScalarStringByKeys(
     record,
@@ -828,10 +834,17 @@ function extractStablePublisherId(
   }
 
   // Accept GraphQL `id` only from an object explicitly type-qualified as Group
-  // (e.g. fixture-demonstrated paths `to` or `comet_sections.action_link.group`).
+  // on a fixture-demonstrated publisher path (relative to the candidate
+  // Story): exactly $.to or $.comet_sections.action_link.group. Path-based
+  // authorization is required because container-key discovery alone would
+  // accept unrelated nested `group` keys or generic publisher containers.
   // Do not accept arbitrary object ids, actor/user ids, or unqualified
   // `target_group.id` without independent Group type qualification.
-  if (kind === "GROUP" && isExplicitlyTypeQualifiedGroup(record)) {
+  if (
+    kind === "GROUP" &&
+    isExplicitlyTypeQualifiedGroup(record) &&
+    isFixtureDemonstratedGroupPublisherPath(path)
+  ) {
     return getScalarStringByKeys(record, ["id"]);
   }
 
@@ -848,6 +861,13 @@ function isExplicitlyTypeQualifiedGroup(
   }
 
   return normalizeKey(typeName) === "group";
+}
+
+function isFixtureDemonstratedGroupPublisherPath(path: string): boolean {
+  // collectPublisherReferencesFromValue traverses children of the candidate
+  // post using paths relative to the post (e.g. "$.to",
+  // "$.comet_sections.action_link.group"). Match the relative path exactly.
+  return FIXTURE_DEMONSTRATED_GROUP_PUBLISHER_PATHS.has(path);
 }
 
 function isHomeFeedPublisherKind(
@@ -923,7 +943,7 @@ function publisherKindFromContainerKey(
   return undefined;
 }
 
-function isFixtureDemonstratedGroupPublisherPath(
+function isFixtureDemonstratedGroupPublisherKey(
   normalizedKey: string,
 ): boolean {
   // Story destination `to` is a fixture-demonstrated publisher path. Collect

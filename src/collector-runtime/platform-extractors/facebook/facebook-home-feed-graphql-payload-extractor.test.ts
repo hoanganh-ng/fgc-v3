@@ -231,6 +231,77 @@ describe("FacebookHomeFeedGraphQLPayloadExtractor", () => {
     );
   });
 
+  it("rejects an explicitly type-qualified Group with id under a non-demonstrated generic publisher container", () => {
+    const result = requireValid(
+      extract({
+        data: {
+          node: {
+            __typename: "Story",
+            post_id: "fixture-unqualified-group-id-non-demonstrated-container",
+            url: "https://www.facebook.com/groups/synthetic-home-feed-group/posts/fixture-unqualified-group-id-non-demonstrated-container/",
+            sourcePublisher: {
+              __typename: "Group",
+              id: "fixture-unqualified-group-id",
+              name: "Synthetic Non Demonstrated Container Group",
+              canonicalUrl:
+                "https://www.facebook.com/groups/synthetic-non-demonstrated-container/",
+            },
+            message: {
+              text: "An explicitly type-qualified Group id under a non-demonstrated container must still be rejected.",
+            },
+          },
+        },
+      }),
+    );
+
+    expect(result.candidates).toEqual([]);
+    expect(result.warnings).toEqual([
+      expect.objectContaining({
+        code: "MISSING_STABLE_PUBLISHER_ID",
+        externalPostId:
+          "fixture-unqualified-group-id-non-demonstrated-container",
+        publisherKind: "GROUP",
+      }),
+    ]);
+  });
+
+  it("rejects an explicitly type-qualified Group with id under an unrelated nested group key", () => {
+    const result = requireValid(
+      extract({
+        data: {
+          node: {
+            __typename: "Story",
+            post_id: "fixture-unqualified-group-id-unrelated-nested-group",
+            url: "https://www.facebook.com/groups/synthetic-home-feed-group/posts/fixture-unqualified-group-id-unrelated-nested-group/",
+            attachments: [
+              {
+                nested: {
+                  group: {
+                    __typename: "Group",
+                    id: "fixture-unqualified-group-id",
+                    name: "Synthetic Unrelated Nested Group",
+                  },
+                },
+              },
+            ],
+            message: {
+              text: "An explicitly type-qualified Group id under an unrelated nested group key must still be rejected.",
+            },
+          },
+        },
+      }),
+    );
+
+    expect(result.candidates).toEqual([]);
+    expect(result.warnings).toEqual([
+      expect.objectContaining({
+        code: "MISSING_STABLE_PUBLISHER_ID",
+        externalPostId: "fixture-unqualified-group-id-unrelated-nested-group",
+        publisherKind: "GROUP",
+      }),
+    ]);
+  });
+
   it("does not throw on malformed payloads", () => {
     const extractor = new FacebookHomeFeedGraphQLPayloadExtractor();
     const cyclicPayload: Record<string, unknown> = {};
