@@ -70,15 +70,23 @@ Expected outcome: distinguish capture failure, parse failure, unsupported payloa
 
 ### Sprint 075 — Real-Shape Home Feed Extractor Calibration
 
-Status: **active; evidence intake pending**.
+Status: **accepted**.
 
-Use Sprint 074 diagnostics and sanitized real-shape fixtures to reproduce confirmed failures and make the narrowest evidence-based extractor correction.
+Used Sprint 074 diagnostics and an admitted sanitized real-shape fixture to
+calibrate the exact Group-qualified GraphQL publisher-id paths while preserving
+off-path and unstable-identity exclusions.
 
-Expected outcome: current eligible Facebook group/page posts represented by approved fixtures are extracted while personal-profile, sponsored, unstable-identity, and bodyless candidates remain excluded.
+Expected outcome achieved: the admitted fixture extracts one expected
+`GROUP` candidate, focused and full-unit verification passes, and the repeated
+live run improved from zero to five candidates with five submissions.
 
 ### Sprint 076 — Repeated Live Collector Validation
 
-Run the complete home-feed-to-review flow repeatedly against live Facebook and record evidence against the Collector Completion Gate.
+Status: **active**.
+
+Run the complete home-feed-to-review flow five times with Playwright across at
+least two UTC dates and record safe evidence against the Collector Completion
+Gate.
 
 Expected outcome: either the gate passes, or each failure becomes a narrow correction sprint. One successful run is not sufficient for acceptance.
 
