@@ -24,7 +24,8 @@ Content Builder discovery.
 
 ## Current Active Sprint
 
-Sprint 076 — Repeated Live Collector Validation is **active**.
+Sprint 076A — Supported Direct-Network Home-Feed Baseline is **active and
+approved for Builder execution**.
 
 Sprint 075 is accepted. It classified the live gap as `EXTRACTION`, admitted a
 sanitized configured-group text-post fixture, and calibrated the extractor to
@@ -34,26 +35,33 @@ the exact candidate-relative paths `$.to` and
 unqualified `target_group.id` cases remain excluded. The accepted repeated
 live run improved from zero to five candidates and submitted all five.
 
-Sprint 076 now validates the complete existing home-feed-to-review loop through
-five Playwright baseline runs across at least two UTC dates, including useful
-content review, duplicate merging, lease release, discovered-source review, and
-one approved group promotion.
+Sprint 076 exploratory samples then proved useful content, duplicate merging,
+and lease release, but they required a temporary proxy eligibility bypass.
+Sprint 076A now adds an explicit supported `DIRECT` network mode and keeps the
+accepted normal `https://www.facebook.com/` target.
+
+The Product Owner also found a second acceptance blocker: Discovered Sources can
+show only an opaque external publisher ID, omit any review URL, and still enable
+Approve. Sprint 076B — Reviewable Discovered-Source Identity is shaped and
+approved as the next correction after Sprint 076A. The earlier exploratory
+source approval/promotion does not count as acceptance evidence.
 
 The planned completion sequence is:
 
-- **Sprint 075 — Real-Shape Home Feed Extractor Calibration**: reproduce
-  confirmed failures with sanitized real-shape fixtures and make only the
-  evidence-backed extractor correction.
-- **Sprint 076 — Repeated Live Collector Validation**: complete at least five
-  live runs across multiple days, preferably with at least two profiles, and
-  evaluate reliability, usefulness, diagnostics, deduplication, lease release,
-  content review, and discovered-source review/promotion.
+- **Sprint 076A — Supported Direct-Network Home-Feed Baseline**: implement and
+  prove standard direct-network checkout with one clean Playwright run.
+- **Sprint 076B — Reviewable Discovered-Source Identity**: expose a safe
+  Facebook review link, keep opaque IDs as technical detail, and fail approval
+  closed when no safe review destination exists.
+- **Sprint 076 — Repeated Live Collector Validation**: resume after both
+  corrections, complete supported samples `V06`–`V10` across multiple UTC
+  dates, and repeat review/promotion through the accepted reviewable flow.
 - **Sprint 077 — Collector MVP Baseline Lock**: record the supported provider,
   regression fixtures, limitations, recovery guidance, and smoke test, then
   move active product development to Content Builder.
 
-If live validation reveals a blocking defect, a narrow correction sprint is
-inserted before acceptance rather than expanding the validation sprint.
+If live validation reveals another blocking defect, a narrow correction sprint
+is inserted before acceptance rather than expanding the validation sprint.
 
 Sprint 073 — Product Scope Lock And Surface Trim is accepted.
 
@@ -78,14 +86,23 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 - **Profile Management**: profile creation, lifecycle, session ingestion, provisioning/reprovisioning, authentication health, checkout leasing, and trusted runtime profile configuration.
 - **Profile Behavior**: safe operator-driven account exercise / warm-up and authentication-health observation.
 - **Profile Feed Collection**: profile-bound home-feed run records, bounded browser execution through the existing browser provider boundary, payload capture, extraction, source-publisher observation, content submission, safe run summaries, and strict aggregate diagnostics for capture, extraction, warnings, deduplication, and terminal failure stages.
-- **Content Management**: content categories, managed source groups, normalized content items, deduplication, review lifecycle, top comments, safe content preview/status APIs, discovered source identity, and approved group promotion into managed source groups.
+- **Content Management**: content categories, managed source groups, normalized
+  content items, deduplication, review lifecycle, top comments, safe content
+  preview/status APIs, discovered source records, and approved group promotion
+  into managed source groups. Discovered-source approval is not yet safely
+  reviewable when optional name/URL metadata is absent.
 - **Web UI**: Profile Feed Collector MVP surfaces for profiles, profile feed runs, content items, source groups/categories, and discovered sources. Parked/advanced pages may remain routed but are hidden from primary navigation.
 - **Operator Commands**: canonical `pnpm operator:*` commands for provisioning, manual collection, workers, schedulers, browser probe, and the profile home-feed one-shot runner.
 
 ## Current Known Gaps
 
-- The complete home-feed-to-review loop still needs five baseline live runs
-  across multiple days with duplicate, lease, review, and promotion evidence.
+- Direct-network profiles need the explicit supported Sprint 076A mode and clean
+  no-bypass proof.
+- ID-only discovered groups need Sprint 076B safe review links and
+  application-level approval gating.
+- The complete home-feed-to-review loop still needs five supported baseline live
+  runs across multiple days with duplicate, lease, review, and promotion
+  evidence.
 - Further extractor calibration beyond the admitted exact Group-qualified
   `id` paths requires new diagnostics and a separate sanitized fixture.
 - Content Builder and Content Publisher remain parked until the collector loop is validated.
@@ -100,8 +117,9 @@ Before moving to Content Builder:
 - Zero-yield and failed runs must be safely explainable.
 - Duplicate posts must merge instead of creating duplicate review items.
 - Profile leases must release on the exercised terminal paths.
-- The Web UI must support run inspection, content review, discovered-source
-  review, and eligible group promotion.
+- The Web UI must support run inspection, content review, safe source
+  inspection before approval, discovered-source review, and eligible group
+  promotion.
 - No unresolved blocking defect may remain in the normal
   home-feed-to-review loop.
 - Logs, DTOs, fixtures, docs, and UI must remain free of sensitive browser,
