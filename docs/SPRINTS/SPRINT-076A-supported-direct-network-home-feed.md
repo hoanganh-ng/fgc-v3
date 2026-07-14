@@ -116,7 +116,7 @@ Read only:
 - `apps/web/src/lib/api/profile-manager-client.ts` and tests;
 - `apps/web/src/features/profiles/profile-configuration-form.tsx` and directly
   related tests;
-- `src/collector-runtime/infrastructure/facebook-home-feed-browser-payload-capture-adapter.ts`
+- `src/collector-runtime/infrastructure/facebook-home-feed-browser-payload-capture.ts`
   and its focused test only to retain the normal home URL;
 - the latest Drizzle journal/snapshot/migration files.
 
