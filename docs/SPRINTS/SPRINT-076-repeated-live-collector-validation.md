@@ -2,8 +2,9 @@
 
 ## Status
 
-Active. Sprint 075 is accepted. This sprint is operator-driven validation; it
-does not authorize product implementation or speculative fixes.
+Active and approved for Builder execution. Sprint 075 is accepted. This sprint
+is operator-driven validation; it does not authorize product implementation or
+speculative fixes.
 
 ## Goal
 
@@ -37,6 +38,25 @@ Read only:
   flow.
 
 Do not scan unrelated modules or historical sprints.
+
+## Product Owner Execution Approval
+
+The Product Owner authorizes the Builder to execute this validation against the
+existing local development stack and already logged-in eligible profile.
+
+This approval permits:
+
+- running the accepted baseline verification commands;
+- executing the existing bounded Playwright home-feed flow;
+- using supported Web UI/API surfaces for review and promotion;
+- updating only the safe Sprint 076 evidence worksheet;
+- pausing after same-day samples and resuming on a genuinely later UTC date.
+
+This approval does not permit credential entry, reprovisioning, profile-state
+bypasses, temporary runtime patches, provider-default changes, execution-bound
+changes, application/test changes, fabricated dates, or fabricated evidence.
+
+The Builder must not commit or push unless the Product Owner separately asks.
 
 ## Preconditions
 
@@ -201,3 +221,29 @@ Return:
 - confirmation that no runtime code changed.
 
 Do not mark Sprint 076 accepted, activate Sprint 077, or begin Content Builder.
+
+## Builder Handoff Prompt
+
+Execute Sprint 076 — Repeated Live Collector Validation from
+`docs/SPRINTS/SPRINT-076-repeated-live-collector-validation.md`.
+
+Use the existing local dev stack and already logged-in eligible profile. Load
+only Required Context. Confirm the accepted baseline with `pnpm typecheck` and
+`pnpm test`, then execute the five Playwright baseline samples `V01` through
+`V05` across at least two genuine UTC dates.
+
+After every sample, update
+`docs/SPRINTS/SPRINT-076-live-validation-evidence.md` with safe aggregate facts
+only. Review content and discovered sources through supported UI/API behavior.
+Demonstrate one duplicate merge and one approved eligible-group promotion into a
+paused managed source group.
+
+Do not use CloakBrowser as a substitute for a baseline sample. Do not change
+runtime code, tests, configuration defaults, execution bounds, profile state, or
+authentication behavior. If a stop condition occurs, record the safe facts and
+stop instead of fixing it.
+
+If all samples cannot truthfully be completed today, stop with a progress report
+and resume on a later UTC date. Do not invent date coverage. Do not commit or
+push. Return the worksheet diff and Product Owner Handoff when complete; do not
+accept Sprint 076 or activate Sprint 077.
