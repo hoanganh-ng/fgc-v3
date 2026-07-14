@@ -782,7 +782,7 @@ describe("ExecuteProfileHomeFeedCollectionRunUseCase", () => {
         networkListenerCaptureCount: 4,
         parseFailureCount: 1,
         totalPayloadsPassedToExtractor: 2,
-        finalPageUrl: "https://www.facebook.com/?sk=h_chr",
+        finalPageUrl: "https://www.facebook.com/",
         loginRedirectSuspected: false,
       },
     };

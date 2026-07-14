@@ -13,7 +13,7 @@ import {
   PlaywrightChromiumBrowserProvider,
 } from "./browser-providers";
 
-export const FACEBOOK_HOME_FEED_URL = "https://www.facebook.com/?sk=h_chr";
+export const FACEBOOK_HOME_FEED_URL = "https://www.facebook.com/";
 
 export interface FacebookHomeFeedBrowserPayloadCaptureAdapterOptions {
   readonly runtimeProfileConfigurationPort: RuntimeProfileConfigurationPort;

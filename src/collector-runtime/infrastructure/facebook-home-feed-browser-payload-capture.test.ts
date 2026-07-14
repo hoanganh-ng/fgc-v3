@@ -14,7 +14,7 @@ import {
 import type { FacebookPageState } from "./facebook-page-state-observer";
 
 describe("FacebookHomeFeedBrowserPayloadCaptureAdapter", () => {
-  it("navigates to the chronological Facebook home-feed URL", async () => {
+  it("navigates to the normal Facebook home-feed URL", async () => {
     const browserProvider = new FakeBrowserProvider({
       pageLoaded: true,
       blockingState: "NONE_DETECTED",
@@ -26,7 +26,7 @@ describe("FacebookHomeFeedBrowserPayloadCaptureAdapter", () => {
     }).captureHomeFeedPayloads({ ...captureInput(), maxScrolls: 0, maxDurationMs: 1_000 });
 
     expect(browserProvider.page.gotoUrls).toEqual([FACEBOOK_HOME_FEED_URL]);
-    expect(FACEBOOK_HOME_FEED_URL).toBe("https://www.facebook.com/?sk=h_chr");
+    expect(FACEBOOK_HOME_FEED_URL).toBe("https://www.facebook.com/");
   });
 
   it("applies per-call maxScrolls and maxDurationMs", async () => {

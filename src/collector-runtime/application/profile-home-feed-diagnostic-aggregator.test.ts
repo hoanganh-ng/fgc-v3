@@ -21,7 +21,7 @@ describe("profile-home-feed diagnostic aggregator", () => {
       networkListenerCaptureCount: 1,
       parseFailureCount: 0,
       totalPayloadsPassedToExtractor: 3,
-      finalPageUrl: "https://www.facebook.com/?sk=h_chr",
+      finalPageUrl: "https://www.facebook.com/",
       loginRedirectSuspected: false,
     };
     recordCaptureSucceeded(summary, captureDiagnostics, 3);
