@@ -68,8 +68,8 @@ pnpm test
 Start containerized workers only when queued jobs should be consumed automatically:
 
 ```bash
-pnpm stack:dev:workers:start
-pnpm stack:dev:workers:logs
+pnpm stack:service -- --stack dev --service all --action start
+pnpm stack:service -- --stack dev --service all --action logs
 ```
 
 ## Commands
@@ -111,22 +111,43 @@ CloakBrowser provisioning uses the Node package `cloakbrowser` from `CloakHQ/Clo
 
 ### Docker Stacks
 
-- `pnpm stack:dev:start`, `pnpm stack:dev:stop`, `pnpm stack:dev:reset`
-- `pnpm stack:dev:worker:start`, `pnpm stack:dev:worker:once`, `pnpm stack:dev:worker:logs`
-- `pnpm stack:dev:exercise-worker:start`, `pnpm stack:dev:exercise-worker:once`, `pnpm stack:dev:exercise-worker:logs`
-- `pnpm stack:dev:scheduler:start`, `pnpm stack:dev:scheduler:once`, `pnpm stack:dev:scheduler:logs`
-- `pnpm stack:dev:profile-home-feed-scheduler:start`, `pnpm stack:dev:profile-home-feed-scheduler:once`, `pnpm stack:dev:profile-home-feed-scheduler:logs`
-- `pnpm stack:dev:profile-home-feed-worker:start`, `pnpm stack:dev:profile-home-feed-worker:once`, `pnpm stack:dev:profile-home-feed-worker:logs`
-- `pnpm stack:dev:workers:start`, `pnpm stack:dev:workers:logs`
-- `pnpm stack:preview:start`, `pnpm stack:preview:stop`, `pnpm stack:preview:reset`
-- `pnpm stack:preview:worker:start`, `pnpm stack:preview:worker:once`, `pnpm stack:preview:worker:logs`
-- `pnpm stack:preview:exercise-worker:start`, `pnpm stack:preview:exercise-worker:once`, `pnpm stack:preview:exercise-worker:logs`
-- `pnpm stack:preview:scheduler:start`, `pnpm stack:preview:scheduler:once`, `pnpm stack:preview:scheduler:logs`
-- `pnpm stack:preview:profile-home-feed-scheduler:start`, `pnpm stack:preview:profile-home-feed-scheduler:once`, `pnpm stack:preview:profile-home-feed-scheduler:logs`
-- `pnpm stack:preview:profile-home-feed-worker:start`, `pnpm stack:preview:profile-home-feed-worker:once`, `pnpm stack:preview:profile-home-feed-worker:logs`
-- `pnpm stack:preview:workers:start`, `pnpm stack:preview:workers:logs`
+Lifecycle:
 
-The `collector-worker`, `account-exercise-worker`, `collection-scheduler`, `profile-home-feed-scheduler`, and `profile-home-feed-worker` Compose services are behind the `worker` profile and expose no ports. Inside Docker, worker services talk to the API at `http://api:3000`; host commands still use `http://localhost:8081` for preview gateway access or `http://localhost:3000` for direct API access. The `collection-scheduler` and `profile-home-feed-scheduler` services do not open a browser and use the lightweight `scheduler-runtime` image that installs no Playwright runtime or Xvfb. Browser-backed workers use `worker-runtime`.
+- `pnpm stack:dev:start`, `pnpm stack:dev:stop`, `pnpm stack:dev:reset`
+- `pnpm stack:preview:start`, `pnpm stack:preview:stop`, `pnpm stack:preview:reset`
+
+Worker/scheduler operations use one typed command:
+
+```bash
+pnpm stack:service -- --stack <dev|preview> --service <service> --action <start|once|logs>
+```
+
+Examples:
+
+```bash
+pnpm stack:service -- --stack dev --service all --action start
+pnpm stack:service -- --stack dev --service profile-home-feed-worker --action once
+pnpm stack:service -- --stack preview --service collector-worker --action logs
+```
+
+`--service` accepts `collector-worker`, `account-exercise-worker`,
+`collection-scheduler`, `profile-home-feed-scheduler`,
+`profile-home-feed-worker`, or `all`. `all` supports `start` and `logs` only.
+
+| Old alias segment | New `--service` |
+| --- | --- |
+| `worker` | `collector-worker` |
+| `exercise-worker` | `account-exercise-worker` |
+| `scheduler` | `collection-scheduler` |
+| `profile-home-feed-scheduler` | `profile-home-feed-scheduler` |
+| `profile-home-feed-worker` | `profile-home-feed-worker` |
+| `workers` | `all` (`start` / `logs` only) |
+
+The five Compose services remain behind the `worker` profile and expose no
+ports. Inside Docker they talk to the API at `http://api:3000`; host commands
+still use `http://localhost:8081` for preview gateway access or
+`http://localhost:3000` for direct API access. Schedulers use
+`scheduler-runtime`; browser-backed workers use `worker-runtime`.
 
 ## Deeper Docs
 

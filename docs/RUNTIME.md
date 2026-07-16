@@ -46,8 +46,7 @@ subset; this file is the full reference.
 | `pnpm test:db` | Run opt-in database integration tests. |
 | `pnpm test:db:docker` | Run the canonical Docker-backed Layer 2 database integration test runner (isolated Postgres + Vitest). |
 | `pnpm test:http:db` | Run opt-in DB-backed HTTP integration tests. |
-| `pnpm test:e2e:docker` | Run the isolated Docker E2E stack and Playwright runner. The only operator-facing host command for the E2E harness. |
-| `pnpm test:e2e:container` | Internal: the in-container Playwright invocation the `e2e-runner` entrypoint calls. Not directly host-runnable; `http://web-gateway` is Docker-only and no host port is published. |
+| `pnpm test:e2e:docker` | Run the isolated Docker E2E stack and Playwright runner. The only operator-facing host command for the E2E harness. The container entrypoint invokes Playwright directly. |
 
 `pnpm test:db:docker` accepts an optional `DB_TEST_ARGS` env var forwarded
 into the runner container and split on whitespace into Vitest positional
@@ -108,45 +107,38 @@ The following backward-compatible alias scripts were removed from the root
 | Command | Purpose |
 | --- | --- |
 | `pnpm stack:dev:start` | Start the development Compose stack. |
-| `pnpm stack:dev:worker:start` | Start the development stack worker service in polling mode. |
-| `pnpm stack:dev:worker:once` | Run one development stack worker iteration in a disposable container. |
-| `pnpm stack:dev:worker:logs` | Follow development stack worker logs. |
-| `pnpm stack:dev:exercise-worker:start` | Start the development stack account exercise worker service in polling mode. |
-| `pnpm stack:dev:exercise-worker:once` | Run one development stack account exercise worker iteration in a disposable container. |
-| `pnpm stack:dev:exercise-worker:logs` | Follow development stack account exercise worker logs. |
-| `pnpm stack:dev:scheduler:start` | Start the development stack collection scheduler service in polling mode. |
-| `pnpm stack:dev:scheduler:once` | Run one development stack collection scheduler iteration in a disposable container. |
-| `pnpm stack:dev:scheduler:logs` | Follow development stack collection scheduler logs. |
-| `pnpm stack:dev:profile-home-feed-scheduler:start` | Start the development stack profile home-feed scheduler service in polling mode. |
-| `pnpm stack:dev:profile-home-feed-scheduler:once` | Run one development stack profile home-feed scheduler iteration in a disposable container. |
-| `pnpm stack:dev:profile-home-feed-scheduler:logs` | Follow development stack profile home-feed scheduler logs. |
-| `pnpm stack:dev:profile-home-feed-worker:start` | Start the development stack profile home-feed worker service in polling mode. |
-| `pnpm stack:dev:profile-home-feed-worker:once` | Run one development stack profile home-feed worker iteration in a disposable container. |
-| `pnpm stack:dev:profile-home-feed-worker:logs` | Follow development stack profile home-feed worker logs. |
-| `pnpm stack:dev:workers:start` | Start all development stack opt-in worker services. |
-| `pnpm stack:dev:workers:logs` | Follow logs for all development stack opt-in worker services. |
 | `pnpm stack:dev:stop` | Stop the development Compose stack. |
 | `pnpm stack:dev:reset` | Stop the development stack and remove volumes. |
 | `pnpm stack:preview:start` | Start the production-like preview Compose stack. |
-| `pnpm stack:preview:worker:start` | Start the preview stack worker service in polling mode. |
-| `pnpm stack:preview:worker:once` | Run one preview stack worker iteration in a disposable container. |
-| `pnpm stack:preview:worker:logs` | Follow preview stack worker logs. |
-| `pnpm stack:preview:exercise-worker:start` | Start the preview stack account exercise worker service in polling mode. |
-| `pnpm stack:preview:exercise-worker:once` | Run one preview stack account exercise worker iteration in a disposable container. |
-| `pnpm stack:preview:exercise-worker:logs` | Follow preview stack account exercise worker logs. |
-| `pnpm stack:preview:scheduler:start` | Start the preview stack collection scheduler service in polling mode. |
-| `pnpm stack:preview:scheduler:once` | Run one preview stack collection scheduler iteration in a disposable container. |
-| `pnpm stack:preview:scheduler:logs` | Follow preview stack collection scheduler logs. |
-| `pnpm stack:preview:profile-home-feed-scheduler:start` | Start the preview stack profile home-feed scheduler service in polling mode. |
-| `pnpm stack:preview:profile-home-feed-scheduler:once` | Run one preview stack profile home-feed scheduler iteration in a disposable container. |
-| `pnpm stack:preview:profile-home-feed-scheduler:logs` | Follow preview stack profile home-feed scheduler logs. |
-| `pnpm stack:preview:profile-home-feed-worker:start` | Start the preview stack profile home-feed worker service in polling mode. |
-| `pnpm stack:preview:profile-home-feed-worker:once` | Run one preview stack profile home-feed worker iteration in a disposable container. |
-| `pnpm stack:preview:profile-home-feed-worker:logs` | Follow preview stack profile home-feed worker logs. |
-| `pnpm stack:preview:workers:start` | Start all preview stack opt-in worker services. |
-| `pnpm stack:preview:workers:logs` | Follow logs for all preview stack opt-in worker services. |
 | `pnpm stack:preview:stop` | Stop the preview Compose stack. |
 | `pnpm stack:preview:reset` | Stop the preview stack and remove volumes. |
+| `pnpm stack:service` | Typed worker/scheduler start, once, or logs for `dev` or `preview`. |
+
+```bash
+pnpm stack:service -- --stack <dev|preview> --service <service> --action <start|once|logs>
+```
+
+`--service` values: `collector-worker`, `account-exercise-worker`,
+`collection-scheduler`, `profile-home-feed-scheduler`,
+`profile-home-feed-worker`, `all`. `all` supports `start` and `logs` only.
+
+### Removed stack service aliases (Sprint 078)
+
+| Old command | New command |
+| --- | --- |
+| `pnpm stack:dev:worker:start` | `pnpm stack:service -- --stack dev --service collector-worker --action start` |
+| `pnpm stack:dev:worker:once` | `pnpm stack:service -- --stack dev --service collector-worker --action once` |
+| `pnpm stack:dev:worker:logs` | `pnpm stack:service -- --stack dev --service collector-worker --action logs` |
+| `pnpm stack:dev:exercise-worker:*` | `--service account-exercise-worker` with the same `--action` |
+| `pnpm stack:dev:scheduler:*` | `--service collection-scheduler` with the same `--action` |
+| `pnpm stack:dev:profile-home-feed-scheduler:*` | `--service profile-home-feed-scheduler` with the same `--action` |
+| `pnpm stack:dev:profile-home-feed-worker:*` | `--service profile-home-feed-worker` with the same `--action` |
+| `pnpm stack:dev:workers:start` | `pnpm stack:service -- --stack dev --service all --action start` |
+| `pnpm stack:dev:workers:logs` | `pnpm stack:service -- --stack dev --service all --action logs` |
+| matching `stack:preview:*` aliases | same mapping with `--stack preview` |
+
+`pnpm test:e2e:container` was also removed. The E2E container invokes Playwright
+directly; operators use `pnpm test:e2e:docker`.
 
 ## Development Stack
 
@@ -242,71 +234,71 @@ Start the development stack and collection worker:
 
 ```bash
 pnpm stack:dev:start
-pnpm stack:dev:worker:start
-pnpm stack:dev:worker:logs
+pnpm stack:service -- --stack dev --service collector-worker --action start
+pnpm stack:service -- --stack dev --service collector-worker --action logs
 ```
 
 Start the development stack and account exercise worker:
 
 ```bash
 pnpm stack:dev:start
-pnpm stack:dev:exercise-worker:start
-pnpm stack:dev:exercise-worker:logs
+pnpm stack:service -- --stack dev --service account-exercise-worker --action start
+pnpm stack:service -- --stack dev --service account-exercise-worker --action logs
 ```
 
 Start every development worker-profile service:
 
 ```bash
 pnpm stack:dev:start
-pnpm stack:dev:workers:start
-pnpm stack:dev:workers:logs
+pnpm stack:service -- --stack dev --service all --action start
+pnpm stack:service -- --stack dev --service all --action logs
 ```
 
 Start the preview stack and collection worker:
 
 ```bash
 pnpm stack:preview:start
-pnpm stack:preview:worker:start
-pnpm stack:preview:worker:logs
+pnpm stack:service -- --stack preview --service collector-worker --action start
+pnpm stack:service -- --stack preview --service collector-worker --action logs
 ```
 
 Start the preview stack and account exercise worker:
 
 ```bash
 pnpm stack:preview:start
-pnpm stack:preview:exercise-worker:start
-pnpm stack:preview:exercise-worker:logs
+pnpm stack:service -- --stack preview --service account-exercise-worker --action start
+pnpm stack:service -- --stack preview --service account-exercise-worker --action logs
 ```
 
 Start every preview worker-profile service:
 
 ```bash
 pnpm stack:preview:start
-pnpm stack:preview:workers:start
-pnpm stack:preview:workers:logs
+pnpm stack:service -- --stack preview --service all --action start
+pnpm stack:service -- --stack preview --service all --action logs
 ```
 
 Run one disposable collection-worker iteration through Docker:
 
 ```bash
-pnpm stack:dev:worker:once
-pnpm stack:preview:worker:once
+pnpm stack:service -- --stack dev --service collector-worker --action once
+pnpm stack:service -- --stack preview --service collector-worker --action once
 ```
 
 Run one disposable account-exercise-worker iteration through Docker:
 
 ```bash
-pnpm stack:dev:exercise-worker:once
-pnpm stack:preview:exercise-worker:once
+pnpm stack:service -- --stack dev --service account-exercise-worker --action once
+pnpm stack:service -- --stack preview --service account-exercise-worker --action once
 ```
 
 Run one disposable profile-home-feed scheduler or worker iteration through Docker:
 
 ```bash
-pnpm stack:dev:profile-home-feed-scheduler:once
-pnpm stack:dev:profile-home-feed-worker:once
-pnpm stack:preview:profile-home-feed-scheduler:once
-pnpm stack:preview:profile-home-feed-worker:once
+pnpm stack:service -- --stack dev --service profile-home-feed-scheduler --action once
+pnpm stack:service -- --stack dev --service profile-home-feed-worker --action once
+pnpm stack:service -- --stack preview --service profile-home-feed-scheduler --action once
+pnpm stack:service -- --stack preview --service profile-home-feed-worker --action once
 ```
 
 Stop polling workers without stopping the whole stack:
@@ -340,39 +332,39 @@ Start the development stack and collection scheduler:
 
 ```bash
 pnpm stack:dev:start
-pnpm stack:dev:scheduler:start
-pnpm stack:dev:scheduler:logs
+pnpm stack:service -- --stack dev --service collection-scheduler --action start
+pnpm stack:service -- --stack dev --service collection-scheduler --action logs
 ```
 
 Start the preview stack and collection scheduler:
 
 ```bash
 pnpm stack:preview:start
-pnpm stack:preview:scheduler:start
-pnpm stack:preview:scheduler:logs
+pnpm stack:service -- --stack preview --service collection-scheduler --action start
+pnpm stack:service -- --stack preview --service collection-scheduler --action logs
 ```
 
 Start every dev opt-in worker service:
 
 ```bash
 pnpm stack:dev:start
-pnpm stack:dev:workers:start
-pnpm stack:dev:workers:logs
+pnpm stack:service -- --stack dev --service all --action start
+pnpm stack:service -- --stack dev --service all --action logs
 ```
 
 Start every preview opt-in worker service:
 
 ```bash
 pnpm stack:preview:start
-pnpm stack:preview:workers:start
-pnpm stack:preview:workers:logs
+pnpm stack:service -- --stack preview --service all --action start
+pnpm stack:service -- --stack preview --service all --action logs
 ```
 
 Run one disposable scheduler iteration through Docker:
 
 ```bash
-pnpm stack:dev:scheduler:once
-pnpm stack:preview:scheduler:once
+pnpm stack:service -- --stack dev --service collection-scheduler --action once
+pnpm stack:service -- --stack preview --service collection-scheduler --action once
 ```
 
 The container entrypoint is `scripts/run-collection-scheduler-container.sh`. It polls the configured `COLLECTION_SCHEDULER_READINESS_URL` (default `http://api:3000/collector/collection-runs?limit=1`) until the API returns an HTTP status below 500, then `exec`s the scheduler CLI. Default scheduler mode is `--poll-interval-ms 5000`; override `COLLECTION_SCHEDULER_MODE_ARGS` to run `--once` or a different poll interval. The scheduler talks to PostgreSQL through the existing Collector Runtime composition root, so it needs `DATABASE_URL` and no other module base URL. It never logs `DATABASE_URL`, credentials, base URLs, or any other environment variable.
@@ -392,41 +384,41 @@ Start the development stack and profile home-feed scheduler:
 
 ```bash
 pnpm stack:dev:start
-pnpm stack:dev:profile-home-feed-scheduler:start
-pnpm stack:dev:profile-home-feed-scheduler:logs
+pnpm stack:service -- --stack dev --service profile-home-feed-scheduler --action start
+pnpm stack:service -- --stack dev --service profile-home-feed-scheduler --action logs
 ```
 
 Start the development stack and profile home-feed worker:
 
 ```bash
 pnpm stack:dev:start
-pnpm stack:dev:profile-home-feed-worker:start
-pnpm stack:dev:profile-home-feed-worker:logs
+pnpm stack:service -- --stack dev --service profile-home-feed-worker --action start
+pnpm stack:service -- --stack dev --service profile-home-feed-worker --action logs
 ```
 
 Start the preview stack and profile home-feed scheduler:
 
 ```bash
 pnpm stack:preview:start
-pnpm stack:preview:profile-home-feed-scheduler:start
-pnpm stack:preview:profile-home-feed-scheduler:logs
+pnpm stack:service -- --stack preview --service profile-home-feed-scheduler --action start
+pnpm stack:service -- --stack preview --service profile-home-feed-scheduler --action logs
 ```
 
 Start the preview stack and profile home-feed worker:
 
 ```bash
 pnpm stack:preview:start
-pnpm stack:preview:profile-home-feed-worker:start
-pnpm stack:preview:profile-home-feed-worker:logs
+pnpm stack:service -- --stack preview --service profile-home-feed-worker --action start
+pnpm stack:service -- --stack preview --service profile-home-feed-worker --action logs
 ```
 
 Run one disposable profile home-feed scheduler or worker iteration:
 
 ```bash
-pnpm stack:dev:profile-home-feed-scheduler:once
-pnpm stack:dev:profile-home-feed-worker:once
-pnpm stack:preview:profile-home-feed-scheduler:once
-pnpm stack:preview:profile-home-feed-worker:once
+pnpm stack:service -- --stack dev --service profile-home-feed-scheduler --action once
+pnpm stack:service -- --stack dev --service profile-home-feed-worker --action once
+pnpm stack:service -- --stack preview --service profile-home-feed-scheduler --action once
+pnpm stack:service -- --stack preview --service profile-home-feed-worker --action once
 ```
 
 `profile-home-feed-scheduler` sets `DATABASE_URL`,
@@ -1150,13 +1142,12 @@ operator-facing host command is:
 pnpm test:e2e:docker
 ```
 
-`pnpm test:e2e:container` is an internal command executed inside the
-`e2e-runtime` container. It is not directly usable from the host
-because `http://web-gateway` is Docker-only and no host port is
-published. The host driver invokes it inside the `e2e-runner`
-container; the script remains in `package.json` so the runner
-entrypoint can call it, but operators should run `pnpm test:e2e:docker`
-instead.
+The E2E container entrypoint
+(`scripts/run-e2e-runner-container.sh`) invokes Playwright directly with
+`pnpm exec playwright test --config=tests/e2e/playwright.config.ts`. That
+invocation is not a host package script; operators should run
+`pnpm test:e2e:docker` only. The runner is not directly usable from the host
+because `http://web-gateway` is Docker-only and no host port is published.
 
 ### What the harness does
 

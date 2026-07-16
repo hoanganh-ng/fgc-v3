@@ -115,8 +115,9 @@ higher layer can attribute the failure correctly.
 
 ## Layer 4 — Docker End-to-End Tests
 
-- Runner: Playwright in the `e2e-runtime` Docker image (`pnpm test:e2e:docker`,
-  with `pnpm test:e2e:container` as the in-container command).
+- Runner: Playwright in the `e2e-runtime` Docker image (`pnpm test:e2e:docker`).
+  The E2E container entrypoint invokes Playwright directly
+  (`pnpm exec playwright test --config=tests/e2e/playwright.config.ts`).
 - Scope: end-to-end flows through the production-like stack
   (`postgres`, `api`, `web-gateway`, and the E2E runner) using only
   synthetic fixtures. No workers, schedulers, or exercise workers run
