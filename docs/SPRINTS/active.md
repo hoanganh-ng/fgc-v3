@@ -1,7 +1,13 @@
 # Active Sprint
 
-Sprint 077 — Collector MVP Baseline Lock is **active and approved for Builder
-execution**.
+Sprint 078 — Runtime Command Surface Consolidation is **active and approved
+for Builder execution**.
+
+Sprint 077 — Collector MVP Baseline Lock is accepted by the Product Owner on
+2026-07-16. Commit `93cf205` created the permanent Collector baseline runbook,
+and correction commit `1a7861d` made the canonical Playwright worker example
+and supported `DIRECT | PROXY` sandbox wording explicit. The accepted change
+is documentation-only; it adds no runtime behavior or new live-Facebook claim.
 
 Sprint 076A — Supported Direct-Network Home-Feed Baseline is accepted. Commit
 `f7a4970` implements the explicit `UNCONFIGURED | DIRECT | PROXY` contract, and
@@ -28,21 +34,24 @@ proven. No unresolved Collector blocker remains.
 - [Sprint 076 - Repeated Live Collector Validation](SPRINT-076-repeated-live-collector-validation.md)
 - [Sprint 076 - Live Validation Evidence](SPRINT-076-live-validation-evidence.md)
 - [Sprint 077 - Collector MVP Baseline Lock](SPRINT-077-collector-mvp-baseline-lock.md)
+- [Sprint 078 - Runtime Command Surface Consolidation](SPRINT-078-runtime-command-surface-consolidation.md)
 
 Keep the normal Facebook home target `https://www.facebook.com/`; do not restore
 the chronological `?sk=h_chr` override.
 
-Sprint 077 is documentation and product-state lock only. Record the accepted
-Collector baseline, supported operator smoke test, recovery guidance, provider
-choice, regression fixtures, limitations, and maintenance boundary. Do not add
-Collector behavior or begin Content Builder implementation.
+Sprint 078 is one bounded tooling cleanup before Content Builder discovery.
+Preserve the locked Collector commands and exact Compose behavior while
+replacing the repetitive stack service/action alias matrix with one typed,
+validated command surface. Do not change Collector behavior, Compose service
+definitions, browser/network/profile configuration, or accepted evidence.
 
 Sprint 075 — Real-Shape Home Feed Extractor Calibration is accepted.
 
-Remaining Collector-completion sequence:
+Immediate delivery sequence:
 
-1. Complete and accept Sprint 077.
+1. Complete and accept Sprint 078.
 2. Begin Architect-led Content Builder discovery from actual reviewed content.
 
-Content Builder remains parked until Sprint 077 locks the Collector operational
-baseline.
+The Collector baseline is locked and maintenance-only. Content Builder remains
+parked only for this bounded command-surface cleanup; Sprint 078 must not invent
+or implement Content Builder behavior.

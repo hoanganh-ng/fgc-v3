@@ -15,10 +15,12 @@ The project has enough Content Collector foundation to focus on proving one oper
 7. Review discovered publishing sources.
 8. Promote approved Facebook group sources into managed source groups.
 
-Content Builder Transform Types, Content Briefs, Producers, Producer Sets,
-artifacts, LLM execution, prompt versioning, collected-content selection, and
-Content Publisher behavior remain parked until Sprint 077 locks the already
-validated Collector baseline.
+The validated Collector baseline is locked by accepted Sprint 077 and is now
+maintenance-only. Content Builder Transform Types, Content Briefs, Producers,
+Producer Sets, artifacts, LLM execution, prompt versioning, and
+collected-content selection remain parked through the bounded Sprint 078
+command-surface cleanup. Content Publisher remains parked until a useful
+generated-content workflow exists.
 
 The priority is actual working behavior as soon as possible: explain current
 home-feed outcomes, calibrate only from real diagnostic evidence, validate the
@@ -27,8 +29,13 @@ Content Builder discovery.
 
 ## Current Active Sprint
 
-Sprint 077 — Collector MVP Baseline Lock is **active and approved for Builder
-execution**.
+Sprint 078 — Runtime Command Surface Consolidation is **active and approved for
+Builder execution**.
+
+Sprint 077 is accepted at implementation commit `93cf205` and correction commit
+`1a7861d`. `docs/COLLECTOR_BASELINE.md` is now the permanent operator and
+maintenance runbook. The change was documentation-only; it added no runtime
+behavior or new live-Facebook claim.
 
 Sprint 075 is accepted. It classified the live gap as `EXTRACTION`, admitted a
 sanitized configured-group text-post fixture, and calibrated the extractor to
@@ -68,9 +75,12 @@ The planned completion sequence is:
   inspection and fail-closed approval are proven.
 - **Sprint 076 — Repeated Live Collector Validation**: accepted; the Collector
   Completion Gate passes with no unresolved supported-path blocker.
-- **Sprint 077 — Collector MVP Baseline Lock**: active; record the supported provider,
-  regression fixtures, limitations, recovery guidance, and smoke test, then
-  move active product development to Content Builder.
+- **Sprint 077 — Collector MVP Baseline Lock**: accepted; the permanent runbook
+  records the supported provider, network modes, target, smoke test, recovery,
+  regression anchors, limitations, and maintenance boundary.
+- **Sprint 078 — Runtime Command Surface Consolidation**: active; consolidate
+  34 repetitive stack aliases into one validated CLI and remove one dead E2E
+  alias while preserving canonical operator commands and exact runtime behavior.
 
 If live validation reveals another blocking defect, a narrow correction sprint
 is inserted before acceptance rather than expanding the validation sprint.
@@ -108,13 +118,15 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 
 ## Current Known Gaps
 
-- The proven Collector baseline still needs its permanent operator runbook,
-  recovery guidance, provider/fixture record, limitations, and maintenance
-  boundary locked by Sprint 077.
+- Root `package.json` exposes 69 scripts. Forty are `stack:*` commands, including
+  a 34-command dev/preview service/action matrix that duplicates the same
+  Compose behavior and is costly to understand and maintain. Sprint 078 has an
+  exact behavior-preserving target of 35 scripts.
 - Further extractor calibration beyond the admitted exact Group-qualified
   `id` paths requires new diagnostics and a separate sanitized fixture.
-- Content Builder and Content Publisher remain parked until Sprint 077 locks
-  the validated Collector baseline.
+- Content Builder remains parked through Sprint 078; Architect-led discovery is
+  next. Content Publisher remains parked until a useful generated-content
+  workflow exists.
 
 ## Collector Completion Gate — Passed
 

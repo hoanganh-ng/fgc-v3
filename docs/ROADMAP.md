@@ -122,14 +122,30 @@ unresolved supported-path blocker.
 
 ### Sprint 077 — Collector MVP Baseline Lock
 
-Status: **active and approved for Builder execution**.
+Status: **accepted**.
 
 Record the supported baseline, known limitations, regression fixtures,
 provider choice, recovery guidance, and manual smoke test without changing
 runtime behavior.
 
-Expected outcome: the Collector becomes a stable upstream source and active
-product development moves to Content Builder.
+Expected outcome achieved: `docs/COLLECTOR_BASELINE.md` is the permanent
+operator and maintenance runbook. The Collector is a locked, maintenance-only
+upstream source.
+
+### Sprint 078 — Runtime Command Surface Consolidation
+
+Status: **active and approved for Builder execution**.
+
+Reduce the root `package.json` script surface without changing supported
+behavior. Preserve the canonical `operator:*` commands and six explicit stack
+lifecycle commands, replace the 34 repetitive dev/preview service/action aliases
+with one typed and validated `stack:service` CLI, and remove the unused
+`test:e2e:container` alias. The exact target is 35 scripts, down from 69.
+
+Expected outcome: operators retain explicit, documented commands with exact
+Compose parity, while the package manifest becomes understandable and harder to
+drift. This is the final bounded tooling cleanup before Content Builder
+discovery.
 
 ## Correction Sprint Rule
 
@@ -142,7 +158,7 @@ If Sprint 075 or Sprint 076 reveals a blocking defect, insert a narrowly named c
 - avoid unrelated refactoring;
 - repeat the affected live validation afterward.
 
-## Parked Until Collector Lock
+## Parked Until Runtime Command Consolidation
 
 - Content Builder Transform Type expansion.
 - Content Briefs, Producers, Producer Sets, graphs, artifacts, and LLM execution.
@@ -150,9 +166,10 @@ If Sprint 075 or Sprint 076 reveals a blocking defect, insert a narrowly named c
 - Broad autonomous-operation improvements not required for manual validation.
 - Broad UI redesign or module cleanup.
 
-## After the Collector Baseline Lock
+## After Runtime Command Consolidation
 
-Content Builder discovery starts from actual selected content and this operator need:
+After Sprint 078 acceptance, Content Builder discovery starts from actual
+selected content and this operator need:
 
 > Turn selected collected posts into a useful article, script, or video-content input.
 

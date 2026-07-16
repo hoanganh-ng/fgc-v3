@@ -146,7 +146,7 @@ higher layer can attribute the failure correctly.
 
 ## Accepted Collector regression anchors
 
-Sprint 077 locks the Profile Feed Collector MVP baseline. Automated
+Accepted Sprint 077 locked the Profile Feed Collector MVP baseline. Automated
 regression anchors for capture, extraction, diagnostics, lease release,
 safe discovered-source review identity, and synthetic E2E flows are listed
 in [`COLLECTOR_BASELINE.md`](COLLECTOR_BASELINE.md) §6. Prefer those

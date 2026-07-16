@@ -2,8 +2,16 @@
 
 ## Status
 
-Active and approved for Builder execution. Sprint 076 was accepted by the
-Product Owner on 2026-07-16 at evidence commit `109ee4c`.
+Accepted by the Product Owner on 2026-07-16. Sprint 076 was accepted at evidence
+commit `109ee4c`. Sprint 077 was implemented at `93cf205` and corrected at
+`1a7861d` before acceptance.
+
+Acceptance record: the permanent runbook contains all eight required sections;
+the canonical worker example explicitly selects Playwright; supported sandbox
+wording allows intentional `DIRECT` or `PROXY` networking; all command and link
+checks passed; `pnpm typecheck`, `pnpm test` (1,992 passed / 18 skipped), and
+`git diff --check` passed. Only documentation changed. No live Facebook run or
+runtime behavior was claimed. Sprint 078 is now active.
 
 ## Goal
 
