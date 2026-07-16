@@ -7,20 +7,43 @@ Planning aid for future structural cleanup. **This document does not authorize i
 | Field | Value |
 | --- | --- |
 | **Date** | 2026-07-16 |
-| **Scope** | Production TypeScript under `src/` and `apps/web/src/` (excludes `*.test.ts`, fixtures) |
-| **File count** | 633 TypeScript/TSX files (repository-wide, per Sprint 079 baseline) |
+| **Scope** | TypeScript under `src/` and `apps/web/src/` |
+| **Repository-wide file count (baseline)** | **633** TS/TSX files at commit `efa1b46` (pre-Sprint-079), **including** `*.test.ts`, `*.test.tsx`, and `__fixtures__` |
+| **Repository-wide file count (current)** | **660** TS/TSX files under `src/` and `apps/web/src/` (same inclusion rules) |
+| **Production-only file count (current)** | **481** TS/TSX files excluding tests and fixtures (see command below) |
 | **Ranking inputs** | Line count, mixed ownership (multiple resource families or layers in one file), cross-feature edit frequency, adapter coupling, test co-location density |
 | **Tooling** | `find … \| xargs wc -l`, architecture boundary tests, GitNexus impact analysis before symbol moves |
 
-Line count alone is not a defect. **Mixed ownership and repeated cross-feature editing** are the primary change-risk signals.
+**Repository-wide count command** (baseline or current tree):
+
+```bash
+git ls-tree -r --name-only <ref> \
+  | rg '\.(ts|tsx)$' \
+  | rg '^(src|apps/web/src)/' \
+  | wc -l
+```
+
+**Production-only count command** (excludes tests and fixtures):
+
+```bash
+find src apps/web/src \( -name '*.ts' -o -name '*.tsx' \) \
+  ! -name '*.test.ts' \
+  ! -name '*.test.tsx' \
+  ! -path '*/__fixtures__/*' \
+  | wc -l
+```
+
+At `efa1b46`, the production-only count is **458** files.
+
+Line count rankings below are **supporting evidence only**, not a quality gate. **Mixed ownership and repeated cross-feature editing** are the primary change-risk signals.
 
 ## Ranked hotspots
 
 | Rank | File | Lines | Responsibility mix | Safe to split now? |
 | --- | --- | ---: | --- | --- |
-| 1 | `src/interfaces/http/schemas/collector-runtime.http-schemas.ts` | 1,765 | Six HTTP resource families + shared DTO primitives | **Yes** — clear family seams; compatibility barrel preserves imports (Sprint 079 deliverable 2) |
-| 2 | `src/interfaces/http/routes/collector-runtime.routes.ts` | 1,168 | Six route registrars + DTO mappers | **Yes** — same family model as schemas |
-| 3 | `apps/web/src/lib/api/collector-runtime-client.ts` | 1,289 | Six client families + shared transport | **Yes** — mirror server family split (Sprint 079 deliverable 3) |
+| 1 | `src/interfaces/http/schemas/collector-runtime.http-schemas.ts` | 1,765 → 89 (barrel) | Six HTTP resource families + shared DTO primitives | **Done** (Sprint 079) — family modules under `schemas/collector-runtime/`; barrel preserves imports |
+| 2 | `src/interfaces/http/routes/collector-runtime.routes.ts` | 1,168 → 44 (barrel) | Six route registrars + DTO mappers | **Done** (Sprint 079) — family modules under `routes/collector-runtime/` |
+| 3 | `apps/web/src/lib/api/collector-runtime-client.ts` | 1,289 → 161 (barrel) | Six client families + shared transport | **Done** (Sprint 079) — family modules under `lib/api/collector-runtime/` |
 | 4 | `src/collector-runtime/platform-extractors/facebook/facebook-home-feed-graphql-payload-extractor.ts` | 2,052 | Home-feed GraphQL parsing + warning taxonomy | **Defer** — needs fixture discipline and live-baseline regression anchors |
 | 5 | `src/collector-runtime/platform-extractors/facebook/facebook-graphql-payload-extractor.ts` | 1,398 | Group-feed GraphQL parsing | **Defer** — same extractor protection gap |
 | 6 | `src/collector-runtime/infrastructure/facebook-browser-payload-capture.ts` | 1,444 | Capture orchestration + diagnostics | **Defer** — tightly coupled to live browser behavior |
@@ -43,12 +66,12 @@ Line count alone is not a defect. **Mixed ownership and repeated cross-feature e
 
 Each slice requires its **own acceptance gate** (characterization tests green before and after, zero HTTP/export/script diffs unless explicitly intended).
 
-### Slice 1 — Collector Runtime HTTP modularization (Sprint 079)
+### Slice 1 — Collector Runtime HTTP modularization (Sprint 079) — **completed**
 
 - Split server schemas, routes, and Web client by six resource families
-- Retain compatibility barrels at existing import paths
-- Add/extend characterization tests for route inventory, schema association, and public export inventory
-- **Gate**: `pnpm test`, `pnpm test:http:db`, `pnpm web:typecheck`, pre/post export inventory identical
+- Retained compatibility barrels at existing import paths
+- Added characterization tests for route inventory, schema association, and public export inventory
+- **Gate passed**: `pnpm test`, `pnpm web:typecheck`, `pnpm web:build`, Docker E2E; `pnpm test:http:db` when `DATABASE_URL` is available
 
 ### Slice 2 — Content Manager HTTP schema/route grouping
 
@@ -79,6 +102,7 @@ Structural cleanup is warranted when **mixed ownership blocks a product change**
 ## Architecture guard references
 
 - Shared file walker: `src/test-support/collect-typescript-files.ts`
+- Module graph parser (import + re-export edges): `src/test-support/collect-typescript-module-graph.ts`
 - Global boundary tests: `src/test-support/architecture-boundary.test.ts`
 - Module boundary tests: `src/**/*.boundary.test.ts`, `apps/web/src/web-architecture-boundary.test.ts`
 

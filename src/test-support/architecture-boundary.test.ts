@@ -1,8 +1,13 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { collectTypeScriptFiles } from "./collect-typescript-files";
+import {
+  collectRelativeModuleGraph,
+  findModuleGraphCycle,
+  referencesCompatibilityBarrel,
+} from "./collect-typescript-module-graph";
 
 const projectRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 
@@ -48,9 +53,6 @@ const serverCompatibilityBarrels = [
   "src/interfaces/http/schemas/collector-runtime.http-schemas.ts",
 ] as const;
 
-const importPattern =
-  /\b(?:from|import)\s*(?:type\s*)?(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)\s*(?:,\s*(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)\s*)*from\s*["']([^"']+)["']|\bimport\s*["']([^"']+)["']/g;
-
 function readModuleSourceFiles(moduleRoot: string): readonly URL[] {
   const absoluteRoot = resolve(projectRoot, moduleRoot);
   if (!existsSync(absoluteRoot)) {
@@ -60,107 +62,6 @@ function readModuleSourceFiles(moduleRoot: string): readonly URL[] {
   return collectTypeScriptFiles(pathToFileURL(`${absoluteRoot}/`)).filter(
     (file) => !file.pathname.endsWith(".test.ts"),
   );
-}
-
-function resolveImportPath(
-  importerPath: string,
-  importSpecifier: string,
-): string | null {
-  if (!importSpecifier.startsWith(".")) {
-    return null;
-  }
-
-  const importerDir = dirname(importerPath);
-  const candidatePaths = [
-    resolve(importerDir, importSpecifier),
-    `${resolve(importerDir, importSpecifier)}.ts`,
-    resolve(importerDir, importSpecifier, "index.ts"),
-  ];
-
-  for (const candidate of candidatePaths) {
-    if (existsSync(candidate) && statSync(candidate).isFile()) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-function collectRelativeImportGraph(entryFile: string): Map<string, string[]> {
-  const graph = new Map<string, string[]>();
-  const queue = [entryFile];
-  const visited = new Set<string>();
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current || visited.has(current)) {
-      continue;
-    }
-
-    visited.add(current);
-    const source = readFileSync(current, "utf8");
-    const imports: string[] = [];
-
-    for (const match of source.matchAll(importPattern)) {
-      const specifier = match[1] ?? match[2];
-      if (!specifier) {
-        continue;
-      }
-
-      const resolved = resolveImportPath(current, specifier);
-      if (resolved) {
-        imports.push(resolved);
-        if (!visited.has(resolved)) {
-          queue.push(resolved);
-        }
-      }
-    }
-
-    graph.set(current, imports);
-  }
-
-  return graph;
-}
-
-function findCycle(graph: Map<string, string[]>): readonly string[] | null {
-  const visiting = new Set<string>();
-  const visited = new Set<string>();
-  const stack: string[] = [];
-
-  const visit = (node: string): readonly string[] | null => {
-    if (visiting.has(node)) {
-      const cycleStart = stack.indexOf(node);
-      return cycleStart === -1 ? [node, node] : [...stack.slice(cycleStart), node];
-    }
-
-    if (visited.has(node)) {
-      return null;
-    }
-
-    visiting.add(node);
-    stack.push(node);
-
-    for (const next of graph.get(node) ?? []) {
-      const cycle = visit(next);
-      if (cycle) {
-        return cycle;
-      }
-    }
-
-    stack.pop();
-    visiting.delete(node);
-    visited.add(node);
-    return null;
-  };
-
-  for (const node of graph.keys()) {
-    const cycle = visit(node);
-    if (cycle) {
-      return cycle;
-    }
-  }
-
-  return null;
 }
 
 describe("global architecture boundary", () => {
@@ -196,8 +97,8 @@ describe("global architecture boundary", () => {
       const absoluteBarrel = resolve(projectRoot, barrelPath);
       expect(existsSync(absoluteBarrel)).toBe(true);
 
-      const graph = collectRelativeImportGraph(absoluteBarrel);
-      const cycle = findCycle(graph);
+      const graph = collectRelativeModuleGraph(absoluteBarrel);
+      const cycle = findModuleGraphCycle(graph);
 
       expect(cycle, `cycle detected for ${barrelPath}`).toBeNull();
     }
@@ -218,16 +119,17 @@ describe("global architecture boundary", () => {
       }
 
       const barrelBasename = barrelPath.split("/").at(-1);
+      if (!barrelBasename) {
+        continue;
+      }
+
       const familyFiles = collectTypeScriptFiles(
         pathToFileURL(`${familyDirectory}/`),
       ).filter((file) => !file.pathname.endsWith(".test.ts"));
 
       for (const file of familyFiles) {
         const source = readFileSync(file, "utf8");
-        if (
-          barrelBasename &&
-          source.includes(`./${barrelBasename.replace(/\.ts$/, "")}`)
-        ) {
+        if (referencesCompatibilityBarrel(source, barrelBasename)) {
           violations.push(relative(projectRoot, fileURLToPath(file)));
         }
       }
