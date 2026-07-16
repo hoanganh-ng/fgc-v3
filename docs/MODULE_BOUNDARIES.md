@@ -1,405 +1,85 @@
 # Module Boundaries
 
+Concise ownership and communication matrix for the implemented modules. For layer detail see [ARCHITECTURE.md](ARCHITECTURE.md); for module depth see [modules/](modules/).
+
 ## Collector Profile Manager
 
-Owns:
-
-- Profile lifecycle and state machine rules.
-- Account maturity/readiness stage and transition rules.
-- Profile property model and invariants.
-- Provisioning token lifecycle.
-- Session ingestion rules.
-- Checkout eligibility rules.
-- Domain-level validation for profile readiness, busy state, cooldowns, temporal windows, and safety thresholds.
-- Checkout eligibility gating for normal collection, including the requirement that `accountStage = COLLECTION_READY`.
-- Profile lease purpose rules for `COLLECTION`, `AMBIENT_EXERCISE`, and `ASSISTED_GROUP_ACCESS`.
-- Specified-profile ambient exercise checkout eligibility for `READY` profiles, including allowed account stages and rejected review/retired stages.
-- Specified-profile assisted group access checkout eligibility for `READY` profiles in `WARMING` or `COLLECTION_READY`, with source-group reference validation and no profile-source access mutation.
-- Profile-source access state for `profileId + sourceGroupId` pairs, stored with `sourceGroupId` as an external module reference string.
-- Profile-source access HTTP workflows, including validating source group references through an explicit Content Manager-facing port or adapter.
-
-Does not own:
-
-- Browser automation execution.
-- Collection task orchestration.
-- Content Manager source group records or source group entry route metadata.
-- Direct Content Manager repository access or database foreign keys from profile-source access records to Content Manager source group tables.
-- Web UI rendering.
-- Database technology selection.
-- HTTP framework implementation.
-- Content building.
-- Content publishing.
+| Aspect | Detail |
+| --- | --- |
+| **Owns** | Profile lifecycle; account stage rules; property invariants; provisioning tokens; session ingestion; checkout eligibility; lease purposes; profile-source access state; trusted runtime configuration; authentication-health transitions |
+| **Does not own** | Browser execution; collection orchestration; Content Manager source records; Web UI; HTTP framework; content building or publishing |
+| **Inbound** | HTTP checkout/release/configure/provision routes; operator provisioning CLI |
+| **Outbound** | Source group existence validation via Content Manager port adapter |
+| **Prohibited imports** | Content Manager repositories/schema; Collector Runtime internals; Fastify; Drizzle from domain/application |
 
 ## Content Manager
 
-Owns:
-
-- Validation of normalized content ingestion input.
-- Content item storage.
-- Content deduplication and upsert rules.
-- Content lifecycle status.
-- Source group records.
-- Source group entry route metadata for future access and exercise paths.
-- Group categories as managed entities.
-- Engagement counts.
-- Top comments as normalized metadata for each content item.
-- `SourcePublisher` identity (`platform + kind + externalPublisherId`)
-  as the durable publishing-source identity for a Facebook group or
-  page observed while reading a feed.
-- `SourcePublisher` pure observation behavior: first observation
-  creates `status = DISCOVERED` with `observationCount = 1`; subsequent
-  observations preserve `id`, identity, `createdAt`, `firstObservedAt`,
-  and current review `status`; `observationCount` increments by
-  exactly 1; `lastObservedAt` never moves backward; older observations
-  do not overwrite metadata from newer observations; omitted
-  metadata does not clear existing metadata; observation never
-  changes review status.
-- Explicit, reversible `SourcePublisher` status updates (idempotent
-  when reapplying the current status).
-- `SourcePublisher` application ports (`observeAtomically`,
-  `updateStatus`, `findById`, `findByIdentity`, `list` with bounded
-  `limit` and non-negative `offset`, ordered `lastObservedAt`
-  descending then `id` ascending).
-- `ContentCollectionProvenance` domain value object: a strict,
-  Zod-validated `CollectionSurface` discriminated union with
-  `SOURCE_GROUP` (with `sourceGroupId`) and `PROFILE_HOME_FEED`
-  (no profile id, no source group id) branches; a
-  `CollectedContentProvenanceInput` with the collection surface,
-  an optional `sourcePublisherId`, and an optional
-  `managedSourceGroupId` (required and equal to the surface
-  `sourceGroupId` when the surface is `SOURCE_GROUP`; absent or
-  present when the surface is `PROFILE_HOME_FEED`); a durable
-  `ContentCollectionProvenance` with the immutable
-  `firstCollectionSurface` plus the optional associations (the
-  same cross-field rule applies: required and equal when the
-  first surface is `SOURCE_GROUP`, absent or present when the
-  first surface is `PROFILE_HOME_FEED`); pure
-  `createInitialContentCollectionProvenance` and
-  `mergeContentCollectionProvenance` that runtime-validate their
-  inputs and outputs against the existing Zod domain schemas,
-  preserve the first surface, fill absent associations later,
-  are idempotent on identical observations, do not mutate inputs,
-  and throw a typed `ContentCollectionProvenanceConflictError`
-  (code `CONTENT_COLLECTION_PROVENANCE_CONFLICT`) on conflicting
-  `sourcePublisherId` or `managedSourceGroupId`. The
-  `PROFILE_HOME_FEED` surface contains no source-group
-  identifier; the optional `managedSourceGroupId` association is
-  a separate top-level field. Provenance is a domain value
-  object; it does not own profile ids, collection run ids, URLs,
-  entry routes, raw publisher identities, raw payloads,
-  observation arrays, or event history. Sprint 064A adds no
-  persistence, HTTP, application, composition, runtime,
-  extractor, browser, scheduler, Docker, or Web UI behavior.
-- Durable `ContentItem.collectionProvenance` persistence and
-  ingestion integration: the Sprint 064A
-  `ContentCollectionProvenance` value object is required on every
-  durable content item and is persisted through a final
-  `NOT NULL content_items.collection_provenance JSONB` column.
-  The Content Manager owns the safe split add-column → backfill →
-  set-NOT-NULL migration sequence that mirrors the existing
-  `0011`/`0012`/`0013` split. Provenance is derived from the
-  required `sourceGroupId` internally through a `SOURCE_GROUP`
-  collection surface; new content items use
-  `createInitialContentCollectionProvenance`; duplicate content
-  items (matched by `platform + externalPostId`) use
-  `mergeContentCollectionProvenance`. A merge that throws
-  `ContentCollectionProvenanceConflictError` propagates the typed
-  domain error and never persists. The source-group ingestion contract still
-  requires `sourceGroupId`, and source-group-first persisted content keeps the
-  invariant that
-  `collectionProvenance.firstCollectionSurface.kind === 'SOURCE_GROUP'` and
-  `collectionProvenance.firstCollectionSurface.sourceGroupId === sourceGroupId`.
-  Current durable content can omit `sourceGroupId` only for home-feed-first
-  content added by Sprint 065C1. The HTTP DTOs do not expose
-  `collectionProvenance`; `ContentItemDto.sourceGroupId` is optional and is
-  omitted when absent. Sprint 064B itself did not introduce home-feed ingestion
-  or execution, `SourcePublisher` observation or resolution, a provenance
-  filter or index, or Collector Runtime, extractor, browser, worker,
-  scheduler, Docker, or Web UI changes.
-- Sprint 065C1 (accepted at
-  `40b3ce7023c126c03386994a719ae7acb7758f21`) makes
-  `ContentItem.sourceGroupId` optional in the domain schema and DTOs
-  and `NULL`-tolerant in PostgreSQL while preserving the existing
-  `sourceGroupId`-required source-group ingestion contract.
-  `SOURCE_GROUP` first surfaces still require `sourceGroupId` and a
-  matching `managedSourceGroupId`. `PROFILE_HOME_FEED` first surfaces
-  may omit both `sourceGroupId` and `managedSourceGroupId`; when
-  either is present both must be present and equal.
-  `CollectionProvenance` does not gain `profileId`, `runId`, URLs,
-  raw payloads, or event history. Generic PROFILE_HOME_FEED
-  provenance permits an absent `sourcePublisherId`; the dedicated
-  `IngestHomeFeedCollectedContentUseCase` boundary still requires
-  it. The use case accepts an input carrying only `sourcePublisherId`
-  and normalized safe content (no `sourceGroupId`,
-  `managedSourceGroupId`, `profileId`, `runId`, provenance, raw
-  GraphQL, cookies, localStorage, tokens, headers, proxy details,
-  viewer data, or unknown fields), verifies the publisher exists and
-  its platform matches, and persists the item with
-  `firstCollectionSurface.kind = "PROFILE_HOME_FEED"`, no
-  `sourceGroupId`, no `managedSourceGroupId`, and no fake Home Feed
-  `SourceGroup`. The use case preserves the immutable first surface
-  on duplicates, fills absent associations on later merges, is
-  idempotent for identical associations, and rejects conflicting
-  associations through the existing typed
-  `ContentCollectionProvenanceConflictError`. The existing
-  `IngestCollectedContentUseCase` is extended so a later source-group
-  collection can fill `sourceGroupId` and `managedSourceGroupId` on
-  a home-feed-first item while preserving its
-  `PROFILE_HOME_FEED` first surface. The new
-  `POST /collector/content-items/home-feed` route uses a strict
-  allowlist body schema; `ContentItemDto.sourceGroupId` is optional
-  and omitted when absent; `collectionProvenance` remains internal
-  and is not exposed through HTTP. Sprint 065C1 extends the Web UI
-  `ContentItem` schema and the list/detail pages to render "No
-  managed source group" safely when `sourceGroupId` is omitted. It
-  does not add browser execution, Facebook navigation, capture,
-  extractor orchestration, Collector Runtime HTTP client changes,
-  workers, schedulers, Docker service changes, live-Facebook
-  validation, `SourcePublisher` review or status mutation,
-  source-group promotion, Content Builder, or Content Publisher
-  behavior. Sprint 065C1 makes no browser or live-Facebook execution
-  claim.
-- Sprint 065C2 (accepted) adds the
-  explicit profile-bound checkout path for the exact profile
-  referenced by a `ProfileHomeFeedCollectionRun`. It extends
-  `ProfileLeasePurpose` with a fourth value, `HOME_FEED_COLLECTION`,
-  which shares the existing `COLLECTION_READY` account-stage rule
-  and the full existing safety and readiness check set (including
-  the approved `NETWORK_CONTEXT_MISSING` rule). It adds
-  `CheckoutProfileForHomeFeedCollectionUseCase` (input:
-  `{ profileId }` only — no `Source Group` reference, no
-  profile-source access record, no candidate selection) which loads
-  the exact requested profile, queries the active lease, throws
-  `ProfileLeaseStateConflictError` when an active lease exists,
-  evaluates `HOME_FEED_COLLECTION` eligibility, and atomically marks
-  the profile `BUSY` and saves an `ACTIVE` `HOME_FEED_COLLECTION`
-  lease through the existing transaction manager. It adds `POST
-  /collector/profiles/:profileId/home-feed/checkout` with no required
-  body and a strict empty-allowlist body schema. Duplicate checkouts
-  of the same profile are mapped to HTTP 409 with
-  `PROFILE_LEASE_STATE_CONFLICT`. It extends `ProfileManagerHttpClient`
-  with a dedicated `checkoutProfileForHomeFeedCollection(profileId)`
-  method backed by a new application-owned
-  `ProfileHomeFeedCheckoutPort` whose `accountStage` is typed as
-  `CollectorRuntimeAccountStage` (parsed through
-  `CollectorRuntimeAccountStageSchema`; an unsupported or malformed
-  account stage produces `PROFILE_MANAGER_RESPONSE_ERROR`). The port
-  returns only `{ profileId, accountStage, leaseId, leaseExpiresAt? }`.
-  It adds migration `0024` (PostgreSQL `ALTER TYPE ... ADD VALUE`) to
-  add `HOME_FEED_COLLECTION` to the existing
-  `collector_profile_lease_purpose` enum. The migration preserves
-  the one-active-lease-per-profile unique partial index unchanged.
-  `GetRuntimeProfileConfigurationUseCase` accepts an active
-  `HOME_FEED_COLLECTION` lease for its matching `BUSY` profile.
-  `ReleaseProfileLeaseUseCase` releases the lease and returns the
-  profile to `READY`. Sprint 065C2 does not execute a run, navigate
-  Facebook, capture payloads, observe `SourcePublisher`, submit
-  Content Manager items, add workers or schedulers, change Docker,
-  add Web UI behavior, or make any live-Facebook claim. The new
-  `ProfileHomeFeedCheckoutPort` is not wired into a worker or
-  executor in Sprint 065C2.
-- Sprint 065C3 (accepted at
-  `e60e5a8f0167cad84d7fac4545fdda2e29feea99`) wires the
-  `HOME_FEED_COLLECTION` checkout into the one-shot operator-invoked
-  executor `pnpm operator:profile-home-feed:run-next` that drives bounded
-  home-feed capture, publisher observation, and home-feed content
-  submission through the existing Content Manager HTTP contracts.
-  Manual live-Facebook validation was **not performed** by
-  Sprint 065C3.
-- Safe read APIs.
-- Future handoff shape for Content Builder.
-
-Does not own:
-
-- Profile or session management.
-- Profile-source access state for individual profiles.
-- Browser automation.
-- Network payload capture.
-- Raw Facebook GraphQL parsing.
-- Scraping strategy.
-- Platform-specific extraction rules.
-- Comment crawling strategy.
-- Video generation.
-- Publishing workflows.
-- Promotion of a `SourcePublisher` into a managed `SourceGroup`,
-  `SourceGroup` configuration, scheduling, or any social action.
-- `Content Publisher` pipeline behavior. `SourcePublisher` is the
-  Content Manager-owned durable publishing-source identity, not the
-  future Content Publisher pipeline module, and it does not model
-  drafts, publications, videos, publishing schedules, or published
-  artifacts.
-- Profile ids, collection run ids, URLs, entry routes, raw
-  publisher identities, raw payloads, observation arrays, or
-  event history for `ContentCollectionProvenance`. The provenance
-  value object records the first collection surface and the
-  optional `SourcePublisher` and managed `SourceGroup`
-  associations only.
-
-Content Manager should not accept raw Facebook GraphQL payloads as its primary ingestion contract. Its canonical write contract is normalized Content Manager ingestion input. A future implementation may optionally store sanitized raw payload data or a raw payload reference for trusted diagnostics or reprocessing, but that storage is not the canonical content model.
-
-`SourcePublisher` is the Content Manager-owned publishing-source
-identity and is distinct from `SourceGroup`. A `SourcePublisher` is
-not a managed `SourceGroup`, is not the future Content Publisher
-pipeline stage, and Sprint 063A does not promote, configure,
-schedule, or join anything.
+| Aspect | Detail |
+| --- | --- |
+| **Owns** | Normalized content ingestion; content items; deduplication/upsert; lifecycle status; source groups and entry routes; categories; engagement and top comments; `SourcePublisher` identity and observation; collection provenance; safe reads; approved-group promotion to paused source groups |
+| **Does not own** | Profiles/sessions; browser automation; raw GraphQL parsing; scraping; video generation; publishing pipelines |
+| **Inbound** | Collector Runtime HTTP ingestion and publisher observation; Web UI CRUD/review; operator tools |
+| **Outbound** | Source group reference validation responses to Profile Manager adapter |
+| **Prohibited imports** | Profile Manager repositories/schema; Collector Runtime internals; browser providers from domain/application |
 
 ## Collector Runtime
 
-Owns:
-
-- Future execution of collection workflows.
-- Durable Collector Runtime run records for collection runs and ambient account exercise runs.
-- Durable Collector Runtime run records for profile-source access check runs.
-- Checking out eligible profiles from Collector Profile Manager.
-- Calling specified-profile ambient exercise checkout for read-only account exercise attempts.
-- Future consumption of assisted group access leases after Profile Manager checkout, when explicitly added by a later sprint.
-- Visiting Facebook groups and posts.
-- Future consumption of Content Manager source group entry route metadata through explicit contracts.
-- Visiting safe Facebook home/feed surfaces for read-only account exercise.
-- Browser automation and network payload capture.
-- Browser provider orchestration and provider adapters inside infrastructure.
-- Platform Extractors that convert raw platform artifacts into normalized Content Manager ingestion input.
-- The Facebook GraphQL Payload Extractor that converts captured Facebook GraphQL response bodies into normalized Content Manager ingestion input candidates.
-- Raw Facebook GraphQL payload interpretation.
-- Facebook-specific field mapping.
-- Post extraction.
-- High-engagement comment extraction.
-- Engagement count extraction.
-- Best-effort handling of missing fields in captured platform payloads.
-- Future extractor fixtures and parser tests.
-- Submitting normalized collected content to Content Manager through the Content Manager HTTP API.
-- Calling Collector Profile Manager checkout/release through runtime-owned ports and HTTP adapters.
-- Requesting lease-scoped runtime profile configuration from Collector Profile Manager through trusted application/API contracts after checkout.
-- Profile lease release orchestration.
-- Returning profile usage outcomes and runtime metrics.
-- Recording safe ambient exercise summaries and sanitized failure reasons.
-- Browser-backed profile-source access check execution, including sanitized
-  observation, deterministic outcome classification, and safe Profile Manager
-  mutation through explicit ports.
-
-The Sprint 022 orchestration flow coordinates Profile Manager checkout/release behavior, captured payload collection, and Content Manager submission through Collector Runtime-owned ports and use cases. Payload capture is represented by a port only in Sprint 022; real browser automation, network interception, login, navigation, scheduling, queues, and database access remain out of scope.
-
-Browser-provider hardening must stay inside Collector Runtime infrastructure. Providers consume Profile Manager trusted runtime configuration after checkout; they must not become a profile manager, randomly mutate profile identity, regenerate fingerprints outside Profile Manager, solve CAPTCHAs, automate credentials, bypass checkpoints, bypass rate limits/access controls, post, comment, or like.
-
-Ambient account exercise is a Collector Runtime workflow for safe stability exercise only. It may record that a page loaded, login was required, a checkpoint was detected, how many light scrolls ran, whether the lease was released, and the run duration. It must not collect or submit content items, join groups, create platform actions, or write raw browser/platform/session material to records or logs.
-
-Sprint 040 source group entry routes remain Content Manager metadata. Collector Runtime does not use them for navigation in Sprint 040, and it must not treat a route as proof of group access.
-
-Does not own:
-
-- Profile property invariants.
-- Provisioning token rules.
-- Authentication session ingestion rules.
-- Content item lifecycle rules.
-- Content deduplication or upsert rules.
-- Group category management.
-- Source group entry route metadata ownership or direct mutation.
-- Direct database access to Collector Profile Manager or Content Manager storage.
-- Direct Content Manager repository access.
-- Collector Profile Manager repository access.
-- Collector Profile Manager composition root wiring.
-- Collector Profile Manager checkout eligibility or leasing business rules.
-- Collector Profile Manager lease-purpose eligibility rules.
-- Collector Profile Manager account maturity/readiness stage rules.
-- Automatic account-stage promotion or demotion after exercise.
-- Automatic account-stage promotion or demotion after profile-source access
-  checks.
-- Public Profile Manager read DTO expansion for sensitive runtime material.
-- Authority over profile identity, session state, proxy configuration, or fingerprint configuration.
-- Content building.
-- Content publishing.
-
-## Platform Extractor Boundary
-
-A Platform Extractor is a collection-side component that converts raw platform-specific artifacts, such as captured Facebook GraphQL payloads, into normalized Content Manager ingestion input.
-
-The first extractor is the Facebook GraphQL Payload Extractor under `src/collector-runtime/platform-extractors/facebook`.
-
-The Sprint 020 extractor is extractor-only. It does not perform browser automation, network interception, profile checkout, HTTP submission to Content Manager, database access, or persistent deduplication.
-
-The Sprint 021 submission flow accepts already-captured payloads only. It invokes the Facebook GraphQL Payload Extractor, submits normalized candidates to the Content Manager HTTP API, and reports per-candidate submission outcomes. It does not perform browser automation, network interception, profile checkout, lease release, scheduling, queueing, database access, or Content Manager business logic.
-
-The Sprint 022 profile-orchestrated collection flow invokes the Sprint 021 submission flow for each captured payload. It does not move extractor rules, Content Manager deduplication/upsert behavior, or Profile Manager checkout eligibility/leasing rules into Collector Runtime.
-
-The Sprint 024 trusted runtime profile configuration contract remains owned by Collector Profile Manager and is guarded by `leaseId`. Collector Runtime may consume that contract after checkout, but public profile read DTOs must continue to omit authentication state, local storage, proxy credentials, provisioning tokens, and token hashes.
-
-Sprint 038 keeps profile operational status separate from account maturity. A profile may be `READY` after login/session ingestion while its `accountStage` remains `NEW_ACCOUNT`; Collector Runtime must still rely on Profile Manager checkout instead of interpreting or bypassing account-stage rules itself. Sprint 039 adds ambient exercise checkout for specified profiles, but exercise outcomes do not automatically change `accountStage` and do not grant normal collection eligibility.
-
-Extractor fixtures must be sanitized. They must not include cookies, tokens, authorization headers, viewer IDs, private user data, raw request headers, or sensitive account/session details. Synthetic fixtures should be clearly named as synthetic. Real payload fixtures must be sanitized before they are used in tests.
-
-Canonical collection ingestion flow:
-
-```text
-raw GraphQL payload
--> Facebook GraphQL Payload Extractor
--> normalized Content Manager ingestion input
--> Content Manager validation/upsert/storage
-```
-
-Platform Extractors belong to the Collector Runtime side of the Content Collector. They do not belong in the Content Manager domain core.
-
-## Profile Manager Web UI
-
-Owns:
-
-- Future human-facing profile management screens.
-- Future profile state inspection and operational controls.
-- Calling application APIs to perform allowed profile operations.
-
-Does not own:
-
-- Profile domain rules.
-- Direct persistence logic.
-- Browser automation execution.
-- Content building.
-- Content publishing.
+| Aspect | Detail |
+| --- | --- |
+| **Owns** | Collection/exercise/access-check/home-feed run records; schedules and dispatch use cases; browser capture; platform extractors; HTTP submission to Content Manager; Profile Manager checkout/release clients; safe diagnostics |
+| **Does not own** | Profile invariants; checkout eligibility rules; content lifecycle/deduplication; source group metadata ownership; direct database access to other modules' tables |
+| **Inbound** | HTTP run/schedule management; worker/scheduler/operator CLIs |
+| **Outbound** | Profile Manager HTTP (checkout, release, config); Content Manager HTTP (ingest, observe publisher) |
+| **Prohibited imports** | Any module's repositories, composition roots, or database schema; browser automation in application/domain/extractor layers |
 
 ## Content Builder
 
-Owns:
+| Aspect | Detail |
+| --- | --- |
+| **Owns** | Transform Type catalog (create/list/read/update/archive); safe `/builder/transform-types` HTTP; Web UI management |
+| **Does not own** | Content Manager entities; Collector execution; LLM execution; collected-content selection; publishing |
+| **Inbound** | Web UI and HTTP catalog operations |
+| **Outbound** | None to other module internals |
+| **Prohibited imports** | Content Manager/Profile Manager/Collector Runtime repositories, schema, or runtime internals |
 
-- The current Sprint 072 Transform Type catalog: reusable initial transform
-  prompt records, create/list/read/update/archive lifecycle, active normalized
-  name uniqueness, safe `/builder/transform-types` HTTP contracts, PostgreSQL
-  persistence, and Web UI management.
-- Future Builder workflows may transform collected material into video-ready
-  assets only after a later sprint defines the safe contracts and DTOs.
+## Web UI
 
-Does not own:
+| Aspect | Detail |
+| --- | --- |
+| **Owns** | Operator presentation; routing/layout; client validation; TanStack Query state; API client wrappers |
+| **Does not own** | Domain rules; persistence; browser execution; secret storage |
+| **Inbound** | Operator interaction |
+| **Outbound** | HTTP to `/collector/*` and `/builder/*` via typed clients in `apps/web/src/lib/api/` |
+| **Prohibited imports** | Backend `src/` modules; direct database or Fastify usage |
 
-- Profile lifecycle.
-- Profile provisioning.
-- Content Manager source groups, source publishers, content items, ingestion,
-  review lifecycle, repositories, or database schema.
-- Collector runtime execution.
-- Browser automation, raw Facebook payloads, profile/session material,
-  cookies, localStorage, tokens, proxy details, browser data, or provenance
-  internals.
-- Content Briefs, Producers, Producer Sets, artifacts, LLM execution, prompt
-  versioning, or collected-content selection.
-- Publishing workflows.
+## Operator Tools and Infrastructure
 
-Future Builder workflows must consume collected content through explicit safe
-Content Manager contracts or Content Builder-owned application ports. Builder
-must not import Content Manager repositories, database schema, Collector
-Runtime internals, raw payloads, profile/session material, cookies,
-localStorage, tokens, proxy details, browser data, or provenance internals
-unless a later sprint explicitly approves a safe DTO.
+| Aspect | Detail |
+| --- | --- |
+| **Owns** | CLIs (provision, collect, exercise, schedulers, workers); Docker Compose stacks; stack lifecycle commands |
+| **Does not own** | Domain rules; HTTP route logic; bypass of leasing/readiness |
+| **Inbound** | Operator invocation |
+| **Outbound** | Same HTTP boundaries as Web UI where possible |
+| **Prohibited imports** | Other modules' repositories from tool code; embedding business rules outside use-case calls |
 
-## Content Publisher
+## Shared infrastructure
 
-Owns:
+| Aspect | Detail |
+| --- | --- |
+| **Owns** | PostgreSQL schemas; Drizzle repositories; mappers; transaction helpers; system clock/token adapters |
+| **Does not own** | Business rules; HTTP routing; module-specific use-case orchestration |
+| **Used by** | Composition roots only — not domain/application layers |
 
-- Future publishing workflows for completed video outputs.
-- Future destination-specific publishing rules, scheduling, and status tracking.
+## HTTP adapter (`src/interfaces/http/`)
 
-Does not own:
+| Aspect | Detail |
+| --- | --- |
+| **Owns** | Fastify server factory; route registration; HTTP schemas/DTO mapping; centralized error mapping |
+| **Does not own** | Use-case business logic; repository queries; browser behavior |
+| **Depends on** | Composed module service interfaces from composition roots |
 
-- Profile lifecycle.
-- Collection runtime execution.
-- Video assembly.
-- Collector profile provisioning.
+## Boundary rule
 
-## Boundary Rule
+Shared behavior requires a clear owner. Cross-module work uses explicit application contracts, HTTP APIs, or composition adapters — never another module's repositories, database tables, or composition root.
 
-Shared behavior must be introduced only when it has a clear owner and does not leak adapter or framework concerns into domain logic. Cross-module communication should happen through explicit application contracts, not direct access to another module's internals.
+Architecture boundary tests in `src/test-support/` and `*.boundary.test.ts` files enforce these rules. Violations found on baseline are documented, not silently whitelisted.

@@ -1,37 +1,66 @@
 # Operator Tools and Infrastructure
 
-## Ownership
-- Command-line interfaces for manual intervention, debugging, and targeted tasks.
-- Profile provisioning CLI workflows (connecting one-time tokens to browser sessions).
-- Manual Facebook collection triggers and diagnostics.
-- Containerized execution environments (Docker Compose) for dependent services (API, DB, UI, Workers).
-- Opt-in script aliases and lifecycle commands in `package.json`.
+## Purpose and current capability
 
-## Does Not Own
-- Domain rules, API endpoint logic, or HTTP routing.
-- Persistent source of truth for runtime config.
-- Bypassing profile leasing rules or faking readiness.
+Operator tools provide command-line and containerized execution paths for provisioning, manual collection, exercise, schedulers, workers, and stack lifecycle. Docker Compose stacks in `docker-compose.dev.yml` and `docker-compose.preview.yml` run the API, database, Web UI gateway, and opt-in worker/scheduler services.
 
-## Important Source Paths
-- `docker/`
-- `scripts/`
-- Tool entrypoints in `src/operator-tools/` or specific runtime files.
+The root manifest exposes 35 scripts including `pnpm stack:service` for typed service control (accepted Sprint 078 baseline).
 
-## Important Entrypoints
-- `pnpm operator:profile:provision`
-- `pnpm operator:collector:facebook`
-- `pnpm stack:dev:start` / `pnpm stack:preview:start`
+## Owns
 
-## Critical Invariants
-- Manual tools should consume the same HTTP API boundaries as the Web UI whenever possible.
-- Provisioning tools must pass captured sessions back securely.
+- Profile provisioning CLI and browser probe tools
+- Manual Facebook collection and bounded home-feed runner CLIs
+- Collection scheduler, collector worker, home-feed scheduler/worker, account exercise worker, profile-source access check worker
+- Stack lifecycle commands (`stack:dev:*`, `stack:preview:*`, `stack:service`)
+- Docker images: API runtime, worker runtime, scheduler runtime, web gateway
 
-## Sensitive Data Rules
-- Do not persist raw Facebook payloads captured during manual runs without sanitization.
-- CLI output must never print proxy credentials or raw session values.
+## Does not own
 
-## Relevant Verification Commands
+- Domain rules or use-case business logic
+- HTTP route registration or DTO mapping
+- Persistent source of truth for profile or content data
+- Bypass of leasing, cooldown, or readiness gates
+
+## Public ports, contracts, and cross-module communication
+
+- **Preferred pattern**: call the same HTTP APIs as the Web UI
+- **Direct composition**: some workers compose Collector Runtime modules at startup (same boundaries as `src/main.ts` wiring)
+- **Environment**: `DATABASE_URL`, browser provider settings, service URLs from Compose
+
+## Important source paths and entrypoints
+
+- Tools: `src/operator-tools/` (profile-provisioning, facebook-collector, collection-scheduler, profile-home-feed-worker, stack-service, etc.)
+- Docker: `docker/`, `docker-compose.dev.yml`, `docker-compose.preview.yml`
+- Scripts: root `package.json` (35 commands)
+
+Key commands:
+
 ```bash
-# Verify the types of tools directly
-pnpm typecheck
+pnpm operator:profile:provision
+pnpm operator:profile-home-feed:run-next
+pnpm operator:collector:worker
+pnpm stack:dev:start
+pnpm stack:service --help
 ```
+
+## Critical invariants and sensitive-data rules
+
+- Manual tools must respect the same checkout and readiness rules as automated workers
+- Provisioning captures sessions through secure HTTP contracts only
+- CLI output must not print proxy credentials, tokens, cookies, or raw payloads
+- Sanitize captured fixtures before test or diagnostic reuse
+
+## Verification anchors
+
+```bash
+pnpm typecheck
+pnpm test src/operator-tools
+pnpm test:e2e:docker
+```
+
+## Known change hotspots and limitations
+
+- `src/operator-tools/profile-exercise/exercise-runner.ts` (~1,499 lines)
+- `src/operator-tools/profile-provisioning/provisioning-browser-provider.ts` (~928 lines)
+- `src/operator-tools/facebook-collector/collector-runner.ts` (~530 lines)
+- Exercise and provisioning runner splits are deferred ([CODEBASE_CHANGE_MAP.md](../CODEBASE_CHANGE_MAP.md))

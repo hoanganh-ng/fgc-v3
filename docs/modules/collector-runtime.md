@@ -1,121 +1,70 @@
 # Collector Runtime
 
-The accepted Profile Feed Collector baseline (supported provider, target,
-operator flow, regression anchors, and maintenance-only boundary) is locked in
-[`COLLECTOR_BASELINE.md`](../COLLECTOR_BASELINE.md). Collector Runtime continues
-to own execution, capture, extraction, diagnostics, and lease release for that
-loop; feature expansion beyond maintenance is parked until an explicit product
-decision.
+## Purpose and current capability
 
-## Ownership
-- Execution of collection workflows (queues, workers).
-- Durable run records for collection, ambient exercise, profile-source access checks, and profile-bound home-feed runs.
-- Orchestrating profile checkout from Collector Profile Manager (including profile-bound home-feed checkout via the new `ProfileHomeFeedCheckoutPort`).
-- Orchestrating browser automation, network payload capture, and page context interaction.
-- Platform Extractors (e.g. Facebook GraphQL Payload Extractor) converting raw artifacts to normalized inputs.
-- Submitting normalized collected content to Content Manager.
-- Processing lease-scoped runtime profile configuration.
-- Shared browser-provider launch config maps trusted runtime `networkContext.mode`
-  to launch settings: valid `DIRECT` omits proxy settings; valid `PROXY` keeps
-  existing proxy settings; `UNCONFIGURED` and contradictory network configuration
-  fail closed with the browser-configuration error family.
-- Detecting authentication walls (login, checkpoints).
-- Owns the `CollectionSchedule` aggregate (one schedule per source group; persisted schedule, not yet driving dispatch).
-- Atomic scheduled dispatch: `DispatchNextDueCollectionScheduleUseCase` selects one enabled due schedule with `FOR UPDATE SKIP LOCKED`, inserts a `QUEUED` `SCHEDULED` `CollectionRun`, and advances the schedule's `next_run_at` per the cadence policy, all in a single PostgreSQL transaction. Missed intervals produce one run only. See [Sprint 058](../SPRINTS/SPRINT-058-atomic-scheduled-collection-dispatch.md).
-- Scheduled dispatch poller: the **collection scheduler** (`src/operator-tools/collection-scheduler/`) is a sibling CLI that polls `DispatchNextDueCollectionScheduleUseCase` on an interval; it dispatches due schedules into runs but never executes them — execution remains the collector worker's job. See [Sprint 059](../SPRINTS/SPRINT-059-scheduled-collection-dispatch-poller.md). The scheduler is available as an opt-in `collection-scheduler` Docker Compose service in the dev and preview stacks, built from a lightweight `scheduler-runtime` image that does not install or run a browser. See [Sprint 060](../SPRINTS/SPRINT-060-collection-scheduler-containerization.md).
-- Owns the `ProfileHomeFeedCollectionSchedule` aggregate (one schedule per profile; persisted schedule configuration only). Sprint 068A exposes safe operator create/update, get, and list HTTP routes for these profile-bound home-feed schedules, but does not dispatch schedules into home-feed runs, wire a poller, execute browser collection, or change the one-shot home-feed executor. Sprint 068C exposes those routes through a Web UI list / create / edit / enable / disable page at `/profile-home-feed-schedules` (read-only presentation of safe Profile Manager summary metadata; no behavior change to the backend).
-- Current state: Sprint 071 exposes the existing safe `ProfileHomeFeedCollectionRun` request/list/get/cancel HTTP contracts through the Web UI at `/profile-home-feed-collection-runs`, allowing operators to queue manual profile-bound Facebook home-feed collection runs, monitor and filter runs by status/profile, refresh, paginate, poll active QUEUED/RUNNING rows, and cancel only QUEUED/RUNNING runs. Backend behavior, persistence, HTTP routes, schedules, scheduled dispatch, the bounded runner, scheduler/worker services, Docker, and other modules are unchanged.
-- Profile home-feed scheduled dispatch: `DispatchNextDueProfileHomeFeedCollectionScheduleUseCase` selects one eligible due profile-home-feed schedule, performs profile reference lookup outside any database transaction, and persists exactly one queued `SCHEDULED` `ProfileHomeFeedCollectionRun` or a safe skip/defer outcome through a schedule compare-and-set repository.
-- Profile home-feed runtime services: `src/operator-tools/profile-home-feed-scheduler/` polls the existing scheduled dispatch use case, and `src/operator-tools/profile-home-feed-worker/` claims queued profile home-feed runs and delegates execution to the existing bounded home-feed runner. Sprint 068B2 exposes them as separate opt-in `profile-home-feed-scheduler` and `profile-home-feed-worker` Docker Compose services in dev and preview. The scheduler uses the lightweight `scheduler-runtime` image and does not launch a browser; the worker uses `worker-runtime` and starts Xvfb like the other browser-backed worker services.
+Collector Runtime executes Facebook collection workflows: profile-bound home-feed runs, source-group collection, ambient account exercise, and profile-source access checks. It owns durable run and schedule records, browser capture, platform extractors, HTTP submission to Content Manager, and safe home-feed diagnostics.
 
-## Safe Home-Feed Diagnostic Contract (Sprint 074)
+The accepted Profile Feed Collector baseline is locked in [COLLECTOR_BASELINE.md](../COLLECTOR_BASELINE.md). Runtime behavior beyond maintenance requires an explicit product decision.
 
-Sprint 074 adds a strict, safe, aggregate diagnostic summary on every terminal `ProfileHomeFeedCollectionRun`. The summary is owned by **Collector Runtime**; it is never persisted by Content Manager, never copied into the broader run, and is exposed only through the existing profile home-feed run read contracts and Web UI.
+## Owns
 
-### Ownership
+- Collection, exercise, access-check, and home-feed run records and state machines
+- Collection schedules and profile home-feed schedules with atomic dispatch use cases
+- Browser automation orchestration and payload capture (infrastructure layer)
+- Platform extractors, including Facebook group and home-feed GraphQL extractors
+- HTTP clients to Profile Manager (checkout, release, config) and Content Manager (ingest, observe)
+- Profile home-feed diagnostic summaries on terminal runs
+- Workers and bounded runners invoked by operator tools
 
-- **Source of truth**: `src/collector-runtime/domain/profile-home-feed-diagnostic-summary.schemas.ts`. Domain types are inferred from the Zod schema; the public summary is the strict `ProfileHomeFeedDiagnosticSummary`.
-- **Persistence**: a single nullable JSONB column `profile_home_feed_collection_runs.diagnostics` (migration `drizzle/0028_profile_home_feed_collection_runs_diagnostics.sql`). The mapper rejects unknown warning codes, unknown failure codes, unknown page-state values, and unknown schema versions at the boundary.
-- **Capture & execution propagation**: `src/collector-runtime/application/profile-home-feed-diagnostic-aggregator.ts` is the pure aggregator; `ExecuteProfileHomeFeedCollectionRunUseCase` records events at every stage and forwards the finalized summary through `markSucceeded` and `markFailed`.
-- **HTTP**: `ProfileHomeFeedCollectionRunDto` exposes `diagnostics?` via a strict OpenAPI allowlist (`additionalProperties: false` on every nested block).
-- **Web UI**: `apps/web/src/pages/profile-home-feed-collection-runs-page.tsx` renders an explicit "Diagnostics unavailable for this run" placeholder for older runs without the field, and a structured panel for newer runs.
-- **Operator logger**: the bounded home-feed runner (`src/operator-tools/profile-home-feed-runner/runner.ts`) prints the diagnostic lines alongside the existing safe summary block. No raw URLs, no Facebook field values, no upstream error codes are logged.
+## Does not own
 
-### Schema version
+- Profile checkout eligibility or account stage rules
+- Content deduplication, lifecycle, or storage
+- Source group or entry route metadata ownership
+- Direct database access to Profile Manager or Content Manager tables
+- Automatic account-stage promotion after runs
 
-- `schemaVersion` is a required integer literal `1`.
-- Older runs without a `diagnostics` column (pre-Sprint 074) are readable: the mapper returns `null`, the domain `run.diagnostics` is `undefined`, the HTTP DTO omits the `diagnostics` field, the Web UI shows "Diagnostics unavailable for this run."
-- New runs always write a `diagnostics` JSON object; on the existing unaccepted Sprint 074 implementation rows, a one-time re-shape is not part of the sprint.
+## Public ports, contracts, and cross-module communication
 
-### Strict, safe shape
+- **HTTP**: six resource families under `/collector/*` via `src/interfaces/http/routes/collector-runtime.routes.ts`
+- **Profile Manager ports**: checkout/release/runtime-config HTTP clients in `src/collector-runtime/infrastructure/`
+- **Content Manager ports**: ingestion and publisher observation HTTP clients
+- **Web client**: `apps/web/src/lib/api/collector-runtime-client.ts`
+- **Operator entrypoints**: workers and schedulers under `src/operator-tools/`
 
-- **Capture counters** (`capture`): aggregate counts from the existing `FacebookPayloadCaptureDiagnostics` — page-context fetch/XHR counts, network listener count, parse failure count, payloads passed to the extractor. Counts are non-negative integers.
-- **Capture stage** (`captureStage`): closed enum `NOT_STARTED | IN_PROGRESS | SUCCEEDED | CAPTURE_FAILED | INTERRUPTED`.
-- **Capture page state** (`capturePageState`): closed enum `HOME_FEED | LOGIN | CHECKPOINT | OTHER`. The original raw URL and any upstream `FacebookPageBlockingState` value are mapped into one of these four values at the application boundary; raw URLs are never persisted, returned, or logged.
-- **Capture login redirect** (`captureLoginRedirectSuspected`): boolean. Set from the existing capture-port diagnostic.
-- **Extractor counters** (`extractor`): `extractedCandidateCount` is the total raw extractor output before executor-level cross-payload deduplication; `deduplicatedCandidateCount` is the count of candidates that survived the executor's `platform + externalPostId` cross-payload dedup and the `maxPosts` ceiling. The two are independent and truthful.
-- **Warning histogram** (`warningCounts`): partial `Record<ProfileHomeFeedDiagnosticWarningCode, non-negative integer>`. Keys are restricted to the 13 allowlisted `FacebookHomeFeedExtractionWarningCode` values; unknown keys are rejected by the strict Zod object schema and the strict OpenAPI `additionalProperties: false` allowlist.
-- **Unsupported payload count** (`unsupportedPayloadCount`): non-negative integer, derived from the `UNSUPPORTED_PAYLOAD_SHAPE` extractor warning.
-- **Run outcome** (`runOutcome`): `failureStage` from the closed enum `BOUNDS_EXCEEDED | CHECKOUT | CAPTURE | PUBLISHER_OBSERVATION | CONTENT_SUBMISSION | LEASE_RELEASE | PARTIAL | INTERRUPTED | EXECUTION`; `failureCode` from the closed enum `PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_CODES`. When the lease release fails, the run outcome is force-overwritten to `LEASE_RELEASE` with code `HOME_FEED_LEASE_RELEASE_FAILED` so a stale stage from a prior branch cannot leak into the persisted row.
+## Important source paths and entrypoints
 
-### Prohibited fields (must not appear on the diagnostic contract)
+- Domain/application: `src/collector-runtime/domain/`, `src/collector-runtime/application/`
+- Extractors: `src/collector-runtime/platform-extractors/facebook/`
+- Browser infrastructure: `src/collector-runtime/infrastructure/`
+- Composition: `src/composition/collector-runtime/`
+- Workers: `src/collector-runtime/workers/`, `src/operator-tools/profile-home-feed-worker/`
+- HTTP schemas: `src/interfaces/http/schemas/collector-runtime.http-schemas.ts`
 
-- Raw Facebook payloads or response bodies
-- Cookies, localStorage, tokens, authorization headers, proxy credentials, fingerprint secrets, trusted runtime configuration
-- Viewer / account identifiers, screenshots, raw HTML, stack traces
-- The full or sanitized final-page URL. **No URL** appears on the diagnostic contract — not on the persisted column, not in the HTTP DTO, not in the Web UI, not in operator logs. Only the closed `capturePageState` enum value is permitted.
-- Upstream capture-port error codes. Every code is mapped to an allowlisted `PROFILE_HOME_FEED_DIAGNOSTIC_FAILURE_CODES` value at the application boundary via `mapCaptureErrorCodeToFailureCode`; the original code is never copied through.
+## Critical invariants and sensitive-data rules
 
-### Backward compatibility for legacy rows
+- Profile leases must release on success, failure, and interruption paths
+- Extractor output must conform to Content Manager ingestion schemas
+- Browser providers consume trusted runtime config after checkout; they do not mutate profile identity
+- Diagnostic contracts expose aggregate counts and closed enums only — no raw URLs, payloads, or secrets
+- Extractor fixtures must be synthetic or sanitized
 
-Sprint 074 is unaccepted. The chosen compatibility behavior for any pre-Sprint 074 rows is **read-and-omit**: existing rows that pre-date this sprint carry a `NULL` `diagnostics` column, the mapper returns `null`, the domain `run.diagnostics` is `undefined`, the HTTP DTO omits `diagnostics`, the Web UI shows the explicit unavailable state. No data migration, no shape coercion, and no back-fill of legacy rows is performed.
+## Verification anchors
 
-## Does Not Own
-- Profile property invariants, session ingestion rules, or checkout eligibility.
-- Content item lifecycle, deduplication, or storage.
-- Source group entry route metadata mutations.
-- Automatic profile account stage promotion or demotion.
-- Authority over profile identity or proxy/fingerprint secrets.
-
-## Important Source Paths
-- `src/collector-runtime/`
-- `src/collector-runtime/platform-extractors/`
-- `src/collector-runtime/workers/`
-- `src/collector-runtime/infrastructure/adapters/browser/`
-
-## Important Entrypoints
-- `Workers`: `src/collector-runtime/workers/` (e.g. `start-collector-worker.ts`)
-- `Orchestration`: Collection flow use cases invoking HTTP clients to other modules.
-- `Platform Extractors`: Pure domain logic mapping raw JSON to normalized types.
-
-## Critical Invariants
-- Must release profile leases accurately, specifically in error or interruption paths.
-- Extractor rules must yield data complying with the Content Manager schema.
-- Must safely detect and yield on authentication issues, relying on Profile Manager to handle health states.
-
-## Home-Feed Publisher Identity (Sprint 075)
-
-The Facebook home-feed GraphQL extractor accepts a GraphQL node `id` as the
-stable external publisher id only when the object is explicitly type-qualified
-as `Group` (for example `__typename: "Group"`) on a fixture-demonstrated
-publisher path such as Story destination `to` or
-`comet_sections.action_link.group`.
-
-It does not accept arbitrary object ids, actor/user ids, or
-`target_group.id` without independent explicit `Group` qualification. Unqualified
-group/page publishers continue to emit `MISSING_STABLE_PUBLISHER_ID`.
-
-## Cross-Module Communication
-- Uses explicit HTTP or adapter contracts to interface with Profile Manager (for leases/config) and Content Manager (for submission).
-- Does not import repositories from other modules.
-
-## Sensitive Data Rules
-- Browser provider execution must not leak runtime config, cookies, or payloads to logs.
-- Extractor test fixtures must use synthetic or sanitized real data.
-
-## Relevant Verification Commands
 ```bash
 pnpm test src/collector-runtime
 pnpm test:db src/collector-runtime
 pnpm test:http:db src/collector-runtime
 ```
+
+Boundary tests: `src/collector-runtime/collector-runtime.boundary.test.ts`, global checks in `src/test-support/architecture-boundary.test.ts`
+
+## Known change hotspots and limitations
+
+- `src/interfaces/http/schemas/collector-runtime.http-schemas.ts` (~1,765 lines) — six resource families in one schema module
+- `src/interfaces/http/routes/collector-runtime.routes.ts` (~1,168 lines) — combined route registration
+- `apps/web/src/lib/api/collector-runtime-client.ts` (~1,289 lines) — combined Web client
+- `src/collector-runtime/platform-extractors/facebook/facebook-home-feed-graphql-payload-extractor.ts` (~2,052 lines)
+- `src/collector-runtime/infrastructure/facebook-browser-payload-capture.ts` (~1,444 lines)
+- `src/collector-runtime/application/use-cases/execute-profile-home-feed-collection-run.use-case.ts` (~977 lines)
+- Facebook extractor/capture splits are deferred until fixture and live-baseline protections are sufficient ([CODEBASE_CHANGE_MAP.md](../CODEBASE_CHANGE_MAP.md))

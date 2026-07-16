@@ -1,74 +1,58 @@
 # Content Builder
 
-## Ownership
+## Purpose and current capability
 
-- The current Sprint 072 implementation is the Transform Type catalog only.
-- `TransformType` catalog entries that define a reusable initial transform
-  prompt.
-- Transform Type lifecycle: create, list, read, update, and archive.
-- Safe operator HTTP and Web UI surfaces for Transform Type catalog
-  management.
+Content Builder currently implements only the **Transform Type catalog** — reusable initial transform prompt records with create, list, read, update, and archive lifecycle. Operators manage the catalog through safe `/builder/transform-types` HTTP routes and the Web UI at `/transform-types`.
 
-## Does Not Own
+Broader Builder workflows (content selection, LLM execution, artifacts, publishing handoff) remain parked until explicit product discovery.
 
-- Content Manager source groups, source publishers, content items, ingestion,
-  or review lifecycle.
-- Collector Runtime execution, browser automation, Facebook capture,
-  extractor orchestration, queues, schedulers, or workers.
-- Profile/session management or checkout behavior.
-- LLM provider configuration, prompt execution, prompt versioning, Content
-  Briefs, Producers, Producer Sets, Producer graphs, artifacts, collected
-  content selection, or Content Publisher behavior.
+## Owns
 
-## Important Source Paths
+- `TransformType` domain model and lifecycle rules
+- Active normalized name uniqueness among non-archived records
+- Safe HTTP contracts under `/builder/*`
+- Web UI catalog management page
+- PostgreSQL persistence for transform types
 
-- `src/content-builder/domain/`
-- `src/content-builder/application/`
-- `src/composition/content-builder/`
-- `src/infrastructure/database/schema/content-builder.schema.ts`
-- `src/infrastructure/database/repositories/drizzle-transform-type.repository.ts`
-- `src/interfaces/http/routes/content-builder.routes.ts`
-- `src/interfaces/http/schemas/content-builder.http-schemas.ts`
-- `apps/web/src/lib/api/content-builder-client.ts`
-- `apps/web/src/features/content-builder/`
-- `apps/web/src/pages/transform-types-page.tsx`
+## Does not own
 
-## Critical Invariants
+- Content Manager source groups, publishers, content items, or ingestion
+- Collector Runtime execution, capture, or scheduling
+- Profile/session management
+- LLM provider configuration or prompt execution
+- Content Briefs, Producers, artifacts, or publishing
 
-- Domain code remains framework-free and database-free.
-- Application code owns repository ports and typed errors.
-- Optional descriptions are omitted when absent or empty.
-- Archived Transform Types remain readable.
-- Active normalized names are unique among non-archived Transform Types.
-- No LLM call, prompt execution, runtime orchestration, or collected-content
-  selection happens in the Transform Type catalog.
+## Public ports, contracts, and cross-module communication
 
-## Cross-Module Communication
+- **HTTP**: `/builder/transform-types` via `src/interfaces/http/routes/content-builder.routes.ts`
+- **Web client**: `apps/web/src/lib/api/content-builder-client.ts`
+- **Cross-module**: none into other module repositories or runtime internals
 
-- The Web UI consumes safe `/builder/*` HTTP contracts.
-- Content Builder does not import Content Manager repositories, Collector
-  Runtime internals, Profile Manager internals, browser providers, or LLM SDKs.
-- Future Builder workflows must consume collected content through explicit safe
-  Content Manager contracts or Content Builder-owned application ports.
-- Builder must not import Content Manager repositories, database schema,
-  Collector Runtime internals, raw payloads, profile/session material, cookies,
-  localStorage, tokens, proxy details, browser data, or provenance internals
-  unless a later sprint explicitly approves a safe DTO.
+## Important source paths and entrypoints
 
-## Sensitive Data Rules
+- Domain: `src/content-builder/domain/`
+- Application: `src/content-builder/application/`
+- Composition: `src/composition/content-builder/`
+- Persistence: `src/infrastructure/database/schema/content-builder.schema.ts`
+- Web page: `apps/web/src/pages/transform-types-page.tsx`
 
-- Transform Type DTOs contain only catalog metadata and prompt text.
-- Do not expose collector/profile/runtime data, cookies, localStorage, tokens,
-  authorization headers, proxy credentials, browser fingerprints, raw Facebook
-  payloads, screenshots, or viewer data through Content Builder DTOs, logs,
-  tests, or docs.
+## Critical invariants and sensitive-data rules
 
-## Relevant Verification Commands
+- Domain and application layers remain framework-free and database-free
+- Optional descriptions are omitted when absent or empty
+- Archived Transform Types remain readable
+- DTOs contain catalog metadata and prompt text only — no collector, profile, or raw payload data
+
+## Verification anchors
 
 ```bash
-pnpm typecheck
-pnpm test
+pnpm test src/content-builder
+pnpm test:db src/content-builder
+pnpm test:http:db src/content-builder
 pnpm web:typecheck
-pnpm web:build
-pnpm test:db
 ```
+
+## Known change hotspots and limitations
+
+- Small module surface today; expansion into collected-content selection will require new ports and safe DTO contracts
+- Future Builder work must not import Content Manager repositories or Collector Runtime internals without an explicit approved contract

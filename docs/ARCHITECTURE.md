@@ -1,130 +1,168 @@
 # Architecture
 
-## Intended Style
+## Style and dependency direction
 
-The project will use hexagonal architecture, also called ports and adapters architecture. The application core owns domain rules, use cases, and port contracts. External technologies integrate through adapters.
+The codebase uses hexagonal (ports and adapters) architecture. Business rules, use cases, and port contracts live in the application core. External technologies integrate through adapters and composition roots.
 
-## Dependency Direction
+Dependencies point inward:
 
-Dependencies must point inward:
+1. **Domain** — business concepts, invariants, and Zod-backed schemas ([ADR-0003](DECISIONS/ADR-0003-domain-schema-source-of-truth.md))
+2. **Application** — use cases and application-owned ports
+3. **Adapters** — HTTP ([ADR-0011](DECISIONS/ADR-0011-http-api-fastify-adapter.md)), PostgreSQL/Drizzle ([ADR-0007](DECISIONS/ADR-0007-postgresql-drizzle-foundation.md), [ADR-0008](DECISIONS/ADR-0008-postgresql-repository-adapters-and-transactions.md)), browser automation, operator CLIs
+4. **Composition** — module wiring ([ADR-0010](DECISIONS/ADR-0010-composition-root-boundary.md))
+5. **Runtime entrypoints** — `src/main.ts`, workers, schedulers, Web UI
 
-1. Domain model and domain services
-2. Application use cases and ports
-3. Adapters for persistence, HTTP, browser automation, queues, scheduling, and UI frameworks
-4. Composition root and runtime wiring
+Domain and application code must not import HTTP, database, composition, browser frameworks, or other adapter layers.
 
-The domain must not import or depend on HTTP, database, browser automation, queues, or framework code.
+## Module topology
 
-## Domain Core
+The Content Video Pipeline has three planned stages: **Content Collector**, **Content Builder**, and **Content Publisher**. The implemented system focuses on the Collector stage plus a parked Builder catalog.
 
-The domain core contains business concepts and invariants. For Collector Profile Manager, this includes profile operational status transitions, account maturity/readiness stage transitions, property invariants, provisioning token rules, session ingestion rules, and checkout eligibility rules.
+| Module | Role | Primary source |
+| --- | --- | --- |
+| Collector Profile Manager | Profile lifecycle, leasing, provisioning, trusted runtime config | `src/collector-profile-manager/` |
+| Content Manager | Collected content, source groups, publishers, ingestion | `src/content-manager/` |
+| Collector Runtime | Collection execution, extractors, browser capture, run records | `src/collector-runtime/` |
+| Content Builder | Transform Type catalog only (parked expansion) | `src/content-builder/` |
+| Web UI | Operator presentation | `apps/web/` |
+| Operator tools | CLIs, workers, schedulers, Docker stacks | `src/operator-tools/` |
+| Shared infrastructure | PostgreSQL schema, Drizzle repositories, system adapters | `src/infrastructure/` |
+| HTTP adapter | Fastify routes, schemas, error mapping | `src/interfaces/http/` |
+| Composition | Per-module factories and containers | `src/composition/` |
 
-For Content Manager, this includes source group rules, source group entry route metadata rules, managed group category rules, content item lifecycle status, content deduplication/upsert rules, high-engagement top comment rules, engagement count invariants, and future builder handoff eligibility.
+See [MODULE_BOUNDARIES.md](MODULE_BOUNDARIES.md) for ownership matrices and [modules/](modules/) for module-specific detail.
 
-Content Manager domain core must work from normalized content ingestion input. It must not parse raw Facebook GraphQL payloads or own platform-specific extraction rules.
+## Layer responsibilities
 
-Collector Profile Manager also owns profile-source access state: durable profile-specific facts about whether a given profile can access a given source group. Profile-source access state stores `sourceGroupId` as an external module reference and does not make Content Manager repository calls from the Profile Manager core.
+### Domain
 
-Domain code should be deterministic where possible and should express business errors in domain terms.
+Owns business concepts and invariants. Types are inferred from Zod schemas where practical. Domain code is deterministic where possible and expresses business errors in domain terms.
 
-## Application Layer
+Examples:
 
-The application layer coordinates use cases and owns port interfaces. It may orchestrate domain objects and call ports for persistence, token generation, clock access, identity, and external services.
+- Profile operational status vs account maturity stage
+- Checkout eligibility and lease purpose rules
+- Content deduplication, provenance, and `SourcePublisher` observation rules
+- Collection run state machines and schedule cadence rules
 
-Application code should not know concrete adapter details.
+### Application
 
-## Ports
+Coordinates use cases and owns port interfaces. Orchestrates domain objects and calls ports for persistence, clocks, identity, and external services. Does not know concrete adapter implementations.
 
-Ports are abstract contracts owned by the core. Expected future port categories include:
+### Ports and adapters
 
-- Profile repository.
-- Content repository.
-- Source group repository.
-- Content category repository.
-- Token generator.
-- Clock.
-- Fingerprint provider.
-- Event publisher.
-- Authorization or actor context.
+Ports are abstract contracts owned by application layers. Adapters implement ports with concrete technologies:
 
-These are not implementation commitments for Sprint 000. They are architectural placeholders for future design.
+- **Persistence** — Drizzle repositories under `src/infrastructure/database/`
+- **HTTP** — Fastify route registrars under `src/interfaces/http/routes/`
+- **Browser** — Playwright-backed providers under `src/collector-runtime/infrastructure/`
+- **Cross-module HTTP clients** — runtime-owned clients calling Profile Manager and Content Manager APIs
 
-## Adapters
+### Composition
 
-Adapters implement ports using concrete technologies. Expected future adapter categories include:
+Each module has a composition root under `src/composition/<module>/` that wires use cases to concrete adapters. Composition is the only layer that connects application ports to infrastructure implementations. See [ADR-0010](DECISIONS/ADR-0010-composition-root-boundary.md).
 
-- Database persistence.
-- HTTP API handlers.
-- Browser automation integration.
-- Queue or scheduler integration.
-- Web UI integration.
+`src/main.ts` composes all modules and starts the Fastify HTTP server.
 
-Collector Runtime will be a future operational module that consumes Collector Profile Manager and Content Manager application contracts. Browser automation, network payload capture, scraping strategy, and raw platform payload parsing must remain outside the Content Manager domain and application rules.
+### Operator tools and Web UI
 
-Browser-provider hardening is allowed only behind Collector Runtime infrastructure adapters. Browser provider ports are owned by the Collector Runtime application layer; concrete browser providers consume Profile Manager runtime configuration after checkout and must not randomize or mutate profile identity, session, proxy, or fingerprint settings outside Profile Manager.
+Operator tools (`src/operator-tools/`) are thin CLIs and long-running workers that call the same HTTP boundaries as the Web UI. They do not embed domain rules.
 
-Browser providers must not solve CAPTCHAs, automate credentials, bypass checkpoints, bypass rate limits or access controls, post, comment, or like. Login, checkpoint, and session-expired states are profile/session health issues to surface safely, not states to bypass automatically. Browser-provider logs and persisted records must not include cookies, localStorage, raw platform payloads, proxy credentials, session headers, trusted runtime configuration, or fingerprint secrets.
+The Web UI (`apps/web/`) consumes safe HTTP client DTOs only. It does not import backend `src/` modules.
 
-## Profile Readiness
+## Cross-module communication
 
-Collector Profile Manager keeps operational profile status separate from account maturity:
+Modules communicate through explicit contracts, not shared repositories:
 
-- `profile.status` describes operational lifecycle state: `PENDING_CONFIG`, `PENDING_LOGIN`, `READY`, and `BUSY`.
-- `accountStage` describes account readiness/maturity: `NEW_ACCOUNT`, `WARMING`, `COLLECTION_READY`, `LIMITED`, `NEEDS_REVIEW`, and `RETIRED`.
+| From | To | Mechanism |
+| --- | --- | --- |
+| Collector Runtime | Collector Profile Manager | HTTP client ports (checkout, release, runtime config) |
+| Collector Runtime | Content Manager | HTTP client ports (content ingestion, publisher observation) |
+| Collector Profile Manager | Content Manager | Application port adapter for source group reference validation |
+| Web UI / operator tools | All modules | HTTP via Nginx gateway to Fastify |
+| Composition | Any module | Factory wiring only at startup |
 
-Provisioning and session ingestion may move a profile to operational `READY` without making it collection-ready. Normal collection checkout uses lease purpose `COLLECTION` and requires `status = READY` and `accountStage = COLLECTION_READY`, plus the existing authentication, runtime configuration, temporal routine, cooldown, lease, and safety-threshold checks.
+Cross-module database foreign keys are avoided. External references use opaque string IDs validated through ports (for example `sourceGroupId` on profile-source access records).
 
-Ambient account exercise uses lease purpose `AMBIENT_EXERCISE` for a specified profile. It may exercise `READY` profiles in `NEW_ACCOUNT`, `WARMING`, `LIMITED`, or `COLLECTION_READY`, while `NEEDS_REVIEW` and `RETIRED` remain ineligible. This purpose is only for read-only stability exercise; it must not collect or submit content, and it must not automatically change `accountStage`.
+## Collector flow into Content Manager
 
-Assisted group access checkout uses lease purpose `ASSISTED_GROUP_ACCESS` for a specified profile and source group. It may check out `READY` profiles in `WARMING` or `COLLECTION_READY` when the ordinary authentication, runtime configuration, temporal routine, cooldown, daily safety, and active-lease gates pass. It does not require successful profile-source access because future operator-assisted workflows use it to establish or inspect access. It must not mutate profile-source access records or store `sourceGroupId` on the generic profile lease.
+The accepted profile home-feed baseline ([COLLECTOR_BASELINE.md](COLLECTOR_BASELINE.md)) follows:
 
-Account stage transition rules and lease-purpose eligibility remain Collector Profile Manager domain logic. Collector Runtime and browser providers consume the resulting lease and trusted runtime configuration, record exercise outcomes, and release leases, but they do not bypass or reinterpret Profile Manager readiness rules.
+```text
+operator queues ProfileHomeFeedCollectionRun (Web UI or HTTP)
+  -> worker claims run
+  -> Profile Manager checkout (HOME_FEED_COLLECTION lease)
+  -> browser capture on https://www.facebook.com/
+  -> Facebook home-feed GraphQL extractor
+  -> SourcePublisher observation (Content Manager HTTP)
+  -> home-feed content ingestion (Content Manager HTTP)
+  -> lease release
+  -> safe diagnostics on run record
+```
 
-## Profile-Source Access
+Source-group collection follows the same pattern with group payload capture, the group GraphQL extractor, and source-group ingestion contracts.
 
-Collector Profile Manager owns profile-source access records for `profileId + sourceGroupId` pairs. This state answers whether a particular profile appears able to access a particular source group; it is separate from source group status and profile account stage.
-
-Content Manager remains the owner of source groups and source group entry route metadata. Profile-source access stores `sourceGroupId` as an external module reference string. Sprint 041B validates source group existence for HTTP workflows through an explicit Content Manager-facing port/adapter, not through direct repository imports or database foreign keys.
-
-Profile-source access state and HTTP management must not trigger browser automation, assisted group access, group joining, source-group search, collection runs, account-stage promotion/demotion, or platform actions.
-
-## Source Group Entry Routes
-
-Content Manager owns source group entry route metadata. Entry routes describe possible future paths toward a source group, such as direct group URLs, category entry URLs, public page then group routes, operator-assisted search, or saved referral URLs.
-
-Entry routes are metadata only. They do not grant access, imply that any profile can access the group, create profile-source access state, run browser automation, join groups, search automatically, or change profile account stage.
-
-Source groups without stored entry routes are treated as having a derived default `DIRECT_GROUP_URL` route from the source group URL. New source groups store that direct default route explicitly with `riskLevel = MEDIUM`. Setting a different route as default clears the previous default. Deleting the current default route is rejected so source groups keep an obvious entry path.
-
-Collector Runtime may consume entry route metadata later through explicit Content Manager contracts or runtime-owned ports, but it must not own, persist, or mutate source group route metadata directly.
-
-## Platform Extractors
-
-A Platform Extractor is a collection-side component that converts raw platform-specific artifacts, such as captured Facebook GraphQL payloads, into normalized Content Manager ingestion input.
-
-The first extractor is the Facebook GraphQL Payload Extractor. It belongs to the Collector Runtime side and owns raw Facebook GraphQL payload interpretation, Facebook-specific field mapping, post extraction, high-engagement comment extraction, engagement count extraction, best-effort missing-field handling, and extractor fixtures and parser tests.
-
-The extractor produces normalized Content Manager ingestion input candidates only. It does not submit to Content Manager, perform browser automation, intercept network traffic, check out profiles, or access storage.
-
-The canonical flow is:
+Platform extractors belong to Collector Runtime, not Content Manager ([ADR-015](DECISIONS/ADR-015-platform-extractor-boundary.md)):
 
 ```text
 raw GraphQL payload
--> Facebook GraphQL Payload Extractor
--> normalized Content Manager ingestion input
--> Content Manager validation/upsert/storage
+  -> Platform Extractor (Collector Runtime)
+  -> normalized Content Manager ingestion input
+  -> Content Manager validation / upsert / storage
 ```
 
-Content Manager should not accept raw Facebook GraphQL payloads as its primary ingestion contract. Optional future storage of sanitized raw payload data or a raw payload reference must be diagnostic, must not become the canonical content model, and must not leak through safe reads by default.
+Content Manager does not accept raw Facebook GraphQL as its primary ingestion contract ([ADR-014](DECISIONS/ADR-014-content-manager-boundaries.md)).
 
-Adapter selection is out of scope for Sprint 000.
+## Profile readiness and leasing
 
-## Validation
+Collector Profile Manager separates operational profile status from account maturity:
 
-Runtime validation should protect data entering through public APIs and data leaving persistence before it reaches business use cases. The NFRs call for schemas that mirror compile-time TypeScript interfaces, but the exact tooling is not selected in Sprint 000.
+- `profile.status`: `PENDING_CONFIG`, `PENDING_LOGIN`, `READY`, `BUSY`
+- `accountStage`: `NEW_ACCOUNT`, `WARMING`, `COLLECTION_READY`, `LIMITED`, `NEEDS_REVIEW`, `RETIRED`
 
-Content Manager validation should validate normalized content ingestion input after platform extraction. Content Manager safe read contracts should avoid exposing optional sanitized raw payload diagnostics or raw payload references by default. If trusted diagnostics need sanitized raw payload data or raw payload references later, they should use a dedicated application contract.
+Lease purposes include `COLLECTION`, `AMBIENT_EXERCISE`, `ASSISTED_GROUP_ACCESS`, and `HOME_FEED_COLLECTION`. Eligibility rules live in Profile Manager domain/application code; Collector Runtime consumes the resulting lease and trusted runtime configuration without bypassing those rules.
 
-## Sprint 000 Scope
+Network context uses explicit mode `UNCONFIGURED | DIRECT | PROXY`. Do not infer direct networking from a null proxy alone.
 
-Sprint 000 only establishes this project brain. It does not create architecture folders, packages, services, endpoints, database schemas, UI code, or automation code.
+## Sensitive data boundaries
+
+The following must never appear in logs, fixtures, safe read DTOs, or Web UI rendering:
+
+- Cookies, localStorage values, tokens, authorization headers
+- Proxy credentials, fingerprint secrets, trusted runtime configuration
+- Raw Facebook payloads, raw page HTML, private screenshots, viewer data
+
+Trusted runtime configuration is issued only inside an active lease context. Generic profile read DTOs omit authentication state and secret material ([ADR-0012](DECISIONS/ADR-0012-profile-read-api-sensitive-fields.md)).
+
+Browser providers must not solve CAPTCHAs, automate credentials, bypass checkpoints, or perform social actions. Login and checkpoint states are surfaced safely, not bypassed.
+
+## Content Builder boundary
+
+Content Builder currently implements only the **Transform Type catalog** — reusable initial transform prompt records with safe HTTP and Web UI management. It does not execute LLM calls, select collected content, or produce video artifacts.
+
+Future Builder workflows remain parked until explicit product discovery defines safe contracts. Builder must consume collected content through explicit Content Manager DTOs or Builder-owned ports, not through Content Manager repositories or raw collector internals.
+
+## HTTP surface
+
+Fastify registers module routes under `/collector/*` and `/builder/*`. Route handlers delegate to composed module services and map domain errors through `src/interfaces/http/errors/http-error-mapper.ts`.
+
+Collector Runtime HTTP contracts cover six resource families: collection runs, account exercise runs, profile-source access check runs, profile home-feed collection runs (including diagnostics), collection schedules, and profile home-feed collection schedules. Server schemas and routes live under `src/interfaces/http/`; Web clients mirror shapes under `apps/web/src/lib/api/`.
+
+## Verification and architecture guards
+
+Architecture boundary tests under `src/test-support/` and module-local `*.boundary.test.ts` files enforce:
+
+- Domain/application independence from HTTP, database, composition, and browser adapters
+- No cross-module repository or schema imports
+- Web UI independence from backend `src/` imports
+- Acyclic compatibility barrels for Collector Runtime HTTP contracts
+
+Run `pnpm test` for the full suite. Module-specific anchors are listed in each [modules/](modules/) reference.
+
+## Related documents
+
+- [MODULE_BOUNDARIES.md](MODULE_BOUNDARIES.md) — ownership matrix
+- [CODEBASE_CHANGE_MAP.md](CODEBASE_CHANGE_MAP.md) — change hotspots and deferred cleanup
+- [GLOSSARY.md](GLOSSARY.md) — domain vocabulary
+- [COLLECTOR_BASELINE.md](COLLECTOR_BASELINE.md) — accepted Collector MVP baseline
+- [DECISIONS/](DECISIONS/) — durable ADRs
