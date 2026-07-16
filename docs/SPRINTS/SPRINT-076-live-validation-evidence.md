@@ -9,10 +9,11 @@ supported direct networking and accepted the normal
 `https://www.facebook.com/` home target; the chronological `?sk=h_chr`
 override remains retired.
 
-The clean supported direct-network proof counts as `V06`. Complete final
-supported-path samples `V07`–`V10` on a genuinely later UTC date and finish the
-usefulness, duplicate-merge, lease-release, and paused-group promotion evidence
-through the accepted safe review-link flow.
+The clean supported direct-network proof counts as `V06`. Supported-path
+samples `V07`–`V10` were completed on UTC date `2026-07-16`. Usefulness,
+duplicate-merge, lease-release, and paused-group promotion evidence are
+recorded below. Sprint 076 remains **not accepted** pending Product Owner
+review of this worksheet.
 
 ## Sprint 076B Product Owner Proof
 
@@ -33,12 +34,12 @@ required promotion of one eligible approved group into a paused managed source.
 ## Baseline Verification
 
 ```text
-verifiedCommit: cfb1bf9
+verifiedCommit: f475d53
 typecheckCommand: pnpm typecheck
 typecheckResult: passed (exit 0)
 unitCommand: pnpm test
-unitResult: Test Files 146 passed | 17 skipped (163); Tests 1952 passed | 18 skipped (1970); Duration 24.95s
-runtimeCodeChangedDuringSprint: temporary local-only proxy eligibility bypass applied then restored; FACEBOOK_HOME_FEED_URL changed from chronological (?sk=h_chr) to normal https://www.facebook.com/ under operator direction (focused capture-adapter tests 9/9 pass)
+unitResult: Test Files 147 passed | 17 skipped (164); Tests 1992 passed | 18 skipped (2010); Duration 24.30s
+runtimeCodeChangedDuringSprint: none during V07-V10 validation pass; prior exploratory temporary proxy eligibility bypass remains restored; FACEBOOK_HOME_FEED_URL remains normal https://www.facebook.com/
 ```
 
 ## Exploratory Validation Matrix — Not Acceptance Baseline
@@ -60,10 +61,10 @@ Facebook names, text, identifiers, or URLs.
 | Sample | UTC date | Profile alias | Provider | Network mode | Status | Captured | Extracted | Submitted | Useful | Lease released |
 |---|---|---|---|---|---|---:|---:|---:|---:|---|
 | V06 | 2026-07-14 | P1 | PLAYWRIGHT | DIRECT | SUCCEEDED | 72 | 6 | 6 |  | yes |
-| V07 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
-| V08 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
-| V09 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
-| V10 |  | P1 | PLAYWRIGHT | DIRECT |  |  |  |  |  |  |
+| V07 | 2026-07-16 | P1 | PLAYWRIGHT | DIRECT | SUCCEEDED | 85 | 3 | 3 | 3 | yes |
+| V08 | 2026-07-16 | P1 | PLAYWRIGHT | DIRECT | FAILED |  |  |  |  | n/a |
+| V09 | 2026-07-16 | P1 | PLAYWRIGHT | DIRECT | SUCCEEDED | 90 | 5 | 5 | 5 | yes |
+| V10 | 2026-07-16 | P1 | PLAYWRIGHT | DIRECT | SUCCEEDED | 62 | 6 | 6 | 6 | yes |
 
 `V06` is the first accepted Sprint 076 baseline sample: configured through the
 supported configuration API (`mode: DIRECT`, `proxy: null`, killswitch
@@ -113,6 +114,185 @@ existingRunSummary:
   failedContentSubmissions: 0
   leaseReleased: true
 notes: Clean supported-path DIRECT proof for Sprint 076A. Normal facebook.com home URL. Profile returned to READY. No proxy/session secrets observed in runner output.
+```
+
+## Supported-Path Per-Run Detail
+
+```text
+sample: V07
+utcDate: 2026-07-16
+profileAlias: P1
+provider: PLAYWRIGHT
+networkMode: DIRECT
+configuredVia: supported PATCH /collector/profiles/:id/configuration (reaffirmed mode DIRECT, proxy null, killswitch false/false)
+checkoutBypassUsed: no
+terminalStatus: SUCCEEDED
+durationSeconds: 34.680
+captureStage: SUCCEEDED
+capturePageState: HOME_FEED
+captureCounters:
+  pageContextFetchCaptureCount: 0
+  pageContextXhrCaptureCount: 84
+  networkListenerCaptureCount: 85
+  parseFailureCount: 0
+  totalPayloadsPassedToExtractor: 85
+extractorCounters:
+  extractedCandidateCount: 3
+  deduplicatedCandidateCount: 3
+warningCounts:
+  EXCLUDED_SPONSORED_POST: 6
+  MISSING_STABLE_PUBLISHER_ID: 2
+  SKIPPED_CANDIDATE_WITHOUT_POST_ID: 1
+  UNKNOWN_PUBLISHER_KIND: 66
+  UNSUPPORTED_PAYLOAD_SHAPE: 75
+unsupportedPayloadCount: 75
+existingRunSummary:
+  capturedPayloads: 85
+  extractorCandidates: 3
+  sourcePublishersObserved: 3
+  contentItemsSubmitted: 3
+  failedPublisherObservations: 0
+  failedContentSubmissions: 0
+  leaseReleased: true
+contentReview:
+  reviewedItemCount: 3
+  usefulItemCount: 3
+  usefulnessDecision: USEFUL
+duplicateObservation:
+  repeatedPostObserved: no
+  mergedWithoutDuplicateReviewItem: not_applicable
+discoveredSourceReview:
+  reviewedCount: 3
+  eligibleGroupObserved: yes
+failureOrRecoveryClassification:
+notes: First supported-path sample on later UTC date 2026-07-16. Normal facebook.com home. Content total 220→223 (+3 new). Profile returned READY. Web UI /content-items reachable.
+```
+
+```text
+sample: V08
+utcDate: 2026-07-16
+profileAlias: P1
+provider: PLAYWRIGHT
+networkMode: DIRECT
+checkoutBypassUsed: no
+terminalStatus: FAILED
+durationSeconds: 0.131
+captureStage: not_started
+capturePageState:
+failureOrRecoveryClassification: CHECKOUT_COOLDOWN
+runOutcome:
+  failureStage: CHECKOUT
+  failureCode: HOME_FEED_CHECKOUT_FAILED
+existingRunSummary:
+  leaseReleased: not_applicable
+contentReview:
+  reviewedItemCount: 0
+  usefulItemCount: 0
+  usefulnessDecision: not_applicable
+duplicateObservation:
+  repeatedPostObserved: no
+  mergedWithoutDuplicateReviewItem: not_applicable
+discoveredSourceReview:
+  reviewedCount: 0
+  eligibleGroupObserved: not_applicable
+notes: Claimed about 12s before nextAvailableAt from V07 one-minute cooldown. No lease acquired; profile remained READY. Explained natural failure; not a product defect.
+```
+
+```text
+sample: V09
+utcDate: 2026-07-16
+profileAlias: P1
+provider: PLAYWRIGHT
+networkMode: DIRECT
+checkoutBypassUsed: no
+terminalStatus: SUCCEEDED
+durationSeconds: 24.045
+captureStage: SUCCEEDED
+capturePageState: HOME_FEED
+captureCounters:
+  pageContextFetchCaptureCount: 0
+  pageContextXhrCaptureCount: 89
+  networkListenerCaptureCount: 90
+  parseFailureCount: 0
+  totalPayloadsPassedToExtractor: 90
+extractorCounters:
+  extractedCandidateCount: 6
+  deduplicatedCandidateCount: 5
+warningCounts:
+  EXCLUDED_SPONSORED_POST: 9
+  MISSING_STABLE_PUBLISHER_ID: 8
+  UNKNOWN_PUBLISHER_KIND: 80
+  UNSUPPORTED_PAYLOAD_SHAPE: 77
+unsupportedPayloadCount: 77
+existingRunSummary:
+  capturedPayloads: 90
+  extractorCandidates: 5
+  sourcePublishersObserved: 5
+  contentItemsSubmitted: 5
+  failedPublisherObservations: 0
+  failedContentSubmissions: 0
+  leaseReleased: true
+contentReview:
+  reviewedItemCount: 5
+  usefulItemCount: 5
+  usefulnessDecision: USEFUL
+duplicateObservation:
+  repeatedPostObserved: yes
+  mergedWithoutDuplicateReviewItem: yes
+discoveredSourceReview:
+  reviewedCount: 5
+  eligibleGroupObserved: yes
+failureOrRecoveryClassification:
+notes: Content total 223→225 (+2) with 5 submissions implies 3 merges. Three V07 items had lastCollectedAt advanced without new rows. Global unique externalPostId count equals item count (225/225).
+```
+
+```text
+sample: V10
+utcDate: 2026-07-16
+profileAlias: P1
+provider: PLAYWRIGHT
+networkMode: DIRECT
+checkoutBypassUsed: no
+terminalStatus: SUCCEEDED
+durationSeconds: 23.828
+captureStage: SUCCEEDED
+capturePageState: HOME_FEED
+captureCounters:
+  pageContextFetchCaptureCount: 0
+  pageContextXhrCaptureCount: 61
+  networkListenerCaptureCount: 62
+  parseFailureCount: 0
+  totalPayloadsPassedToExtractor: 62
+extractorCounters:
+  extractedCandidateCount: 6
+  deduplicatedCandidateCount: 6
+warningCounts:
+  EXCLUDED_SPONSORED_POST: 9
+  MISSING_STABLE_PUBLISHER_ID: 2
+  SKIPPED_CANDIDATE_WITHOUT_POST_ID: 1
+  UNKNOWN_PUBLISHER_KIND: 109
+  UNSUPPORTED_PAYLOAD_SHAPE: 49
+unsupportedPayloadCount: 49
+existingRunSummary:
+  capturedPayloads: 62
+  extractorCandidates: 6
+  sourcePublishersObserved: 6
+  contentItemsSubmitted: 6
+  failedPublisherObservations: 0
+  failedContentSubmissions: 0
+  leaseReleased: true
+contentReview:
+  reviewedItemCount: 6
+  usefulItemCount: 6
+  usefulnessDecision: USEFUL
+duplicateObservation:
+  repeatedPostObserved: no
+  mergedWithoutDuplicateReviewItem: not_applicable
+discoveredSourceReview:
+  reviewedCount: 6
+  eligibleGroupObserved: yes
+failureOrRecoveryClassification:
+notes: Content total 225→231 (+6 new). Profile returned READY. Used as the run preceding supported-path paused-group promotion.
 ```
 
 ## Exploratory Per-Run Detail
@@ -348,11 +528,26 @@ notes: Normal facebook.com home URL. Candidate yield remained 1; lease released;
 ## Cross-Run Duplicate/Merge Evidence
 
 ```text
-demonstratedBySamples: V02
+demonstratedBySamples: V09 (supported-path); exploratory V02 retained only as non-baseline history
 repeatedPostObserved: yes
 mergedWithoutDuplicateReviewItem: yes
 verificationSurface: SAFE_API
-notes: V02 submitted 4 with content-total delta 3. End-of-day inventory: content item count equals unique externalPostId count (214/214); zero duplicate review rows.
+notes: V09 submitted 5 with content-total delta 2. Three items first collected in V07 had lastCollectedAt advanced without creating new review rows. End-of-pass inventory: content item count equals unique externalPostId count (231/231); zero duplicate review rows.
+```
+
+## Supported-Path Discovered-Source Promotion
+
+```text
+demonstratedAfterSample: V10
+reviewedThroughWebUi: yes
+reviewLinkSafe: yes
+eligibleGroupApproved: yes
+promotionCompleted: yes
+promotionOutcome: CREATED
+managedSourceInitialStatus: PAUSED
+duplicateManagedSourcePrevented: yes
+verificationSurface: SAFE_API_AND_WEB_UI
+notes: Promoted one already-APPROVED Facebook group that had a safe reviewUrl default. Managed source count rose 6→7 with paused count 1→2. Re-promote returned ALREADY_EXISTS with PAUSED and left source-group total unchanged. No group/source identifiers or raw URLs recorded here.
 ```
 
 ## Exploratory Discovered-Source Promotion — Not Acceptance Evidence
@@ -372,14 +567,16 @@ notes: The source was approved and promoted, but the Product Owner could not ide
 ## Provider and Profile Coverage
 
 ```text
-distinctUtcDates: 1
+distinctUtcDates: 2
+finalBaselineUtcDates: 2026-07-14, 2026-07-16
 playwrightBaselineRunCount: 5
 supplementaryCloakBrowserRunCount: 0
 profileAliasesUsed: P1
 secondProfileAvailable: no
 secondProfileException: Only one READY + HEALTHY + COLLECTION_READY profile is present; three others remain PENDING_CONFIG / NOT_PROVISIONED.
-temporaryProxyIgnoreAuthorized: yes (restored after samples)
-homeFeedUrlModeBySample: V01-V03 chronological query param; V04-V05 normal facebook.com home (param removed under operator direction)
+temporaryProxyIgnoreAuthorized: no for V06-V10; exploratory V01-V05 bypass remains restored and was not reapplied
+homeFeedUrlModeBySample: V06-V10 normal https://www.facebook.com/; exploratory V01-V03 chronological query param; exploratory V04-V05 normal facebook.com home
+networkModeByFinalBaselineSample: DIRECT for V06-V10 via supported configuration
 ```
 
 ## Safety Confirmation
@@ -399,35 +596,37 @@ homeFeedUrlModeBySample: V01-V03 chronological query param; V04-V05 normal faceb
 ## Acceptance Summary
 
 ```text
-fiveSupportedBaselineRunsComplete: no — V06 complete; V07-V10 pending
+fiveSupportedBaselineRunsComplete: yes — V06-V10 recorded
 supportedBaselineSamplesRequired: V06-V10
-runsSpanAtLeastTwoUtcDates: no — final baseline currently has 2026-07-14 only
-playwrightBaselineSatisfied: pending V07-V10
-atLeastThreeRunsYieldCandidates: pending — V06 yielded candidates; two more required
-atLeastTwoRunsYieldUsefulContent: pending — V06 usefulness was not scored
-allTerminalLeasesReleased: yes for V06; V07-V10 pending
-zeroYieldOrFailuresExplained: not applicable for V06; V07-V10 pending
-duplicateMergeDemonstrated: pending supported-path confirmation
-contentReviewUsable: exploratory proof exists; final baseline confirmation pending
-discoveredSourceReviewUsable: yes — Sprint 076B accepted through Product Owner proof
-eligibleGroupPromotedPaused: no — Sprint 076B proof intentionally did not promote
-safetyConfirmationComplete: exploratory packet safe; final baseline pending
-unresolvedBlockingDefects: none known; final multi-day DIRECT evidence remains incomplete
-acceptanceBlocker: V07-V10 plus usefulness, duplicate-merge, lease, and paused-group promotion gates
-productOwnerDecision: IN_PROGRESS_SPRINT_076
+runsSpanAtLeastTwoUtcDates: yes — 2026-07-14 and 2026-07-16
+playwrightBaselineSatisfied: yes
+atLeastThreeRunsYieldCandidates: yes — V06(6), V07(3), V09(5), V10(6)
+atLeastTwoRunsYieldUsefulContent: yes — V07(3), V09(5), V10(6)
+allTerminalLeasesReleased: yes for succeeded runs V06/V07/V09/V10; V08 failed at checkout before lease acquisition and left profile READY
+zeroYieldOrFailuresExplained: yes — V08 CHECKOUT_COOLDOWN against one-minute nextAvailableAt after V07
+duplicateMergeDemonstrated: yes — supported-path V09
+contentReviewUsable: yes — Web UI /content-items reviewed; counts and usefulness recorded without copying Facebook text
+discoveredSourceReviewUsable: yes — Sprint 076B accepted; Web UI /source-publishers shows safe Open on Facebook review links
+eligibleGroupPromotedPaused: yes — CREATED into PAUSED; re-promote ALREADY_EXISTS
+safetyConfirmationComplete: pending Product Owner scan of worksheet
+unresolvedBlockingDefects: none observed on supported DIRECT path
+acceptanceBlocker: none for Builder packet; awaiting Product Owner acceptance decision
+productOwnerDecision: PENDING_REVIEW
 ```
 
 ## Progress / Resume Notes
 
 ```text
-resumeRequired: yes
-resumeReason: V06 is accepted; V07-V10 and the remaining completion gates are pending
-onResume: run V07-V10 on a genuinely later UTC date; record usefulness and supported duplicate/merge evidence; promote one eligible approved group to a paused managed source through the safe review-link flow; never reapply the proxy bypass
+resumeRequired: no for Builder execution of V07-V10
+resumeReason: supported-path samples and completion gates are recorded in this worksheet
+onResume: not applicable unless Product Owner requests re-run or rejects usefulness/promotion judgment
 cloakhrowserSubstitution: not used
 sprint076AAccepted: yes
 sprint076BAccepted: yes
 sprint076Accepted: no
 sprint077Activated: no
 contentBuilderStarted: no
+runtimeCodeChangedDuringThisPass: no
+commitsCreatedDuringThisPass: no
 latestAcceptedCorrectionCommit: bc5c73d
 ```
