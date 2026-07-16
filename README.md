@@ -130,6 +130,7 @@ The `collector-worker`, `account-exercise-worker`, `collection-scheduler`, `prof
 
 ## Deeper Docs
 
+- [Collector MVP Baseline](docs/COLLECTOR_BASELINE.md) — accepted Profile Feed Collector operator runbook, smoke test, recovery, and maintenance boundary
 - [Project Snapshot](docs/PROJECT_SNAPSHOT.md)
 - [Project History](docs/PROJECT_HISTORY.md)
 - [Architecture](docs/ARCHITECTURE.md)

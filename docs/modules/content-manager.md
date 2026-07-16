@@ -1,5 +1,11 @@
 # Content Manager
 
+Content Manager is the accepted upstream store for home-feed normalized items,
+discovered-source review (including safe review identity for ID-only Facebook
+groups), and paused group promotion. The Collector operator boundary and
+downstream Content Builder handoff are recorded in
+[`COLLECTOR_BASELINE.md`](../COLLECTOR_BASELINE.md).
+
 ## Ownership
 - Validation of normalized content ingestion input.
 - Content item storage.
@@ -165,25 +171,29 @@
   Promotion never mutates the durable `SourcePublisher` review
   status or observation counts.
 - Source Publisher operator Web UI surface at `/source-publishers`
-  (Sprint 069). The Web UI consumes only the existing safe Content
-  Manager HTTP contracts for list/get, status mutation, and approved
-  Facebook group promotion. It defaults the review list to
-  `DISCOVERED`, supports status/kind/platform filters, renders
-  canonical URLs as external links when present, exposes explicit
-  `Approve`, `Ignore`, `Block`, and `Reset to discovered` actions,
-  and gates promotion to `platform === "FACEBOOK"`,
-  `kind === "GROUP"`, `status === "APPROVED"` with an existing
-  content category. The promotion panel is hidden for non-group
-  publishers; unapproved Facebook groups render a disabled panel with
-  an approval explanation. Promotion bodies include `categoryId` and
-  integer `collectionPriority` (`0..100`). The URL field defaults from
-  `SourcePublisher.canonicalUrl` when present; when `canonicalUrl` is
-  absent, the UI requires an operator-entered URL before submit. Empty
-  optional `name`, `url`, and `notes` fields are omitted only when
-  allowed, and populated optional fields are trimmed. The UI shows only the typed
-  `CREATED` / `ALREADY_EXISTS` outcome and does not expose raw
-  payloads, cookies, sessions, tokens, proxies, viewer IDs, account
-  IDs, screenshots, diagnostics, stack traces, or backend internals.
+  (Sprint 069, safe review identity from Sprint 076B). The Web UI
+  consumes only the existing safe Content Manager HTTP contracts for
+  list/get, status mutation, and approved Facebook group promotion. It
+  defaults the review list to `DISCOVERED`, supports
+  status/kind/platform filters, exposes safe **Open on Facebook**
+  links from computed `reviewUrl` when present (unsafe persisted
+  `canonicalUrl` values are neither clickable nor promotion defaults),
+  exposes explicit `Approve`, `Ignore`, `Block`, and `Reset to
+  discovered` actions, and gates promotion to
+  `platform === "FACEBOOK"`, `kind === "GROUP"`,
+  `status === "APPROVED"` with an existing content category. Approval
+  fails closed when no safe review destination exists. The promotion
+  panel is hidden for non-group publishers; unapproved Facebook groups
+  render a disabled panel with an approval explanation. Promotion
+  bodies include `categoryId` and integer `collectionPriority`
+  (`0..100`). The URL field defaults from `reviewUrl` when present;
+  when `reviewUrl` is absent, the UI requires an operator-entered URL
+  before submit. Empty optional `name`, `url`, and `notes` fields are
+  omitted only when allowed, and populated optional fields are
+  trimmed. The UI shows only the typed `CREATED` / `ALREADY_EXISTS`
+  outcome and does not expose raw payloads, cookies, sessions, tokens,
+  proxies, viewer IDs, account IDs, screenshots, diagnostics, stack
+  traces, or backend internals.
 - Future handoff shape for Content Builder.
 
 ## Does Not Own

@@ -144,6 +144,15 @@ higher layer can attribute the failure correctly.
   changes a top-level flow that crosses Nginx → API → database adds
   one focused spec.
 
+## Accepted Collector regression anchors
+
+Sprint 077 locks the Profile Feed Collector MVP baseline. Automated
+regression anchors for capture, extraction, diagnostics, lease release,
+safe discovered-source review identity, and synthetic E2E flows are listed
+in [`COLLECTOR_BASELINE.md`](COLLECTOR_BASELINE.md) §6. Prefer those
+existing suites when verifying Collector maintenance; do not broaden this
+strategy document for baseline-lock documentation alone.
+
 ## Layer 5 — Manual Live-Facebook Validation
 
 - Operator-driven. Never automated. Never part of CI.
@@ -153,8 +162,12 @@ higher layer can attribute the failure correctly.
   `pnpm operator:profile:exercise`,
   `pnpm operator:profile:assisted-access`,
   `pnpm operator:collector:facebook`,
-  `pnpm operator:collector:worker`, and the corresponding `--once`
+  `pnpm operator:collector:worker`,
+  `pnpm operator:profile-home-feed:run-next`,
+  `pnpm operator:profile-home-feed-worker`, and the corresponding `--once`
   worker invocations.
+- Accepted live baseline and operator smoke procedure:
+  [`COLLECTOR_BASELINE.md`](COLLECTOR_BASELINE.md).
 - Sandbox: a developer-managed real Facebook account with the
   Facebook app and a configured proxy. The operator collects
   safe summary counts only; the operator never logs raw payloads,

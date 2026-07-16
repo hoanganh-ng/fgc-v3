@@ -1,5 +1,12 @@
 # Web UI
 
+Primary Profile Feed Collector MVP surfaces (`/profiles`,
+`/profile-home-feed-collection-runs`, `/content-items`, `/source-groups`,
+`/source-publishers`) follow the accepted operator flow in
+[`COLLECTOR_BASELINE.md`](../COLLECTOR_BASELINE.md). The Web UI does not execute
+browsers; it queues runs, shows safe diagnostics, and supports content and
+discovered-source review within that locked boundary.
+
 ## Ownership
 - Operator presentation for Content Collector.
 - Dashboard routing, layout shell, UI components, and state management.

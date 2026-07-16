@@ -2,6 +2,12 @@
 
 Sprint 027 provides two Docker Compose runtimes for the current Content Collector management surface. Sprint 037B adds an opt-in containerized worker service for consuming queued collection runs from those stacks. Sprint 047A adds a separate opt-in containerized worker service for queued Account Exercise runs. Sprint 060 adds an opt-in containerized collection scheduler service that drives scheduled dispatch from those stacks. Sprint 068B2 adds separate opt-in profile home-feed scheduler and worker services for scheduled home-feed dispatch and queued home-feed execution.
 
+For the accepted Profile Feed Collector MVP operator runbook (Playwright /
+`DIRECT` / normal `https://www.facebook.com/` baseline, smoke test, recovery,
+and maintenance boundary), see [`COLLECTOR_BASELINE.md`](COLLECTOR_BASELINE.md).
+This file remains the full command and Compose reference; it does not duplicate
+that runbook.
+
 ## Command Groups
 
 Root `package.json` scripts are grouped by operational purpose. Sprint 073

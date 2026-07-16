@@ -1,5 +1,12 @@
 # Collector Runtime
 
+The accepted Profile Feed Collector baseline (supported provider, target,
+operator flow, regression anchors, and maintenance-only boundary) is locked in
+[`COLLECTOR_BASELINE.md`](../COLLECTOR_BASELINE.md). Collector Runtime continues
+to own execution, capture, extraction, diagnostics, and lease release for that
+loop; feature expansion beyond maintenance is parked until an explicit product
+decision.
+
 ## Ownership
 - Execution of collection workflows (queues, workers).
 - Durable run records for collection, ambient exercise, profile-source access checks, and profile-bound home-feed runs.
