@@ -43,6 +43,15 @@ export function resolveRelativeModulePath(
   return null;
 }
 
+export function createServerHttpCompatibilityScopeDirectories(
+  projectRoot: string,
+): readonly string[] {
+  return [
+    resolve(projectRoot, "src/interfaces/http/routes"),
+    resolve(projectRoot, "src/interfaces/http/schemas"),
+  ];
+}
+
 export function collectRelativeModuleGraph(
   entryFile: string,
   options: {

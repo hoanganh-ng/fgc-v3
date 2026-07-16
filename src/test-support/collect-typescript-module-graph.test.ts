@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -51,6 +51,47 @@ describe("collect-typescript-module-graph", () => {
     const graph = collectRelativeModuleGraph(barrel);
 
     expect(graph.get(resolve(barrel))).toEqual([resolve(family)]);
+  });
+
+  it("rejects a synthetic cycle crossing sibling route and schema directories", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "fgc-module-graph-http-"));
+    const routesDir = join(tempDir, "routes");
+    const schemasDir = join(tempDir, "schemas");
+    const routesFamilyDir = join(routesDir, "collector-runtime");
+    const schemasFamilyDir = join(schemasDir, "collector-runtime");
+
+    mkdirSync(routesFamilyDir, { recursive: true });
+    mkdirSync(schemasFamilyDir, { recursive: true });
+
+    const routesBarrel = join(routesDir, "collector-runtime.routes.ts");
+    const routeFamily = join(routesFamilyDir, "collection-runs.routes.ts");
+    const schemaFamily = join(schemasFamilyDir, "collection-runs.http-schemas.ts");
+
+    writeFileSync(
+      routesBarrel,
+      `export { registerRoutes } from "./collector-runtime/collection-runs.routes";\n`,
+    );
+    writeFileSync(
+      routeFamily,
+      `export { registerRoutes } from "../../schemas/collector-runtime/collection-runs.http-schemas";\n`,
+    );
+    writeFileSync(
+      schemaFamily,
+      `export { RouteSchema } from "../../routes/collector-runtime.routes";\n`,
+    );
+
+    const graph = collectRelativeModuleGraph(routesBarrel, {
+      scopeDirectories: [routesDir, schemasDir],
+    });
+    const cycle = findModuleGraphCycle(graph);
+
+    expect(cycle).not.toBeNull();
+    expect(cycle).toEqual([
+      resolve(routesBarrel),
+      resolve(routeFamily),
+      resolve(schemaFamily),
+      resolve(routesBarrel),
+    ]);
   });
 
   it.each([

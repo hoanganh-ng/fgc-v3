@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { collectTypeScriptFiles } from "./collect-typescript-files";
 import {
   collectRelativeModuleGraph,
+  createServerHttpCompatibilityScopeDirectories,
   findModuleGraphCycle,
   referencesCompatibilityBarrel,
 } from "./collect-typescript-module-graph";
@@ -64,6 +65,9 @@ function readModuleSourceFiles(moduleRoot: string): readonly URL[] {
   );
 }
 
+const serverHttpScopeDirectories =
+  createServerHttpCompatibilityScopeDirectories(projectRoot);
+
 describe("global architecture boundary", () => {
   it("keeps domain and application layers free of HTTP, database, composition, and browser adapters", () => {
     const files = moduleDomainApplicationRoots.flatMap((root) =>
@@ -97,7 +101,9 @@ describe("global architecture boundary", () => {
       const absoluteBarrel = resolve(projectRoot, barrelPath);
       expect(existsSync(absoluteBarrel)).toBe(true);
 
-      const graph = collectRelativeModuleGraph(absoluteBarrel);
+      const graph = collectRelativeModuleGraph(absoluteBarrel, {
+        scopeDirectories: serverHttpScopeDirectories,
+      });
       const cycle = findModuleGraphCycle(graph);
 
       expect(cycle, `cycle detected for ${barrelPath}`).toBeNull();
