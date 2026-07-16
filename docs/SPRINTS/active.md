@@ -1,7 +1,16 @@
 # Active Sprint
 
-Sprint 078 — Runtime Command Surface Consolidation is **active and approved
-for Builder execution**.
+Sprint 079 — Codebase Changeability Baseline is **active and approved for
+Builder execution**.
+
+Sprint 078 — Runtime Command Surface Consolidation is accepted at commit
+`28bd08c`. The root manifest now exposes exactly 35 scripts instead of 69: one
+typed `stack:service` CLI replaces 34 repetitive service/action aliases, the
+unused `test:e2e:container` alias is removed, and all six lifecycle and 13
+canonical operator commands remain stable. Exact Compose parity, strict input
+validation, no-shell process launch, failure propagation, both Compose
+configurations, typecheck, 2,006 tests, help output, and whitespace checks
+passed. Collector runtime behavior did not change.
 
 Sprint 077 — Collector MVP Baseline Lock is accepted by the Product Owner on
 2026-07-16. Commit `93cf205` created the permanent Collector baseline runbook,
@@ -35,23 +44,25 @@ proven. No unresolved Collector blocker remains.
 - [Sprint 076 - Live Validation Evidence](SPRINT-076-live-validation-evidence.md)
 - [Sprint 077 - Collector MVP Baseline Lock](SPRINT-077-collector-mvp-baseline-lock.md)
 - [Sprint 078 - Runtime Command Surface Consolidation](SPRINT-078-runtime-command-surface-consolidation.md)
+- [Sprint 079 - Codebase Changeability Baseline](SPRINT-079-codebase-changeability-baseline.md)
 
 Keep the normal Facebook home target `https://www.facebook.com/`; do not restore
 the chronological `?sk=h_chr` override.
 
-Sprint 078 is one bounded tooling cleanup before Content Builder discovery.
-Preserve the locked Collector commands and exact Compose behavior while
-replacing the repetitive stack service/action alias matrix with one typed,
-validated command surface. Do not change Collector behavior, Compose service
-definitions, browser/network/profile configuration, or accepted evidence.
+Sprint 079 is a bounded structural refactor and Architect-document
+reconciliation before Content Builder discovery. Preserve the accepted 35-script
+command surface and all product behavior while splitting only the named
+Collector Runtime HTTP boundary into six resource families and making current
+architecture/module documents truthful. Do not expand into extractors, capture,
+UI pages, unrelated modules, or product behavior.
 
 Sprint 075 — Real-Shape Home Feed Extractor Calibration is accepted.
 
 Immediate delivery sequence:
 
-1. Complete and accept Sprint 078.
+1. Complete and accept Sprint 079.
 2. Begin Architect-led Content Builder discovery from actual reviewed content.
 
 The Collector baseline is locked and maintenance-only. Content Builder remains
-parked only for this bounded command-surface cleanup; Sprint 078 must not invent
+parked only for this bounded changeability baseline; Sprint 079 must not invent
 or implement Content Builder behavior.

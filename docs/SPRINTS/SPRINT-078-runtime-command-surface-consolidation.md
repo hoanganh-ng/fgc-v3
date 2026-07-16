@@ -2,9 +2,20 @@
 
 ## Status
 
-Active and approved for Builder execution. Sprint 077 was accepted by the
-Product Owner on 2026-07-16 at implementation commit `93cf205` and correction
-commit `1a7861d`. The Collector baseline is locked and maintenance-only.
+Accepted by the Product Owner on 2026-07-16 at commit `28bd08c`. Sprint 077 was
+accepted at implementation commit `93cf205` and correction commit `1a7861d`.
+The Collector baseline remains locked and maintenance-only. Sprint 079 is now
+active.
+
+Acceptance record: no live automation, CI, or root-script consumer depended on
+the removed aliases. The manifest contains exactly 35 scripts; all six lifecycle
+and 13 canonical operator commands remain; 34 removed aliases have exact
+Compose argument parity through the typed builder; invalid input fails before
+spawn; process launch uses `shell: false` and inherited standard I/O; exit,
+signal, and spawn failures propagate. Both Compose configurations, help output,
+`pnpm typecheck`, `pnpm test` (2,006 passed), 14 focused tests, GitNexus
+LOW-risk change detection, and `git diff --check` passed. Compose files,
+container scripts, operator CLIs, and Collector runtime behavior did not change.
 
 ## Goal
 
@@ -23,10 +34,11 @@ without changing any supported runtime behavior.
 
 ## Why This Sprint Exists
 
-The root manifest currently contains 69 scripts. Forty are under `stack:*`, and
-34 of those form a repeated dev/preview × service × action alias matrix. The
-matrix makes the manifest look like dozens of separate capabilities even though
-it represents one bounded command model. It also encourages copy/paste drift.
+Before this sprint, the root manifest contained 69 scripts. Forty were under
+`stack:*`, and 34 of those formed a repeated dev/preview × service × action
+alias matrix. The matrix made the manifest look like dozens of separate
+capabilities even though it represented one bounded command model. It also
+encouraged copy/paste drift.
 
 This is a command-surface problem, not a Collector-runtime problem. The 13
 canonical `operator:*` commands are intentional and remain stable. The

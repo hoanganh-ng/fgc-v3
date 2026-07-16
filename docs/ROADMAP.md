@@ -134,7 +134,7 @@ upstream source.
 
 ### Sprint 078 — Runtime Command Surface Consolidation
 
-Status: **active and approved for Builder execution**.
+Status: **accepted**.
 
 Reduce the root `package.json` script surface without changing supported
 behavior. Preserve the canonical `operator:*` commands and six explicit stack
@@ -142,10 +142,25 @@ lifecycle commands, replace the 34 repetitive dev/preview service/action aliases
 with one typed and validated `stack:service` CLI, and remove the unused
 `test:e2e:container` alias. The exact target is 35 scripts, down from 69.
 
-Expected outcome: operators retain explicit, documented commands with exact
-Compose parity, while the package manifest becomes understandable and harder to
-drift. This is the final bounded tooling cleanup before Content Builder
-discovery.
+Expected outcome achieved: the manifest contains exactly 35 scripts. One typed
+`stack:service` command preserves exact Compose behavior for all 34 removed
+matrix aliases, invalid combinations fail before Docker, and the canonical
+operator/lifecycle surface remains stable.
+
+### Sprint 079 — Codebase Changeability Baseline
+
+Status: **active and approved for Builder execution**.
+
+Restore truthful current architecture references and modularize the 4,222-line
+Collector Runtime HTTP contract surface into six resource families behind its
+existing server-schema, server-route, and Web-client compatibility paths.
+Preserve every route, export, DTO, validation rule, error mapping, client
+behavior, product outcome, and the accepted 35-script command surface.
+
+Expected outcome: maintainers can identify module ownership from current docs
+and change one Collector Runtime resource family without editing three
+cross-feature monoliths. Larger extractor, capture, runner, form, and page
+hotspots are ranked for later review rather than refactored without evidence.
 
 ## Correction Sprint Rule
 
@@ -158,7 +173,7 @@ If Sprint 075 or Sprint 076 reveals a blocking defect, insert a narrowly named c
 - avoid unrelated refactoring;
 - repeat the affected live validation afterward.
 
-## Parked Until Runtime Command Consolidation
+## Parked Until Changeability Baseline
 
 - Content Builder Transform Type expansion.
 - Content Briefs, Producers, Producer Sets, graphs, artifacts, and LLM execution.
@@ -166,9 +181,9 @@ If Sprint 075 or Sprint 076 reveals a blocking defect, insert a narrowly named c
 - Broad autonomous-operation improvements not required for manual validation.
 - Broad UI redesign or module cleanup.
 
-## After Runtime Command Consolidation
+## After the Changeability Baseline
 
-After Sprint 078 acceptance, Content Builder discovery starts from actual
+After Sprint 079 acceptance, Content Builder discovery starts from actual
 selected content and this operator need:
 
 > Turn selected collected posts into a useful article, script, or video-content input.

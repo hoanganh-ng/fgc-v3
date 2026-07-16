@@ -18,8 +18,8 @@ The project has enough Content Collector foundation to focus on proving one oper
 The validated Collector baseline is locked by accepted Sprint 077 and is now
 maintenance-only. Content Builder Transform Types, Content Briefs, Producers,
 Producer Sets, artifacts, LLM execution, prompt versioning, and
-collected-content selection remain parked through the bounded Sprint 078
-command-surface cleanup. Content Publisher remains parked until a useful
+collected-content selection remain parked through the bounded Sprint 079
+changeability baseline. Content Publisher remains parked until a useful
 generated-content workflow exists.
 
 The priority is actual working behavior as soon as possible: explain current
@@ -29,8 +29,15 @@ Content Builder discovery.
 
 ## Current Active Sprint
 
-Sprint 078 — Runtime Command Surface Consolidation is **active and approved for
+Sprint 079 — Codebase Changeability Baseline is **active and approved for
 Builder execution**.
+
+Sprint 078 is accepted at commit `28bd08c`. The root command surface is reduced
+from 69 scripts to exactly 35. The typed `stack:service` CLI replaces 34
+repetitive aliases with exact Compose parity, rejects invalid combinations
+before spawn, launches without a shell, and propagates child failures. The six
+lifecycle and 13 canonical operator commands remain stable; Compose and
+Collector runtime behavior did not change.
 
 Sprint 077 is accepted at implementation commit `93cf205` and correction commit
 `1a7861d`. `docs/COLLECTOR_BASELINE.md` is now the permanent operator and
@@ -78,9 +85,12 @@ The planned completion sequence is:
 - **Sprint 077 — Collector MVP Baseline Lock**: accepted; the permanent runbook
   records the supported provider, network modes, target, smoke test, recovery,
   regression anchors, limitations, and maintenance boundary.
-- **Sprint 078 — Runtime Command Surface Consolidation**: active; consolidate
-  34 repetitive stack aliases into one validated CLI and remove one dead E2E
-  alias while preserving canonical operator commands and exact runtime behavior.
+- **Sprint 078 — Runtime Command Surface Consolidation**: accepted; 34
+  repetitive stack aliases and one dead E2E alias are replaced by one validated
+  CLI, leaving an exact 35-script supported surface.
+- **Sprint 079 — Codebase Changeability Baseline**: active; reconcile current
+  architecture/module documentation and modularize the Collector Runtime HTTP
+  boundary into six resource families behind stable compatibility paths.
 
 If live validation reveals another blocking defect, a narrow correction sprint
 is inserted before acceptance rather than expanding the validation sprint.
@@ -118,13 +128,15 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 
 ## Current Known Gaps
 
-- Root `package.json` exposes 69 scripts. Forty are `stack:*` commands, including
-  a 34-command dev/preview service/action matrix that duplicates the same
-  Compose behavior and is costly to understand and maintain. Sprint 078 has an
-  exact behavior-preserving target of 35 scripts.
+- `docs/ARCHITECTURE.md`, `docs/MODULE_BOUNDARIES.md`, and module references
+  mix current rules with outdated future/stage language; Collector Runtime still
+  contains a stale statement that accepted Sprint 074 is unaccepted.
+- The Collector Runtime server schemas (1,765 lines), server routes/DTOs (1,168
+  lines), and Web client (1,289 lines) mix six resource families. Sprint 079
+  modularizes only this admitted 4,222-line boundary behind stable imports.
 - Further extractor calibration beyond the admitted exact Group-qualified
   `id` paths requires new diagnostics and a separate sanitized fixture.
-- Content Builder remains parked through Sprint 078; Architect-led discovery is
+- Content Builder remains parked through Sprint 079; Architect-led discovery is
   next. Content Publisher remains parked until a useful generated-content
   workflow exists.
 
