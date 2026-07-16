@@ -2,9 +2,11 @@
 
 ## Current Product Stage
 
-The near-term product direction is the **Profile Feed Collector MVP**.
+The **Profile Feed Collector MVP is accepted and locked**. The near-term product
+direction is now Architect-led Content Builder workflow discovery using actual
+reviewed content.
 
-The project has enough Content Collector foundation to focus on proving one operator-usable loop before expanding Content Builder or Content Publisher:
+The accepted operator-usable Collector loop is:
 
 1. Persist collector profiles and authenticated sessions.
 2. Run safe profile behavior / warm-up when needed.
@@ -18,9 +20,9 @@ The project has enough Content Collector foundation to focus on proving one oper
 The validated Collector baseline is locked by accepted Sprint 077 and is now
 maintenance-only. Content Builder Transform Types, Content Briefs, Producers,
 Producer Sets, artifacts, LLM execution, prompt versioning, and
-collected-content selection remain parked through the bounded Sprint 079
-changeability baseline. Content Publisher remains parked until a useful
-generated-content workflow exists.
+collected-content selection remain parked until discovery shapes a narrow,
+operator-useful Builder workflow. Content Publisher remains parked until a
+useful generated-content workflow exists.
 
 The priority is actual working behavior as soon as possible: explain current
 home-feed outcomes, calibrate only from real diagnostic evidence, validate the
@@ -29,8 +31,15 @@ Content Builder discovery.
 
 ## Current Active Sprint
 
-Sprint 079 — Codebase Changeability Baseline is **active and approved for
-Builder execution**.
+No Builder implementation sprint is active. Content Builder workflow discovery
+is the current Architect/Product Owner activity.
+
+Sprint 079 is accepted through implementation commits `fc56bb1` and `99e948c`
+and correction commits `5a84070` and `781b53d`. The Collector Runtime HTTP
+surface is separated into six resource families behind stable server-schema,
+server-route, and Web-client compatibility paths. Architecture references are
+current, boundary/cycle guards cover import and re-export edges, and
+`docs/CODEBASE_CHANGE_MAP.md` ranks later cleanup without authorizing it.
 
 Sprint 078 is accepted at commit `28bd08c`. The root command surface is reduced
 from 69 scripts to exactly 35. The typed `stack:service` CLI replaces 34
@@ -88,9 +97,10 @@ The planned completion sequence is:
 - **Sprint 078 — Runtime Command Surface Consolidation**: accepted; 34
   repetitive stack aliases and one dead E2E alias are replaced by one validated
   CLI, leaving an exact 35-script supported surface.
-- **Sprint 079 — Codebase Changeability Baseline**: active; reconcile current
-  architecture/module documentation and modularize the Collector Runtime HTTP
-  boundary into six resource families behind stable compatibility paths.
+- **Sprint 079 — Codebase Changeability Baseline**: accepted; current
+  architecture/module documentation is reconciled and the Collector Runtime
+  HTTP boundary is modularized into six resource families behind stable
+  compatibility paths.
 
 If live validation reveals another blocking defect, a narrow correction sprint
 is inserted before acceptance rather than expanding the validation sprint.
@@ -128,17 +138,15 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 
 ## Current Known Gaps
 
-- `docs/ARCHITECTURE.md`, `docs/MODULE_BOUNDARIES.md`, and module references
-  mix current rules with outdated future/stage language; Collector Runtime still
-  contains a stale statement that accepted Sprint 074 is unaccepted.
-- The Collector Runtime server schemas (1,765 lines), server routes/DTOs (1,168
-  lines), and Web client (1,289 lines) mix six resource families. Sprint 079
-  modularizes only this admitted 4,222-line boundary behind stable imports.
+- Content Builder discovery has not yet selected the first operator workflow,
+  output type, source-selection contract, or acceptance example. No
+  implementation sprint is shaped.
+- `docs/CODEBASE_CHANGE_MAP.md` ranks additional structural hotspots, but none
+  is authorized and cleanup should not displace product discovery.
 - Further extractor calibration beyond the admitted exact Group-qualified
   `id` paths requires new diagnostics and a separate sanitized fixture.
-- Content Builder remains parked through Sprint 079; Architect-led discovery is
-  next. Content Publisher remains parked until a useful generated-content
-  workflow exists.
+- Content Builder implementation remains parked pending discovery. Content
+  Publisher remains parked until a useful generated-content workflow exists.
 
 ## Collector Completion Gate — Passed
 

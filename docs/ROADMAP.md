@@ -149,7 +149,7 @@ operator/lifecycle surface remains stable.
 
 ### Sprint 079 — Codebase Changeability Baseline
 
-Status: **active and approved for Builder execution**.
+Status: **accepted**.
 
 Restore truthful current architecture references and modularize the 4,222-line
 Collector Runtime HTTP contract surface into six resource families behind its
@@ -157,10 +157,11 @@ existing server-schema, server-route, and Web-client compatibility paths.
 Preserve every route, export, DTO, validation rule, error mapping, client
 behavior, product outcome, and the accepted 35-script command surface.
 
-Expected outcome: maintainers can identify module ownership from current docs
-and change one Collector Runtime resource family without editing three
-cross-feature monoliths. Larger extractor, capture, runner, form, and page
-hotspots are ranked for later review rather than refactored without evidence.
+Expected outcome achieved: maintainers can identify current module ownership
+from concise architecture references and change one Collector Runtime resource
+family behind stable compatibility paths. Route, schema, export, command, and
+runtime behavior remain locked. Larger hotspots are ranked in
+`docs/CODEBASE_CHANGE_MAP.md` without authorizing another cleanup sprint.
 
 ## Correction Sprint Rule
 
@@ -173,7 +174,7 @@ If Sprint 075 or Sprint 076 reveals a blocking defect, insert a narrowly named c
 - avoid unrelated refactoring;
 - repeat the affected live validation afterward.
 
-## Parked Until Changeability Baseline
+## Parked Until Content Builder Discovery
 
 - Content Builder Transform Type expansion.
 - Content Briefs, Producers, Producer Sets, graphs, artifacts, and LLM execution.
@@ -181,14 +182,17 @@ If Sprint 075 or Sprint 076 reveals a blocking defect, insert a narrowly named c
 - Broad autonomous-operation improvements not required for manual validation.
 - Broad UI redesign or module cleanup.
 
-## After the Changeability Baseline
+## Current Product Discovery
 
-After Sprint 079 acceptance, Content Builder discovery starts from actual
-selected content and this operator need:
+With Sprint 079 accepted, Content Builder discovery starts from actual selected
+content and this operator need:
 
 > Turn selected collected posts into a useful article, script, or video-content input.
 
-The first Content Builder sprint must be shaped from observed workflow. It must not assume that the parked Transform Type catalog, Producer graph, or Artifact model is automatically the correct starting point.
+No Builder implementation sprint is active. The first Content Builder sprint
+must be shaped from observed workflow. It must not assume that the parked
+Transform Type catalog, Producer graph, or Artifact model is automatically the
+correct starting point.
 
 Content Publisher remains parked until a useful generated-content workflow exists.
 

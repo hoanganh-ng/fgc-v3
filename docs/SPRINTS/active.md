@@ -1,7 +1,17 @@
 # Active Sprint
 
-Sprint 079 — Codebase Changeability Baseline is **active and approved for
-Builder execution**.
+No Builder implementation sprint is active. The next activity is
+Architect-led Content Builder workflow discovery from actual reviewed content;
+it must be shaped before another Builder handoff.
+
+Sprint 079 — Codebase Changeability Baseline is accepted by the Product Owner
+on 2026-07-17. Commits `fc56bb1` and `99e948c` split the Web and server
+Collector Runtime HTTP boundaries; corrections `5a84070` and `781b53d` make
+import/re-export cycle guards truthful, correct change-map metrics, and preserve
+the original Web build contract. Twenty-six routes, 141 Web public exports, all
+server compatibility exports, and the exact 35-script command surface remain
+locked. Architecture and all six module references now describe current
+ownership instead of sprint history.
 
 Sprint 078 — Runtime Command Surface Consolidation is accepted at commit
 `28bd08c`. The root manifest now exposes exactly 35 scripts instead of 69: one
@@ -49,20 +59,20 @@ proven. No unresolved Collector blocker remains.
 Keep the normal Facebook home target `https://www.facebook.com/`; do not restore
 the chronological `?sk=h_chr` override.
 
-Sprint 079 is a bounded structural refactor and Architect-document
-reconciliation before Content Builder discovery. Preserve the accepted 35-script
-command surface and all product behavior while splitting only the named
-Collector Runtime HTTP boundary into six resource families and making current
-architecture/module documents truthful. Do not expand into extractors, capture,
-UI pages, unrelated modules, or product behavior.
+The Collector and changeability baselines are locked. Do not implement another
+cleanup slice from `docs/CODEBASE_CHANGE_MAP.md`; it is planning evidence, not
+authorization. Do not resume parked Sprint 072 or invent Content Builder
+contracts before discovery identifies the operator workflow and the smallest
+useful generated-content outcome.
 
 Sprint 075 — Real-Shape Home Feed Extractor Calibration is accepted.
 
-Immediate delivery sequence:
+Immediate product sequence:
 
-1. Complete and accept Sprint 079.
-2. Begin Architect-led Content Builder discovery from actual reviewed content.
+1. Run Architect-led Content Builder discovery from actual reviewed content.
+2. Shape the smallest end-to-end Builder sprint from that evidence.
+3. Activate it only after Product Owner approval.
 
-The Collector baseline is locked and maintenance-only. Content Builder remains
-parked only for this bounded changeability baseline; Sprint 079 must not invent
-or implement Content Builder behavior.
+The Collector baseline is locked and maintenance-only. Content Builder
+implementation remains parked until the discovery output is reviewed and a new
+sprint is explicitly activated.

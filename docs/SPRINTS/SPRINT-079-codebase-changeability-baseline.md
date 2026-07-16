@@ -2,9 +2,27 @@
 
 ## Status
 
-Active and approved for Builder execution. Sprint 078 was accepted on
-2026-07-16 at commit `28bd08c`; its exact 35-script command surface is the
-baseline this sprint must preserve.
+Accepted by the Product Owner on 2026-07-17. Sprint 078 was accepted at commit
+`28bd08c`; its exact 35-script command surface remains preserved.
+
+Implementation commits: `fc56bb1` modularizes the Web client; `99e948c`
+modularizes server routes/schemas and reconciles architecture documents;
+`5a84070` corrects module-graph parsing and change-map metrics; `781b53d`
+restores the Web build contract and extends server cycle detection across route
+and schema directories.
+
+Acceptance record: all 26 Collector Runtime HTTP routes and schema associations
+are characterized; 141 Web client public exports and the server compatibility
+surfaces are preserved; all six resource families are separated behind the
+three existing entry paths; import/re-export cycles and forbidden dependencies
+are guarded; the root command surface remains exactly 35 scripts; current
+architecture/module documents and `CODEBASE_CHANGE_MAP.md` are reconciled.
+Verification passed: 25 focused characterization/boundary tests, backend and
+Web typechecks, the original Web production build, the full suite (2,030
+tests), Docker E2E (19 tests), and `git diff --check`. GitNexus reported medium
+risk with only three expected `registerCollectorRuntimeRoutes` hub flows and no
+unexpected runtime change. The Product Owner accepts `test:http:db` as an
+environment-only omission because `DATABASE_URL` was unavailable.
 
 ## Goal
 
