@@ -168,9 +168,11 @@ strategy document for baseline-lock documentation alone.
   worker invocations.
 - Accepted live baseline and operator smoke procedure:
   [`COLLECTOR_BASELINE.md`](COLLECTOR_BASELINE.md).
-- Sandbox: a developer-managed real Facebook account with the
-  Facebook app and a configured proxy. The operator collects
-  safe summary counts only; the operator never logs raw payloads,
+- Sandbox: use a developer-managed Facebook account with an
+  explicitly supported network mode. The accepted Profile Feed
+  Collector baseline uses `DIRECT`; other flows may use `PROXY`
+  when intentionally configured. The operator collects safe
+  summary counts only; the operator never logs raw payloads,
   cookies, localStorage, proxy credentials, or session headers.
 - Owner: Sprint 046 introduced manual live-Facebook validation; every
   sprint that changes browser provider behavior or page-state

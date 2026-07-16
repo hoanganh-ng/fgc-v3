@@ -102,7 +102,7 @@ Daily-use commands only. Advanced/operator commands live in [`docs/RUNTIME.md`](
 ### Profile Feed Collector MVP
 
 - `pnpm operator:profile:provision -- --token <token> --base-url http://localhost:8081 --browser-provider playwright`
-- `pnpm operator:profile-home-feed-worker -- --base-url http://localhost:8081 --once`
+- `pnpm operator:profile-home-feed-worker -- --base-url http://localhost:8081 --once --browser-provider playwright`
 - `pnpm operator:browser:probe -- --browser-provider playwright`
 
 Operator browser-backed commands that accept `--browser-provider` use `BROWSER_PROVIDER`, then `playwright` when the option is omitted. Supported values are `playwright` and experimental `cloakbrowser`.
