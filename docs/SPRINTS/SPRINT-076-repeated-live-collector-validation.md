@@ -2,10 +2,25 @@
 
 ## Status
 
-Active and approved for Builder execution. Sprint 076A and Sprint 076B are
-accepted. The clean supported DIRECT proof counts as `V06`; complete `V07`
-through `V10` on a genuinely later UTC date. Samples `V01`–`V05` remain
-exploratory only because they used a temporary proxy-eligibility bypass.
+Accepted by the Product Owner on 2026-07-16. Evidence commit `109ee4c` records
+supported samples `V06`–`V10` across two UTC dates and satisfies the Collector
+Completion Gate. Sprint 077 is active.
+
+## Acceptance Record
+
+- `V06`–`V10` used Playwright, explicit `DIRECT` networking, the normal
+  Facebook home target, and standard checkout without bypasses.
+- Four runs succeeded with candidates; V07, V09, and V10 yielded useful
+  content.
+- V08 was an explained natural `CHECKOUT_COOLDOWN` failure before lease
+  acquisition; the profile remained `READY`.
+- Every acquired lease was released.
+- V09 proved supported-path duplicate merge without duplicate review rows.
+- One safely reviewed and approved group was promoted into a `PAUSED` managed
+  source; repeat promotion returned `ALREADY_EXISTS`.
+- The optional second profile was unavailable and documented.
+- Baseline typecheck and 1,992 unit tests passed; no runtime code changed and no
+  sensitive evidence was recorded.
 
 ## Goal
 

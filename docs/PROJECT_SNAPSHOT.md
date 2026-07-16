@@ -15,7 +15,10 @@ The project has enough Content Collector foundation to focus on proving one oper
 7. Review discovered publishing sources.
 8. Promote approved Facebook group sources into managed source groups.
 
-Content Builder Transform Types, Content Briefs, Producers, Producer Sets, artifacts, LLM execution, prompt versioning, collected-content selection, and Content Publisher behavior are parked until the feed collector loop is validated.
+Content Builder Transform Types, Content Briefs, Producers, Producer Sets,
+artifacts, LLM execution, prompt versioning, collected-content selection, and
+Content Publisher behavior remain parked until Sprint 077 locks the already
+validated Collector baseline.
 
 The priority is actual working behavior as soon as possible: explain current
 home-feed outcomes, calibrate only from real diagnostic evidence, validate the
@@ -24,8 +27,8 @@ Content Builder discovery.
 
 ## Current Active Sprint
 
-Sprint 076 — Repeated Live Collector Validation is **active and approved for
-Builder execution**.
+Sprint 077 — Collector MVP Baseline Lock is **active and approved for Builder
+execution**.
 
 Sprint 075 is accepted. It classified the live gap as `EXTRACTION`, admitted a
 sanitized configured-group text-post fixture, and calibrated the extractor to
@@ -50,16 +53,22 @@ render or default to unsafe persisted canonical URLs. The Product Owner
 recognized and approved one live ID-only group through this supported flow and
 confirmed the safe promotion default without promoting it.
 
+Sprint 076 is accepted at evidence commit `109ee4c`. Supported Playwright
+samples `V06`–`V10` used explicit `DIRECT` networking and the normal home
+target across two UTC dates. Four runs succeeded with candidates, three yielded
+useful content, cooldown behavior was safely explained, all acquired leases
+were released, duplicate merge was proven, and one eligible approved group was
+promoted into a paused managed source.
+
 The planned completion sequence is:
 
 - **Sprint 076A — Supported Direct-Network Home-Feed Baseline**: accepted;
   standard direct-network checkout and one clean Playwright run are proven.
 - **Sprint 076B — Reviewable Discovered-Source Identity**: accepted; safe
   inspection and fail-closed approval are proven.
-- **Sprint 076 — Repeated Live Collector Validation**: active; `V06` is counted
-  and supported samples `V07`–`V10` remain across a later UTC date, followed by
-  the final review/promotion proof.
-- **Sprint 077 — Collector MVP Baseline Lock**: record the supported provider,
+- **Sprint 076 — Repeated Live Collector Validation**: accepted; the Collector
+  Completion Gate passes with no unresolved supported-path blocker.
+- **Sprint 077 — Collector MVP Baseline Lock**: active; record the supported provider,
   regression fixtures, limitations, recovery guidance, and smoke test, then
   move active product development to Content Builder.
 
@@ -99,16 +108,17 @@ Sprint 072 — Content Builder Transform Type Catalog is parked and not accepted
 
 ## Current Known Gaps
 
-- The complete home-feed-to-review loop still needs supported samples
-  `V07`–`V10` on a later UTC date, plus final usefulness, duplicate, lease, and
-  paused-group promotion evidence.
+- The proven Collector baseline still needs its permanent operator runbook,
+  recovery guidance, provider/fixture record, limitations, and maintenance
+  boundary locked by Sprint 077.
 - Further extractor calibration beyond the admitted exact Group-qualified
   `id` paths requires new diagnostics and a separate sanitized fixture.
-- Content Builder and Content Publisher remain parked until the collector loop is validated.
+- Content Builder and Content Publisher remain parked until Sprint 077 locks
+  the validated Collector baseline.
 
-## Collector Completion Gate
+## Collector Completion Gate — Passed
 
-Before moving to Content Builder:
+Sprint 076 proved each required condition before the baseline-lock handoff:
 
 - At least five live home-feed runs must be completed across multiple days,
   preferably using at least two provisioned profiles.

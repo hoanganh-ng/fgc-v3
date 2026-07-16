@@ -3,7 +3,8 @@
 ## Status
 
 Accepted by the Product Owner on 2026-07-14 at commit `f7a4970`. Sprint 076B —
-Reviewable Discovered-Source Identity is also accepted. Sprint 076 is active.
+Reviewable Discovered-Source Identity and Sprint 076 are also accepted. Sprint
+077 is active.
 
 ## Acceptance Record
 

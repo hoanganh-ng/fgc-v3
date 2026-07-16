@@ -5,7 +5,7 @@
 Accepted by the Product Owner on 2026-07-15. Implementation commit `7c8fdd1`
 introduced the review-identity flow; correction commit `bc5c73d` ensures unsafe
 persisted canonical URLs are not rendered or selected as promotion defaults.
-Sprint 076 is active.
+Sprint 076 is accepted and Sprint 077 is active.
 
 ## Acceptance Record
 

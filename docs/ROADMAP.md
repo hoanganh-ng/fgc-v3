@@ -92,8 +92,8 @@ provisioning, checkout, trusted runtime configuration, and browser launch work
 without a proxy bypass.
 
 Expected outcome achieved: explicit direct-network configuration passes the
-supported path, and accepted sample `V06` completed one clean normal-home Playwright
-run with no bypass and a released lease.
+supported path, and accepted sample `V06` completed one clean normal-home
+Playwright run with no bypass and a released lease.
 
 ### Sprint 076B — Reviewable Discovered-Source Identity
 
@@ -110,22 +110,26 @@ clickable or used as promotion defaults.
 
 ### Sprint 076 — Repeated Live Collector Validation
 
-Status: **active and approved for Builder execution**.
+Status: **accepted**.
 
-The accepted Sprint 076A proof now counts as `V06`. Run supported samples
-`V07`–`V10` with Playwright on a genuinely later UTC date and record safe
-evidence against the Collector Completion Gate. Complete the required
-usefulness, duplicate-merge, lease-release, review, and paused-group promotion
-proof through the accepted review-link flow.
+Supported samples `V06`–`V10` span two UTC dates. Four runs succeeded with
+candidates, three yielded useful content, one natural cooldown failure was
+explained without a lease leak, duplicate merge was proven, and one eligible
+approved group was promoted into a paused managed source.
 
-Expected outcome: either the gate passes, or each failure becomes a narrow
-correction sprint. One successful run is not sufficient for acceptance.
+Expected outcome achieved: the Collector Completion Gate passes with no
+unresolved supported-path blocker.
 
 ### Sprint 077 — Collector MVP Baseline Lock
 
-After Sprint 076 passes, record the supported baseline, known limitations, regression fixtures, provider choice, recovery guidance, and manual smoke test.
+Status: **active and approved for Builder execution**.
 
-Expected outcome: the Collector becomes a stable upstream source and active product development moves to Content Builder.
+Record the supported baseline, known limitations, regression fixtures,
+provider choice, recovery guidance, and manual smoke test without changing
+runtime behavior.
+
+Expected outcome: the Collector becomes a stable upstream source and active
+product development moves to Content Builder.
 
 ## Correction Sprint Rule
 

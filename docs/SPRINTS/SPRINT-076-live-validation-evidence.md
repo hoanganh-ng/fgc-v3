@@ -2,7 +2,8 @@
 
 ## Status
 
-Active. Sprint 076A and Sprint 076B are accepted. Same-day samples `V01`–`V05`
+Accepted by the Product Owner on 2026-07-16 at evidence commit `109ee4c`.
+Sprint 076A and Sprint 076B are accepted. Same-day samples `V01`–`V05`
 are retained as exploratory evidence only because they used a temporary
 proxy-eligibility bypass. The bypass was restored. The Product Owner chose
 supported direct networking and accepted the normal
@@ -12,8 +13,7 @@ override remains retired.
 The clean supported direct-network proof counts as `V06`. Supported-path
 samples `V07`–`V10` were completed on UTC date `2026-07-16`. Usefulness,
 duplicate-merge, lease-release, and paused-group promotion evidence are
-recorded below. Sprint 076 remains **not accepted** pending Product Owner
-review of this worksheet.
+recorded below. Sprint 077 is active.
 
 ## Sprint 076B Product Owner Proof
 
@@ -608,10 +608,10 @@ duplicateMergeDemonstrated: yes — supported-path V09
 contentReviewUsable: yes — Web UI /content-items reviewed; counts and usefulness recorded without copying Facebook text
 discoveredSourceReviewUsable: yes — Sprint 076B accepted; Web UI /source-publishers shows safe Open on Facebook review links
 eligibleGroupPromotedPaused: yes — CREATED into PAUSED; re-promote ALREADY_EXISTS
-safetyConfirmationComplete: pending Product Owner scan of worksheet
+safetyConfirmationComplete: yes — Product Owner reviewed the safe worksheet
 unresolvedBlockingDefects: none observed on supported DIRECT path
-acceptanceBlocker: none for Builder packet; awaiting Product Owner acceptance decision
-productOwnerDecision: PENDING_REVIEW
+acceptanceBlocker: none
+productOwnerDecision: ACCEPTED
 ```
 
 ## Progress / Resume Notes
@@ -623,10 +623,11 @@ onResume: not applicable unless Product Owner requests re-run or rejects usefuln
 cloakhrowserSubstitution: not used
 sprint076AAccepted: yes
 sprint076BAccepted: yes
-sprint076Accepted: no
-sprint077Activated: no
+sprint076Accepted: yes
+sprint077Activated: yes
 contentBuilderStarted: no
 runtimeCodeChangedDuringThisPass: no
 commitsCreatedDuringThisPass: no
 latestAcceptedCorrectionCommit: bc5c73d
+acceptedEvidenceCommit: 109ee4c
 ```
